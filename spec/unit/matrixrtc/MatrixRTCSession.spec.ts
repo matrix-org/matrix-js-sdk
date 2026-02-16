@@ -55,7 +55,7 @@ const mockFocus = { type: "mock" };
 
 const textEncoder = new TextEncoder();
 
-const callSession = { id: "", application: "m.call" };
+const callSession = { id: "ROOM", application: "m.call" };
 
 describe("MatrixRTCSession", () => {
     let client: MatrixClient;
@@ -175,12 +175,12 @@ describe("MatrixRTCSession", () => {
                 );
                 await sess.initialMembershipCalculated;
                 expect(sess?.memberships.length).toEqual(1);
-                expect(sess?.memberships[0].slotDescription.id).toEqual("");
+                expect(sess?.memberships[0].slotDescription.id).toEqual("ROOM");
                 expect(sess?.memberships[0].scope).toEqual(testConfig.testCreateSticky ? undefined : "m.room");
                 expect(sess?.memberships[0].applicationData).toEqual({ type: "m.call" });
                 expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
                 expect(sess?.memberships[0].isExpired()).toEqual(false);
-                expect(sess?.slotDescription.id).toEqual("");
+                expect(sess?.slotDescription.id).toEqual("ROOM");
             });
 
             it("ignores memberships where application is not m.call", () => {
@@ -435,12 +435,12 @@ describe("MatrixRTCSession", () => {
             });
             await sess.initialMembershipCalculated;
             expect(sess?.memberships.length).toEqual(1);
-            expect(sess?.memberships[0].slotDescription.id).toEqual("");
+            expect(sess?.memberships[0].slotDescription.id).toEqual("ROOM");
             expect(sess?.memberships[0].scope).toEqual(undefined);
             expect(sess?.memberships[0].application).toEqual("m.call");
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
-            expect(sess?.slotDescription.id).toEqual("");
+            expect(sess?.slotDescription.id).toEqual("ROOM");
         });
         it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
@@ -473,7 +473,7 @@ describe("MatrixRTCSession", () => {
             const memberships = sess.memberships;
             expect(memberships.length).toEqual(2);
             expect(memberships[0].sender).toEqual(stickyUserId);
-            expect(memberships[0].slotDescription.id).toEqual("");
+            expect(memberships[0].slotDescription.id).toEqual("ROOM");
             expect(memberships[0].scope).toEqual(undefined);
             expect(memberships[0].applicationData).toEqual({ type: "m.call" });
             expect(memberships[0].deviceId).toEqual("AAAAAAA");
@@ -482,7 +482,7 @@ describe("MatrixRTCSession", () => {
             // Then state
             expect(memberships[1].sender).toEqual(sessionMembershipTemplate.user_id);
 
-            expect(sess?.slotDescription.id).toEqual("");
+            expect(sess?.slotDescription.id).toEqual("ROOM");
         });
         it("handles an incoming sticky event to an existing session", async () => {
             const mockRoom = makeMockRoom([sessionMembershipTemplate], false);
@@ -683,9 +683,7 @@ describe("MatrixRTCSession", () => {
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock
-                .mockResolvedValueOnce({ event_id: "legacy-evt" })
-                .mockResolvedValueOnce({ event_id: "new-evt" });
+            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -710,43 +708,25 @@ describe("MatrixRTCSession", () => {
                 "sender_ts": expect.any(Number),
             });
 
-            // Check if deprecated notify event is also sent.
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": "ring",
-                "call_id": "",
-            });
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
-            expect(didSendEventFn).toHaveBeenCalledWith(
-                {
-                    "event_id": "new-evt",
-                    "lifetime": 30000,
-                    "m.mentions": { room: true, user_ids: [] },
-                    "m.relates_to": {
-                        event_id: expect.any(String),
-                        rel_type: "m.reference",
-                    },
-                    "notification_type": "ring",
-                    "sender_ts": expect.any(Number),
+            expect(didSendEventFn).toHaveBeenCalledWith({
+                "event_id": "new-evt",
+                "lifetime": 30000,
+                "m.mentions": { room: true, user_ids: [] },
+                "m.relates_to": {
+                    event_id: expect.any(String),
+                    rel_type: "m.reference",
                 },
-                {
-                    "application": "m.call",
-                    "call_id": "",
-                    "event_id": "legacy-evt",
-                    "m.mentions": { room: true, user_ids: [] },
-                    "notify_type": "ring",
-                },
-            );
+                "notification_type": "ring",
+                "sender_ts": expect.any(Number),
+            });
         });
 
         it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock
-                .mockResolvedValueOnce({ event_id: "legacy-evt" })
-                .mockResolvedValueOnce({ event_id: "new-evt" });
+            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -770,7 +750,7 @@ describe("MatrixRTCSession", () => {
             ]);
 
             await sess!._onRTCSessionMemberUpdate();
-            const ownMembershipId = sess?.memberships[0].eventId;
+            const ownMembershipEventId = sess?.memberships[0].eventId;
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
             expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
@@ -778,43 +758,27 @@ describe("MatrixRTCSession", () => {
                 "notification_type": "ring",
                 "m.call.intent": "audio",
                 "m.relates_to": {
-                    event_id: ownMembershipId,
+                    event_id: ownMembershipEventId,
                     rel_type: "m.reference",
                 },
                 "lifetime": 30000,
                 "sender_ts": expect.any(Number),
             });
 
-            // Check if deprecated notify event is also sent.
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.CallNotify, {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": "ring",
-                "call_id": "",
-            });
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
-            expect(didSendEventFn).toHaveBeenCalledWith(
-                {
-                    "event_id": "new-evt",
-                    "lifetime": 30000,
-                    "m.mentions": { room: true, user_ids: [] },
-                    "m.relates_to": {
-                        event_id: expect.any(String),
-                        rel_type: "m.reference",
-                    },
-                    "notification_type": "ring",
-                    "m.call.intent": "audio",
-                    "sender_ts": expect.any(Number),
+            expect(didSendEventFn).toHaveBeenCalledWith({
+                "event_id": "new-evt",
+                "lifetime": 30000,
+                "m.mentions": { room: true, user_ids: [] },
+                "m.relates_to": {
+                    event_id: expect.any(String),
+                    rel_type: "m.reference",
                 },
-                {
-                    "application": "m.call",
-                    "call_id": "",
-                    "event_id": "legacy-evt",
-                    "m.mentions": { room: true, user_ids: [] },
-                    "notify_type": "ring",
-                },
-            );
+                "notification_type": "ring",
+                "m.call.intent": "audio",
+                "sender_ts": expect.any(Number),
+            });
         });
 
         it("doesn't send a notification when joining an existing call", async () => {

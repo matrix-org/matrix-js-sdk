@@ -130,14 +130,14 @@ export class ToDeviceKeyTransport
         const age = now - (typeof content.sent_ts === "number" ? content.sent_ts : now);
         this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
 
-        const hardcodedMemberIdAlternative = `${fromUser}:${content.member.device_id}`;
+        const hardcodedMemberIdAlternative = `${fromUser}:${content.member.claimed_device_id}`;
 
         this.emit(
             KeyTransportEvents.ReceivedKeys,
             // TODO userId this is claimed information, deviceId is claimed information
             {
                 userId: fromUser,
-                deviceId: content.member.device_id!,
+                deviceId: content.member.claimed_device_id!,
                 memberId: content.member.id ?? hardcodedMemberIdAlternative,
             },
             content.keys.key,

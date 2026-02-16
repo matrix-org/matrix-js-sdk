@@ -26,13 +26,12 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
-import { deepCompare, logDurationSync } from "../utils.ts";
+import { logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
     Status,
     IRTCNotificationContent,
-    ICallNotifyContent,
     RTCCallIntent,
     Transport,
     SlotDescription,
@@ -83,7 +82,6 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
         notificationContentNew: { event_id: string } & IRTCNotificationContent,
-        notificationContentLegacy: { event_id: string } & ICallNotifyContent,
     ) => void;
 };
 
@@ -705,20 +703,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
-        const sendLegacyNotificationEvent = async (): Promise<{
-            response: ISendEventResponse;
-            content: ICallNotifyContent;
-        }> => {
-            const content: ICallNotifyContent = {
-                "application": "m.call",
-                "m.mentions": { user_ids: [], room: true },
-                "notify_type": notificationType === "notification" ? "notify" : notificationType,
-                "call_id": this.callId!,
-            };
-            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.CallNotify, content);
-            return { response, content };
-        };
-        const sendNewNotificationEvent = async (): Promise<{
+        const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
         }> => {
@@ -739,12 +724,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
             return { response, content };
         };
 
-        void Promise.all([sendLegacyNotificationEvent(), sendNewNotificationEvent()])
-            .then(([legacy, newNotification]) => {
+        void sendNotificationEvent()
+            .then((notification) => {
                 // Join event_id and origin event content
-                const legacyResult = { ...legacy.response, ...legacy.content };
-                const newResult = { ...newNotification.response, ...newNotification.content };
-                this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult, legacyResult);
+                const newResult = { ...notification.response, ...notification.content };
+                this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult);
             })
             .catch(([errorLegacy, errorNew]) =>
                 this.logger.error("Failed to send call notification", errorLegacy, errorNew),
@@ -921,7 +905,7 @@ function isValidMembership(
     slotDescription: SlotDescription,
     logger: Logger,
 ): boolean {
-    if (!deepCompare(membership.slotDescription, slotDescription)) {
+    if (membership.slotDescription.id !== slotDescription.id) {
         logger.info(
             `Ignoring membership of user ${membership.userId} for a different slot. Theirs: ${JSON.stringify(membership.slotDescription)}, Expected: ${JSON.stringify(slotDescription)}`,
         );

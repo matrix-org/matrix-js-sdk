@@ -67,6 +67,11 @@ export interface IHttpOpts {
      * Optional, only called when a refreshToken is present
      */
     tokenRefreshFunction?: TokenRefreshFunction;
+
+    /**
+     * Whether to use the HTTP Authorization header over the `access_token` query parameter
+     * @deprecated as of v1.11 in https://spec.matrix.org/v1.17/client-server-api/#using-access-tokens
+     */
     useAuthorizationHeader?: boolean; // defaults to true
 
     /** For historical reasons, must be set to `true`. Will eventually be removed. */

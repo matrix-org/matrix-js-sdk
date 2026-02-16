@@ -438,6 +438,11 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.updateModifiedTime();
 
         // update the core event dict
+        // Track display names that change so we can recalculate disambiguation
+        const affectedDisplayNames = new Set<string>();
+        // Track userIds whose membership events we process so we don't emit duplicate events
+        const processedMemberUserIds = new Set<string>();
+
         stateEvents.forEach((event) => {
             if (event.getRoomId() !== this.roomId || !event.isState()) return;
 
@@ -448,7 +453,22 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const lastStateEvent = this.getStateEventMatching(event);
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
-                this.updateDisplayNameCache(event.getStateKey()!, event.getContent().displayname ?? "");
+                const userId = event.getStateKey()!;
+                processedMemberUserIds.add(userId);
+                const newDisplayName = event.getContent().displayname ?? "";
+                const oldDisplayName = this.userIdsToDisplayNames[userId];
+
+                // Track both old and new display names for disambiguation recalculation
+                if (oldDisplayName) {
+                    const strippedOld = removeHiddenChars(oldDisplayName);
+                    if (strippedOld) affectedDisplayNames.add(strippedOld);
+                }
+                if (newDisplayName) {
+                    const strippedNew = removeHiddenChars(newDisplayName);
+                    if (strippedNew) affectedDisplayNames.add(strippedNew);
+                }
+
+                this.updateDisplayNameCache(userId, newDisplayName);
                 this.updateThirdPartyTokenCache(event);
             }
             this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
@@ -513,6 +533,33 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                 this.emit(RoomStateEvent.Marker, event, markerFoundOptions);
             }
         });
+
+        // Recalculate disambiguation for all members whose display names were affected.
+        // This ensures that when a user changes their name to match (or stop matching)
+        // another user, all affected users' disambiguation flags are updated correctly.
+        if (affectedDisplayNames.size > 0) {
+            // Collect all affected user IDs first to avoid duplicate processing
+            const affectedUserIds = new Set<string>();
+            for (const displayName of affectedDisplayNames) {
+                const userIds = this.displayNameToUserIds.get(displayName) ?? [];
+                userIds.forEach((id) => affectedUserIds.add(id));
+            }
+
+            // Process each affected member once, excluding those whose membership
+            // events were already processed (they already got their events emitted)
+            for (const userId of affectedUserIds) {
+                if (processedMemberUserIds.has(userId)) {
+                    continue;
+                }
+                const member = this.members[userId];
+                if (member?.events.member) {
+                    const nameChanged = member.recalculateDisambiguatedName(this);
+                    if (nameChanged) {
+                        this.emit(RoomStateEvent.Members, member.events.member, this, member);
+                    }
+                }
+            }
+        }
 
         this.emit(RoomStateEvent.Update, this);
     }
@@ -1110,6 +1157,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
 
     private updateDisplayNameCache(userId: string, displayName: string): void {
         const oldName = this.userIdsToDisplayNames[userId];
+
         delete this.userIdsToDisplayNames[userId];
         if (oldName) {
             // Remove the old name from the cache.

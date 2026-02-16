@@ -154,8 +154,35 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                // slot_id is application and call_id dependent. So we create
+                // a membership for each possible combination
+
+                // non call application (should not alter call_id even with empty string)
+                const nonCallMembership = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: "m.not.a.call",
+                    call_id: "",
+                });
+                // non "" call id should not be altered
+                const callMembershipCustomId = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    call_id: "customCallId",
+                });
+
+                // for membership (application = m.call and call_id = "") we expect "" -> ROOM
+                // for legacy events we expect the room to be added automagically
+                // See INFO_SLOT_ID_LEGACY_CASE comments
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
+
+                expect(nonCallMembership.slotId).toBe("m.not.a.call#");
+                expect(nonCallMembership.slotDescription).toStrictEqual({ id: "", application: "m.not.a.call" });
+
+                expect(callMembershipCustomId.slotId).toBe("m.call#customCallId");
+                expect(callMembershipCustomId.slotDescription).toStrictEqual({
+                    id: "customCallId",
+                    application: "m.call",
+                });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");

@@ -1103,6 +1103,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const inMemoryUpdate = this.loadMembers()
             .then((result) => {
                 this.currentState.setOutOfBandMembers(result.memberEvents);
+                // recalculate the room name: it may have been based on members, so may have changed
+                this.recalculate();
                 return result.fromServer;
             })
             .catch((err) => {

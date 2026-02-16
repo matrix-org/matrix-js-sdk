@@ -1,3 +1,47 @@
+Changes in [40.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.2.0) (2026-02-10)
+==================================================================================================
+## 🦖 Deprecations
+
+* [MatrixRTC] Remove sending of deprecated `notify` event (we now use `m.rtc.notification`) ([#5167](https://github.com/matrix-org/matrix-js-sdk/pull/5167)). Contributed by @toger5.
+
+## ✨ Features
+
+* Use stable /auth\_metadata endpoint where homeserver supports v1.15 ([#5174](https://github.com/matrix-org/matrix-js-sdk/pull/5174)). Contributed by @hughns.
+* Support additional\_creators in upgradeRoom (MSC4289) ([#5173](https://github.com/matrix-org/matrix-js-sdk/pull/5173)). Contributed by @andybalaam.
+* [MatrixRTC] Minimal change to transition from "" to "ROOM" as the callId/slotId ([#5166](https://github.com/matrix-org/matrix-js-sdk/pull/5166)). Contributed by @toger5.
+* [MatrixRTC] Do not send the `livekit_alias` in sticky events ([#5165](https://github.com/matrix-org/matrix-js-sdk/pull/5165)). Contributed by @toger5.
+* Improve startup performance by using `promise.all` when processing rooms from sync ([#5095](https://github.com/matrix-org/matrix-js-sdk/pull/5095)). Contributed by @MidhunSureshR.
+* Add OAuthGrantType enum for OAuth 2.0 API grant types ([#5161](https://github.com/matrix-org/matrix-js-sdk/pull/5161)). Contributed by @hughns.
+* Add support for stable OAuth2.0 aware feature from MSC3824 ([#5159](https://github.com/matrix-org/matrix-js-sdk/pull/5159)). Contributed by @hughns.
+* Give RoomWidgetClient the ability to send and receive sticky events ([#5142](https://github.com/matrix-org/matrix-js-sdk/pull/5142)). Contributed by @robintown.
+
+## 🐛 Bug Fixes
+
+* [js sdk embedded/widget] Fix race where this.syncApi.injectRoomEvents was called before the syncApi is instantiated ([#5168](https://github.com/matrix-org/matrix-js-sdk/pull/5168)). Contributed by @toger5.
+* [MatrixRTC] Fix delayId not resetting on leave ([#5156](https://github.com/matrix-org/matrix-js-sdk/pull/5156)). Contributed by @toger5.
+
+
+Changes in [40.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.1.0) (2026-01-27)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate unused `EventShieldReason` reason codes ([#5127](https://github.com/matrix-org/matrix-js-sdk/pull/5127)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Add stable m.oauth UIA stage enum ([#5138](https://github.com/matrix-org/matrix-js-sdk/pull/5138)). Contributed by @hughns.
+* Add `MatrixEvent.getKeyForwardingUser` ([#5128](https://github.com/matrix-org/matrix-js-sdk/pull/5128)). Contributed by @richvdh.
+* Add types for (unstable) policy servers ([#5116](https://github.com/matrix-org/matrix-js-sdk/pull/5116)). Contributed by @turt2live.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] Recalculate room name on loading members ([#5164](https://github.com/matrix-org/matrix-js-sdk/pull/5164)). Contributed by @RiotRobot.
+* Avoid rapidly retrying failed requests ([#5146](https://github.com/matrix-org/matrix-js-sdk/pull/5146)). Contributed by @andybalaam.
+* [matrixRTC] MatrixRTCSessions, add missing event reemission. ([#5144](https://github.com/matrix-org/matrix-js-sdk/pull/5144)). Contributed by @toger5.
+* Use normal base64 encoding for RTC backend identities ([#5129](https://github.com/matrix-org/matrix-js-sdk/pull/5129)). Contributed by @robintown.
+* export parseCallNotificationContent and isMyMembership from RTC types ([#5132](https://github.com/matrix-org/matrix-js-sdk/pull/5132)). Contributed by @Half-Shot.
+
+
 Changes in [40.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.0.0) (2026-01-13)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
