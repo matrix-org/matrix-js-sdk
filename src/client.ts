@@ -3929,14 +3929,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const resp = this.http.authedRequest<IPreviewUrlResponse>(
             Method.Get,
-            "/preview_url",
+            "/media/preview_url",
             {
                 url,
                 ts: ts.toString(),
             },
             undefined,
             {
-                prefix: MediaPrefix.V3,
+                prefix: ClientPrefix.V1,
                 priority: "low",
             },
         );
