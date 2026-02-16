@@ -62,7 +62,7 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         user_id: "@mock:user.example",
         device_id: "AAAAAAA",
     },
-    slot_id: "m.call#",
+    slot_id: "m.call#ROOM",
     versions: [],
     rtc_transports: [
         {
