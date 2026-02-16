@@ -4001,4 +4001,37 @@ describe("MatrixClient", function () {
             ]);
         });
     });
+    describe("getUrlPreview", () => {
+        it("makes a well-formed request to the new endpoint", async () => {
+            client.getVersions = vi.fn().mockResolvedValue({
+                versions: ["v1.11"],
+            });
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/media/preview_url`,
+                    expectQueryParams: { url: "https://example.org/", ts: "60000" },
+                    data: { "og:title": "Test" },
+                    prefix: "/_matrix/client/v1",
+                },
+            ];
+            expect(await client.getUrlPreview("https://example.org", 60000)).toEqual({
+                "og:title": "Test",
+            });
+        });
+        it("makes a well-formed request to the old endpoint", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/preview_url`,
+                    expectQueryParams: { url: "https://example.org/", ts: "60000" },
+                    data: { "og:title": "Test" },
+                    prefix: "/_matrix/media/v3",
+                },
+            ];
+            expect(await client.getUrlPreview("https://example.org", 60000)).toEqual({
+                "og:title": "Test",
+            });
+        });
+    });
 });
