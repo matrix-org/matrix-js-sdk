@@ -53,6 +53,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     private sortedAnnotationsByKey: [string, Set<MatrixEvent>][] = [];
     private targetEvent: MatrixEvent | null = null;
     private creationEmitted = false;
+    private replacementUpdateId = 0;
     private readonly client: MatrixClient;
 
     /**
@@ -106,9 +107,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
 
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
-            const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement!);
+        } else if (this.relationType === RelationType.Replace) {
+            await this.updateTargetEventReplacement();
         }
 
         event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -132,9 +132,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
 
         if (this.relationType === RelationType.Annotation) {
             this.removeAnnotationFromAggregation(event);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
-            const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement!);
+        } else if (this.relationType === RelationType.Replace) {
+            await this.updateTargetEventReplacement();
         }
 
         this.emit(RelationsEvent.Remove, event);
@@ -243,9 +242,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             // Remove the redacted annotation from aggregation by key
             this.removeAnnotationFromAggregation(redactedEvent);
-        } else if (this.relationType === RelationType.Replace && this.targetEvent && !this.targetEvent.isState()) {
-            const lastReplacement = await this.getLastReplacement();
-            this.targetEvent.makeReplaced(lastReplacement!);
+        } else if (this.relationType === RelationType.Replace) {
+            await this.updateTargetEventReplacement();
         }
 
         redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -343,16 +341,40 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         }
         this.targetEvent = event;
 
-        if (this.relationType === RelationType.Replace && !this.targetEvent.isState()) {
-            const replacement = await this.getLastReplacement();
-            // this is the initial update, so only call it if we already have something
-            // to not emit Event.replaced needlessly
-            if (replacement) {
-                this.targetEvent.makeReplaced(replacement);
-            }
+        if (this.relationType === RelationType.Replace) {
+            await this.updateTargetEventReplacement();
         }
 
         this.maybeEmitCreated();
+    }
+
+    /**
+     * Updates the target event with the latest replacement.
+     *
+     * Multiple replacement updates can be triggered concurrently (for example
+     * while edits are still being decrypted). A monotonic update counter guards
+     * against older async resolutions overriding newer replacement selections.
+     */
+    private async updateTargetEventReplacement(): Promise<void> {
+        if (!this.targetEvent || this.targetEvent.isState()) {
+            return;
+        }
+
+        const targetEvent = this.targetEvent;
+        const updateId = ++this.replacementUpdateId;
+        const lastReplacement = await this.getLastReplacement();
+
+        // If a newer update started while we were awaiting, discard this stale result.
+        if (updateId !== this.replacementUpdateId || this.targetEvent !== targetEvent) {
+            return;
+        }
+
+        // Avoid emitting Event.replaced when there is no replacement and none currently set.
+        if (!lastReplacement && !targetEvent.replacingEvent()) {
+            return;
+        }
+
+        targetEvent.makeReplaced(lastReplacement ?? undefined);
     }
 
     private maybeEmitCreated(): void {
