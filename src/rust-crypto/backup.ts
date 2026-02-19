@@ -199,6 +199,15 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
             );
             await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
+            // Check if the backup should be enabled (e.g. if it's properly
+            // signed), and enable it if it should
+            if (this.keyBackupCheckInProgress) {
+                await this.keyBackupCheckInProgress;
+            }
+            this.keyBackupCheckInProgress = this.doCheckKeyBackup(latestBackupInfo).finally(() => {
+                this.keyBackupCheckInProgress = null;
+            });
+            await this.keyBackupCheckInProgress;
             return true;
         } catch (e) {
             this.logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
@@ -281,12 +290,17 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     private keyBackupCheckInProgress: Promise<KeyBackupCheck | null> | null = null;
 
-    /** Helper for `checkKeyBackup` */
-    private async doCheckKeyBackup(): Promise<KeyBackupCheck | null> {
+    /** Helper to check the key backup status, and enable/disable it as appropriate
+     *
+     * A KeyBackupInfo can be passed if it was fetched recently, to avoid trying to
+     * re-fetch it from the server.
+     */
+    private async doCheckKeyBackup(backupInfo?: KeyBackupInfo | null | undefined): Promise<KeyBackupCheck | null> {
         this.logger.debug("Checking key backup status...");
-        let backupInfo: KeyBackupInfo | null | undefined;
         try {
-            backupInfo = await this.requestKeyBackupVersion();
+            if (!backupInfo) {
+                backupInfo = await this.requestKeyBackupVersion();
+            }
         } catch (e) {
             this.logger.warn("Error checking for active key backup", e);
             this.serverBackupInfo = undefined;
