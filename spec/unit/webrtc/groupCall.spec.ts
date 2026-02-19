@@ -963,7 +963,7 @@ describe("Group Call", function () {
             const getMetadataEvent = (audio: boolean, video: boolean): MatrixEvent =>
                 ({
                     getContent: () => ({
-                        [SDPStreamMetadataKey]: {
+                        [SDPStreamMetadataKey.name]: {
                             stream: {
                                 purpose: SDPStreamMetadataPurpose.Usermedia,
                                 audio_muted: audio,
@@ -1330,7 +1330,7 @@ describe("Group Call", function () {
             call.getOpponentMember = () => ({ userId: call.invitee }) as RoomMember;
             call.onNegotiateReceived({
                 getContent: () => ({
-                    [SDPStreamMetadataKey]: {
+                    [SDPStreamMetadataKey.name]: {
                         screensharing_stream: {
                             purpose: SDPStreamMetadataPurpose.Screenshare,
                         },

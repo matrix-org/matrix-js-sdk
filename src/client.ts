@@ -138,6 +138,7 @@ import {
     MsgType,
     PUSHER_ENABLED,
     RelationType,
+    type RoomAccountDataEvents,
     RoomCreateTypeField,
     RoomType,
     type StateEvents,
@@ -145,6 +146,7 @@ import {
     UNSTABLE_MSC3088_ENABLED,
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
+    type WritableAccountDataEvents,
 } from "./@types/event.ts";
 import {
     GuestAccess,
@@ -2221,7 +2223,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The event type
      * @param content - the contents object for the event
      */
-    public async setAccountData<K extends keyof AccountDataEvents>(
+    public async setAccountData<K extends keyof WritableAccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
     ): Promise<EmptyObject> {
@@ -2273,7 +2275,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventType - The event type
      * @param content - the contents object for the event
      */
-    public setAccountDataRaw<K extends keyof AccountDataEvents>(
+    public setAccountDataRaw<K extends keyof WritableAccountDataEvents>(
         eventType: K,
         content: AccountDataEvents[K] | Record<string, never>,
     ): Promise<EmptyObject> {
@@ -2328,7 +2330,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    public async deleteAccountData(eventType: keyof AccountDataEvents): Promise<void> {
+    public async deleteAccountData(eventType: keyof WritableAccountDataEvents): Promise<void> {
         const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
         // if deletion is not supported overwrite with empty content
         if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
@@ -2584,12 +2586,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * @param roomId - the ID of the room this event should be stored within
      * @param eventType - event type to be set
      * @param content - event content
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    public setRoomAccountData(roomId: string, eventType: string, content: Record<string, any>): Promise<EmptyObject> {
+    public setRoomAccountData<K extends keyof RoomAccountDataEvents>(
+        roomId: string,
+        eventType: K,
+        content: RoomAccountDataEvents[K] | Record<string, never>,
+    ): Promise<EmptyObject> {
         const path = utils.encodeUri("/user/$userId/rooms/$roomId/account_data/$type", {
             $userId: this.credentials.userId!,
             $roomId: roomId,
