@@ -72,24 +72,12 @@ class MockWidgetApi extends EventEmitter {
     public requestCapabilityToReceiveState = vi.fn().mockResolvedValue(undefined);
     public requestCapabilityToSendToDevice = vi.fn().mockResolvedValue(undefined);
     public requestCapabilityToReceiveToDevice = vi.fn().mockResolvedValue(undefined);
-    public sendRoomEvent = vi.fn(
-        async (eventType: string, content: unknown, roomId?: string, delay?: number, parentDelayId?: string) =>
-            delay === undefined && parentDelayId === undefined
-                ? { event_id: `$${Math.random()}` }
-                : { delay_id: `id-${Math.random()}` },
+    public sendRoomEvent = vi.fn(async (eventType: string, content: unknown, roomId?: string, delay?: number) =>
+        delay === undefined ? { event_id: `$${Math.random()}` } : { delay_id: `id-${Math.random()}` },
     );
     public sendStateEvent = vi.fn(
-        async (
-            eventType: string,
-            stateKey: string,
-            content: unknown,
-            roomId?: string,
-            delay?: number,
-            parentDelayId?: string,
-        ) =>
-            delay === undefined && parentDelayId === undefined
-                ? { event_id: `$${Math.random()}` }
-                : { delay_id: `id-${Math.random()}` },
+        async (eventType: string, stateKey: string, content: unknown, roomId?: string, delay?: number) =>
+            delay === undefined ? { event_id: `$${Math.random()}` } : { delay_id: `id-${Math.random()}` },
     );
     public cancelScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
     public restartScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
@@ -176,7 +164,6 @@ describe("RoomWidgetClient", () => {
                 "org.matrix.rageshake_request",
                 { request_id: 123 },
                 "!1:example.org",
-                undefined,
                 undefined,
                 undefined,
             );
@@ -434,28 +421,6 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     2000,
                     undefined,
-                    undefined,
-                );
-            });
-
-            it("sends child action delayed message events", async () => {
-                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                const parentDelayId = `id-${Math.random()}`;
-                await client._unstable_sendDelayedEvent(
-                    "!1:example.org",
-                    { parent_delay_id: parentDelayId },
-                    null,
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                );
-                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                    "!1:example.org",
-                    undefined,
-                    parentDelayId,
-                    undefined,
                 );
             });
 
@@ -478,31 +443,6 @@ describe("RoomWidgetClient", () => {
                     { hello: "world" },
                     "!1:example.org",
                     2000,
-                    undefined,
-                );
-            });
-
-            it("sends child action delayed state events", async () => {
-                await makeClient({
-                    sendDelayedEvents: true,
-                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
-                });
-                expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                const parentDelayId = `fg-${Math.random()}`;
-                await client._unstable_sendDelayedStateEvent(
-                    "!1:example.org",
-                    { parent_delay_id: parentDelayId },
-                    "org.example.foo",
-                    { hello: "world" },
-                    "bar",
-                );
-                expect(widgetApi.sendStateEvent).toHaveBeenCalledWith(
-                    "org.example.foo",
-                    "bar",
-                    { hello: "world" },
-                    "!1:example.org",
-                    undefined,
-                    parentDelayId,
                 );
             });
 
@@ -909,7 +849,6 @@ describe("RoomWidgetClient", () => {
                     EventType.RTCMembership,
                     { msc4354_sticky_key: "test" },
                     "!1:example.org",
-                    undefined,
                     undefined,
                     2000,
                 );

@@ -421,14 +421,7 @@ export class RoomWidgetClient extends MatrixClient {
         if (delayOpts) {
             // TODO: updatePendingEvent for delayed events?
             const response = await this.widgetApi
-                .sendRoomEvent(
-                    event.getType(),
-                    content,
-                    room.roomId,
-                    "delay" in delayOpts ? delayOpts.delay : undefined,
-                    "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-                    stickyDurationMsAsNumber,
-                )
+                .sendRoomEvent(event.getType(), content, room.roomId, delayOpts.delay, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
         }
@@ -440,7 +433,7 @@ export class RoomWidgetClient extends MatrixClient {
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMsAsNumber)
+                .sendRoomEvent(event.getType(), content, room.roomId, undefined, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
@@ -492,14 +485,7 @@ export class RoomWidgetClient extends MatrixClient {
         }
 
         const response = await this.widgetApi
-            .sendStateEvent(
-                eventType,
-                stateKey,
-                content,
-                roomId,
-                "delay" in delayOpts ? delayOpts.delay : undefined,
-                "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-            )
+            .sendStateEvent(eventType, stateKey, content, roomId, delayOpts.delay)
             .catch(timeoutToConnectionError);
         return this.validateSendDelayedEventResponse(response);
     }
