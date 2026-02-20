@@ -72,23 +72,12 @@ class MockWidgetApi extends EventEmitter {
     public requestCapabilityToReceiveState = vi.fn().mockResolvedValue(undefined);
     public requestCapabilityToSendToDevice = vi.fn().mockResolvedValue(undefined);
     public requestCapabilityToReceiveToDevice = vi.fn().mockResolvedValue(undefined);
-    public sendRoomEvent = vi.fn(
-        async (eventType: string, content: unknown, roomId?: string, delay?: number) =>
-            delay === undefined
-                ? { event_id: `$${Math.random()}` }
-                : { delay_id: `id-${Math.random()}` },
+    public sendRoomEvent = vi.fn(async (eventType: string, content: unknown, roomId?: string, delay?: number) =>
+        delay === undefined ? { event_id: `$${Math.random()}` } : { delay_id: `id-${Math.random()}` },
     );
     public sendStateEvent = vi.fn(
-        async (
-            eventType: string,
-            stateKey: string,
-            content: unknown,
-            roomId?: string,
-            delay?: number,
-        ) =>
-            delay === undefined
-                ? { event_id: `$${Math.random()}` }
-                : { delay_id: `id-${Math.random()}` },
+        async (eventType: string, stateKey: string, content: unknown, roomId?: string, delay?: number) =>
+            delay === undefined ? { event_id: `$${Math.random()}` } : { delay_id: `id-${Math.random()}` },
     );
     public cancelScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
     public restartScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);

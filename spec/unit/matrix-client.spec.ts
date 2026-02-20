@@ -987,12 +987,7 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await client._unstable_sendDelayedStateEvent(
-                roomId,
-                delayOpts,
-                EventType.RoomTopic,
-                { ...content },
-            );
+            await client._unstable_sendDelayedStateEvent(roomId, delayOpts, EventType.RoomTopic, { ...content });
         });
 
         describe("lookups", () => {
