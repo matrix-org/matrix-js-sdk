@@ -17,11 +17,11 @@ limitations under the License.
 /**
  * Thrown when an event is not valid for use with MatrixRTC.
  */
-export class MatrixRTCMembershipParseError extends Error {
+export class MatrixRTCMembershipParseError extends AggregateError {
     public constructor(
         public readonly type: string,
-        public readonly errors: string[],
+        errors: string[],
     ) {
-        super(`Does not match ${type}:\n${errors.join("\n")}`);
+        super(errors, `Does not match ${type}:\n${errors.join("\n")}`);
     }
 }
