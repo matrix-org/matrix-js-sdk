@@ -1,3 +1,23 @@
+Changes in [41.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.0.0) (2026-02-24)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Add support for Matrix Spec v1.13 ([#5160](https://github.com/matrix-org/matrix-js-sdk/pull/5160)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Download room keys from backup prior to buliding historic room key bundles ([#5171](https://github.com/matrix-org/matrix-js-sdk/pull/5171)). Contributed by @kaylendog.
+* Add support for Matrix Spec v1.13 ([#5160](https://github.com/matrix-org/matrix-js-sdk/pull/5160)). Contributed by @t3chguy.
+* Add logging on MSC4108 DELETE request ([#5140](https://github.com/matrix-org/matrix-js-sdk/pull/5140)). Contributed by @reivilibre.
+* Add `m.invite_permission_config` account data type ([#5183](https://github.com/matrix-org/matrix-js-sdk/pull/5183)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* fix(relations): prevent stale m.replace from overriding newer edits ([#5192](https://github.com/matrix-org/matrix-js-sdk/pull/5192)). Contributed by @basnijholt.
+* Fix reactive display name disambiguation ([#5135](https://github.com/matrix-org/matrix-js-sdk/pull/5135)). Contributed by @aditya-cherukuru.
+* Fix empty string to room compatibility trick to only apply to m.call ([#5172](https://github.com/matrix-org/matrix-js-sdk/pull/5172)). Contributed by @toger5.
+
+
 Changes in [40.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.2.0) (2026-02-10)
 ==================================================================================================
 ## 🦖 Deprecations
