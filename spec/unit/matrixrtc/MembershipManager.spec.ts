@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,15 +25,16 @@ import {
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
+import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
 import {
-    MembershipManagerEvent,
-    Status,
-    type Transport,
-    type SessionMembershipData,
-    type LivekitFocusSelection,
-} from "../../../src/matrixrtc";
-import { makeMockClient, makeMockRoom, membershipTemplate, mockCallMembership, type MockClient } from "./mocks";
+    makeMockClient,
+    makeMockRoom,
+    sessionMembershipTemplate,
+    mockCallMembership,
+    type MockClient,
+} from "./mocks.ts";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
+import { type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -90,7 +91,7 @@ describe("MembershipManager", () => {
         // Default to fake timers.
         vi.useFakeTimers();
         client = makeMockClient("@alice:example.org", "AAAAAAA");
-        room = makeMockRoom([membershipTemplate]);
+        room = makeMockRoom([sessionMembershipTemplate]);
         // Provide a default mock that is like the default "non error" server behaviour.
         vi.mocked(client._unstable_sendDelayedStateEvent).mockResolvedValue({ delay_id: "id" });
         vi.mocked(client._unstable_updateDelayedEvent).mockResolvedValue({});
@@ -400,7 +401,7 @@ describe("MembershipManager", () => {
             const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
             await vi.advanceTimersByTimeAsync(RESTART_DELAY);
             // first simulate the sync, then resolve sending the delayed event.
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             resolve({ delay_id: "id" });
             // Let the scheduler run one iteration so that the new join gets sent
             await vi.runOnlyPendingTimersAsync();
@@ -506,7 +507,7 @@ describe("MembershipManager", () => {
     describe("onRTCSessionMemberUpdate()", () => {
         it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             await vi.advanceTimersToNextTimerAsync();
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).not.toHaveBeenCalled();
@@ -529,7 +530,7 @@ describe("MembershipManager", () => {
             vi.mocked(client._unstable_sendDelayedStateEvent).mockClear();
 
             await manager.onRTCSessionMemberUpdate([
-                mockCallMembership(membershipTemplate, room.roomId),
+                mockCallMembership(sessionMembershipTemplate, room.roomId),
                 mockCallMembership(
                     { ...(myMembership as SessionMembershipData), user_id: client.getUserId()! },
                     room.roomId,
@@ -555,7 +556,7 @@ describe("MembershipManager", () => {
             vi.mocked(client._unstable_sendDelayedStateEvent).mockClear();
 
             // Our own membership is removed:
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             await vi.advanceTimersByTimeAsync(1);
             expect(client.sendStateEvent).toHaveBeenCalled();
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
@@ -578,7 +579,7 @@ describe("MembershipManager", () => {
 
             const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
             await vi.advanceTimersByTimeAsync(10_000);
-            await manager.onRTCSessionMemberUpdate([mockCallMembership(membershipTemplate, room.roomId)]);
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             resolve({ delay_id: "id" });
             await vi.advanceTimersByTimeAsync(10_000);
 
@@ -950,7 +951,10 @@ describe("MembershipManager", () => {
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
-            const membership = mockCallMembership({ ...membershipTemplate, user_id: client.getUserId()! }, room.roomId);
+            const membership = mockCallMembership(
+                { ...sessionMembershipTemplate, user_id: client.getUserId()! },
+                room.roomId,
+            );
             await manager.onRTCSessionMemberUpdate([membership]);
             await manager.updateCallIntent("video");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
@@ -964,7 +968,7 @@ describe("MembershipManager", () => {
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
             const membership = mockCallMembership(
-                { ...membershipTemplate, "user_id": client.getUserId()!, "m.call.intent": "video" },
+                { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "m.call.intent": "video" },
                 room.roomId,
             );
             await manager.onRTCSessionMemberUpdate([membership]);
@@ -1039,7 +1043,7 @@ describe("MembershipManager", () => {
 
 it("Should prefix log with MembershipManager used", () => {
     const client = makeMockClient("@alice:example.org", "AAAAAAA");
-    const room = makeMockRoom([membershipTemplate]);
+    const room = makeMockRoom([sessionMembershipTemplate]);
 
     const membershipManager = new MembershipManager(undefined, room, client, callSession);
 

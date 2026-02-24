@@ -1,5 +1,5 @@
 /*
-Copyright 2020 The Matrix.org Foundation C.I.C.
+Copyright 2020-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -60,7 +60,7 @@ import {
     type ICallNotifyContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/CallMembership.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membershipData/index.ts";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";

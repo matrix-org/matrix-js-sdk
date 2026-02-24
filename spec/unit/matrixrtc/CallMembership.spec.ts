@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,23 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type IContent, type MatrixEvent } from "../../../src";
-import {
-    CallMembership,
-    type SessionMembershipData,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-} from "../../../src/matrixrtc/CallMembership";
-import { membershipTemplate } from "./mocks";
-
-function makeMockEvent(originTs = 0): MatrixEvent {
-    return {
-        getTs: vi.fn().mockReturnValue(originTs),
-        getSender: vi.fn().mockReturnValue("@alice:example.org"),
-        getId: vi.fn().mockReturnValue("$eventid"),
-        getContent: vi.fn().mockReturnValue({}),
-    } as unknown as MatrixEvent;
-}
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
+import { type IContent, type MatrixEvent } from "../../../src/models/event.ts";
+import { EventType } from "../../../src/@types/event.ts";
+import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership.ts";
 
 function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
     vi.mocked(ev.getContent).mockReturnValue(content);
@@ -40,6 +27,15 @@ function createCallMembership(ev: MatrixEvent, content: IContent): CallMembershi
 
 describe("CallMembership", () => {
     describe("SessionMembershipData", () => {
+        function makeMockEvent(originTs = 0): MatrixEvent {
+            return {
+                getTs: vi.fn().mockReturnValue(originTs),
+                getSender: vi.fn().mockReturnValue("@alice:example.org"),
+                getId: vi.fn().mockReturnValue("$eventid"),
+                getContent: vi.fn().mockReturnValue({}),
+                getType: vi.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+            } as unknown as MatrixEvent;
+        }
         beforeEach(() => {
             vi.useFakeTimers();
         });
@@ -212,9 +208,40 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(true);
             });
         });
+        describe("expiry calculation", () => {
+            let fakeEvent: MatrixEvent;
+            let membership: CallMembership;
+
+            beforeEach(() => {
+                // server origin timestamp for this event is 1000
+                fakeEvent = makeMockEvent(1000);
+                membership = createCallMembership(fakeEvent!, membershipTemplate);
+
+                vi.useFakeTimers();
+            });
+
+            afterEach(() => {
+                vi.useFakeTimers();
+            });
+
+            it("calculates time until expiry", () => {
+                vi.setSystemTime(2000);
+                // should be using absolute expiry time
+                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+            });
+        });
     });
 
     describe("RtcMembershipData", () => {
+        function makeMockEvent(originTs = 0, content: IContent = {}): MatrixEvent {
+            return {
+                getTs: vi.fn().mockReturnValue(originTs),
+                getSender: vi.fn().mockReturnValue("@alice:example.org"),
+                getId: vi.fn().mockReturnValue("$eventid"),
+                getContent: vi.fn().mockReturnValue(content),
+                getType: vi.fn().mockReturnValue(EventType.RTCMembership),
+            } as unknown as MatrixEvent;
+        }
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
@@ -232,6 +259,11 @@ describe("CallMembership", () => {
         it("rejects membership with invalid slot_id", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "invalid_slot_id" });
+            }).toThrow();
+        });
+        it("rejects membership with slot_id that contains extra #", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#mycall#extra" });
             }).toThrow();
         });
         it("accepts membership with valid slot_id", () => {
@@ -334,13 +366,9 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it.skip("considers memberships unexpired if local age low enough", () => {
-            // TODO link prev event
-        });
-
-        it.skip("considers memberships expired if local age large enough", () => {
-            // TODO link prev event
-        });
+        // TODO link prev event
+        it.todo("considers memberships unexpired if local age low enough");
+        it.todo("considers memberships expired if local age large enough");
 
         describe("getTransport", () => {
             it("gets the correct active transport with oldest_membership", () => {
@@ -397,44 +425,9 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-    });
-
-    describe("expiry calculation", () => {
-        let fakeEvent: MatrixEvent;
-        let membership: CallMembership;
-
-        beforeEach(() => {
-            // server origin timestamp for this event is 1000
-            fakeEvent = makeMockEvent(1000);
-            membership = createCallMembership(fakeEvent!, membershipTemplate);
-
-            vi.useFakeTimers();
+        it("uses unpadded base64 for RTC backend identities", async () => {
+            const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
+            expect(membership.rtcBackendIdentity).toBe("j9N1u04ZbvI9qKf3cxrf2NauD-fIGJ4uAcYkfI9V7SY");
         });
-
-        afterEach(() => {
-            vi.useRealTimers();
-        });
-
-        it("calculates time until expiry", () => {
-            vi.setSystemTime(2000);
-            // should be using absolute expiry time
-            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
-        });
-    });
-
-    it("uses unpadded base64 for RTC backend identities", async () => {
-        expect(
-            await CallMembership.computeRtcBackendIdentity(makeMockEvent(), {
-                kind: "rtc",
-                data: {
-                    slot_id: "m.call#",
-                    application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
-                    member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzRANDOMxyz" },
-                    rtc_transports: [{ type: "livekit" }],
-                    versions: [],
-                    msc4354_sticky_key: "abc123",
-                },
-            }),
-        ).toBe("2+h2ELE1XY/NsuveToZOekORCoyQMO6V0W7XZUWk5Q4");
     });
 });

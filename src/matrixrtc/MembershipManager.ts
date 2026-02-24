@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,19 +22,9 @@ import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
-import {
-    type CallMembership,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-    type SessionMembershipData,
-} from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status } from "./types.ts";
-import {
-    type SlotDescription,
-    type MembershipConfig,
-    type SessionConfig,
-    slotDescriptionToId,
-} from "./MatrixRTCSession.ts";
+import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
+import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
+import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
@@ -43,6 +33,8 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
+import { computeSlotId } from "./utils.ts";
 import { isLivekitTransportConfig } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
@@ -789,13 +781,14 @@ export class MembershipManager
 
     /**
      * Constructs our own membership
+     * @returns Only returns `SessionMembershipData`
      */
     protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
         const ownMembership = this.ownMembership;
         const needsEmptyStringRoomFix =
             this.slotDescription.application === "m.call" && this.slotDescription.id === "ROOM";
 
-        const focusObjects =
+        const focusObjects: Pick<SessionMembershipData, "foci_preferred" | "focus_active"> =
             this.rtcTransport === undefined
                 ? {
                       focus_active: { type: "livekit", focus_selection: "oldest_membership" } as const,
@@ -1099,7 +1092,11 @@ export class StickyEventMembershipManager extends MembershipManager {
         return super.actionUpdateFromErrors(e, t, StickyEventMembershipManager.nameMap.get(m) ?? "unknown");
     }
 
-    protected makeMyMembership(expires: number): SessionMembershipData | RtcMembershipData {
+    /**
+     *
+     * @returns Only returns `RtcMembershipData`
+     */
+    protected makeMyMembership(): RtcMembershipData {
         const ownMembership = this.ownMembership;
 
         const livekitTransport = isLivekitTransportConfig(this.rtcTransport) ? this.rtcTransport : undefined;
@@ -1111,7 +1108,7 @@ export class StickyEventMembershipManager extends MembershipManager {
                 type: this.slotDescription.application,
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
             },
-            slot_id: slotDescriptionToId(this.slotDescription),
+            slot_id: computeSlotId(this.slotDescription),
             // Make sure we do not add the alias to the transport.
             // It is not needed in matrix2.0. The additional session information will be used to find the right alias on the sfu.
             rtc_transports: livekitTransport
