@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { getEncryptionKeyMapKey, type CallMembershipIdentityParts } from "./EncryptionManager.ts";
-import { type InboundEncryptionSession, type EncryptionKeyMapKey } from "./types.ts";
+import type { InboundEncryptionSession, EncryptionKeyMapKey, SlotDescription } from "./types.ts";
 
 /**
  * Detects when a key for a given index is outdated.
@@ -46,4 +46,26 @@ export class OutdatedKeyFilter {
         this.tsBuffer.get(mapKey)!.set(item.keyIndex, item.creationTS);
         return false;
     }
+}
+
+/**
+ * Converts a slot ID into it's component application and ID portions.
+ * @param slotId e.g. `m.call#call_id`
+ * @throws If the format of `slotId` is invalid.
+ */
+export function slotIdToDescription(slotId: string): SlotDescription {
+    const [application, id, ...unexpectedAdditionalValues] = slotId.split("#");
+    if (unexpectedAdditionalValues.length) {
+        throw Error(
+            "MatrixRTC Slot IDs *must* only contain two components seperated by one '#'. Additional '#' characters detected.",
+        );
+    }
+    return { application, id };
+}
+
+/**
+ * Converts a SlotDescription into it's slot ID format.
+ */
+export function computeSlotId(slotDescription: SlotDescription): string {
+    return `${slotDescription.application}#${slotDescription.id}`;
 }

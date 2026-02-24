@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,12 +18,12 @@ import { EventEmitter } from "stream";
 import { type Mocked, type MockedObject } from "vitest";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
+import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
 import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
-import { logger } from "../../../src/logger.ts";
 
-export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
 export const owmMemberIdentity: CallMembershipIdentityParts = {
     deviceId: "AAAAAAA",
@@ -31,7 +31,7 @@ export const owmMemberIdentity: CallMembershipIdentityParts = {
     userId: "@alice:example.org",
 };
 
-export const membershipTemplate: SessionMembershipData & { user_id: string } = {
+export const sessionMembershipTemplate: SessionMembershipData & { user_id: string } = {
     application: "m.call",
     call_id: "",
     user_id: "@mock:user.example",
@@ -50,6 +50,39 @@ export const membershipTemplate: SessionMembershipData & { user_id: string } = {
             type: "livekit",
         },
     ],
+};
+
+export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
+    user_id: "@mock:user.example",
+    application: {
+        type: "m.call",
+    },
+    member: {
+        id: "IDIDID",
+        user_id: "@mock:user.example",
+        device_id: "AAAAAAA",
+    },
+    slot_id: "m.call#ROOM",
+    versions: [],
+    rtc_transports: [
+        {
+            type: "livekit",
+            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+            foci_preferred: [
+                {
+                    livekit_alias: "!alias:something.org",
+                    livekit_service_url: "https://livekit-jwt.something.io",
+                    type: "livekit",
+                },
+                {
+                    livekit_alias: "!alias:something.org",
+                    livekit_service_url: "https://livekit-jwt.something.dev",
+                    type: "livekit",
+                },
+            ],
+        },
+    ],
+    msc4354_sticky_key: "m.call#",
 };
 
 export type MockClient = MockedObject<
@@ -198,7 +231,7 @@ export function mockCallMembership(
     const ev = mockRTCEvent(membershipData, roomId);
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx", logger);
+    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx");
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {

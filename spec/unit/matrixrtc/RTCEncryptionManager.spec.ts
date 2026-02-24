@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManage
 import { type CallMembership, type Statistics } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
-import { membershipTemplate, mockCallMembership } from "./mocks.ts";
+import { sessionMembershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { logger } from "../../../src/logger.ts";
 import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
@@ -983,7 +983,7 @@ describe("RTCEncryptionManager", () => {
         rtcBackendIdentity: string,
     ): CallMembership {
         return mockCallMembership(
-            { ...membershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
+            { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
             rtcBackendIdentity,
         );
@@ -998,7 +998,7 @@ describe("RTCEncryptionManager", () => {
      */
     function aStateBaseMembership(userId: string, deviceId: string, ts: number = 1000): CallMembership {
         return mockCallMembership(
-            { ...membershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
+            { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
             `${userId}|${deviceId}`,
         );

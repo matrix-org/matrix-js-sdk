@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import {
     type IEncryptionManager,
 } from "./EncryptionManager.ts";
 import { type EncryptionConfig, type MembershipConfig } from "./MatrixRTCSession.ts";
-import { CallMembership } from "./CallMembership.ts";
+import type { CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { type Logger } from "../logger.ts";
@@ -33,6 +33,7 @@ import {
     type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
+import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -139,7 +140,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         rtcBackendIdProvider?: (userId: string, deviceId: string, memberId: string) => Promise<string>,
     ) {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
-        this.rtcIdentityProvider = rtcBackendIdProvider ?? CallMembership.computeRtcIdentityRaw;
+        this.rtcIdentityProvider = rtcBackendIdProvider ?? computeRtcIdentityRaw;
     }
 
     private async getOwnRtcBackendIdentity(): Promise<string> {

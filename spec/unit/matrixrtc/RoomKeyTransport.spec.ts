@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mocked } from "vitest";
 
-import { makeMockEvent, makeMockRoom, membershipTemplate, makeKey } from "./mocks";
+import { makeMockEvent, makeMockRoom, sessionMembershipTemplate, makeKey } from "./mocks.ts";
 import { RoomKeyTransport } from "../../../src/matrixrtc/RoomKeyTransport";
 import { KeyTransportEvents } from "../../../src/matrixrtc/IKeyTransport";
 import { EventType, MatrixClient, RoomEvent } from "../../../src";
@@ -49,7 +49,7 @@ describe("RoomKeyTransport", () => {
                 roomEventEncryptionKeysReceivedTotalAge: 0,
             },
         };
-        room = makeMockRoom([membershipTemplate]);
+        room = makeMockRoom([sessionMembershipTemplate]);
         client = new MatrixClient({ baseUrl: "base_url" });
         client.matrixRTC.start();
         transport = new RoomKeyTransport(room, client, statistics, {

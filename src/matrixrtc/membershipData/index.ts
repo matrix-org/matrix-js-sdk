@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Matrix.org Foundation C.I.C.
+Copyright 2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,11 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export * from "./CallMembership.ts";
-export * from "./LivekitTransport.ts";
-export * from "./MatrixRTCSession.ts";
-export * from "./MatrixRTCSessionManager.ts";
-export type * from "./types.ts";
-export { type SessionMembershipData, type RtcMembershipData } from "./membershipData/index.ts";
-export { Status, parseCallNotificationContent, isMyMembership } from "./types.ts";
-export { MembershipManagerEvent } from "./IMembershipManager.ts";
+export { type SessionMembershipData, checkSessionsMembershipData } from "./session.ts";
+export { type RtcMembershipData, computeRtcIdentityRaw, checkRtcMembershipData } from "./rtc.ts";
+export { MatrixRTCMembershipParseError } from "./common.ts";
