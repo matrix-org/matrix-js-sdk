@@ -30,7 +30,6 @@ import {
     type InboundEncryptionSession,
     type OutboundEncryptionSession,
     type ParticipantDeviceInfo,
-    type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
 import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
@@ -59,7 +58,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
      * The keys are stored and can be retrieved later when the application layer is ready {@link RTCEncryptionManager#getEncryptionKeys}.
      */
-    private participantKeyRings = new Map<
+    private readonly participantKeyRings = new Map<
         EncryptionKeyMapKey,
         Array<{
             key: Uint8Array<ArrayBuffer>;
@@ -112,7 +111,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger | undefined = undefined;
 
-    private rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
+    private readonly rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
 
     /**
      *
@@ -125,10 +124,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * @param rtcBackendIdProvider - A function to compute the rtc backend identity, exposed for testing purposes
      */
     public constructor(
-        private ownMembership: CallMembershipIdentityParts,
+        private readonly ownMembership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
-        private statistics: Statistics,
         // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array<ArrayBuffer>,
@@ -297,7 +295,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 candidateInboundSession.keyIndex,
                 candidateInboundSession.membership,
             );
-            this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
             this.logger?.info(
                 `Received an out of order key for ${membership.userId}:${membership.deviceId}, dropping it`,
@@ -411,7 +408,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
         try {
             this.logger?.trace(`Sending key...`);
             await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
-            this.statistics.counters.roomEventEncryptionKeysSent += 1;
             outboundKey.sharedWith.push(...toDistributeTo);
             this.logger?.trace(
                 `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,

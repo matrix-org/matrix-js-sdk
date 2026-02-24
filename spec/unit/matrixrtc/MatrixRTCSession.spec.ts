@@ -16,34 +16,19 @@ limitations under the License.
 
 import { type Mock } from "vitest";
 
+import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
+import { MatrixRTCSession, MatrixRTCSessionEvent, MembershipManagerEvent, Status } from "../../../src/matrixrtc";
 import {
-    encodeBase64,
-    type EventTimeline,
-    EventType,
-    MatrixClient,
-    type MatrixError,
-    type MatrixEvent,
-    type Room,
-} from "../../../src";
-import { KnownMembership } from "../../../src/@types/membership.ts";
-import { MatrixRTCSession, MatrixRTCSessionEvent } from "../../../src/matrixrtc/MatrixRTCSession.ts";
-import { MembershipManagerEvent } from "../../../src/matrixrtc/IMembershipManager.ts";
-import { Status, type EncryptionKeysEventContent } from "../../../src/matrixrtc/types.ts";
-import {
-    makeMockEvent,
     makeMockRoom,
-    sessionMembershipTemplate,
-    makeKey,
     type MembershipData,
     mockRoomState,
     mockRTCEvent,
     owmMemberIdentity,
     rtcMembershipTemplate,
-} from "./mocks.ts";
-import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
+    sessionMembershipTemplate,
+} from "./mocks";
 import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
-import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
 import {
     computeRtcIdentityRaw,
@@ -52,8 +37,6 @@ import {
 } from "../../../src/matrixrtc/membershipData/index.ts";
 
 const mockFocus = { type: "mock" };
-
-const textEncoder = new TextEncoder();
 
 const callSession = { id: "ROOM", application: "m.call" };
 
@@ -868,920 +851,83 @@ describe("MatrixRTCSession", () => {
     });
 
     describe("key management", () => {
-        // TODO make this test suit only test the encryption manager. And mock the transport directly not the session.
-        describe("sending", () => {
-            let mockRoom: Room;
-            let sendStateEventMock: Mock;
-            let sendDelayedStateMock: Mock;
-            let sendEventMock: Mock;
-            let sendToDeviceMock: Mock;
-
-            beforeEach(() => {
-                sendStateEventMock = vi.fn().mockResolvedValue({ event_id: "id" });
-                sendDelayedStateMock = vi.fn().mockResolvedValue({ event_id: "id" });
-                sendEventMock = vi.fn().mockResolvedValue({ event_id: "id" });
-                sendToDeviceMock = vi.fn();
-                client.sendStateEvent = sendStateEventMock;
-                client._unstable_sendDelayedStateEvent = sendDelayedStateMock;
-                client.sendEvent = sendEventMock;
-                client.encryptAndSendToDevice = sendToDeviceMock;
-
-                mockRoom = makeMockRoom([]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                // await new Promise((resolve) => sess!.once(MatrixRTCSessionEvent.MembershipsChanged, resolve));
+        // Then encryption manager is tested separately, here we just test the integration
+        it("provides encryption keys for memberships", async () => {
+            client.encryptAndSendToDevice = vi.fn().mockResolvedValue(undefined);
+            const mockRoom = makeMockRoom([
+                {
+                    ...sessionMembershipTemplate,
+                    user_id: "@bob:user.example",
+                    device_id: "BBBBBB",
+                },
+                {
+                    ...sessionMembershipTemplate,
+                    user_id: client.getUserId()!,
+                    device_id: client.getDeviceId()!,
+                },
+            ]);
+            const sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            sess.joinRTCSession(owmMemberIdentity, [{ type: "livekit", livekit_service_url: "https://test.org" }], {
+                type: "livekit",
+                focus_selection: "oldest_membership",
             });
-
-            afterEach(async () => {
-                // stop the timers
-                await sess!.leaveRoomSession();
-                // vi.restoreAllMocks();
-            });
-
-            it("creates a key when joining", () => {
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess?.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    expect.any(Uint8Array),
-                    0,
-                    {
-                        deviceId: "AAAAAAA",
-                        memberId: "@alice:example.org:AAAAAAA",
-                        userId: "@alice:example.org",
-                    },
-                    "@alice:example.org:AAAAAAA",
-                );
-            });
-
-            it("sends keys when joining", async () => {
-                vi.useFakeTimers();
-                try {
-                    const eventSentPromise = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-
-                    await eventSentPromise;
-
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [makeKey(0, expect.stringMatching(".*"))],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("does not send key if join called when already joined", async () => {
-                const sentStateEvent = new Promise((resolve) => {
-                    sendStateEventMock = vi.fn(resolve);
-                });
-                client.sendStateEvent = sendStateEventMock;
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                await sentStateEvent;
-                expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                expect(client.sendEvent).toHaveBeenCalledTimes(1);
-                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                expect(client.sendEvent).toHaveBeenCalledTimes(1);
-                expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-            });
-
-            it("retries key sends", async () => {
-                vi.useFakeTimers();
-                let firstEventSent = false;
-
-                try {
-                    const eventSentPromise = new Promise<{ event_id: string }>((resolve) => {
-                        sendEventMock.mockImplementation(() => {
-                            if (!firstEventSent) {
-                                firstEventSent = true;
-                                const e = new Error() as MatrixError;
-                                e.data = {};
-                                throw e;
-                            } else {
-                                resolve({ event_id: "id" });
-                            }
-                        });
-                    });
-
-                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                    // wait for the encryption event to get sent
-                    await vi.advanceTimersByTimeAsync(5000);
-                    await eventSentPromise;
-
-                    expect(sendEventMock).toHaveBeenCalledTimes(2);
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("cancels key send event that fail", () => {
-                const eventSentinel = {} as unknown as MatrixEvent;
-
-                client.cancelPendingEvent = vi.fn();
-                sendEventMock.mockImplementation(() => {
-                    const e = new Error() as MatrixError;
-                    e.data = {};
-                    e.event = eventSentinel;
-                    throw e;
-                });
-
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-
-                expect(client.cancelPendingEvent).toHaveBeenCalledWith(eventSentinel);
-            });
-
-            it("re-sends key if a new member joins even if a key rotation is in progress", async () => {
-                vi.useFakeTimers();
-                try {
-                    // session with two members
-                    const member2 = Object.assign({}, sessionMembershipTemplate, {
-                        device_id: "BBBBBBB",
-                    });
-                    const mockRoom = makeMockRoom([sessionMembershipTemplate, member2]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                    await sess.initialMembershipCalculated;
-                    // joining will trigger an initial key send
-                    const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                        manageMediaKeys: true,
-                        updateEncryptionKeyThrottle: 1000,
-                        makeKeyDelay: 3000,
-                    });
-                    await keysSentPromise1;
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    // member2 leaves triggering key rotation
-                    mockRoomState(mockRoom, [sessionMembershipTemplate]);
-                    await sess._onRTCSessionMemberUpdate();
-
-                    // member2 re-joins which should trigger an immediate re-send
-                    const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-                    mockRoomState(mockRoom, [sessionMembershipTemplate, member2]);
-                    await sess._onRTCSessionMemberUpdate();
-                    // but, that immediate resend is throttled so we need to wait a bit
-                    vi.advanceTimersByTime(1000);
-                    const { keys } = await keysSentPromise2;
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                    // key index should still be the original: 0
-                    expect(keys[0].index).toEqual(0);
-
-                    // check that the key rotation actually happens
-                    const keysSentPromise3 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-                    vi.advanceTimersByTime(2000);
-                    const { keys: rotatedKeys } = await keysSentPromise3;
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(3);
-                    // key index should now be the rotated one: 1
-                    expect(rotatedKeys[0].index).toEqual(1);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("re-sends key if a new member joins", async () => {
-                vi.useFakeTimers();
-                try {
-                    const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-
-                    const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                    await keysSentPromise1;
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    sendEventMock.mockClear();
-                    vi.advanceTimersByTime(10000);
-
-                    const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-
-                    const onMembershipsChanged = vi.fn();
-                    sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
-
-                    const member2 = Object.assign({}, sessionMembershipTemplate, {
-                        device_id: "BBBBBBB",
-                    });
-
-                    mockRoomState(mockRoom, [sessionMembershipTemplate, member2]);
-                    await sess._onRTCSessionMemberUpdate();
-
-                    await keysSentPromise2;
-
-                    expect(sendEventMock).toHaveBeenCalled();
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("does not re-send key if memberships stays same", async () => {
-                vi.useFakeTimers();
-                try {
-                    const keysSentPromise1 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    const member1 = sessionMembershipTemplate;
-                    const member2 = Object.assign({}, sessionMembershipTemplate, {
-                        device_id: "BBBBBBB",
-                    });
-
-                    const mockRoom = makeMockRoom([member1, member2]);
-                    mockRoomState(mockRoom, [member1, member2]);
-
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-
-                    await keysSentPromise1;
-
-                    // make sure an encryption key was sent
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [makeKey(0, expect.stringMatching(".*"))],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    sendEventMock.mockClear();
-
-                    // these should be a no-op:
-                    await sess._onRTCSessionMemberUpdate();
-                    expect(sendEventMock).toHaveBeenCalledTimes(0);
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("re-sends key if a member changes created_ts", async () => {
-                vi.useFakeTimers();
-                vi.setSystemTime(1000);
-                try {
-                    const keysSentPromise1 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    const member1 = { ...sessionMembershipTemplate, created_ts: 1000 };
-                    const member2 = {
-                        ...sessionMembershipTemplate,
-                        created_ts: 1000,
-                        device_id: "BBBBBBB",
-                    };
-
-                    const mockRoom = makeMockRoom([member1, member2]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                    await sess.initialMembershipCalculated;
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-
-                    await keysSentPromise1;
-
-                    // make sure an encryption key was sent
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [makeKey(0, expect.stringMatching(".*"))],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    sendEventMock.mockClear();
-
-                    // this should be a no-op:
-                    await sess._onRTCSessionMemberUpdate();
-                    expect(sendEventMock).toHaveBeenCalledTimes(0);
-
-                    // advance time to avoid key throttling
-                    vi.advanceTimersByTime(10000);
-
-                    // update created_ts
-                    member2.created_ts = 5000;
-                    mockRoomState(mockRoom, [member1, member2]);
-
-                    const keysSentPromise2 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    // this should re-send the key
-                    await sess._onRTCSessionMemberUpdate();
-
-                    await keysSentPromise2;
-
-                    expect(sendEventMock).toHaveBeenCalledWith(
-                        expect.stringMatching(".*"),
-                        "io.element.call.encryption_keys",
-                        {
-                            call_id: "",
-                            device_id: "AAAAAAA",
-                            keys: [makeKey(0, expect.stringMatching(".*"))],
-                            sent_ts: Date.now(),
-                        },
-                    );
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(2);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("rotates key if a member leaves", async () => {
-                vi.useFakeTimers();
-                try {
-                    const KEY_DELAY = 3000;
-                    const member2 = Object.assign({}, sessionMembershipTemplate, {
-                        device_id: "BBBBBBB",
-                    });
-                    const mockRoom = makeMockRoom([sessionMembershipTemplate, member2]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                    await sess.initialMembershipCalculated;
-                    const onMyEncryptionKeyChanged = vi.fn();
-                    sess.on(
-                        MatrixRTCSessionEvent.EncryptionKeyChanged,
-                        (_key: Uint8Array, _idx: number, membership: CallMembershipIdentityParts) => {
-                            if (
-                                membership.userId === client.getUserId() &&
-                                membership.deviceId === client.getDeviceId()
-                            ) {
-                                onMyEncryptionKeyChanged();
-                            }
-                        },
-                    );
-
-                    const keysSentPromise1 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                        manageMediaKeys: true,
-                        makeKeyDelay: KEY_DELAY,
-                    });
-                    const sendKeySpy = vi.spyOn((sess as unknown as any).encryptionManager.transport, "sendKey");
-                    const firstKeysPayload = await keysSentPromise1;
-                    expect(firstKeysPayload.keys).toHaveLength(1);
-                    expect(firstKeysPayload.keys[0].index).toEqual(0);
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    sendEventMock.mockClear();
-
-                    const keysSentPromise2 = new Promise<EncryptionKeysEventContent>((resolve) => {
-                        sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                    });
-
-                    mockRoomState(mockRoom, [sessionMembershipTemplate]);
-                    await sess._onRTCSessionMemberUpdate();
-
-                    vi.advanceTimersByTime(KEY_DELAY);
-                    expect(sendKeySpy).toHaveBeenCalledTimes(1);
-                    // check that we send the key with index 1 even though the send gets delayed when leaving.
-                    // this makes sure we do not use an index that is one too old.
-                    expect(sendKeySpy).toHaveBeenLastCalledWith(
-                        expect.any(String),
-                        1,
-                        sess.memberships.map((m) => ({
-                            userId: m.sender,
-                            deviceId: m.deviceId,
-                            membershipTs: m.createdTs(),
-                        })),
-                    );
-                    // fake a condition in which we send another encryption key event.
-                    // this could happen do to someone joining the call.
-                    (sess as unknown as any).encryptionManager.sendEncryptionKeysEvent();
-                    expect(sendKeySpy).toHaveBeenLastCalledWith(
-                        expect.any(String),
-                        1,
-                        sess.memberships.map((m) => ({
-                            userId: m.sender,
-                            deviceId: m.deviceId,
-                            membershipTs: m.createdTs(),
-                        })),
-                    );
-                    vi.advanceTimersByTime(7000);
-
-                    const secondKeysPayload = await keysSentPromise2;
-
-                    expect(secondKeysPayload.keys).toHaveLength(1);
-                    expect(secondKeysPayload.keys[0].index).toEqual(1);
-                    expect(onMyEncryptionKeyChanged).toHaveBeenCalledTimes(2);
-                    // initial, on leave and the fake one we do with: `(sess as unknown as any).encryptionManager.sendEncryptionKeysEvent();`
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(3);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("wraps key index around to 0 when it reaches the maximum", { timeout: 15000 }, async () => {
-                // this should give us keys with index [0...255, 0, 1]
-                const membersToTest = 258;
-                const members: MembershipData[] = [];
-                for (let i = 0; i < membersToTest; i++) {
-                    members.push(Object.assign({}, sessionMembershipTemplate, { device_id: `DEVICE${i}` }));
-                }
-                vi.useFakeTimers();
-                try {
-                    // start with all members
-                    const mockRoom = makeMockRoom(members);
-
-                    for (let i = 0; i < membersToTest; i++) {
-                        const keysSentPromise = new Promise<EncryptionKeysEventContent>((resolve) => {
-                            sendEventMock.mockImplementation((_roomId, _evType, payload) => resolve(payload));
-                        });
-
-                        if (i === 0) {
-                            // if first time around then set up the session
-                            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                            await sess.initialMembershipCalculated;
-                            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                                manageMediaKeys: true,
-                            });
-                        } else {
-                            // otherwise update the state reducing the membership each time in order to trigger key rotation
-                            mockRoomState(mockRoom, members.slice(0, membersToTest - i));
-                        }
-
-                        await sess!._onRTCSessionMemberUpdate();
-
-                        // advance time to avoid key throttling
-                        vi.advanceTimersByTime(10000);
-
-                        const keysPayload = await keysSentPromise;
-                        expect(keysPayload.keys).toHaveLength(1);
-                        expect(keysPayload.keys[0].index).toEqual(i % 256);
-                    }
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("doesn't re-send key immediately", async () => {
-                const realSetTimeout = setTimeout;
-                vi.useFakeTimers();
-                try {
-                    const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                    await sess.initialMembershipCalculated;
-
-                    const keysSentPromise1 = new Promise((resolve) => {
-                        sendEventMock.mockImplementation(resolve);
-                    });
-
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                    await keysSentPromise1;
-
-                    sendEventMock.mockClear();
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-
-                    const onMembershipsChanged = vi.fn();
-                    sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
-
-                    const member2 = Object.assign({}, sessionMembershipTemplate, {
-                        device_id: "BBBBBBB",
-                    });
-
-                    mockRoomState(mockRoom, [sessionMembershipTemplate, member2]);
-                    await sess._onRTCSessionMemberUpdate();
-
-                    await new Promise((resolve) => {
-                        realSetTimeout(resolve);
-                    });
-
-                    expect(sendEventMock).not.toHaveBeenCalled();
-                    expect(sess!.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
-
-            it("send key as to device", async () => {
-                vi.useFakeTimers();
-                try {
-                    const keySentPromise = new Promise((resolve) => {
-                        sendToDeviceMock.mockImplementation(resolve);
-                    });
-
-                    const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                    await sess.initialMembershipCalculated;
-                    sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                        manageMediaKeys: true,
-                        useExperimentalToDeviceTransport: true,
-                    });
-                    await sess._onRTCSessionMemberUpdate();
-
-                    await keySentPromise;
-
-                    expect(sendToDeviceMock).toHaveBeenCalled();
-
-                    // Access private to test
-                    expect(sess["encryptionManager"]).toBeInstanceOf(RTCEncryptionManager);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
+            await flushPromises();
+
+            expect(client.encryptAndSendToDevice).toHaveBeenCalledTimes(1);
+            expect(client.encryptAndSendToDevice).toHaveBeenCalledWith(
+                "io.element.call.encryption_keys",
+                [{ userId: "@bob:user.example", deviceId: "BBBBBB" }],
+                expect.anything(),
+            );
+            expect(sess.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
+
+            await sess.leaveRoomSession();
+        });
+    });
+
+    describe("read status", () => {
+        it("returns the correct probablyLeft status", () => {
+            const mockRoom = makeMockRoom([sessionMembershipTemplate]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            expect(sess!.probablyLeft).toBe(undefined);
+
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess!.probablyLeft).toBe(false);
+
+            // Simulate the membership manager believing the user has left
+            const accessPrivateFieldsSession = sess as unknown as {
+                membershipManager: { state: { probablyLeft: boolean } };
+            };
+            accessPrivateFieldsSession.membershipManager.state.probablyLeft = true;
+            expect(sess!.probablyLeft).toBe(true);
         });
 
-        describe("receiving", () => {
-            beforeEach(() => {
-                vi.useFakeTimers();
-            });
-            afterEach(() => {
-                vi.useRealTimers();
-            });
+        it("returns membershipStatus once joinRTCSession got called", () => {
+            const mockRoom = makeMockRoom([rtcMembershipTemplate]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            expect(sess!.membershipStatus).toBe(undefined);
 
-            it("collects keys from encryption events", async () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                await sess.initialMembershipCalculated;
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
-                        device_id: "bobsphone",
-                        call_id: "",
-                        keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
-                    }),
-                );
-                await vi.advanceTimersToNextTimerAsync();
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess!.reemitEncryptionKeys();
-
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("this is the key"),
-                    0,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-                expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
-            });
-
-            it("collects keys at non-zero indices", async () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                await sess.initialMembershipCalculated;
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
-                        device_id: "bobsphone",
-                        call_id: "",
-                        keys: [makeKey(4, "dGhpcyBpcyB0aGUga2V5")],
-                    }),
-                );
-                await vi.advanceTimersToNextTimerAsync();
-
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("this is the key"),
-                    4,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-
-                expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
-            });
-
-            it("collects keys by merging", async () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
-                        device_id: "bobsphone",
-                        call_id: "",
-                        keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
-                    }),
-                );
-                await vi.advanceTimersToNextTimerAsync();
-
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("this is the key"),
-                    0,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-
-                expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(1);
-
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
-                        device_id: "bobsphone",
-                        call_id: "",
-                        keys: [makeKey(4, "dGhpcyBpcyB0aGUga2V5")],
-                    }),
-                );
-                await vi.advanceTimersToNextTimerAsync();
-
-                encryptionKeyChangedListener.mockClear();
-                sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(3);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("this is the key"),
-                    0,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("this is the key"),
-                    4,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-
-                expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(2);
-            });
-
-            it("ignores older keys at same index", async () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent(
-                        "io.element.call.encryption_keys",
-                        "@bob:example.org",
-                        "1234roomId",
-                        {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, encodeBase64(Buffer.from("newer key", "utf-8")))],
-                        },
-                        2000,
-                    ),
-                );
-
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent(
-                        "io.element.call.encryption_keys",
-                        "@bob:example.org",
-                        "1234roomId",
-                        {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, encodeBase64(Buffer.from("newer key", "utf-8")))],
-                        },
-                        2000,
-                    ),
-                );
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent(
-                        "io.element.call.encryption_keys",
-                        "@bob:example.org",
-                        "1234roomId",
-                        {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, encodeBase64(Buffer.from("older key", "utf-8")))],
-                        },
-                        1000,
-                    ),
-                );
-                await vi.advanceTimersToNextTimerAsync();
-
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("newer key"),
-                    0,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-
-                expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(3);
-            });
-
-            it("key timestamps are treated as monotonic", async () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent(
-                        "io.element.call.encryption_keys",
-                        "@bob:example.org",
-                        "1234roomId",
-                        {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, encodeBase64(Buffer.from("older key", "utf-8")))],
-                        },
-                        1000,
-                    ),
-                );
-
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent(
-                        "io.element.call.encryption_keys",
-                        "@bob:example.org",
-                        "1234roomId",
-                        {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, encodeBase64(Buffer.from("second key", "utf-8")))],
-                        },
-                        1000,
-                    ),
-                );
-                await vi.advanceTimersToNextTimerAsync();
-
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(2);
-                expect(encryptionKeyChangedListener).toHaveBeenCalledWith(
-                    textEncoder.encode("second key"),
-                    0,
-                    {
-                        deviceId: "bobsphone",
-                        memberId: "@bob:example.org:bobsphone",
-                        userId: "@bob:example.org",
-                    },
-                    "@bob:example.org:bobsphone",
-                );
-            });
-
-            it("ignores keys event for the local participant", () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                mockRoom.emitTimelineEvent(
-                    makeMockEvent("io.element.call.encryption_keys", client.getUserId()!, "1234roomId", {
-                        device_id: client.getDeviceId(),
-                        call_id: "",
-                        keys: [makeKey(4, "dGhpcyBpcyB0aGUga2V5")],
-                    }),
-                );
-
-                const encryptionKeyChangedListener = vi.fn();
-                sess!.on(MatrixRTCSessionEvent.EncryptionKeyChanged, encryptionKeyChangedListener);
-                sess!.reemitEncryptionKeys();
-                expect(encryptionKeyChangedListener).toHaveBeenCalledTimes(1);
-
-                expect(sess!.statistics.counters.roomEventEncryptionKeysReceived).toEqual(0);
-            });
-
-            it("tracks total age statistics for collected keys", async () => {
-                vi.useFakeTimers();
-                try {
-                    const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                    sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-
-                    // defaults to getTs()
-                    vi.setSystemTime(1000);
-                    sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                    mockRoom.emitTimelineEvent(
-                        makeMockEvent(
-                            "io.element.call.encryption_keys",
-                            "@bob:example.org",
-                            "1234roomId",
-                            {
-                                device_id: "bobsphone",
-                                call_id: "",
-                                keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
-                            },
-                            0,
-                        ),
-                    );
-                    await vi.advanceTimersToNextTimerAsync();
-
-                    expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(1000);
-
-                    vi.setSystemTime(2000);
-
-                    mockRoom.emitTimelineEvent(
-                        makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
-                            sent_ts: 0,
-                        }),
-                    );
-                    await vi.advanceTimersToNextTimerAsync();
-
-                    expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(3000);
-
-                    vi.setSystemTime(3000);
-                    mockRoom.emitTimelineEvent(
-                        makeMockEvent("io.element.call.encryption_keys", "@bob:example.org", "1234roomId", {
-                            device_id: "bobsphone",
-                            call_id: "",
-                            keys: [makeKey(0, "dGhpcyBpcyB0aGUga2V5")],
-                            sent_ts: 1000,
-                        }),
-                    );
-                    await vi.advanceTimersToNextTimerAsync();
-
-                    expect(sess!.statistics.totals.roomEventEncryptionKeysReceivedTotalAge).toEqual(5000);
-                } finally {
-                    vi.useRealTimers();
-                }
-            });
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess!.membershipStatus).toBe(Status.Connecting);
         });
-        describe("read status", () => {
-            it("returns the correct probablyLeft status", () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                expect(sess!.probablyLeft).toBe(undefined);
+    });
+    it("reemits membershipManager events", () => {
+        sess = MatrixRTCSession.sessionForSlot(client, makeMockRoom([rtcMembershipTemplate]), callSession);
+        const delayIdChanged = vi.fn();
+        sess.on(MembershipManagerEvent.DelayIdChanged, delayIdChanged);
+        const statusChanged = vi.fn();
+        sess.on(MembershipManagerEvent.StatusChanged, statusChanged);
+        const probablyLeftChanged = vi.fn();
+        sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
 
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                expect(sess!.probablyLeft).toBe(false);
+        sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
 
-                // Simulate the membership manager believing the user has left
-                const accessPrivateFieldsSession = sess as unknown as {
-                    membershipManager: { state: { probablyLeft: boolean } };
-                };
-                accessPrivateFieldsSession.membershipManager.state.probablyLeft = true;
-                expect(sess!.probablyLeft).toBe(true);
-            });
-
-            it("returns membershipStatus once joinRTCSession got called", () => {
-                const mockRoom = makeMockRoom([sessionMembershipTemplate]);
-                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-                expect(sess!.membershipStatus).toBe(undefined);
-
-                sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-                expect(sess!.membershipStatus).toBe(Status.Connecting);
-            });
-        });
-        it("reemits membershipManager events", () => {
-            sess = MatrixRTCSession.sessionForSlot(client, makeMockRoom([sessionMembershipTemplate]), callSession);
-            const delayIdChanged = vi.fn();
-            sess.on(MembershipManagerEvent.DelayIdChanged, delayIdChanged);
-            const statusChanged = vi.fn();
-            sess.on(MembershipManagerEvent.StatusChanged, statusChanged);
-            const probablyLeftChanged = vi.fn();
-            sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
-
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
-
-            const membershipManager = sess["membershipManager"]!;
-            membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");
-            membershipManager.emit(MembershipManagerEvent.StatusChanged, Status.Connected, Status.Disconnected);
-            membershipManager.emit(MembershipManagerEvent.ProbablyLeft, false);
-            expect(delayIdChanged).toHaveBeenCalledWith("newDelayId", membershipManager);
-            expect(statusChanged).toHaveBeenCalledWith(Status.Connected, Status.Disconnected, membershipManager);
-            expect(probablyLeftChanged).toHaveBeenCalledWith(false, membershipManager);
-        });
+        const membershipManager = sess["membershipManager"]!;
+        membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");
+        membershipManager.emit(MembershipManagerEvent.StatusChanged, Status.Connected, Status.Disconnected);
+        membershipManager.emit(MembershipManagerEvent.ProbablyLeft, false);
+        expect(delayIdChanged).toHaveBeenCalledWith("newDelayId", membershipManager);
+        expect(statusChanged).toHaveBeenCalledWith(Status.Connected, Status.Disconnected, membershipManager);
+        expect(probablyLeftChanged).toHaveBeenCalledWith(false, membershipManager);
     });
 });

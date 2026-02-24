@@ -25,7 +25,7 @@ import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
-import { type CallMembershipIdentityParts, EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
+import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
 import { logDurationSync } from "../utils.ts";
 import type {
     Statistics,
@@ -46,7 +46,6 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { RoomKeyTransport } from "./RoomKeyTransport.ts";
 import { computeSlotId } from "./utils.ts";
 
 /**
@@ -151,11 +150,6 @@ export interface MembershipConfig {
      * failed to send due to a network error. (send membership event, send delayed event, restart delayed event...)
      */
     networkErrorRetryMs?: number;
-
-    /**
-     * If true, use the new to-device transport for sending encryption keys.
-     */
-    useExperimentalToDeviceTransport?: boolean;
 
     /**
      * The time (in milliseconds) after which a we consider a delayed event restart http request to have failed.
@@ -388,6 +382,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @param slotDescription The slot description is a virtual address where participants are allowed to meet.
      * This session will only manage memberships that match this slot description.Sessions are distinct if any of
      * those properties are distinct: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
+     * @param calculateMembershipsOpts - Options to configure how memberships are calculated for this session.
      */
     public constructor(
         private readonly client: Pick<
@@ -411,7 +406,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         >,
         private roomSubset: Pick<
             Room,
-            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+            | "getLiveTimeline"
+            | "roomId"
+            | "getVersion"
+            | "hasMembershipState"
+            | "on"
+            | "off"
+            | "_unstable_getStickyEvents"
         >,
 
         public readonly slotDescription: SlotDescription,
@@ -499,57 +500,28 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 MembershipManagerEvent.DelayIdChanged,
             ]);
             // Create Encryption manager
-            let transport;
-            if (joinConfig?.useExperimentalToDeviceTransport) {
-                this.logger.info("Using experimental to-device transport for encryption keys");
-                this.logger.info("Using to-device with room fallback transport for encryption keys");
-                const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
-                const transport = new ToDeviceKeyTransport(ownMembershipIdentity, room.roomId, client, statistics);
-                this.encryptionManager = new RTCEncryptionManager(
-                    ownMembershipIdentity,
-                    () => this.memberships,
-                    transport,
-                    this.statistics,
-                    (
-                        keyBin: Uint8Array<ArrayBuffer>,
-                        encryptionKeyIndex: number,
-                        membership: CallMembershipIdentityParts,
-                        rtcBackendIdentity: string,
-                    ) => {
-                        this.emit(
-                            MatrixRTCSessionEvent.EncryptionKeyChanged,
-                            keyBin,
-                            encryptionKeyIndex,
-                            membership,
-                            rtcBackendIdentity,
-                        );
-                    },
-                    this.logger,
-                );
-            } else {
-                // TODO REMOVE ME!
-                transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
-                this.encryptionManager = new EncryptionManager(
-                    ownMembershipIdentity,
-                    () => this.memberships,
-                    transport,
-                    this.statistics,
-                    (
-                        keyBin: Uint8Array<ArrayBuffer>,
-                        encryptionKeyIndex: number,
-                        membership: CallMembershipIdentityParts,
-                        rtcBackendIdentity: string,
-                    ) => {
-                        this.emit(
-                            MatrixRTCSessionEvent.EncryptionKeyChanged,
-                            keyBin,
-                            encryptionKeyIndex,
-                            membership,
-                            rtcBackendIdentity,
-                        );
-                    },
-                );
-            }
+            const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
+            const transport = new ToDeviceKeyTransport(ownMembershipIdentity, room.roomId, client, statistics);
+            this.encryptionManager = new RTCEncryptionManager(
+                ownMembershipIdentity,
+                () => this.memberships,
+                transport,
+                (
+                    keyBin: Uint8Array<ArrayBuffer>,
+                    encryptionKeyIndex: number,
+                    membership: CallMembershipIdentityParts,
+                    rtcBackendIdentity: string,
+                ) => {
+                    this.emit(
+                        MatrixRTCSessionEvent.EncryptionKeyChanged,
+                        keyBin,
+                        encryptionKeyIndex,
+                        membership,
+                        rtcBackendIdentity,
+                    );
+                },
+                this.logger,
+            );
         }
 
         this.joinConfig = joinConfig;
