@@ -26,12 +26,17 @@ on:
                 description: |
                     The path to the asset you want to upload, if any. You can use glob patterns here.
                     Will be GPG signed and an `.asc` file included in the release artifacts if `gpg-fingerprint` is set.
+                    Relative to `dir`.
                 type: string
                 required: false
             expected-asset-count:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
+            dir:
+                description: The directory to release
+                type: string
+                default: "."
         outputs:
             npm-id:
                 description: "The npm package@version string we published"
@@ -90,6 +95,7 @@ jobs:
 
             - name: Prepare variables
               id: prepare
+              working-directory: ${{ inputs.dir }}
               run: |
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
 
@@ -127,12 +133,13 @@ jobs:
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
               with:
                   cache: "pnpm"
-                  node-version-file: package.json
+                  node-version-file: ${{ inputs.dir }}/package.json
 
             - name: Install dependencies
               run: "pnpm install --frozen-lockfile"
 
             - name: Handle develop dependencies
+              working-directory: ${{ inputs.dir }}
               run: |
                   ret=0
                   cat package.json | jq -r '.dependencies | to_entries | .[] | "\(.key) \(.value)"' | grep '#develop$' | while read -r dep ; do
@@ -147,6 +154,7 @@ jobs:
                   done
 
             - name: Bump package.json version
+              working-directory: ${{ inputs.dir }}
               run: |
                   pnpm version --no-git-tag-version "${VERSION#v}"
                   git add package.json
@@ -176,6 +184,7 @@ jobs:
 
             - name: Build assets
               if: steps.prepare.outputs.has-dist-script == '1'
+              working-directory: ${{ inputs.dir }}
               run: DIST_VERSION="$VERSION" pnpm dist
 
             - name: Upload release assets & signatures
@@ -184,7 +193,7 @@ jobs:
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.draft-release.outputs.upload_url }}
-                  asset-path: ${{ inputs.asset-path }}
+                  asset-path: ${{ inputs.dir }}/${{ inputs.asset-path }}
 
             - name: Create signed tag
               if: inputs.gpg-fingerprint
@@ -278,6 +287,8 @@ jobs:
         needs: release
         if: inputs.npm
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+        with:
+            dir: ${{ inputs.dir }}
         permissions:
             contents: read
             id-token: write

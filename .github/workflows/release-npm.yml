@@ -1,6 +1,11 @@
 name: Publish to npm
 on:
     workflow_call:
+        inputs:
+            dir:
+                description: The directory to release
+                type: string
+                default: "."
         outputs:
             id:
                 description: "The npm package@version string we published"
@@ -27,7 +32,7 @@ jobs:
               with:
                   cache: "pnpm"
                   registry-url: "https://registry.npmjs.org"
-                  node-version-file: package.json
+                  node-version-file: ${{ inputs.dir }}/package.json
 
             # Ensure npm 11.5.1 or later is installed
             - name: Update npm
@@ -38,6 +43,7 @@ jobs:
 
             - name: 🚀 Publish to npm
               id: npm-publish
+              working-directory: ${{ inputs.dir }}
               run: |
                   npm publish --provenance --access public --tag "$TAG"
                   release=$(jq -r '"\(.name)@\(.version)"' package.json)

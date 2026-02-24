@@ -41,8 +41,9 @@ jobs:
         runs-on: ubuntu-24.04
         strategy:
             matrix:
-                repo:
-                    - element-hq/element-web
+                include:
+                    - repo: element-hq/element-web
+                      path: apps/web
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
@@ -59,11 +60,12 @@ jobs:
             - name: Bump dependency
               env:
                   DEPENDENCY: ${{ needs.release.outputs.npm-id }}
+                  DIR: ${{ matrix.path }}
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
-                  pnpm add "$DEPENDENCY" --save-exact
-                  git add package.json pnpm-lock.yaml
+                  pnpm add -C "$DIR" "$DEPENDENCY" --save-exact
+                  git add "$DIR"/package.json pnpm-lock.yaml
                   git commit -am"Upgrade dependency to $DEPENDENCY"
                   git push origin staging
 
