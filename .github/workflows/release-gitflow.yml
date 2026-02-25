@@ -12,6 +12,10 @@ on:
                 description: List of dependencies to reset.
                 type: string
                 required: false
+            dir:
+                description: The directory to release
+                type: string
+                default: "."
 concurrency: ${{ github.workflow }}
 permissions: {} # Uses ELEMENT_BOT_TOKEN
 jobs:
@@ -54,6 +58,7 @@ jobs:
 
             - name: Reset dependencies
               if: inputs.dependencies
+              working-directory: ${{ inputs.dir }}
               run: |
                   while IFS= read -r PACKAGE; do
                       [ -z "$PACKAGE" ] && continue
