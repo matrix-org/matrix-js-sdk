@@ -15,3 +15,4 @@ limitations under the License.
 */
 
 export * from "./MSC4108RendezvousSession.ts";
+export * from "./MSC4388RendezvousSession.ts";

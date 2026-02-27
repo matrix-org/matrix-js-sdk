@@ -49,7 +49,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^17.0.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "git+https://github.com/matrix-org/matrix-sdk-crypto-wasm.git#a6ed0587a096737c451b9ccfb2da9ea8cff6ac10",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^1.0.4",

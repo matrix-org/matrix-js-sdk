@@ -14,15 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QrCodeData, QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrCodeData, QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "@fetch-mock/vitest";
 
 import {
     MSC4108FailureReason,
     MSC4108RendezvousSession,
     MSC4108SecureChannel,
-    MSC4108SignInWithQR,
-    PayloadType,
+    type MSC4108SignInWithQR,
     RendezvousError,
 } from "../../../src/rendezvous";
 import {
@@ -35,6 +34,7 @@ import {
     MatrixHttpApi,
 } from "../../../src";
 import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
+import { MSC4108v2024SignInWithQR, PayloadType } from "../../../src/rendezvous/MSC4108v2024SignInWithQR";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const baseUrl = "https://example.com";
@@ -86,7 +86,7 @@ describe("MSC4108SignInWithQR", () => {
             url,
         });
         const channel = new MSC4108SecureChannel(session);
-        const login = new MSC4108SignInWithQR(channel, false);
+        const login = new MSC4108v2024SignInWithQR(channel, false);
 
         await login.generateCode();
         const code = login.code;
@@ -146,12 +146,12 @@ describe("MSC4108SignInWithQR", () => {
 
             const ourChannel = new MSC4108SecureChannel(ourMockSession);
             const qrCodeData = QrCodeData.fromBytes(
-                await ourChannel.generateCode(QrCodeMode.Reciprocate, client.getDomain()!),
+                await ourChannel.generateCode(QrCodeIntent.Reciprocate, client.getDomain()!),
             );
             const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.publicKey);
 
-            ourLogin = new MSC4108SignInWithQR(ourChannel, true, client);
-            opponentLogin = new MSC4108SignInWithQR(opponentChannel, false);
+            ourLogin = new MSC4108v2024SignInWithQR(ourChannel, true, client);
+            opponentLogin = new MSC4108v2024SignInWithQR(opponentChannel, false);
         });
 
         it("should be able to connect with opponent and share server name & check code", async () => {

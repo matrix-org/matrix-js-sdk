@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Matrix.org Foundation C.I.C.
+Copyright 2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import {
     Ecies,
     type EstablishedEcies,
     QrCodeData,
-    QrCodeIntent,
+    type QrCodeIntent,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
@@ -28,23 +28,24 @@ import {
     RendezvousError,
     type RendezvousFailureListener,
 } from "../index.ts";
-import { type MSC4108RendezvousSession } from "../transports/MSC4108RendezvousSession.ts";
+import { type MSC4388RendezvousSession } from "../transports/MSC4388RendezvousSession.ts";
 import { logger } from "../../logger.ts";
-import { type MSC4108v2024Payload } from "../MSC4108v2024SignInWithQR.ts";
+import { type MSC4108v2025Payload } from "../MSC4108v2025SignInWithQR.ts";
 
 /**
- * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4388)
  * secure rendezvous session protocol.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  * Imports @matrix-org/matrix-sdk-crypto-wasm so should be async-imported to avoid bundling the WASM into the main bundle.
  */
-export class MSC4108SecureChannel {
+export class MSC4388SecureChannel {
     private readonly secureChannel: Ecies;
     private establishedChannel?: EstablishedEcies;
     private connected = false;
 
     public constructor(
-        private rendezvousSession: MSC4108RendezvousSession,
+        private rendezvousSession: MSC4388RendezvousSession,
+        public intent: QrCodeIntent,
         private theirPublicKey?: Curve25519PublicKey,
         public onFailure?: RendezvousFailureListener,
     ) {
@@ -54,22 +55,18 @@ export class MSC4108SecureChannel {
     /**
      * Generate a QR code for the current session.
      * @param mode the mode to generate the QR code in, either `Login` or `Reciprocate`.
-     * @param serverName the name of the homeserver to connect to, as defined by server discovery in the spec, required for `Reciprocate` mode.
      */
-    public async generateCode(mode: QrCodeIntent.Login): Promise<Uint8Array>;
-    public async generateCode(mode: QrCodeIntent.Reciprocate, serverName: string): Promise<Uint8Array>;
-    public async generateCode(mode: QrCodeIntent, serverName?: string): Promise<Uint8Array> {
-        const { url } = this.rendezvousSession;
+    public async generateCode(): Promise<Uint8Array> {
+        const { id, baseUrl } = this.rendezvousSession;
 
-        if (!url) {
-            throw new Error("No rendezvous session URL");
+        if (!id) {
+            throw new Error("No rendezvous session ID");
         }
 
-        return new QrCodeData(
-            this.secureChannel.public_key(),
-            url,
-            mode === QrCodeIntent.Reciprocate ? serverName : undefined,
-        ).toBytes();
+        if (!baseUrl) {
+            throw new Error("No rendezvous session base URL");
+        }
+        return QrCodeData.newMsc4388(this.secureChannel.public_key(), id, baseUrl, this.intent).toBytes();
     }
 
     /**
@@ -95,39 +92,21 @@ export class MSC4108SecureChannel {
         }
 
         if (this.theirPublicKey) {
-            // We are the scanning device
-            const result = this.secureChannel.establish_outbound_channel(
-                this.theirPublicKey,
-                "MATRIX_QR_CODE_LOGIN_INITIATE",
-            );
-            this.establishedChannel = result.channel;
+            // We are device S: the scanning device
 
-            /*
-             Secure Channel step 4. Device S sends the initial message
-
-             Nonce := 0
-             SH := ECDH(Ss, Gp)
-             EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
-             TaggedCiphertext := ChaCha20Poly1305_Encrypt(EncKey, Nonce, "MATRIX_QR_CODE_LOGIN_INITIATE")
-             Nonce := Nonce + 2
-             LoginInitiateMessage := UnpaddedBase64(TaggedCiphertext) || "|" || UnpaddedBase64(Sp)
-             */
+            // Secure Channel step 4. Device S sends the initial message
             {
+                const result = this.secureChannel.establish_outbound_channel(
+                    this.theirPublicKey,
+                    "MATRIX_QR_CODE_LOGIN_INITIATE",
+                );
+                this.establishedChannel = result.channel;
                 logger.info("Sending LoginInitiateMessage");
+                // send LoginInitiateMessage
                 await this.rendezvousSession.send(result.initial_message);
             }
 
-            /*
-            Secure Channel step 6. Verification by Device S
-
-            Nonce_G := 1
-            (TaggedCiphertext, Sp) := Unpack(Message)
-            Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_G, TaggedCiphertext)
-            Nonce_G := Nonce_G + 2
-
-            unless Plaintext == "MATRIX_QR_CODE_LOGIN_OK":
-                FAIL
-             */
+            // Secure Channel step 6. Verification by Device S
             {
                 logger.info("Waiting for LoginOkMessage");
                 const ciphertext = await this.rendezvousSession.receive();
@@ -140,6 +119,7 @@ export class MSC4108SecureChannel {
                 }
                 const candidateLoginOkMessage = await this.decrypt(ciphertext);
 
+                // Verify LoginOkMessage
                 if (candidateLoginOkMessage !== "MATRIX_QR_CODE_LOGIN_OK") {
                     throw new RendezvousError(
                         "Invalid response from other device",
@@ -147,19 +127,11 @@ export class MSC4108SecureChannel {
                     );
                 }
 
-                // Step 6 is now complete. We trust the channel
+                // Step 6 is now complete. We, device S, trusts the channel
             }
         } else {
-            /*
-            Secure Channel step 5. Device G confirms
+            // We are device G: the generating device
 
-            Nonce_S := 0
-            (TaggedCiphertext, Sp) := Unpack(LoginInitiateMessage)
-            SH := ECDH(Gs, Sp)
-            EncKey := HKDF_SHA256(SH, "MATRIX_QR_CODE_LOGIN|" || Gp || "|" || Sp, 0, 32)
-            Plaintext := ChaCha20Poly1305_Decrypt(EncKey, Nonce_S, TaggedCiphertext)
-            Nonce_S := Nonce_S + 2
-             */
             // wait for the other side to send us their public key
             logger.info("Waiting for LoginInitiateMessage");
             const loginInitiateMessage = await this.rendezvousSession.receive();
@@ -171,6 +143,7 @@ export class MSC4108SecureChannel {
                 this.secureChannel.establish_inbound_channel(loginInitiateMessage);
             this.establishedChannel = channel;
 
+            // Verify LoginInitiateMessage
             if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
                 throw new RendezvousError(
                     "Invalid response from other device",
@@ -183,7 +156,7 @@ export class MSC4108SecureChannel {
             const loginOkMessage = await this.encrypt("MATRIX_QR_CODE_LOGIN_OK");
             await this.rendezvousSession.send(loginOkMessage);
 
-            // Step 5 is complete. We don't yet trust the channel
+            // Step 5 is complete. We, device G, don't yet trust the channel
 
             // next step will be for the user to confirm the check code on the other device
         }
@@ -211,7 +184,7 @@ export class MSC4108SecureChannel {
      * Sends a payload securely to the other device.
      * @param payload the payload to encrypt and send
      */
-    public async secureSend<T extends MSC4108v2024Payload>(payload: T): Promise<void> {
+    public async secureSend<T extends MSC4108v2025Payload>(payload: T): Promise<void> {
         if (!this.connected) {
             throw new Error("Channel closed");
         }
@@ -225,7 +198,7 @@ export class MSC4108SecureChannel {
     /**
      * Receives an encrypted payload from the other device and decrypts it.
      */
-    public async secureReceive<T extends MSC4108v2024Payload>(): Promise<Partial<T> | undefined> {
+    public async secureReceive<T extends MSC4108v2025Payload>(): Promise<Partial<T> | undefined> {
         if (!this.establishedChannel) {
             throw new Error("Channel closed");
         }
