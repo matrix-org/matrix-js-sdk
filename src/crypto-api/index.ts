@@ -563,8 +563,11 @@ export interface CryptoApi {
      * if they match, stores the key in the crypto store by calling {@link storeSessionBackupPrivateKey},
      * which enables automatic restore of individual keys when an Unable-to-decrypt error is encountered.
      *
-     * If we are unable to fetch the key from secret storage, there is no backup on the server, or the key
-     * does not match, throws an exception.
+     * If the backup decryption key from secret storage does not match the
+     * latest backup on the server, we throw a {@link DecryptionKeyDoesNotMatchError}.
+     *
+     * If we are unable to fetch the key from secret storage or there is no backup on the server,
+     * we throw an exception.
      */
     loadSessionBackupPrivateKeyFromSecretStorage(): Promise<void>;
 
@@ -1337,6 +1340,18 @@ export interface OlmEncryptionInfo {
      *  This is the state at the time of decryption (the user could be verified later).
      */
     senderVerified: boolean;
+}
+
+/**
+ * An error thrown by loadSessionBackupPrivateKeyFromSecretStorage indicating
+ * that the decryption key found in secret storage does not match the public key
+ * of the latest backup.
+ */
+export class DecryptionKeyDoesNotMatchError extends Error {
+    public constructor(message: string) {
+        super(message);
+        this.name = "DecryptionKeyDoesNotMatchError";
+    }
 }
 
 export * from "./verification.ts";

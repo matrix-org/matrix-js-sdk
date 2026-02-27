@@ -37,7 +37,13 @@ import { advanceTimersUntil, awaitDecryption, syncPromise } from "../../test-uti
 import * as testData from "../../test-utils/test-data";
 import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
-import { decodeRecoveryKey, DecryptionFailureCode, CryptoEvent, type CryptoApi } from "../../../src/crypto-api";
+import {
+    decodeRecoveryKey,
+    DecryptionFailureCode,
+    CryptoEvent,
+    type CryptoApi,
+    DecryptionKeyDoesNotMatchError,
+} from "../../../src/crypto-api";
 import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 
 const ROOM_ID = testData.TEST_ROOM_ID;
@@ -502,15 +508,10 @@ describe("megolm-keys backup", () => {
             // @ts-ignore - mock a private method for testing purpose
             vi.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64);
 
-            const fullBackup = {
-                rooms: {
-                    [ROOM_ID]: {
-                        sessions: {
-                            [testData.MEGOLM_SESSION_DATA.session_id]: testData.CURVE25519_KEY_BACKUP_DATA,
-                        },
-                    },
-                },
-            };
+            const fullBackup = createFullBackup(
+                testData.MEGOLM_SESSION_DATA.session_id,
+                testData.CURVE25519_KEY_BACKUP_DATA,
+            );
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
 
             await aliceCrypto.loadSessionBackupPrivateKeyFromSecretStorage();
@@ -521,9 +522,38 @@ describe("megolm-keys backup", () => {
             expect(result.imported).toStrictEqual(1);
         });
 
+        it("Should throw an error if the decryption key does not match the backup", async function () {
+            // Given the stored backup decryption key does not match the public backup info
+            // @ts-ignore - mock a private method for testing purpose
+            vi.spyOn(aliceCrypto.secretStorage, "get").mockResolvedValue(testData.BACKUP_DECRYPTION_KEY_BASE64_ALT);
+
+            const fullBackup = createFullBackup(
+                testData.MEGOLM_SESSION_DATA.session_id,
+                testData.CURVE25519_KEY_BACKUP_DATA,
+            );
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", fullBackup);
+
+            // When we load that key, we throw because the keys don't match
+            await expect(aliceCrypto.loadSessionBackupPrivateKeyFromSecretStorage()).rejects.toThrow(
+                DecryptionKeyDoesNotMatchError,
+            );
+        });
+
         it("Should throw an error if the decryption key is not found in cache", async () => {
             await expect(aliceCrypto.restoreKeyBackup()).rejects.toThrow("No decryption key found in crypto store");
         });
+
+        function createFullBackup(sessionId: string, data: KeyBackupSession) {
+            return {
+                rooms: {
+                    [ROOM_ID]: {
+                        sessions: {
+                            [sessionId]: data,
+                        },
+                    },
+                },
+            };
+        }
     });
 
     describe("backupLoop", () => {
