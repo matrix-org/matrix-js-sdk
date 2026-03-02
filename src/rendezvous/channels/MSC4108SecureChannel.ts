@@ -19,7 +19,7 @@ import {
     Ecies,
     type EstablishedEcies,
     QrCodeData,
-    QrCodeMode,
+    QrCodeIntent,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
@@ -56,9 +56,9 @@ export class MSC4108SecureChannel {
      * @param mode the mode to generate the QR code in, either `Login` or `Reciprocate`.
      * @param serverName the name of the homeserver to connect to, as defined by server discovery in the spec, required for `Reciprocate` mode.
      */
-    public async generateCode(mode: QrCodeMode.Login): Promise<Uint8Array>;
-    public async generateCode(mode: QrCodeMode.Reciprocate, serverName: string): Promise<Uint8Array>;
-    public async generateCode(mode: QrCodeMode, serverName?: string): Promise<Uint8Array> {
+    public async generateCode(mode: QrCodeIntent.Login): Promise<Uint8Array>;
+    public async generateCode(mode: QrCodeIntent.Reciprocate, serverName: string): Promise<Uint8Array>;
+    public async generateCode(mode: QrCodeIntent, serverName?: string): Promise<Uint8Array> {
         const { url } = this.rendezvousSession;
 
         if (!url) {
@@ -68,7 +68,7 @@ export class MSC4108SecureChannel {
         return new QrCodeData(
             this.secureChannel.public_key(),
             url,
-            mode === QrCodeMode.Reciprocate ? serverName : undefined,
+            mode === QrCodeIntent.Reciprocate ? serverName : undefined,
         ).toBytes();
     }
 

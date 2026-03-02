@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
     ClientRendezvousFailureReason,
@@ -108,7 +108,7 @@ interface SecretsPayload extends MSC4108Payload, Awaited<ReturnType<NonNullable<
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
 export class MSC4108SignInWithQR {
-    private readonly ourIntent: QrCodeMode;
+    private readonly ourIntent: QrCodeIntent;
     private _code?: Uint8Array;
     private expectingNewDeviceId?: string;
 
@@ -131,7 +131,7 @@ export class MSC4108SignInWithQR {
         private readonly client?: MatrixClient,
         public onFailure?: RendezvousFailureListener,
     ) {
-        this.ourIntent = client ? QrCodeMode.Reciprocate : QrCodeMode.Login;
+        this.ourIntent = client ? QrCodeIntent.Reciprocate : QrCodeIntent.Login;
     }
 
     /**
@@ -149,9 +149,9 @@ export class MSC4108SignInWithQR {
             return;
         }
 
-        if (this.ourIntent === QrCodeMode.Reciprocate && this.client) {
+        if (this.ourIntent === QrCodeIntent.Reciprocate && this.client) {
             this._code = await this.channel.generateCode(this.ourIntent, this.client.getDomain()!);
-        } else if (this.ourIntent === QrCodeMode.Login) {
+        } else if (this.ourIntent === QrCodeIntent.Login) {
             this._code = await this.channel.generateCode(this.ourIntent);
         }
     }
@@ -160,7 +160,7 @@ export class MSC4108SignInWithQR {
      * Returns true if the device is the already logged in device reciprocating a new login on the other side of the channel.
      */
     public get isExistingDevice(): boolean {
-        return this.ourIntent === QrCodeMode.Reciprocate;
+        return this.ourIntent === QrCodeIntent.Reciprocate;
     }
 
     /**
