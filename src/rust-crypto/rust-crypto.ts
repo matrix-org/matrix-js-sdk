@@ -367,10 +367,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             /* allowRedirects */ true,
             /* useAuthentication */ true,
         );
-        let encryptedBundle: Blob;
+        let encryptedBundle: Uint8Array;
         try {
             const bundleUrl = new URL(url);
-            encryptedBundle = await this.http.authedRequest<Blob>(
+            const encryptedBundleBlob = await this.http.authedRequest<Blob>(
                 Method.Get,
                 bundleUrl.pathname + bundleUrl.search,
                 {},
@@ -380,20 +380,26 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                     prefix: "",
                 },
             );
+            logger.info(`Received blob of length ${encryptedBundleBlob.size}`);
+            encryptedBundle = new Uint8Array(await encryptedBundleBlob.arrayBuffer());
         } catch (err) {
             logger.warn(`Error downloading encrypted bundle from ${url}:`, err);
             throw err;
         }
 
-        logger.info(`Received blob of length ${encryptedBundle.size}`);
         try {
-            await this.olmMachine.receiveRoomKeyBundle(bundleData, new Uint8Array(await encryptedBundle.arrayBuffer()));
+            await this.olmMachine.receiveRoomKeyBundle(bundleData, encryptedBundle);
         } catch (err) {
             logger.warn(`Error receiving encrypted bundle:`, err);
+
+            // Even though we were unable to import the bundle, we still clear the flag that indicates that we
+            // are waiting for the bundle to be received. The only reason this can happen is that the bundle was
+            // malformed somehow, so we don't want to keep retrying it.
+            await this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
+
             throw err;
         }
 
-        // TODO: also clear this if the bundle was malformed.
         await this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         return true;
     }

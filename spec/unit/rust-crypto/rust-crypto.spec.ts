@@ -2389,6 +2389,7 @@ describe("RustCrypto", () => {
                 queryKeysForUsers: vi.fn().mockReturnValue({}),
                 getReceivedRoomKeyBundleData: vi.fn(),
                 receiveRoomKeyBundle: vi.fn(),
+                clearRoomPendingKeyBundle: vi.fn(),
             } as unknown as Mocked<OlmMachine>;
 
             const http = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
@@ -2449,6 +2450,10 @@ describe("RustCrypto", () => {
             expect(mockOlmMachine.receiveRoomKeyBundle).toHaveBeenCalledTimes(1);
             expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][0]).toBe(bundleData);
             expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][1]).toEqual(new TextEncoder().encode("asdfghjkl"));
+
+            // It should also flag the room as not waiting for a key bundle
+            expect(mockOlmMachine.clearRoomPendingKeyBundle).toHaveBeenCalledTimes(1);
+            expect(mockOlmMachine.clearRoomPendingKeyBundle.mock.calls[0][0].toString()).toEqual("!room_id");
         });
     });
 
