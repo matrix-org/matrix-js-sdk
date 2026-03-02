@@ -131,9 +131,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
 
-    /** mapping of room ID -> inviter ID for rooms pending MSC4268 key bundles */
-    private readonly roomsPendingKeyBundles: Map<string, string> = new Map();
-
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
     private outgoingRequestProcessor: OutgoingRequestProcessor;
@@ -396,14 +393,19 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             throw err;
         }
 
+        // TODO: also clear this if the bundle was malformed.
+        await this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         return true;
     }
 
     /**
      * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
      */
-    public markRoomAsPendingKeyBundle(roomId: string, inviter: string): void {
-        this.roomsPendingKeyBundles.set(roomId, inviter);
+    public async markRoomAsPendingKeyBundle(roomId: string, inviter: string): Promise<void> {
+        await this.olmMachine.storeRoomPendingKeyBundle(
+            new RustSdkCryptoJs.RoomId(roomId),
+            new RustSdkCryptoJs.UserId(inviter),
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1727,27 +1729,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                     // We don't actually need to validate the contents of the bundle message, or do
                     // anything with its contents at all. We simply want to inform the Rust SDK we have
                     // received a new room key bundle that we might be able to download.
-                    if (
-                        isRoomKeyBundleMessage(parsedMessage) &&
-                        this.roomsPendingKeyBundles.has(parsedMessage.content.room_id)
-                    ) {
-                        // No `await`-ing here, as this is called from inside the `/sync` loop.
-                        this.maybeAcceptKeyBundle(
-                            parsedMessage.content.room_id,
-                            this.roomsPendingKeyBundles.get(parsedMessage.content.room_id)!,
-                        ).then(
-                            (success) => {
-                                if (success) {
-                                    this.roomsPendingKeyBundles.delete(parsedMessage.content.room_id);
-                                }
-                            },
-                            (err) => {
-                                this.logger.error(
-                                    `Error attempting to download key bundle for room ${parsedMessage.content.room_id}`,
-                                );
-                                this.logger.error(err);
-                            },
+                    if (isRoomKeyBundleMessage(parsedMessage)) {
+                        const roomId = parsedMessage.content.room_id;
+                        const pendingDetails = await this.olmMachine.getPendingKeyBundleDetailsForRoom(
+                            new RustSdkCryptoJs.RoomId(roomId),
                         );
+                        if (pendingDetails) {
+                            // Don't block for the import to happen, here, as this is called from inside the `/sync` loop.
+                            this.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString()).catch((err) => {
+                                this.logger.error(`Error attempting to download key bundle for room ${roomId}`);
+                                this.logger.error(err);
+                            });
+                        }
                     }
 
                     break;
