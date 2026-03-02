@@ -50,6 +50,7 @@ import {
     CryptoEvent,
     type CryptoEventHandlerMap,
     DecryptionFailureCode,
+    DecryptionKeyDoesNotMatchError,
     deriveRecoveryKeyFromPassphrase,
     type DeviceIsolationMode,
     DeviceIsolationModeKind,
@@ -1315,7 +1316,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(backupKey);
         if (!decryptionKeyMatchesKeyBackupInfo(backupDecryptionKey, keyBackupInfo)) {
-            throw new Error("loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info");
+            throw new DecryptionKeyDoesNotMatchError(
+                "loadSessionBackupPrivateKeyFromSecretStorage: decryption key does not match backup info",
+            );
         }
 
         await this.backupManager.saveBackupDecryptionKey(backupDecryptionKey, keyBackupInfo.version);
