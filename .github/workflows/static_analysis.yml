@@ -160,6 +160,7 @@ jobs:
                   JS_SDK_GITHUB_BASE_REF: ${{ github.sha }}
 
             - name: Typecheck
+              working-directory: apps/web
               run: "pnpm run lint:types"
 
     # Hook for branch protection to skip downstream typechecking outside of merge queues
