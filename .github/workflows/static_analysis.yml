@@ -15,6 +15,8 @@ jobs:
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -33,6 +35,8 @@ jobs:
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -51,6 +55,8 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -79,8 +85,12 @@ jobs:
     workflow_lint:
         name: "Workflow Lint"
         runs-on: ubuntu-24.04
+        permissions:
+            security-events: write
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -94,11 +104,16 @@ jobs:
             - name: Run Linter
               run: "pnpm lint:workflows"
 
+            - name: Run zizmor
+              uses: zizmorcore/zizmor-action@0dce2577a4760a2749d8cfb7a84b7d5585ebcb7d # v0.5.0
+
     docs:
         name: "JSDoc Checker"
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -125,6 +140,8 @@ jobs:
         runs-on: ubuntu-24.04
         steps:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -146,6 +163,7 @@ jobs:
             - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
               with:
                   repository: element-hq/element-web
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
@@ -163,13 +181,19 @@ jobs:
               working-directory: apps/web
               run: "pnpm run lint:types"
 
-    # Hook for branch protection to skip downstream typechecking outside of merge queues
-    downstream:
-        name: Downstream Typescript Syntax Check
+    # Workflow consolidation job
+    done:
+        needs:
+            - ts_lint
+            - js_lint
+            - node_example_lint
+            - workflow_lint
+            - docs
+            - analyse_dead_code
+            - element-web
+        name: Static Analysis
         runs-on: ubuntu-24.04
         if: always()
-        needs:
-            - element-web
         steps:
-            - if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
+            - if: contains(needs.*.result , 'failure') || contains(needs.*.result, 'cancelled')
               run: exit 1

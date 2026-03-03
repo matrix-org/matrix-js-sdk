@@ -41,6 +41,7 @@ jobs:
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   ref: ${{ github.event.workflow_run.head_branch }} # checkout commit that triggered this workflow
                   fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
+                  persist-credentials: false
 
             - name: 📥 Download artifact
               uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7

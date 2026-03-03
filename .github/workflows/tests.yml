@@ -23,6 +23,8 @@ jobs:
         steps:
             - name: Checkout code
               uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              with:
+                  persist-credentials: false
 
             - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
             - name: Setup Node
@@ -42,15 +44,18 @@ jobs:
             - name: Run tests
               run: |
                   pnpm test \
-                      --coverage=${{ env.ENABLE_COVERAGE }} \
-                      --maxWorkers ${{ steps.cpu-cores.outputs.count }} \
+                      --coverage=${ENABLE_COVERAGE} \
+                      --maxWorkers ${NUM_WORKERS} \
                       ./spec/${{ matrix.specs }}
               env:
                   SHARD: ${{ matrix.specs }}
+                  NUM_WORKERS: ${{ steps.cpu-cores.outputs.count }}
 
             - name: Move coverage files into place
               if: env.ENABLE_COVERAGE == 'true'
-              run: mv coverage/lcov.info coverage/${{ steps.setupNode.outputs.node-version }}-${{ matrix.specs }}.lcov.info
+              run: mv coverage/lcov.info coverage/${NODE_VERSION}-${{ matrix.specs }}.lcov.info
+              env:
+                  NODE_VERSION: ${{ steps.setupNode.outputs.node-version }}
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
@@ -74,7 +79,7 @@ jobs:
     element-web:
         name: Downstream test element-web
         if: github.event_name == 'merge_group'
-        uses: element-hq/element-web/.github/workflows/tests.yml@develop
+        uses: element-hq/element-web/.github/workflows/tests.yml@develop # zizmor: ignore[unpinned-uses]
         permissions:
             statuses: write
         with:
@@ -84,8 +89,8 @@ jobs:
     complement-crypto:
         name: "Run Complement Crypto tests"
         if: github.event_name == 'merge_group'
-        permissions: read-all
-        uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main
+        permissions: read-all # zizmor: ignore[excessive-permissions]
+        uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main # zizmor: ignore[unpinned-uses]
         with:
             use_js_sdk: "."
 
