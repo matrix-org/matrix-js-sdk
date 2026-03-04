@@ -1,6 +1,9 @@
 name: Pull Request
 on:
-    pull_request_target:
+    # Privilege escalation necessary access members of the review teams
+    # 🚨 We must not execute any checked out code here, and be careful around use of user-controlled inputs.
+    # FIXME: only `community-prs` job needs this privilege, so it should be in its own workflow file.
+    pull_request_target: # zizmor: ignore[dangerous-triggers]
         types: [opened, edited, labeled, unlabeled, synchronize]
     merge_group:
         types: [checks_requested]

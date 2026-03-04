@@ -27,6 +27,7 @@ jobs:
                   # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
+                  persist-credentials: true
 
             - name: Get actions scripts
               uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6

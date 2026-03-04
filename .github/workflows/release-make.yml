@@ -48,7 +48,7 @@ jobs:
         permissions:
             issues: read
             pull-requests: read
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-checks.yml@develop
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-checks.yml@develop # zizmor: ignore[unpinned-uses]
 
     release:
         name: Release
@@ -69,7 +69,7 @@ jobs:
 
             - name: Get draft release
               id: draft-release
-              uses: cardinalby/git-get-release-action@5172c3a026600b1d459b117738c605fabc9e4e44 # v1
+              uses: cardinalby/git-get-release-action@5172c3a026600b1d459b117738c605fabc9e4e44 # 1.2.5
               env:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
@@ -82,6 +82,7 @@ jobs:
                   # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   fetch-depth: 0
+                  persist-credentials: true
 
             - name: Get actions scripts
               uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -286,7 +287,7 @@ jobs:
         name: Publish to npm
         needs: release
         if: inputs.npm
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop # zizmor: ignore[unpinned-uses]
         with:
             dir: ${{ inputs.dir }}
         permissions:

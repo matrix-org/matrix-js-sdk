@@ -21,7 +21,7 @@ concurrency:
 jobs:
     playwright:
         name: Playwright
-        uses: element-hq/element-web/.github/workflows/end-to-end-tests.yaml@develop
+        uses: element-hq/element-web/.github/workflows/end-to-end-tests.yaml@develop # zizmor: ignore[unpinned-uses]
         permissions:
             actions: read
             issues: read
