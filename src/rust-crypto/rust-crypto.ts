@@ -1934,7 +1934,21 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param oldMembership - The previous membership state. Null if it's a new member.
      */
     public onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {
-        const enc = this.roomEncryptors[event.getRoomId()!];
+        const roomId = event.getRoomId()!;
+
+        // If it's our own membership, and we are no longer joined, clear any indication that we are waiting for a key
+        // bundle.
+        if (
+            oldMembership === KnownMembership.Join &&
+            member.membership !== KnownMembership.Join &&
+            member.userId === this.olmMachine.userId.toString()
+        ) {
+            this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId)).catch((e) => {
+                this.logger.error(`Error clearing room pending key bundle indicator for ${roomId}: ${e}`);
+            });
+        }
+
+        const enc = this.roomEncryptors[roomId];
         if (!enc) {
             // not encrypting in this room
             return;
