@@ -111,6 +111,9 @@ interface ISignableObject {
     unsigned?: object;
 }
 
+/** The maximum time, in milliseconds, since we accepted an invite, that we should accept a key bundle. */
+export const MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  *
@@ -1728,9 +1731,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                         },
                     });
 
-                    // If we have received a room key bundle message, and have previously marked the room
-                    // IDs it references as pending key bundles, tell the Rust SDK to try and accept it,
-                    // just in case it was received after invite.
+                    // If we have received a room key bundle message, and have recently joined the room in question,
+                    // tell the Rust SDK to try and accept the key bundle.
                     //
                     // We don't actually need to validate the contents of the bundle message, or do
                     // anything with its contents at all. We simply want to inform the Rust SDK we have
@@ -1740,7 +1742,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                         const pendingDetails = await this.olmMachine.getPendingKeyBundleDetailsForRoom(
                             new RustSdkCryptoJs.RoomId(roomId),
                         );
-                        if (pendingDetails) {
+                        // Only accept the key bundle if we joined the room less than 24 hours ago.
+                        if (!pendingDetails) {
+                            this.logger.debug(
+                                `Not yet accepting key bundle for room where we are not awaiting a bundle: ${roomId}`,
+                            );
+                        } else if (
+                            Date.now() - pendingDetails.inviteAcceptedAtMillis >
+                            MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE
+                        ) {
+                            this.logger.info(
+                                `Ignoring key bundle for room we joined too long ago: ${roomId}, joining time: ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()}`,
+                            );
+                        } else {
+                            this.logger.info(`Considering key bundle for recently-joined room ${roomId}`);
                             // Don't block for the import to happen, here, as this is called from inside the `/sync` loop.
                             this.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString()).catch((err) => {
                                 this.logger.error(`Error attempting to download key bundle for room ${roomId}`);

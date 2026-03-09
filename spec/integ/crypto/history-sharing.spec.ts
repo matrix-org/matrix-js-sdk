@@ -251,6 +251,92 @@ describe("History Sharing", () => {
         expect(encryptionInfo?.shieldReason).toEqual(EventShieldReason.AUTHENTICITY_NOT_GUARANTEED);
     });
 
+    test("Room keys are not imported if the bundle arrives more than 24H after the invite is accepted", async () => {
+        vitest.useFakeTimers();
+
+        // Alice is in an encrypted room
+        const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
+        aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        // ... and she sends an event
+        const msgProm = expectSendRoomEvent(ALICE_HOMESERVER_URL, "m.room.encrypted");
+        await aliceClient.sendEvent(ROOM_ID, EventType.RoomMessage, { msgtype: MsgType.Text, body: "Hello!" });
+        const sentMessage = await msgProm;
+        debug(`Alice sent encrypted room event: ${JSON.stringify(sentMessage)}`);
+
+        // Now, Alice invites Bob
+        const uploadProm = expectUploadRequest();
+        const toDeviceMessageProm = expectSendToDeviceMessage(ALICE_HOMESERVER_URL, "m.room.encrypted");
+        // POST https://alice-server.com/_matrix/client/v3/rooms/!room%3Aexample.com/invite
+        fetchMock.postOnce(`${ALICE_HOMESERVER_URL}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+
+        const uploadedBlob = await uploadProm;
+        const sentToDeviceRequest = await toDeviceMessageProm;
+        debug(`Alice sent encrypted to-device events: ${JSON.stringify(sentToDeviceRequest)}`);
+        const bobToDeviceMessage = sentToDeviceRequest[bobClient.getSafeUserId()][bobClient.deviceId!];
+        expect(bobToDeviceMessage).toBeDefined();
+
+        // Bob receives the room invite, but not the room key bundle
+        const inviteEvent = mkInviteEvent(aliceClient, bobClient);
+        bobSyncResponder.sendOrQueueSyncResponse({
+            rooms: { invite: { [ROOM_ID]: { invite_state: { events: [inviteEvent] } } } },
+        });
+        await syncPromise(bobClient);
+
+        // Bob joins the room
+        const room = bobClient.getRoom(ROOM_ID);
+        expect(room).toBeTruthy();
+        expect(room?.getMyMembership()).toEqual(KnownMembership.Invite);
+        fetchMock.postOnce(`${BOB_HOMESERVER_URL}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
+            room_id: ROOM_ID,
+        });
+        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+
+        // Bob receives and attempts to decrypt the megolm message, but should not be able to (yet).
+        const event = await bobReceivesEvent(
+            aliceClient,
+            bobClient,
+            mkEventCustom({
+                type: "m.room.encrypted",
+                sender: aliceClient.getSafeUserId(),
+                content: sentMessage,
+                event_id: "$event_id",
+                room_id: ROOM_ID,
+            }),
+            bobSyncResponder,
+        );
+        await event.getDecryptionPromise();
+        expect(event.isDecryptionFailure()).toBeTruthy();
+
+        // 24 hours elapse before the room key bundle message arrives.
+        vitest.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+
+        fetchMock.getOnce(`begin:${BOB_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`, {
+            body: uploadedBlob,
+        });
+        bobSyncResponder.sendOrQueueSyncResponse({
+            to_device: {
+                events: [
+                    {
+                        type: "m.room.encrypted",
+                        sender: aliceClient.getSafeUserId(),
+                        content: bobToDeviceMessage,
+                    },
+                ],
+            },
+        });
+        await syncPromise(bobClient);
+
+        // Wait a bit to ensure the event is not decrypted.
+        for (let i = 0; i < 10; i++) {
+            await vitest.advanceTimersByTimeAsync(10);
+        }
+
+        expect(event.isDecryptionFailure()).toBeTruthy();
+    });
+
     test("Room keys are downloaded from key backup before inviting", async () => {
         // Set up backup, and ignore requests to send room key requests
         fetchMock.get("path:/_matrix/client/v3/room_keys/version", SIGNED_BACKUP_DATA);
