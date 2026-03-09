@@ -110,6 +110,7 @@ describe("initRustCrypto", () => {
             getBackupKeys: vi.fn(),
             getIdentity: vi.fn().mockResolvedValue(null),
             trackedUsers: vi.fn(),
+            getAllRoomsPendingKeyBundles: vi.fn().mockResolvedValue([]),
         } as unknown as Mocked<OlmMachine>;
     }
 
