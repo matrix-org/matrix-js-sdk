@@ -21,6 +21,7 @@ import {
     KeysQueryRequest,
     Migration,
     OlmMachine,
+    type OtherUserIdentity,
     type PickledInboundGroupSession,
     type PickledSession,
     StoreHandle,
@@ -1535,7 +1536,7 @@ describe("RustCrypto", () => {
                 free: vi.fn(),
                 isVerified: vi.fn().mockReturnValue(true),
                 wasPreviouslyVerified: vi.fn().mockReturnValue(true),
-            });
+            } as unknown as OtherUserIdentity);
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
             expect(userVerificationStatus.isVerified()).toBeTruthy();
