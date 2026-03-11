@@ -394,15 +394,17 @@ describe("History Sharing", () => {
 });
 
 function expectSendRoomEvent(homeserverUrl: string, msgtype: string): Promise<IContent> {
+    const name = `sendRoomEvent-${homeserverUrl}-${msgtype}`;
     return new Promise<IContent>((resolve) => {
         fetchMock.putOnce(
             new RegExp(`^${escapeRegExp(homeserverUrl)}/_matrix/client/v3/rooms/[^/]*/send/${escapeRegExp(msgtype)}/`),
             (callLog) => {
                 const content = JSON.parse(callLog.options.body as string);
                 resolve(content);
+                fetchMock.removeRoute(name);
                 return { event_id: "$event_id" };
             },
-            { name: "sendRoomEvent" },
+            { name },
         );
     });
 }
