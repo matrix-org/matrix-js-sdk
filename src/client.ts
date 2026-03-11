@@ -4088,7 +4088,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (opts.shareEncryptedHistory) {
-            await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
+            await this.cryptoBackend?.shareRoomHistoryWithUser(
+                roomId,
+                userId,
+                this.getRoom(roomId)?.getHistoryVisibility(),
+            );
         }
 
         return await this.membershipChange(roomId, userId, KnownMembership.Invite, opts.reason);
