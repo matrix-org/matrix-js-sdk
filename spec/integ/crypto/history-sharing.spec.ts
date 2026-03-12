@@ -404,7 +404,7 @@ describe("History Sharing", () => {
         expect(
             fetchMock.callHistory.called(new URL("/_matrix/media/v3/upload", ALICE_HOMESERVER_URL).toString()),
         ).toBeFalsy();
-        // ... didn't sent Bob the key bundle info ...
+        // ... didn't send Bob the key bundle info ...
         expect(
             fetchMock.callHistory.called(
                 new RegExp(
