@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import { type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type OtherUserIdentity, type OutgoingRequest } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type Mocked } from "vitest";
 
 import {
@@ -138,7 +138,9 @@ describe("VerificationRequest", () => {
             await bobOlmMachine.updateTrackedUsers([new RustSdkCryptoJs.UserId(aliceUserId)]);
 
             // Alice requests verification
-            const bobUserIdentity = await aliceOlmMachine.getIdentity(new RustSdkCryptoJs.UserId(bobUserId));
+            const bobUserIdentity = (await aliceOlmMachine.getIdentity(
+                new RustSdkCryptoJs.UserId(bobUserId),
+            )) as OtherUserIdentity;
 
             const roomId = new RustSdkCryptoJs.RoomId("!roomId:example.org");
             const methods = [verificationMethodIdentifierToMethod("m.sas.v1")];
@@ -276,7 +278,9 @@ describe("VerificationRequest", () => {
             await bobOlmMachine.updateTrackedUsers([new RustSdkCryptoJs.UserId(aliceUserId)]);
 
             // Alice requests verification
-            const bobUserIdentity = await aliceOlmMachine.getIdentity(new RustSdkCryptoJs.UserId(bobUserId));
+            const bobUserIdentity = (await aliceOlmMachine.getIdentity(
+                new RustSdkCryptoJs.UserId(bobUserId),
+            )) as OtherUserIdentity;
 
             const roomId = new RustSdkCryptoJs.RoomId("!roomId:example.org");
             const methods = [verificationMethodIdentifierToMethod("m.sas.v1")];
@@ -394,7 +398,9 @@ describe("VerificationRequest", () => {
             await bobOlmMachine.updateTrackedUsers([new RustSdkCryptoJs.UserId(aliceUserId)]);
 
             // Alice requests verification
-            const bobUserIdentity = await aliceOlmMachine.getIdentity(new RustSdkCryptoJs.UserId(bobUserId));
+            const bobUserIdentity = (await aliceOlmMachine.getIdentity(
+                new RustSdkCryptoJs.UserId(bobUserId),
+            )) as OtherUserIdentity;
 
             const roomId = new RustSdkCryptoJs.RoomId("!roomId:example.org");
             const methods = [

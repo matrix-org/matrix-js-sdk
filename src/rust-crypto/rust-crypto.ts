@@ -781,9 +781,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#getCrossSigningKeyId}
      */
     public async getCrossSigningKeyId(type: CrossSigningKey = CrossSigningKey.Master): Promise<string | null> {
-        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
-            new RustSdkCryptoJs.UserId(this.userId),
-        );
+        const userIdentity = await this.getOwnIdentity();
         if (!userIdentity) {
             // The public keys are not available on this device
             return null;
@@ -1012,9 +1010,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#getCrossSigningStatus}
      */
     public async getCrossSigningStatus(): Promise<CrossSigningStatus> {
-        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | null = await this.getOlmMachineOrThrow().getIdentity(
-            new RustSdkCryptoJs.UserId(this.userId),
-        );
+        const userIdentity = await this.getOwnIdentity();
 
         const publicKeysOnDevice =
             Boolean(userIdentity?.masterKey) &&
@@ -1128,9 +1124,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Implementation of {@link CryptoApi#requestVerificationDM}
      */
     public async requestVerificationDM(userId: string, roomId: string): Promise<VerificationRequest> {
-        const userIdentity: RustSdkCryptoJs.OtherUserIdentity | undefined = await this.olmMachine.getIdentity(
-            new RustSdkCryptoJs.UserId(userId),
-        );
+        const userIdentity = (await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(userId))) as
+            | RustSdkCryptoJs.OtherUserIdentity
+            | undefined;
 
         if (!userIdentity) throw new Error(`unknown userId ${userId}`);
 
@@ -1214,9 +1210,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @returns a VerificationRequest when the request has been sent to the other party.
      */
     public async requestOwnUserVerification(): Promise<VerificationRequest> {
-        const userIdentity: RustSdkCryptoJs.OwnUserIdentity | undefined = await this.olmMachine.getIdentity(
-            new RustSdkCryptoJs.UserId(this.userId),
-        );
+        const userIdentity = await this.getOwnIdentity();
         if (userIdentity === undefined) {
             throw new Error("cannot request verification for this device when there is no existing cross-signing key");
         }
@@ -2189,7 +2183,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * Used during migration from legacy js-crypto to update local trust if needed.
      */
     public async getOwnIdentity(): Promise<RustSdkCryptoJs.OwnUserIdentity | undefined> {
-        return await this.olmMachine.getIdentity(new RustSdkCryptoJs.UserId(this.userId));
+        const identity = (await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(this.userId))) as
+            | RustSdkCryptoJs.OwnUserIdentity
+            | undefined;
+        return identity;
     }
 }
 

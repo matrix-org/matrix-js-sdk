@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { QrCodeData, QrCodeMode } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrCodeData, QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 import fetchMock from "@fetch-mock/vitest";
 
 import {
@@ -146,7 +146,7 @@ describe("MSC4108SignInWithQR", () => {
 
             const ourChannel = new MSC4108SecureChannel(ourMockSession);
             const qrCodeData = QrCodeData.fromBytes(
-                await ourChannel.generateCode(QrCodeMode.Reciprocate, client.getDomain()!),
+                await ourChannel.generateCode(QrCodeIntent.Reciprocate, client.getDomain()!),
             );
             const opponentChannel = new MSC4108SecureChannel(opponentMockSession, qrCodeData.publicKey);
 
