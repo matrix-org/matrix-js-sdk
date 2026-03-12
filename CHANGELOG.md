@@ -1,3 +1,11 @@
+Changes in [41.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.1.0) (2026-03-10)
+==================================================================================================
+## ✨ Features
+
+* Throw a specific error when the backup decryption key does not match the public backup ([#5202](https://github.com/matrix-org/matrix-js-sdk/pull/5202)). Contributed by @andybalaam.
+* Update getUrlPreview to use /\_matrix/client/v1/media/preview\_url ([#5191](https://github.com/matrix-org/matrix-js-sdk/pull/5191)). Contributed by @Half-Shot.
+
+
 Changes in [41.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.0.0) (2026-02-24)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
