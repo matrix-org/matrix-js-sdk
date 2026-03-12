@@ -4091,7 +4091,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const historyVisibility = this.getRoom(roomId)?.getHistoryVisibility() ?? HistoryVisibility.Shared;
             // We should only share room history if the *current* visibility allows it.
             if ([HistoryVisibility.Invited, HistoryVisibility.Joined].includes(historyVisibility)) {
-                logger.debug("Not sharing message history as the room history visibility is currently unshared");
+                this.logger.debug("Not sharing message history as the room history visibility is currently unshared");
             } else {
                 await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
             }
