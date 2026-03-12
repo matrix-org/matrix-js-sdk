@@ -31,7 +31,6 @@ import {
 } from "./keybackup.ts";
 import { type ISignatures } from "../@types/signed.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { type HistoryVisibility } from "../matrix.ts";
 
 /**
  * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.
@@ -734,11 +733,10 @@ export interface CryptoApi {
      *
      * @param roomId - The ID of the room in question.
      * @param userId - The ID of the user being invited.
-     * @param historyVisibility - The history visibility of the room, defaulting to `HistoryVisibility.Shared`.
      *
      * @experimental
      */
-    shareRoomHistoryWithUser(roomId: string, userId: string, historyVisibility?: HistoryVisibility): Promise<void>;
+    shareRoomHistoryWithUser(roomId: string, userId: string): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */

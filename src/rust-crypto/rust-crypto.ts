@@ -98,7 +98,6 @@ import { VerificationMethod } from "../types.ts";
 import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
-import { HistoryVisibility } from "../matrix.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1606,25 +1605,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoApi#shareRoomHistoryWithUser}.
      */
-    public async shareRoomHistoryWithUser(
-        roomId: string,
-        userId: string,
-        historyVisibility: HistoryVisibility = HistoryVisibility.Shared,
-    ): Promise<void> {
+    public async shareRoomHistoryWithUser(roomId: string, userId: string): Promise<void> {
         const logger = new LogSpan(this.logger, `shareRoomHistoryWithUser(${roomId}, ${userId})`);
 
-        // 0.a. We can only share room history if our user has set up cross-signing.
+        // 0. We can only share room history if our user has set up cross-signing.
         const identity = await this.getOwnIdentity();
         if (!identity?.isVerified()) {
             logger.warn(
                 "Not sharing message history as the current device is not verified by our cross-signing identity",
             );
-            return;
-        }
-
-        // 0.b. We should only share room history if the *current* visibility allows it.
-        if ([HistoryVisibility.Invited, HistoryVisibility.Joined].includes(historyVisibility)) {
-            logger.debug("Not sharing message history as the room history visibility is currently unshared");
             return;
         }
 
