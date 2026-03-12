@@ -80,6 +80,18 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
      */
     importBackedUpRoomKeys(keys: IMegolmSessionData[], backupVersion: string, opts?: ImportRoomKeysOpts): Promise<void>;
 
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // Room key history sharing (MSC4268)
+    //
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+    /**
+     * Share any shareable E2EE history in the given room with the given recipient,
+     * as per [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268)
+     */
+    shareRoomHistoryWithUser(roomId: string, userId: string): Promise<void>;
+
     /**
      * Having accepted an invite for the given room from the given user, attempt to
      * find information about a room key bundle and, if found, download the
