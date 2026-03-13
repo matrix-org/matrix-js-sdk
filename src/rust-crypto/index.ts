@@ -249,12 +249,17 @@ async function initOlmMachine(
 
     // If we have any recently-joined rooms, see if we have a pending key bundle for them.
     for (const pendingDetails of await olmMachine.getAllRoomsPendingKeyBundles()) {
+        const roomId = pendingDetails.roomId.toString();
         if (Date.now() - pendingDetails.inviteAcceptedAtMillis <= MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE) {
-            const roomId = pendingDetails.roomId.toString();
             logger.info(
                 `Checking for pending key bundle for recently-joined room ${roomId} (joined ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()})`,
             );
             await rustCrypto.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString());
+        } else {
+            logger.info(
+                `Clearing pending-key-bundle flag for room ${roomId} (too old: joined ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()})`,
+            );
+            await olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         }
     }
 
