@@ -1365,6 +1365,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async resetKeyBackup(): Promise<void> {
         const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
 
+        await this.pushSecretToVerifiedDevices("m.megolm_backup.v1");
+
         // we want to store the private key in 4S
         // need to check if 4S is set up?
         if (await this.secretStorageHasAESKey()) {
@@ -2038,9 +2040,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Handles secret received from the rust secret inbox.
      *
-     * The gossipped secrets are received using the `m.secret.send` event type
-     * and are guaranteed to have been received over a 1-to-1 Olm
-     * Session from a verified device.
+     * The gossipped secrets are received using the `m.secret.send` or
+     * `io.element.msc4385.secret.push` event types and are guaranteed to have
+     * been received over a 1-to-1 Olm Session from a verified device.
      *
      * The only secret currently handled in this way is `m.megolm_backup.v1`.
      *
@@ -2068,6 +2070,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     public async checkSecrets(name: string): Promise<void> {
         const pendingValues: Set<string> = await this.olmMachine.getSecretsFromInbox(name);
+        (await this.olmMachine.getPushedSecretsFromInbox(name)).forEach((value: string) => pendingValues.add(value));
         for (const value of pendingValues) {
             if (await this.handleSecretReceived(name, value)) {
                 // If we have a valid secret for that name there is no point of processing the other secrets values.
@@ -2078,6 +2081,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         // Important to call this after handling the secrets as good hygiene.
         await this.olmMachine.deleteSecretsFromInbox(name);
+        await this.olmMachine.deletePushedSecretsFromInbox(name);
     }
 
     /**
@@ -2187,6 +2191,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             | RustSdkCryptoJs.OwnUserIdentity
             | undefined;
         return identity;
+    }
+
+    /**
+     * Push a secret to all of the current user's verified devices.
+     *
+     * <strong>This method is experimental and may change.</strong>
+     */
+    public async pushSecretToVerifiedDevices(name: string): Promise<void> {
+        const logger = new LogSpan(this.logger, "pushSecretToVerifiedDevices");
+        await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(this.userId)]);
+        await this.olmMachine.pushSecretToVerifiedDevices(name);
+        this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
+            this.logger.warn("onKeyVerificationRequest: Error processing outgoing requests", e);
+        });
     }
 }
 
