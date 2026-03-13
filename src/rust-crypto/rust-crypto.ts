@@ -395,15 +395,14 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         } catch (err) {
             logger.warn(`Error receiving encrypted bundle:`, err);
 
-            // Even though we were unable to import the bundle, we still clear the flag that indicates that we
+            throw err;
+        } finally {
+            // Even if we were unable to import the bundle, we still clear the flag that indicates that we
             // are waiting for the bundle to be received. The only reason this can happen is that the bundle was
             // malformed somehow, so we don't want to keep retrying it.
             await this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
-
-            throw err;
         }
 
-        await this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         return true;
     }
 
