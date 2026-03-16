@@ -17,7 +17,7 @@ limitations under the License.
 import { logger } from "../../logger.ts";
 import { sleep } from "../../utils.ts";
 import { ClientRendezvousFailureReason, MSC4108FailureReason, type RendezvousFailureListener } from "../index.ts";
-import { MatrixClient, Method } from "../../matrix.ts";
+import { type MatrixClient, Method } from "../../matrix.ts";
 import { ClientPrefix, MatrixError } from "../../http-api/index.ts";
 
 const API_PREFIX = "/io.element.msc4388/rendezvous";

@@ -25,7 +25,7 @@ import {
 import { type MatrixClient } from "../client.ts";
 import { logger } from "../logger.ts";
 import { MSC4388SecureChannel } from "./channels/MSC4388SecureChannel.ts";
-import { MatrixError } from "../http-api/index.ts";
+import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
 import { sleep } from "../utils.ts";
 import {
     OAuthGrantType,
@@ -545,6 +545,31 @@ export class MSC4108v2025SignInWithQR {
      */
     public async close(): Promise<void> {
         await this.channel.close();
+    }
+}
+
+export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boolean> {
+    // check for support of device authoriation grant
+    const metadata = await client.getAuthMetadata();
+    if (!metadata.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
+        return false;
+    }
+
+    // check for support of MSC4388 rendezvous endpoint
+    try {
+        // 200 OK means supported
+        await client.http.authedRequest(Method.Get, "/io.element.msc4388/rendezvous", undefined, undefined, {
+            prefix: ClientPrefix.Unstable,
+        });
+
+        return true;
+    } catch (e) {
+        // 404 and 403 are expected
+        if (e instanceof MatrixError && (e.httpStatus === 404 || e.httpStatus === 403)) {
+            return false;
+        }
+
+        throw e;
     }
 }
 
