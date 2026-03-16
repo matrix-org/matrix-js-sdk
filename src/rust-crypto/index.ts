@@ -17,7 +17,7 @@ limitations under the License.
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 
-import { RustCrypto } from "./rust-crypto.ts";
+import { MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE, RustCrypto } from "./rust-crypto.ts";
 import { type IHttpOpts, type MatrixHttpApi } from "../http-api/index.ts";
 import { type ServerSideSecretStorage } from "../secret-storage.ts";
 import { type Logger } from "../logger.ts";
@@ -244,6 +244,22 @@ async function initOlmMachine(
             await migrateLegacyLocalTrustIfNeeded({ legacyCryptoStore, rustCrypto, logger });
 
             await legacyCryptoStore.setMigrationState(MigrationState.INITIAL_OWN_KEY_QUERY_DONE);
+        }
+    }
+
+    // If we have any recently-joined rooms, see if we have a pending key bundle for them.
+    for (const pendingDetails of await olmMachine.getAllRoomsPendingKeyBundles()) {
+        const roomId = pendingDetails.roomId.toString();
+        if (Date.now() - pendingDetails.inviteAcceptedAtMillis <= MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE) {
+            logger.info(
+                `Checking for pending key bundle for recently-joined room ${roomId} (joined ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()})`,
+            );
+            await rustCrypto.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString());
+        } else {
+            logger.info(
+                `Clearing pending-key-bundle flag for room ${roomId} (too old: joined ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()})`,
+            );
+            await olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         }
     }
 

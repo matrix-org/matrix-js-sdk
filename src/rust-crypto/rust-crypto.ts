@@ -111,6 +111,9 @@ interface ISignableObject {
     unsigned?: object;
 }
 
+/** The maximum time, in milliseconds, since we accepted an invite, that we should accept a key bundle. */
+export const MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE = 24 * 60 * 60 * 1000; // 24 hours
+
 /**
  * An implementation of {@link CryptoBackend} using the Rust matrix-sdk-crypto.
  *
@@ -130,9 +133,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
     /** mapping of roomId → encryptor class */
     private roomEncryptors: Record<string, RoomEncryptor> = {};
-
-    /** mapping of room ID -> inviter ID for rooms pending MSC4268 key bundles */
-    private readonly roomsPendingKeyBundles: Map<string, string> = new Map();
 
     private eventDecryptor: EventDecryptor;
     private keyClaimManager: KeyClaimManager;
@@ -370,10 +370,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             /* allowRedirects */ true,
             /* useAuthentication */ true,
         );
-        let encryptedBundle: Blob;
+        let encryptedBundle: Uint8Array;
         try {
             const bundleUrl = new URL(url);
-            encryptedBundle = await this.http.authedRequest<Blob>(
+            const encryptedBundleBlob = await this.http.authedRequest<Blob>(
                 Method.Get,
                 bundleUrl.pathname + bundleUrl.search,
                 {},
@@ -383,17 +383,24 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                     prefix: "",
                 },
             );
+            logger.info(`Received blob of length ${encryptedBundleBlob.size}`);
+            encryptedBundle = new Uint8Array(await encryptedBundleBlob.arrayBuffer());
         } catch (err) {
             logger.warn(`Error downloading encrypted bundle from ${url}:`, err);
             throw err;
         }
 
-        logger.info(`Received blob of length ${encryptedBundle.size}`);
         try {
-            await this.olmMachine.receiveRoomKeyBundle(bundleData, new Uint8Array(await encryptedBundle.arrayBuffer()));
+            await this.olmMachine.receiveRoomKeyBundle(bundleData, encryptedBundle);
         } catch (err) {
             logger.warn(`Error receiving encrypted bundle:`, err);
+
             throw err;
+        } finally {
+            // Even if we were unable to import the bundle, we still clear the flag that indicates that we
+            // are waiting for the bundle to be received. The only reason this can happen is that the bundle was
+            // malformed somehow, so we don't want to keep retrying it.
+            await this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId));
         }
 
         return true;
@@ -402,8 +409,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Implementation of {@link CryptoBackend.markRoomAsPendingKeyBundle}.
      */
-    public markRoomAsPendingKeyBundle(roomId: string, inviter: string): void {
-        this.roomsPendingKeyBundles.set(roomId, inviter);
+    public async markRoomAsPendingKeyBundle(roomId: string, inviter: string): Promise<void> {
+        await this.olmMachine.storeRoomPendingKeyBundle(
+            new RustSdkCryptoJs.RoomId(roomId),
+            new RustSdkCryptoJs.UserId(inviter),
+        );
     }
 
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1720,34 +1730,37 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                         },
                     });
 
-                    // If we have received a room key bundle message, and have previously marked the room
-                    // IDs it references as pending key bundles, tell the Rust SDK to try and accept it,
-                    // just in case it was received after invite.
+                    // If we have received a room key bundle message, and have recently joined the room in question,
+                    // tell the Rust SDK to try and accept the key bundle.
                     //
                     // We don't actually need to validate the contents of the bundle message, or do
                     // anything with its contents at all. We simply want to inform the Rust SDK we have
                     // received a new room key bundle that we might be able to download.
-                    if (
-                        isRoomKeyBundleMessage(parsedMessage) &&
-                        this.roomsPendingKeyBundles.has(parsedMessage.content.room_id)
-                    ) {
-                        // No `await`-ing here, as this is called from inside the `/sync` loop.
-                        this.maybeAcceptKeyBundle(
-                            parsedMessage.content.room_id,
-                            this.roomsPendingKeyBundles.get(parsedMessage.content.room_id)!,
-                        ).then(
-                            (success) => {
-                                if (success) {
-                                    this.roomsPendingKeyBundles.delete(parsedMessage.content.room_id);
-                                }
-                            },
-                            (err) => {
-                                this.logger.error(
-                                    `Error attempting to download key bundle for room ${parsedMessage.content.room_id}`,
-                                );
-                                this.logger.error(err);
-                            },
+                    if (isRoomKeyBundleMessage(parsedMessage)) {
+                        const roomId = parsedMessage.content.room_id;
+                        const pendingDetails = await this.olmMachine.getPendingKeyBundleDetailsForRoom(
+                            new RustSdkCryptoJs.RoomId(roomId),
                         );
+                        // Only accept the key bundle if we joined the room less than 24 hours ago.
+                        if (!pendingDetails) {
+                            this.logger.debug(
+                                `Not yet accepting key bundle for room where we are not awaiting a bundle: ${roomId}`,
+                            );
+                        } else if (
+                            Date.now() - pendingDetails.inviteAcceptedAtMillis >
+                            MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE
+                        ) {
+                            this.logger.info(
+                                `Ignoring key bundle for room we joined too long ago: ${roomId}, joining time: ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()}`,
+                            );
+                        } else {
+                            this.logger.info(`Considering key bundle for recently-joined room ${roomId}`);
+                            // Don't block for the import to happen, here, as this is called from inside the `/sync` loop.
+                            this.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString()).catch((err) => {
+                                this.logger.error(`Error attempting to download key bundle for room ${roomId}`);
+                                this.logger.error(err);
+                            });
+                        }
                     }
 
                     break;
@@ -1920,7 +1933,21 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param oldMembership - The previous membership state. Null if it's a new member.
      */
     public onRoomMembership(event: MatrixEvent, member: RoomMember, oldMembership?: string): void {
-        const enc = this.roomEncryptors[event.getRoomId()!];
+        const roomId = event.getRoomId()!;
+
+        // If it's our own membership, and we are no longer joined, clear any indication that we are waiting for a key
+        // bundle.
+        if (
+            oldMembership === KnownMembership.Join &&
+            member.membership !== KnownMembership.Join &&
+            member.userId === this.olmMachine.userId.toString()
+        ) {
+            this.olmMachine.clearRoomPendingKeyBundle(new RustSdkCryptoJs.RoomId(roomId)).catch((e) => {
+                this.logger.error(`Error clearing room pending key bundle indicator for ${roomId}: ${e}`);
+            });
+        }
+
+        const enc = this.roomEncryptors[roomId];
         if (!enc) {
             // not encrypting in this room
             return;
