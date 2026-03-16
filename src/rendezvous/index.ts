@@ -25,6 +25,7 @@ export * from "./transports/index.ts";
 export * from "./channels/index.ts";
 export {
     MSC4108v2025SignInWithQR,
+    isSignInWithQRAvailable,
     linkNewDeviceByGeneratingQR,
     signInByGeneratingQR,
 } from "./MSC4108v2025SignInWithQR.ts";
