@@ -58,7 +58,9 @@ export interface InviteOpts {
     /**
      * Before sending the invite, if the room is encrypted, share the keys for any messages sent while the history
      * visibility was `shared`, via the experimental
-     * support for [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268).
+     * support for [MSC4268](https://github.com/matrix-org/matrix-spec-proposals/pull/4268). If the room's current
+     * history visibility setting is neither `shared` nor `world_readable`, history sharing will be disabled to prevent
+     * exposing keys for messages sent prior to the visibility restriction.
      *
      * @experimental
      */
