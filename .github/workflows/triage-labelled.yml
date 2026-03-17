@@ -6,6 +6,6 @@ on:
 permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     call-triage-labelled:
-        uses: element-hq/element-web/.github/workflows/triage-labelled.yml@2c9f55cbea90702aa61b9304afa9cbf940efa14f
+        uses: element-hq/element-web/.github/workflows/triage-labelled.yml@97309330faf536b558404b44130823cd908f2cf2
         secrets:
             ELEMENT_BOT_TOKEN: ${{ secrets.ELEMENT_BOT_TOKEN }}
