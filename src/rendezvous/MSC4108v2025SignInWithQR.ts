@@ -558,11 +558,17 @@ export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boo
     // check for support of MSC4388 rendezvous endpoint
     try {
         // 200 OK means supported
-        await client.http.authedRequest(Method.Get, "/io.element.msc4388/rendezvous", undefined, undefined, {
-            prefix: ClientPrefix.Unstable,
-        });
+        const discoveryBody = await client.http.authedRequest<{ create_available: boolean }>(
+            Method.Get,
+            "/io.element.msc4388/rendezvous",
+            undefined,
+            undefined,
+            {
+                prefix: ClientPrefix.Unstable,
+            },
+        );
 
-        return true;
+        return typeof discoveryBody.create_available === "boolean" ? discoveryBody.create_available : false;
     } catch (e) {
         // 404 and 403 are expected
         if (e instanceof MatrixError && (e.httpStatus === 404 || e.httpStatus === 403)) {
