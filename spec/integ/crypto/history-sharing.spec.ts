@@ -68,6 +68,7 @@ afterEach(() => {
 const ROOM_ID = "!room:example.com";
 const ALICE_HOMESERVER_URL = "https://alice-server.com";
 const BOB_HOMESERVER_URL = "https://bob-server.com";
+const CHARLIE_HOMESERVER_URL = "https://charlie-server.com";
 
 async function createAndInitClient(homeserverUrl: string, userId: string, setupNewCrossSigning = true) {
     mockInitialApiRequests(homeserverUrl, userId);
@@ -91,6 +92,8 @@ describe("History Sharing", () => {
     let aliceSyncResponder: SyncResponder;
     let bobClient: MatrixClient;
     let bobSyncResponder: SyncResponder;
+    let charlieClient: MatrixClient;
+    let charlieSyncResponder: SyncResponder;
 
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
@@ -100,6 +103,7 @@ describe("History Sharing", () => {
 
         const aliceId = TEST_USER_ID;
         const bobId = "@bob:xyz";
+        const charlieId = "@charlie:zyx";
 
         const aliceKeyReceiver = new E2EKeyReceiver(ALICE_HOMESERVER_URL, "alice-");
         const aliceKeyResponder = new E2EKeyResponder(ALICE_HOMESERVER_URL);
@@ -108,23 +112,39 @@ describe("History Sharing", () => {
 
         const bobKeyReceiver = new E2EKeyReceiver(BOB_HOMESERVER_URL, "bob-");
         const bobKeyResponder = new E2EKeyResponder(BOB_HOMESERVER_URL);
+        const bobKeyClaimResponder = new E2EOTKClaimResponder(BOB_HOMESERVER_URL);
         bobSyncResponder = new SyncResponder(BOB_HOMESERVER_URL);
+
+        const charlieKeyReceiver = new E2EKeyReceiver(CHARLIE_HOMESERVER_URL, "charlie-");
+        const charlieKeyResponder = new E2EKeyResponder(CHARLIE_HOMESERVER_URL);
+        charlieSyncResponder = new SyncResponder(CHARLIE_HOMESERVER_URL);
 
         aliceKeyResponder.addKeyReceiver(aliceId, aliceKeyReceiver);
         aliceKeyResponder.addKeyReceiver(bobId, bobKeyReceiver);
+        aliceKeyResponder.addKeyReceiver(charlieId, charlieKeyReceiver);
         bobKeyResponder.addKeyReceiver(aliceId, aliceKeyReceiver);
         bobKeyResponder.addKeyReceiver(bobId, bobKeyReceiver);
+        bobKeyResponder.addKeyReceiver(charlieId, charlieKeyReceiver);
+        charlieKeyResponder.addKeyReceiver(aliceId, aliceKeyReceiver);
+        charlieKeyResponder.addKeyReceiver(bobId, bobKeyReceiver);
+        charlieKeyResponder.addKeyReceiver(charlieId, charlieKeyReceiver);
 
         aliceClient = await createAndInitClient(ALICE_HOMESERVER_URL, aliceId);
         bobClient = await createAndInitClient(BOB_HOMESERVER_URL, bobId);
+        charlieClient = await createAndInitClient(CHARLIE_HOMESERVER_URL, charlieId);
 
         aliceKeyClaimResponder.addKeyReceiver(bobId, bobClient.deviceId!, bobKeyReceiver);
+        aliceKeyClaimResponder.addKeyReceiver(charlieId, charlieClient.deviceId!, charlieKeyReceiver);
+        bobKeyClaimResponder.addKeyReceiver(aliceId, aliceClient.deviceId!, aliceKeyReceiver);
 
         aliceSyncResponder.sendOrQueueSyncResponse({});
         await syncPromise(aliceClient);
 
         bobSyncResponder.sendOrQueueSyncResponse({});
         await syncPromise(bobClient);
+
+        charlieSyncResponder.sendOrQueueSyncResponse({});
+        await syncPromise(charlieClient);
     });
 
     test("Room keys are successfully shared on invite", async () => {
@@ -675,6 +695,258 @@ describe("History Sharing", () => {
             ),
         ).toBeFalsy();
     });
+
+    test("Room key is rotated after a member joins and leaves the room", async () => {
+        // Alice and Bob are in an encrypted room
+        let syncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
+        aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        bobSyncResponder.sendOrQueueSyncResponse(syncResponse);
+
+        await syncPromise(aliceClient);
+        await syncPromise(bobClient);
+
+        // Bob sends a message M1, which both he and Alice receive.
+        let msgProm = expectSendRoomEvent(BOB_HOMESERVER_URL, "m.room.encrypted");
+        let toDeviceMessageProm = expectSendToDeviceMessage(BOB_HOMESERVER_URL, "m.room.encrypted");
+        await bobClient.sendEvent(ROOM_ID, EventType.RoomMessage, {
+            msgtype: MsgType.Text,
+            body: "Charlie should be able to read",
+        });
+        const bobEventM1Content = await msgProm;
+        let sentToDeviceRequest = await toDeviceMessageProm;
+        expect(sentToDeviceRequest).toBeDefined();
+        let aliceToDeviceMessage = sentToDeviceRequest[aliceClient.getSafeUserId()][aliceClient.deviceId!];
+
+        // Alice receives the message down sync.
+        syncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
+        syncResponse.rooms.join[ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                type: "m.room.encrypted",
+                sender: bobClient.getSafeUserId(),
+                content: bobEventM1Content,
+                event_id: "$event_id_m1",
+            }) as any,
+        );
+        syncResponse.to_device = {
+            events: [
+                {
+                    type: "m.room.encrypted",
+                    sender: bobClient.getSafeUserId(),
+                    content: aliceToDeviceMessage,
+                },
+            ],
+        };
+        aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        // Alice checks she can read M1.
+        const aliceRoom = aliceClient.getRoom(ROOM_ID);
+        const aliceM1 = aliceRoom!.getLastLiveEvent()!;
+        await aliceM1.getDecryptionPromise();
+        expect(aliceM1.getType()).toEqual("m.room.message");
+        expect(aliceM1.getContent().body).toEqual("Charlie should be able to read");
+
+        // Alice invites and sends a key bundle to Charlie
+        const uploadProm = expectUploadRequest();
+        toDeviceMessageProm = expectSendToDeviceMessage(ALICE_HOMESERVER_URL, "m.room.encrypted");
+        fetchMock.postOnce(`${ALICE_HOMESERVER_URL}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
+        await aliceClient.invite(ROOM_ID, charlieClient.getSafeUserId(), { shareEncryptedHistory: true });
+        const uploadedBlob = await uploadProm;
+        sentToDeviceRequest = await toDeviceMessageProm;
+        debug(`Alice sent encrypted to-device events: ${JSON.stringify(sentToDeviceRequest)}`);
+        const charlieToDeviceMessage = sentToDeviceRequest[charlieClient.getSafeUserId()][charlieClient.deviceId!];
+        expect(charlieToDeviceMessage).toBeDefined();
+
+        /// Charlie receives the invite ...
+        const inviteEvent = mkInviteEvent(aliceClient, charlieClient);
+        charlieSyncResponder.sendOrQueueSyncResponse({
+            rooms: { invite: { [ROOM_ID]: { invite_state: { events: [inviteEvent] } } } },
+            to_device: {
+                events: [
+                    {
+                        type: "m.room.encrypted",
+                        sender: aliceClient.getSafeUserId(),
+                        content: charlieToDeviceMessage,
+                    },
+                ],
+            },
+        });
+        await syncPromise(charlieClient);
+
+        const charlieRoom = charlieClient.getRoom(ROOM_ID);
+        expect(charlieRoom).toBeTruthy();
+        expect(charlieRoom?.getMyMembership()).toEqual(KnownMembership.Invite);
+
+        // ... and subsequently joins.
+        fetchMock.postOnce(`${CHARLIE_HOMESERVER_URL}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
+            room_id: ROOM_ID,
+        });
+        fetchMock.getOnce(`begin:${CHARLIE_HOMESERVER_URL}/_matrix/client/v1/media/download/alice-server/here`, {
+            body: uploadedBlob,
+        });
+        await charlieClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+
+        // Charlie syncs to receive M1 and ensure he can read it.
+        syncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId(), charlieClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
+        syncResponse.rooms.join[ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                type: "m.room.encrypted",
+                sender: bobClient.getSafeUserId(),
+                content: bobEventM1Content,
+                event_id: "$event_id_m1",
+            }) as any,
+        );
+        charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(charlieClient);
+
+        const charlieEventM1 = charlieRoom!
+            .getLiveTimeline()
+            .getEvents()
+            .find((e) => e.getId() === "$event_id_m1");
+
+        await charlieEventM1!.getDecryptionPromise();
+        expect(charlieEventM1!.getType()).toEqual("m.room.message");
+        expect(charlieEventM1!.getContent().body).toEqual("Charlie should be able to read");
+
+        // Charlie then immediately leaves.
+        const charlieSyncResponse = {
+            next_batch: "1",
+            rooms: {
+                leave: {
+                    [ROOM_ID]: {
+                        state: { events: [] },
+                        timeline: {
+                            events: [
+                                mkEventCustom({
+                                    content: { membership: KnownMembership.Leave },
+                                    type: EventType.RoomMember,
+                                    sender: charlieClient.getSafeUserId(),
+                                    state_key: charlieClient.getSafeUserId(),
+                                }),
+                            ],
+                            prev_batch: "",
+                        },
+                        account_data: { events: [] },
+                    },
+                },
+                invite: {},
+                join: {},
+                knock: {},
+            },
+            account_data: { events: [] },
+        };
+        charlieSyncResponder.sendOrQueueSyncResponse(charlieSyncResponse);
+        await syncPromise(charlieClient);
+
+        // Bob syncs to learn about Charlie's joining and leaving.
+        syncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId(), charlieClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
+        syncResponse.rooms.join[ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                content: { membership: KnownMembership.Leave },
+                type: EventType.RoomMember,
+                sender: charlieClient.getSafeUserId(),
+                state_key: charlieClient.getSafeUserId(),
+            }),
+        );
+        bobSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(bobClient);
+
+        // Bob then sends M2, sharing a new room key with Alice.
+        msgProm = expectSendRoomEvent(BOB_HOMESERVER_URL, "m.room.encrypted");
+        toDeviceMessageProm = expectSendToDeviceMessage(BOB_HOMESERVER_URL, "m.room.encrypted");
+        await bobClient.sendEvent(ROOM_ID, EventType.RoomMessage, {
+            msgtype: MsgType.Text,
+            body: "Charlie should not be able to read",
+        });
+        const bobEventM2Content = await msgProm;
+        sentToDeviceRequest = await toDeviceMessageProm;
+        expect(sentToDeviceRequest).toBeDefined();
+        aliceToDeviceMessage = sentToDeviceRequest[aliceClient.getSafeUserId()][aliceClient.deviceId!];
+
+        // Charlie should not receive the room key
+        expect(sentToDeviceRequest[charlieClient.getSafeUserId()]).toBeUndefined();
+
+        debug(`Bob sent encrypted room event: ${JSON.stringify(bobEventM2Content)}`);
+
+        // Sync the message to Alice along with the to-device message, and check she can decrypt it.
+        syncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
+        syncResponse.rooms.join[ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                type: "m.room.encrypted",
+                sender: bobClient.getSafeUserId(),
+                content: bobEventM2Content,
+                event_id: "$event_id_m2",
+            }) as any,
+        );
+        syncResponse.to_device = {
+            events: [
+                {
+                    type: "m.room.encrypted",
+                    sender: bobClient.getSafeUserId(),
+                    content: aliceToDeviceMessage,
+                },
+            ],
+        };
+        aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(aliceClient);
+
+        const aliceEventM2 = aliceRoom!.getLastLiveEvent()!;
+        await aliceEventM2.getDecryptionPromise();
+        expect(aliceEventM2.getType()).toEqual("m.room.message");
+        expect(aliceEventM2.getContent().body).toEqual("Charlie should not be able to read");
+
+        // Charlie rejoins the room by ID, receives M2, which he should not be able to decrypt.
+        fetchMock.postOnce(`${CHARLIE_HOMESERVER_URL}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
+            room_id: ROOM_ID,
+        });
+        await charlieClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        syncResponse = getSyncResponse(
+            [aliceClient.getSafeUserId(), bobClient.getSafeUserId(), charlieClient.getSafeUserId()],
+            HistoryVisibility.Shared,
+            ROOM_ID,
+        );
+        syncResponse.rooms.join[ROOM_ID].timeline.events.push(
+            mkEventCustom({
+                type: "m.room.encrypted",
+                sender: bobClient.getSafeUserId(),
+                content: bobEventM2Content,
+                event_id: "$event_id_m2",
+            }) as any,
+        );
+        charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
+        await syncPromise(charlieClient);
+
+        const events = charlieRoom!.getLiveTimeline().getEvents();
+        expect(events.length).toBeGreaterThanOrEqual(2);
+
+        const charlieM2 = charlieRoom!
+            .getLiveTimeline()
+            .getEvents()
+            .find((e) => e.getId() === "$event_id_m2");
+
+        await charlieM2!.getDecryptionPromise();
+        expect(charlieM2!.isDecryptionFailure()).toBeTruthy();
+    }, 60e3);
 
     afterEach(async () => {
         vitest.useRealTimers();
