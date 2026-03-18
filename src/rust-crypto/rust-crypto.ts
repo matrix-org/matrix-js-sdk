@@ -1947,7 +1947,23 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             });
         }
 
-        // If it's not our membership, and it was a leave event, rotate the room key.
+        /**
+         * Previously, it was sufficient to check if we need to rotate the room key
+         * prior to sending a message. However, the history sharing feature
+         * (MSC4268) breaks this logic:
+         *
+         * 1. Alice sends a message M1 in room X;
+         * 2. Bob invites Charlie, who joins and immediately leaves the room;
+         * 3. Alice sends another message M2 in room X.
+         *
+         * Under the old logic, Alice would not rotate her key after Charlie
+         * leaves, resulting in M2 being encrypted with the same session as M1.
+         * This would allow Charlie to decrypt M2 if he ever gains access to
+         * the event.
+         *
+         * This conditional discards the current room key if the membership event
+         * is a `leave` event.
+         */
         if (member.userId !== this.olmMachine.userId.toString() && member.membership === KnownMembership.Leave) {
             this.logger.info(`Rotating session for room ${roomId} due to member leaving the room`);
             this.forceDiscardSession(member.roomId);
