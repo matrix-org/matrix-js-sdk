@@ -1947,6 +1947,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             });
         }
 
+        // If it's not our membership, and it was a leave event, rotate the room key.
+        if (member.userId !== this.olmMachine.userId.toString() && member.membership === KnownMembership.Leave) {
+            this.logger.info(`Rotating session for room ${roomId} due to member leaving the room`);
+            this.forceDiscardSession(member.roomId);
+        }
+
         const enc = this.roomEncryptors[roomId];
         if (!enc) {
             // not encrypting in this room
