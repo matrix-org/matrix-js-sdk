@@ -98,9 +98,7 @@ export class MSC4388SecureChannel {
             throw new Error("No response from other device");
         }
 
-        logger.info(
-            `Received LoginInitiateMessage, establishing channel with AAD=${this.rendezvousSession.getAdditionalAuthenticationDataForReceive()}`,
-        );
+        logger.info("Received LoginInitiateMessage");
 
         const { channel: unidirectionalChannel, message: candidateLoginInitiateMessage } =
             this.recipientChannel.establishChannel(
