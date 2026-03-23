@@ -794,6 +794,9 @@ export enum DeviceIsolationModeKind {
  *
  * Events from all senders are always decrypted (and should be decorated with message shields in case
  * of authenticity warnings, see {@link EventEncryptionInfo}).
+ *
+ * `AllDevicesIsolationMode` is used in the legacy, non-'exclude insecure devices' mode in Element Web. It is not
+ * recommended (see {@link https://github.com/matrix-org/matrix-spec-proposals/pull/4153 | MSC4153}).
  */
 export class AllDevicesIsolationMode {
     public readonly kind = DeviceIsolationModeKind.AllDevicesIsolationMode;
@@ -820,6 +823,9 @@ export class AllDevicesIsolationMode {
  *
  * Events are decrypted only if they come from a cross-signed device. Other events will result in a decryption
  * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
+ *
+ * `OnlySignedDevicesIsolationMode` corresponds to the 'Exclude insecure devices' mode in Element Web, which is
+ * recommended by {@link https://github.com/matrix-org/matrix-spec-proposals/pull/4153 | MSC4153}.
  */
 export class OnlySignedDevicesIsolationMode {
     public readonly kind = DeviceIsolationModeKind.OnlySignedDevicesIsolationMode;
