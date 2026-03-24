@@ -98,6 +98,7 @@ import { VerificationMethod } from "../types.ts";
 import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
+import { type RoomState } from "../matrix.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1947,6 +1948,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             });
         }
 
+        const enc = this.roomEncryptors[roomId];
+        if (!enc) {
+            // not encrypting in this room
+            return;
+        }
+        enc.onRoomMembership(member);
+    }
+
+    public onRoomStateEvent(event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null): void {
+        if (event.getType() != EventType.RoomMember) {
+            // Ignore all events that aren't member updates.
+            return;
+        }
+
         /**
          * Previously, it was sufficient to check if we need to rotate the room key
          * prior to sending a message. However, the history sharing feature
@@ -1964,17 +1979,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
          * This conditional discards the current room key if the membership event
          * is a `leave` event.
          */
-        if (member.userId !== this.olmMachine.userId.toString() && member.membership === KnownMembership.Leave) {
-            this.logger.info(`Rotating session for room ${roomId} due to member leaving the room`);
-            this.forceDiscardSession(member.roomId);
+        if (
+            event.getStateKey()! !== this.olmMachine.userId.toString() &&
+            event.getContent().membership === KnownMembership.Leave
+        ) {
+            this.logger.info(`Rotating session for room ${event.getRoomId()} due to member leaving the room`);
+            this.forceDiscardSession(event.getRoomId()!);
         }
-
-        const enc = this.roomEncryptors[roomId];
-        if (!enc) {
-            // not encrypting in this room
-            return;
-        }
-        enc.onRoomMembership(member);
     }
 
     /** Callback for OlmMachine.registerRoomKeyUpdatedCallback
