@@ -1,3 +1,12 @@
+Changes in [41.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.2.0) (2026-03-24)
+==================================================================================================
+## ✨ Features
+
+* Only share history if room history visibility is shared ([#5216](https://github.com/matrix-org/matrix-js-sdk/pull/5216)). Contributed by @kaylendog.
+* History sharing: resume key-bundle import on restart ([#5214](https://github.com/matrix-org/matrix-js-sdk/pull/5214)). Contributed by @richvdh.
+* Move `CryptoApi.shareRoomHistoryWithUser` to `CryptoBackend` ([#5218](https://github.com/matrix-org/matrix-js-sdk/pull/5218)). Contributed by @richvdh.
+
+
 Changes in [41.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.1.0) (2026-03-10)
 ==================================================================================================
 ## ✨ Features
