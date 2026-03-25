@@ -855,12 +855,19 @@ describe("History Sharing", () => {
             charlieSyncResponder.sendOrQueueSyncResponse(charlieSyncResponse);
             await syncPromise(charlieClient);
 
+            syncResponse = {
+                next_batch: "2",
+                rooms: {
+                    join: {
+                        [ROOM_ID]: {
+                            timeline: {
+                                events: [],
+                            },
+                        },
+                    },
+                },
+            } as any;
             if (gappySync) {
-                syncResponse = getSyncResponse(
-                    [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
-                    HistoryVisibility.Shared,
-                    ROOM_ID,
-                );
                 // In case of a gappy sync, the timeline is limited and we only see the leave event.
                 syncResponse.rooms.join[ROOM_ID].timeline.limited = true;
                 syncResponse.rooms.join[ROOM_ID].state = {
@@ -874,18 +881,19 @@ describe("History Sharing", () => {
                     ],
                 };
             } else {
-                syncResponse = getSyncResponse(
-                    [aliceClient.getSafeUserId(), bobClient.getSafeUserId(), charlieClient.getSafeUserId()],
-                    HistoryVisibility.Shared,
-                    ROOM_ID,
-                );
                 syncResponse.rooms.join[ROOM_ID].timeline.events.push(
+                    mkEventCustom({
+                        content: { membership: KnownMembership.Join },
+                        type: EventType.RoomMember,
+                        sender: charlieClient.getSafeUserId(),
+                        state_key: charlieClient.getSafeUserId(),
+                    }) as any,
                     mkEventCustom({
                         content: { membership: KnownMembership.Leave },
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }),
+                    }) as any,
                 );
             }
             // Bob syncs to learn about Charlie's leaving (and joining if non-gappy).
@@ -910,28 +918,34 @@ describe("History Sharing", () => {
             debug(`Bob sent encrypted room event: ${JSON.stringify(bobEventM2Content)}`);
 
             // Sync the message to Alice along with the to-device message, and check she can decrypt it.
-            syncResponse = getSyncResponse(
-                [aliceClient.getSafeUserId(), bobClient.getSafeUserId()],
-                HistoryVisibility.Shared,
-                ROOM_ID,
-            );
-            syncResponse.rooms.join[ROOM_ID].timeline.events.push(
-                mkEventCustom({
-                    type: "m.room.encrypted",
-                    sender: bobClient.getSafeUserId(),
-                    content: bobEventM2Content,
-                    event_id: "$event_id_m2",
-                }) as any,
-            );
-            syncResponse.to_device = {
-                events: [
-                    {
-                        type: "m.room.encrypted",
-                        sender: bobClient.getSafeUserId(),
-                        content: aliceToDeviceMessage,
+            syncResponse = {
+                next_batch: "3",
+                rooms: {
+                    join: {
+                        [ROOM_ID]: {
+                            timeline: {
+                                events: [
+                                    mkEventCustom({
+                                        type: "m.room.encrypted",
+                                        sender: bobClient.getSafeUserId(),
+                                        content: bobEventM2Content,
+                                        event_id: "$event_id_m2",
+                                    }) as any,
+                                ],
+                            },
+                        },
                     },
-                ],
-            };
+                },
+                to_device: {
+                    events: [
+                        {
+                            type: "m.room.encrypted",
+                            sender: bobClient.getSafeUserId(),
+                            content: aliceToDeviceMessage,
+                        },
+                    ],
+                },
+            } as any;
             aliceSyncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(aliceClient);
 
@@ -945,19 +959,25 @@ describe("History Sharing", () => {
                 room_id: ROOM_ID,
             });
             await charlieClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
-            syncResponse = getSyncResponse(
-                [aliceClient.getSafeUserId(), bobClient.getSafeUserId(), charlieClient.getSafeUserId()],
-                HistoryVisibility.Shared,
-                ROOM_ID,
-            );
-            syncResponse.rooms.join[ROOM_ID].timeline.events.push(
-                mkEventCustom({
-                    type: "m.room.encrypted",
-                    sender: bobClient.getSafeUserId(),
-                    content: bobEventM2Content,
-                    event_id: "$event_id_m2",
-                }) as any,
-            );
+            syncResponse = {
+                next_batch: "4",
+                rooms: {
+                    join: {
+                        [ROOM_ID]: {
+                            timeline: {
+                                events: [
+                                    mkEventCustom({
+                                        type: "m.room.encrypted",
+                                        sender: bobClient.getSafeUserId(),
+                                        content: bobEventM2Content,
+                                        event_id: "$event_id_m2",
+                                    }) as any,
+                                ],
+                            },
+                        },
+                    },
+                },
+            } as any;
             charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(charlieClient);
 
