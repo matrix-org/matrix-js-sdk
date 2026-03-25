@@ -98,6 +98,7 @@ import { VerificationMethod } from "../types.ts";
 import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
+import { type RoomState } from "../matrix.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -1953,6 +1954,43 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             return;
         }
         enc.onRoomMembership(member);
+    }
+
+    /**
+     * Previously, it was sufficient to check if we need to rotate the room key
+     * prior to sending a message. However, the history sharing feature
+     * (MSC4268) breaks this logic:
+     *
+     * 1. Alice sends a message M1 in room X;
+     * 2. Bob invites Charlie, who joins and immediately leaves the room;
+     * 3. Alice sends another message M2 in room X.
+     *
+     * Under the old logic, Alice would not rotate her key after Charlie
+     * leaves, resulting in M2 being encrypted with the same session as M1.
+     * This would allow Charlie to decrypt M2 if he ever gains access to
+     * the event.
+     *
+     * To counter this, we proactively discard any active outgoing Megolm
+     * session when we see a `leave` event. Note that we have to do this in
+     * `onRoomStateEvent` rather than `onRoomMembership`, because
+     * `onRoomMembership` is only called when we see a *change* in membership.
+     * In the case of a gappy sync, we might miss Charlie's invite and join,
+     * and only see the final `leave` event (sohis membership goes from `leave`
+     * to `leave`).
+     */
+    public onRoomStateEvent(event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null): void {
+        if (event.getType() != EventType.RoomMember) {
+            // Ignore all events that aren't member updates.
+            return;
+        }
+
+        if (
+            event.getStateKey()! !== this.olmMachine.userId.toString() &&
+            event.getContent().membership === KnownMembership.Leave
+        ) {
+            this.logger.info(`Rotating session for room ${event.getRoomId()} due to member leaving the room`);
+            this.forceDiscardSession(event.getRoomId()!);
+        }
     }
 
     /** Callback for OlmMachine.registerRoomKeyUpdatedCallback
