@@ -1976,7 +1976,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
          * This would allow Charlie to decrypt M2 if he ever gains access to
          * the event.
          *
-         * This conditional discards the current room key if the membership event
+         * This conditionally discards the current room key if the membership event
          * is a `leave` event.
          */
         if (
