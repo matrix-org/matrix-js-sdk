@@ -88,7 +88,7 @@ jobs:
                   repository: ${{ github.event.workflow_run.head_repository.full_name }}
                   is_pr: ${{ github.event.workflow_run.event == 'pull_request' }}
                   skip_coverage_label: Z-Skip-Coverage
-                  version_cmd: "cat ${{ version-pkg-json-dir }}/package.json | jq -r .version"
+                  version_cmd: "cat ${{ inputs.version-pkg-json-dir }}/package.json | jq -r .version"
                   branch: ${{ github.event.workflow_run.head_branch }}
                   revision: ${{ github.event.workflow_run.head_sha }}
                   token: ${{ secrets.SONAR_TOKEN }}
