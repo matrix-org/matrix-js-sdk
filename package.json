@@ -114,7 +114,7 @@
         "typedoc-plugin-coverage": "^4.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
-        "typescript": "^5.4.2",
+        "typescript": "^6.0.0",
         "vitest": "^4.0.17",
         "vitest-sonar-reporter": "^3.0.0"
     },
