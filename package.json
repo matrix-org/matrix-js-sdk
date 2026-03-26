@@ -106,7 +106,7 @@
         "fetch-mock": "^12.6.0",
         "happy-dom": "^20.1.0",
         "husky": "^9.0.0",
-        "knip": "^5.0.0",
+        "knip": "^6.0.0",
         "lint-staged": "^16.0.0",
         "matrix-mock-request": "^2.5.0",
         "prettier": "3.8.1",
