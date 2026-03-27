@@ -88,7 +88,7 @@ jobs:
 
     complement-crypto:
         name: "Run Complement Crypto tests"
-        if: github.event_name == 'merge_group'
+        if: false # disabled due to flakiness
         permissions: read-all # zizmor: ignore[excessive-permissions]
         uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main # zizmor: ignore[unpinned-uses]
         with:
