@@ -206,6 +206,13 @@ async function initOlmMachine(
         // Once we have all the values, we can safely clear the secret inbox.
         rustCrypto.checkSecrets(name),
     );
+    // Register a callback to be notified when a new secret is pushed to us, as for now only the key backup secret is supported (if the cross-signing secrets change, we should re-verify)
+    await olmMachine.registerReceivePushedSecretCallback(
+        async (name: string, _value: string) =>
+            // Instead of directly checking the secret value, we poll the inbox to get all values for that secret type.
+            // Once we have all the values, we can safely clear the secret inbox.
+            await rustCrypto.checkSecrets(name),
+    );
 
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.
     //
