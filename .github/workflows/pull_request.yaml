@@ -16,7 +16,7 @@ permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     changelog:
         name: Preview Changelog
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         steps:
             - uses: mheap/github-action-required-labels@0ac283b4e65c1fb28ce6079dea5546ceca98ccbe # v5
               if: github.event_name != 'merge_group'
@@ -33,7 +33,7 @@ jobs:
 
     prevent-blocked:
         name: Prevent Blocked
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         permissions:
             pull-requests: read
         steps:
@@ -46,7 +46,7 @@ jobs:
 
     community-prs:
         name: Label Community PRs
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         if: github.event.action == 'opened'
         permissions:
             pull-requests: write
@@ -75,7 +75,7 @@ jobs:
 
     close-if-fork-develop:
         name: Forbid develop branch fork contributions
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         permissions:
             pull-requests: write
         if: >
