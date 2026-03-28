@@ -15,8 +15,8 @@ importers:
         specifier: ^7.12.5
         version: 7.29.2
       '@matrix-org/matrix-sdk-crypto-wasm':
-        specifier: ^18.0.0
-        version: 18.0.0
+        specifier: matrix-org/matrix-sdk-crypto-wasm#poljar/hpke
+        version: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/9164fa3aba8569f0e7de7fa6855eb3d305315d83
       another-json:
         specifier: ^0.2.0
         version: 0.2.0
@@ -1067,8 +1067,9 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@matrix-org/matrix-sdk-crypto-wasm@18.0.0':
-    resolution: {integrity: sha512-88+n+dvxLI1cjS10UIlKXVYK7TGWbpAnnaDC9fow7ch/hCvdu3dFhJ3tS3/13N9s9+1QFXB4FFuommj+tHJPhQ==}
+  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/9164fa3aba8569f0e7de7fa6855eb3d305315d83':
+    resolution: {tarball: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/9164fa3aba8569f0e7de7fa6855eb3d305315d83}
+    version: 18.0.0
     engines: {node: '>= 18'}
 
   '@matrix-org/olm@3.2.15':
@@ -5067,7 +5068,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@matrix-org/matrix-sdk-crypto-wasm@18.0.0': {}
+  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/9164fa3aba8569f0e7de7fa6855eb3d305315d83': {}
 
   '@matrix-org/olm@3.2.15': {}
 
