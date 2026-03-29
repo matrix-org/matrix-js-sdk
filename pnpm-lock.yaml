@@ -179,7 +179,7 @@ importers:
         version: 12.6.0
       happy-dom:
         specifier: ^20.1.0
-        version: 20.8.8
+        version: 20.8.9
       husky:
         specifier: ^9.0.0
         version: 9.1.7
@@ -212,7 +212,7 @@ importers:
         version: 6.0.2
       vitest:
         specifier: ^4.0.17
-        version: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3)
+        version: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3)
       vitest-sonar-reporter:
         specifier: ^3.0.0
         version: 3.0.0(vitest@4.0.18)
@@ -2780,8 +2780,8 @@ packages:
   graphemer@1.4.0:
     resolution: {integrity: sha512-EtKwoO6kxCL9WO5xipiHTZlSzBm7WLT627TqC/uVRd0HKmq8NXyebnNYxDoBi7wt8eTWrUrKXCOVaFq9x1kgag==}
 
-  happy-dom@20.8.8:
-    resolution: {integrity: sha512-5/F8wxkNxYtsN0bXfMwIyNLZ9WYsoOYPbmoluqVJqv8KBUbcyKZawJ7uYK4WTX8IHBLYv+VXIwfeNDPy1oKMwQ==}
+  happy-dom@20.8.9:
+    resolution: {integrity: sha512-Tz23LR9T9jOGVZm2x1EPdXqwA37G/owYMxRwU0E4miurAtFsPMQ1d2Jc2okUaSjZqAFz2oEn3FLXC5a0a+siyA==}
     engines: {node: '>=20.0.0'}
 
   has-bigints@1.1.0:
@@ -4999,7 +4999,7 @@ snapshots:
   '@fetch-mock/vitest@0.2.18(vitest@4.0.18)':
     dependencies:
       fetch-mock: 12.6.0
-      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3)
+      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3)
 
   '@gerrit0/mini-shiki@3.23.0':
     dependencies:
@@ -5755,7 +5755,7 @@ snapshots:
       obug: 2.1.1
       std-env: 3.10.0
       tinyrainbow: 3.0.3
-      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3)
+      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3)
 
   '@vitest/eslint-plugin@1.6.9(eslint@8.57.1)(typescript@6.0.2)(vitest@4.0.18)':
     dependencies:
@@ -5764,7 +5764,7 @@ snapshots:
       eslint: 8.57.1
     optionalDependencies:
       typescript: 6.0.2
-      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3)
+      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3)
     transitivePeerDependencies:
       - supports-color
 
@@ -5811,7 +5811,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.15
       tinyrainbow: 3.0.3
-      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3)
+      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3)
 
   '@vitest/utils@4.0.18':
     dependencies:
@@ -6890,7 +6890,7 @@ snapshots:
 
   graphemer@1.4.0: {}
 
-  happy-dom@20.8.8:
+  happy-dom@20.8.9:
     dependencies:
       '@types/node': 22.19.15
       '@types/whatwg-mimetype': 3.0.2
@@ -8179,9 +8179,9 @@ snapshots:
 
   vitest-sonar-reporter@3.0.0(vitest@4.0.18):
     dependencies:
-      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3)
+      vitest: 4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3)
 
-  vitest@4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.8)(jiti@2.6.1)(yaml@2.8.3):
+  vitest@4.0.18(@types/node@22.19.15)(@vitest/ui@4.0.18)(happy-dom@20.8.9)(jiti@2.6.1)(yaml@2.8.3):
     dependencies:
       '@vitest/expect': 4.0.18
       '@vitest/mocker': 4.0.18(vite@7.3.1(@types/node@22.19.15)(jiti@2.6.1)(yaml@2.8.3))
@@ -8206,7 +8206,7 @@ snapshots:
     optionalDependencies:
       '@types/node': 22.19.15
       '@vitest/ui': 4.0.18(vitest@4.0.18)
-      happy-dom: 20.8.8
+      happy-dom: 20.8.9
     transitivePeerDependencies:
       - jiti
       - less
