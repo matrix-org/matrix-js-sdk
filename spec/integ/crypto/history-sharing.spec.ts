@@ -205,9 +205,9 @@ describe("History Sharing", () => {
     });
 
     test("Room keys are imported correctly if invite is accepted before the bundle arrives", async () => {
-        const [alice, { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder }] =
-            await setupClients(2);
+        const [alice, bob] = await setupClients(2);
         const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
+        const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
 
         // Alice is in an encrypted room
         const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
@@ -298,9 +298,9 @@ describe("History Sharing", () => {
     test("Room keys are not imported if the bundle arrives more than 24H after the invite is accepted", async () => {
         vitest.useFakeTimers();
 
-        const [alice, { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder }] =
-            await setupClients(2);
+        const [alice, bob] = await setupClients(2);
         const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
+        const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
 
         // Alice is in an encrypted room
         const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
@@ -386,9 +386,9 @@ describe("History Sharing", () => {
     });
 
     test("Room keys are not imported if we left and rejoined the room after accepting the invite", async () => {
-        const [alice, { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder }] =
-            await setupClients(2);
+        const [alice, bob] = await setupClients(2);
         const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
+        const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
 
         // Alice is in an encrypted room
         const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
@@ -544,9 +544,9 @@ describe("History Sharing", () => {
     });
 
     test("Room keys are successfully imported, if the app is shut down while the import is in progress", async () => {
-        const [alice, { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder }] =
-            await setupClients(2);
+        const [alice, bob] = await setupClients(2);
         const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
+        const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
 
         // Alice is in an encrypted room
         const syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
@@ -640,10 +640,9 @@ describe("History Sharing", () => {
     });
 
     test("Room keys are not shared if the current history visibility is unshared", async () => {
-        const [
-            { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder },
-            { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder },
-        ] = await setupClients(2);
+        const [alice, bob] = await setupClients(2);
+        const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
+        const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
 
         // Alice is in an encrypted room
         let syncResponse = getSyncResponse([aliceClient.getSafeUserId()], HistoryVisibility.Shared, ROOM_ID);
@@ -746,12 +745,14 @@ describe("History Sharing", () => {
     test.each([false, true])(
         "Room key is rotated after a member joins and leaves the room (gappy sync = %s)",
         async (gappySync) => {
-            const [
-                alice,
-                { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder },
-                { homeserverUrl: charlieHomeserverUrl, client: charlieClient, syncResponder: charlieSyncResponder },
-            ] = await setupClients(3);
+            const [alice, bob, charlie] = await setupClients(3);
             const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
+            const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
+            const {
+                homeserverUrl: charlieHomeserverUrl,
+                client: charlieClient,
+                syncResponder: charlieSyncResponder,
+            } = charlie;
 
             // Alice and Bob are in an encrypted room
             let syncResponse = getSyncResponse(
@@ -1068,12 +1069,9 @@ describe("History Sharing", () => {
  *
  * @param roomId The ID of the room where the invite and history sharing will be tested.
  */
-async function assertInviteAndShareHistory(
-    alice: TestClient,
-    { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder }: TestClient,
-    roomId: string,
-): Promise<void> {
+async function assertInviteAndShareHistory(alice: TestClient, bob: TestClient, roomId: string): Promise<void> {
     const { homeserverUrl: aliceHomeserverUrl, client: aliceClient } = alice;
+    const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
 
     const uploadProm = expectUploadRequest(alice);
     const toDeviceMessageProm = expectSendToDeviceMessage(aliceHomeserverUrl, "m.room.encrypted");
