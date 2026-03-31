@@ -539,6 +539,12 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
+
+    /**
+     * Include user profiles in sync responses.
+     * Will only work if the server supports MSC4429.
+     */
+    unstableMSC4429SyncUserProfileFields?: string[];
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -1102,6 +1108,7 @@ export enum ClientEvent {
     ReceivedVoipEvent = "received_voip_event",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
+    UserProfileUpdate = "userProfileUpdate",
 }
 
 type RoomEvents =
@@ -1172,6 +1179,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
+    [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown>) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
@@ -7401,6 +7409,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
+        }
+        const storedProfile = this.store.getUserProfile(userId);
+        if (storedProfile?.[key] !== undefined) {
+            return storedProfile[key];
         }
         const profile = (await this.http.authedRequest(
             Method.Get,

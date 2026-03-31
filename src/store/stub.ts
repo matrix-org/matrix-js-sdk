@@ -20,7 +20,7 @@ limitations under the License.
 
 import { type EventType } from "../@types/event.ts";
 import { type Room } from "../models/room.ts";
-import { type User } from "../models/user.ts";
+import { SyncUserProfile, type User } from "../models/user.ts";
 import { type IEvent, type MatrixEvent } from "../models/event.ts";
 import { type Filter } from "../filter.ts";
 import { type ISavedSync, type IStore, type UserCreator } from "./index.ts";
@@ -272,6 +272,18 @@ export class StubStore implements IStore {
 
     public async removeToDeviceBatch(id: number): Promise<void> {
         return Promise.resolve();
+    }
+
+    public getUserProfile(userId: string): undefined {
+        return undefined;
+    }
+
+    public storeUserProfile(userId: string, fullUserProfile: SyncUserProfile): void {
+        return;
+    }
+
+    public removeUserProfile(userId: string): void {
+        return;
     }
 
     public async destroy(): Promise<void> {

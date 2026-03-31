@@ -634,6 +634,17 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
+        // I feel like this is the wrong home for this.
+        if (this.opts.unstableMSC4429SyncUserProfileFields?.length) {
+            this.syncOpts.logger.debug("Enabling EXPERIMENTAL user profiles on sync filter...");
+            if (!this.opts.filter) {
+                this.opts.filter = this.buildDefaultFilter();
+            }
+            this.opts.filter.setUnstableMSC4429SyncUserProfiles(
+                this.opts.unstableMSC4429SyncUserProfileFields,
+                await this.client.doesServerSupportUnstableFeature("org.matrix.msc4429.stable"),
+            );
+        }
     };
 
     private storeClientOptions = async (): Promise<void> => {
@@ -1136,6 +1147,17 @@ export class SyncApi {
                 client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                 return accountDataEvent;
             });
+        }
+
+        const userUpdate = data["users"] ?? data["org.matrix.msc4429.users"];
+        if (typeof userUpdate === "object" && userUpdate !== null) {
+            for (const [userId, userData] of Object.entries(userUpdate)) {
+                if (userData.profile_updates) {
+                    client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates);
+                    const existingProfile = client.store.getUserProfile(userId);
+                    client.store.storeUserProfile(userId, { ...existingProfile, ...userData.profile_updates });
+                }
+            }
         }
 
         // handle to-device events

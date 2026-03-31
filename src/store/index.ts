@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type EventType } from "../@types/event.ts";
 import { type Room } from "../models/room.ts";
-import { type User } from "../models/user.ts";
+import { SyncUserProfile, type User } from "../models/user.ts";
 import { type IEvent, type MatrixEvent } from "../models/event.ts";
 import { type Filter } from "../filter.ts";
 import { type RoomSummary } from "../models/room-summary.ts";
@@ -159,6 +159,25 @@ export interface IStore {
      * @param events - The events to store.
      */
     storeAccountDataEvents(events: MatrixEvent[]): void;
+
+    /**
+     * Store user profile details from a sync. Existing profiles will be overwritten.
+     * @param userId - The user's ID.
+     * @param fullUserProfile - The full user profile.
+     */
+    storeUserProfile(userId: string, fullUserProfile: SyncUserProfile): void;
+
+    /**
+     * Delete a user profile based on a sync response.
+     * @param userId - The user's ID.
+     */
+    removeUserProfile(userId: string): void;
+
+    /**
+     * Delete a user profile based on a sync response.
+     * @param userId - The user's ID.
+     */
+    getUserProfile(userId: string): SyncUserProfile | undefined;
 
     /**
      * Get account data event by event type

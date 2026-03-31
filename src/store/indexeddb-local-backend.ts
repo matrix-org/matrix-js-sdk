@@ -18,7 +18,7 @@ import { type IMinimalEvent, type ISyncData, type ISyncResponse, SyncAccumulator
 import { deepCopy, promiseTry } from "../utils.ts";
 import { exists as idbExists } from "../indexeddb-helpers.ts";
 import { logger } from "../logger.ts";
-import { type IStateEventWithRoomId, type IStoredClientOpts } from "../matrix.ts";
+import type { IUserUpdate, SyncUserProfile, IStateEventWithRoomId, IStoredClientOpts } from "../matrix.ts";
 import { type ISavedSync } from "./index.ts";
 import { type IIndexedDBBackend, type UserTuple } from "./indexeddb-backend.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
@@ -47,6 +47,13 @@ const DB_MIGRATIONS: DbMigration[] = [
     },
     (db): void => {
         db.createObjectStore("to_device_queue", { autoIncrement: true });
+    },
+    (db): void => {
+        db.createObjectStore("user_profile", { keyPath: ["userId"] });
+    },
+    (db): void => {
+        db.deleteObjectStore("userProfile");
+        db.createObjectStore("user_profile", { keyPath: ["userId"] });
     },
     // Expand as needed.
 ];
@@ -118,6 +125,8 @@ function reqAsPromise(req: IDBRequest): Promise<IDBRequest> {
 function reqAsCursorPromise<T>(req: IDBRequest<T>): Promise<T> {
     return reqAsEventPromise(req).then((event) => req.result);
 }
+
+type StoredSyncUserProfile = { userId: string; profile: SyncUserProfile };
 
 export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     public static exists(indexedDB: IDBFactory, dbName: string): Promise<boolean> {
@@ -215,19 +224,24 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns Promise which resolves on success
      */
     private init(): Promise<unknown> {
-        return Promise.all([this.loadAccountData(), this.loadSyncData()]).then(([accountData, syncData]) => {
-            logger.log(`LocalIndexedDBStoreBackend: loaded initial data`);
-            this.syncAccumulator.accumulate(
-                {
-                    next_batch: syncData.nextBatch,
-                    rooms: syncData.roomsData,
-                    account_data: {
-                        events: accountData,
+        return Promise.all([this.loadAccountData(), this.loadUserProfiles(), this.loadSyncData()]).then(
+            ([accountData, userProfiles, syncData]) => {
+                logger.log(`LocalIndexedDBStoreBackend: loaded initial data`);
+                this.syncAccumulator.accumulate(
+                    {
+                        "next_batch": syncData.nextBatch,
+                        "rooms": syncData.roomsData,
+                        "account_data": {
+                            events: accountData,
+                        },
+                        "org.matrix.msc4429.users": Object.fromEntries(
+                            userProfiles.map((o) => [o.userId, { profile_updates: o.profile }]),
+                        ),
                     },
-                },
-                true,
-            );
-        });
+                    true,
+                );
+            },
+        );
     }
 
     /**
@@ -426,6 +440,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             await Promise.all([
                 this.persistUserPresenceEvents(userTuples),
                 this.persistAccountData(syncData.accountData),
+                this.persistUserProfiles(syncData.userProfiles ?? {}),
                 this.persistSyncData(syncData.nextBatch, syncData.roomsData),
             ]);
         } finally {
@@ -467,6 +482,29 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             const store = txn.objectStore("accountData");
             for (const event of accountData) {
                 store.put(event); // put == UPSERT
+            }
+            return txnAsPromise(txn).then();
+        });
+    }
+
+    /**
+     * Persist a list of user profiles. Events with the same 'type' will
+     * be replaced.
+     * @param accountData - An array of raw user-scoped account data events
+     * @returns Promise which resolves if the events were persisted.
+     */
+    private persistUserProfiles(profileUpdate: IUserUpdate): Promise<void> {
+        return promiseTry<void>(() => {
+            const txn = this.db!.transaction(["user_profile"], "readwrite");
+            const store = txn.objectStore("user_profile");
+            for (const [userId, profile] of Object.entries(profileUpdate)) {
+                if (Object.keys(profile).length === 0) {
+                    store.delete(userId);
+                } else {
+                    // Merge
+                    const existingProfile = store.get(userId).result;
+                    store.put({ userId, profile: { ...existingProfile, ...profile } } satisfies StoredSyncUserProfile);
+                }
             }
             return txnAsPromise(txn).then();
         });
@@ -523,6 +561,24 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 return cursor.value;
             }).then((result: IMinimalEvent[]) => {
                 logger.log(`LocalIndexedDBStoreBackend: loaded account data`);
+                return result;
+            });
+        });
+    }
+
+    /**
+     * Load all the account data events from the database. This is not cached.
+     * @returns A list of raw global account events.
+     */
+    private loadUserProfiles(): Promise<StoredSyncUserProfile[]> {
+        logger.log(`LocalIndexedDBStoreBackend: loading synced user profiles...`);
+        return promiseTry<StoredSyncUserProfile[]>(() => {
+            const txn = this.db!.transaction(["user_profile"], "readonly");
+            const store = txn.objectStore("user_profile");
+            return selectQuery(store, undefined, (cursor) => {
+                return cursor.value;
+            }).then((result: StoredSyncUserProfile[]) => {
+                logger.log(`LocalIndexedDBStoreBackend: loading synced user profiles`);
                 return result;
             });
         });

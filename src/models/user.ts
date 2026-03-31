@@ -26,6 +26,8 @@ export enum UserEvent {
     LastPresenceTs = "User.lastPresenceTs",
 }
 
+export type SyncUserProfile = Record<string, unknown>;
+
 export type UserEventHandlerMap = {
     /**
      * Fires whenever any user's display name changes.
