@@ -42,8 +42,8 @@ importers:
         specifier: ^3.0.1
         version: 3.5.0
       p-retry:
-        specifier: '7'
-        version: 7.1.1
+        specifier: '8'
+        version: 8.0.0
       sdp-transform:
         specifier: ^3.0.0
         version: 3.0.0
@@ -3347,9 +3347,9 @@ packages:
     resolution: {integrity: sha512-LaNjtRWUBY++zB5nE/NwcaoMylSPk+S+ZHNB1TzdbMJMny6dynpAGt7X/tl/QYq3TIeE6nxHppbo2LGymrG5Pw==}
     engines: {node: '>=10'}
 
-  p-retry@7.1.1:
-    resolution: {integrity: sha512-J5ApzjyRkkf601HpEeykoiCvzHQjWxPAHhyjFcEUP2SWq0+35NKh8TLhpLw+Dkq5TZBFvUM6UigdE9hIVYTl5w==}
-    engines: {node: '>=20'}
+  p-retry@8.0.0:
+    resolution: {integrity: sha512-kFVqH1HxOHp8LupNsOys7bSV09VYTRLxarH/mokO4Rqhk6wGi70E0jh4VzvVGXfEVNggHoHLAMWsQqHyU1Ey9A==}
+    engines: {node: '>=22'}
 
   p-try@2.2.0:
     resolution: {integrity: sha512-R4nPAVTAU0B9D35/Gk3uJf/7XYbQcyohSKdvAxIRSNghFl4e71hVoGnBNQz9cWaXxO2I10KTC+3jMdvvoKw6dQ==}
@@ -7542,7 +7542,7 @@ snapshots:
     dependencies:
       p-limit: 3.1.0
 
-  p-retry@7.1.1:
+  p-retry@8.0.0:
     dependencies:
       is-network-error: 1.3.0
 
