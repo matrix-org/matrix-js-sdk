@@ -51,10 +51,6 @@ const DB_MIGRATIONS: DbMigration[] = [
     (db): void => {
         db.createObjectStore("user_profile", { keyPath: ["userId"] });
     },
-    (db): void => {
-        db.deleteObjectStore("userProfile");
-        db.createObjectStore("user_profile", { keyPath: ["userId"] });
-    },
     // Expand as needed.
 ];
 const VERSION = DB_MIGRATIONS.length;
