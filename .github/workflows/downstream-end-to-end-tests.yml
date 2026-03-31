@@ -26,6 +26,7 @@ jobs:
             actions: read
             issues: read
             pull-requests: read
+            contents: read
         with:
             matrix-js-sdk-sha: ${{ github.sha }}
             # We only want to run the playwright tests on merge queue to prevent regressions
