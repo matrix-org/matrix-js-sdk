@@ -858,6 +858,25 @@ export interface BootstrapCrossSigningOpts {
  */
 export class UserVerificationStatus {
     /**
+     * Indicates if we have saved a known identity for this user. Typically, this means that we share a
+     * room with them (or have done in the past).
+     *
+     * If this is `false`, then the other flags ({@link isCrossSigningVerified}, {@link wasCrossSigningVerified},
+     * {@link needsUserApproval}) will also be `false`. This means that we haven't seen this user before.
+     *
+     * If this is `true`, then there are further possibilities:
+     *
+     *  - If {@link isCrossSigningVerified} returns `true`, then we have cryptographically verified the current
+     *    identity of this user: that is the highest form of trust we have.
+     *
+     *  - If {@link needsUserApproval} is `true`, that means that the user has changed their identity.
+     *
+     *  - Otherwise, the user is "TOFU trusted": we have a record of their identity, and, typically, will share
+     *    encrypted content with them as long as they retain that identity.
+     */
+    public readonly known: boolean;
+
+    /**
      * Indicates if the identity has changed in a way that needs user approval.
      *
      * This happens if the identity has changed since we first saw it, *unless* the new identity has also been verified
@@ -872,12 +891,14 @@ export class UserVerificationStatus {
      */
     public readonly needsUserApproval: boolean;
 
+    /** @internal */
     public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
-        private readonly tofu: boolean,
+        known: boolean,
         needsUserApproval: boolean = false,
     ) {
+        this.known = known;
         this.needsUserApproval = needsUserApproval;
     }
 
@@ -909,7 +930,7 @@ export class UserVerificationStatus {
      * @deprecated No longer supported, with the Rust crypto stack.
      */
     public isTofu(): boolean {
-        return this.tofu;
+        return false;
     }
 }
 

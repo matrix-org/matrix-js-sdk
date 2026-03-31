@@ -2064,6 +2064,7 @@ describe("crypto", () => {
             expect(hasCrossSigningKeysForUser).toBe(true);
 
             const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            expect(verificationStatus.known).toBe(false); // We haven't actually stashed a copy of Alice's identity
             expect(verificationStatus.isVerified()).toBe(false);
             expect(verificationStatus.isCrossSigningVerified()).toBe(false);
             expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
@@ -2078,7 +2079,8 @@ describe("crypto", () => {
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);
 
-            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
+            expect(verificationStatus.known).toBe(true);
             expect(verificationStatus.isVerified()).toBe(false);
             expect(verificationStatus.isCrossSigningVerified()).toBe(false);
             expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
@@ -2089,7 +2091,8 @@ describe("crypto", () => {
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys("@unknown:xyz");
             expect(hasCrossSigningKeysForUser).toBe(false);
 
-            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+            const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus("@unknown:xyz");
+            expect(verificationStatus.known).toBe(false);
             expect(verificationStatus.isVerified()).toBe(false);
             expect(verificationStatus.isCrossSigningVerified()).toBe(false);
             expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
@@ -2119,6 +2122,7 @@ describe("crypto", () => {
 
             {
                 const verificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(BOB_TEST_USER_ID);
+                expect(verificationStatus.known).toBe(true);
                 expect(verificationStatus.isVerified()).toBe(false);
                 expect(verificationStatus.isCrossSigningVerified()).toBe(false);
                 expect(verificationStatus.wasCrossSigningVerified()).toBe(false);
