@@ -205,7 +205,10 @@ export interface CryptoApi {
      * Get the device information for the given list of users.
      *
      * For any users whose device lists are cached (due to sharing an encrypted room with the user), the
-     * cached device data is returned.
+     * cached device data is returned, unless it is stale.
+     *
+     * If there are users with stale cached entries, a `/keys/query` request is made to the server to
+     * refresh their device info.
      *
      * If there are uncached users, and the `downloadUncached` parameter is set to `true`,
      * a `/keys/query` request is made to the server to retrieve these devices.
