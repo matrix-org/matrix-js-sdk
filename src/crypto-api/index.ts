@@ -626,7 +626,7 @@ export interface CryptoApi {
      *  * Disables 4S, deleting the info for the default key, the default key pointer itself and any
      *    known 4S data (cross-signing keys and the megolm key backup key).
      *  * Deletes any dehydrated devices.
-     *  * Sets the "m.org.matrix.custom.backup_disabled" account data flag to indicate that the user has disabled backups.
+     *  * Sets the "m.key_backup" account data flag to indicate that the user has disabled backups.
      */
     disableKeyStorage(): Promise<void>;
 
