@@ -736,7 +736,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 ? userIdentity.identityNeedsUserApproval()
                 : false;
         userIdentity.free();
-        return new UserVerificationStatus(verified, wasVerified, false, needsUserApproval);
+        return new UserVerificationStatus(verified, wasVerified, true, needsUserApproval);
     }
 
     /**

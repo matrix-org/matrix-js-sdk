@@ -26,7 +26,7 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4
+            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5
             - name: Setup Node
               id: setupNode
               uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
@@ -88,7 +88,7 @@ jobs:
 
     complement-crypto:
         name: "Run Complement Crypto tests"
-        if: false # disabled due to flakiness
+        if: github.event_name == 'merge_group'
         permissions: read-all # zizmor: ignore[excessive-permissions]
         uses: matrix-org/complement-crypto/.github/workflows/single_sdk_tests.yml@main # zizmor: ignore[unpinned-uses]
         with:

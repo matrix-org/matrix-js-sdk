@@ -1526,6 +1526,7 @@ describe("RustCrypto", () => {
 
         it("returns an unverified UserVerificationStatus when there is no UserIdentity", async () => {
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.known).toBe(false);
             expect(userVerificationStatus.isVerified()).toBeFalsy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeFalsy();
@@ -1540,6 +1541,7 @@ describe("RustCrypto", () => {
             } as unknown as OtherUserIdentity);
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.known).toBe(true);
             expect(userVerificationStatus.isVerified()).toBeTruthy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
