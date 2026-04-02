@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import fetchMock from "@fetch-mock/vitest";
-import { type Mocked } from "vitest";
+import { type MockedObject, type Mocked } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
@@ -89,6 +89,7 @@ import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
 import { type Transport } from "../../src/matrixrtc/index.ts";
+import { type IStore } from "../../src/store/index.ts";
 
 vi.useFakeTimers();
 
@@ -385,6 +386,7 @@ describe("MatrixClient", function () {
         store.getClientOptions = vi.fn().mockReturnValue(Promise.resolve(null));
         store.storeClientOptions = vi.fn().mockReturnValue(Promise.resolve(null));
         store.isNewlyCreated = vi.fn().mockReturnValue(Promise.resolve(true));
+        store.getUserProfile = vi.fn().mockReturnValue(undefined);
 
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
@@ -1323,6 +1325,18 @@ describe("MatrixClient", function () {
             ];
             await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
             expect(httpLookups).toHaveLength(0);
+        });
+
+        it("can fetch a property from a extended user profile with a cached profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockImplementation((requestedUserId) => {
+                expect(requestedUserId).toEqual(userId);
+                expect("test_key").toEqual("test_key");
+                return testProfile;
+            });
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
         });
 
         it("can set a property in our extended profile", async () => {
