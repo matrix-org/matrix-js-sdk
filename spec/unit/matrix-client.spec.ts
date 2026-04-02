@@ -1331,7 +1331,7 @@ describe("MatrixClient", function () {
             const testProfile = {
                 test_key: "foo",
             };
-            (client.store as MockedObject<IStore>).getUserProfile.mockImplementation((requestedUserId) => {
+            (client.store as MockedObject<IStore>).getUserProfile.mockImplementation(async (requestedUserId) => {
                 expect(requestedUserId).toEqual(userId);
                 expect("test_key").toEqual("test_key");
                 return testProfile;
