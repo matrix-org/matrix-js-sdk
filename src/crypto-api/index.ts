@@ -188,7 +188,9 @@ export interface CryptoApi {
     /**
      * Check if the given user has published cross-signing keys.
      *
-     * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is this user, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is tracked, any current `/keys/query` requests are awaited (with a timeout) and then
+     *   the locally cached information is used.
      * - If the user is not tracked locally and downloadUncached is set to true,
      *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
      * - Otherwise, return false
