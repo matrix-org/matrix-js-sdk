@@ -161,25 +161,6 @@ export interface IStore {
     storeAccountDataEvents(events: MatrixEvent[]): void;
 
     /**
-     * Store user profile details from a sync. Existing profiles will be overwritten.
-     * @param userId - The user's ID.
-     * @param fullUserProfile - The full user profile.
-     */
-    storeUserProfile(userId: string, fullUserProfile: SyncUserProfile): void;
-
-    /**
-     * Delete a user profile based on a sync response.
-     * @param userId - The user's ID.
-     */
-    removeUserProfile(userId: string): void;
-
-    /**
-     * Delete a user profile based on a sync response.
-     * @param userId - The user's ID.
-     */
-    getUserProfile(userId: string): SyncUserProfile | undefined;
-
-    /**
      * Get account data event by event type
      * @param eventType - The event type being queried
      */
@@ -272,6 +253,22 @@ export interface IStore {
      * Removes a specific batch of to-device messages from the queue
      */
     removeToDeviceBatch(id: number): Promise<void>;
+
+    /**
+     * Store user profile details from a sync. Existing profiles will be overwritten.
+     * @param userProfileTuples - A set of userIds to profiles.
+     */
+    storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void>;
+
+    /**
+     * Delete stored profiles for the given users.
+     */
+    removeUserProfiles(userIds: string[]): Promise<void>;
+
+    /**
+     * Delete a user profile based on a sync response.
+     */
+    getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
 
     /**
      * Stop the store and perform any appropriate cleanup

@@ -20,6 +20,7 @@ import { type IStoredClientOpts } from "../client.ts";
 import { type IStateEventWithRoomId, type ISyncResponse } from "../matrix.ts";
 import { type IIndexedDBBackend, type UserTuple } from "./indexeddb-backend.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { type SyncUserProfile } from "../models/user.ts";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker?: Worker;
@@ -143,6 +144,18 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
 
     public async removeToDeviceBatch(id: number): Promise<void> {
         return this.doCmd("removeToDeviceBatch", [id]);
+    }
+
+    public async getUserProfile(userId: string): Promise<SyncUserProfile | undefined> {
+        return this.doCmd("getUserProfile", [userId]);
+    }
+
+    public async storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void> {
+        await this.doCmd("storeUserProfiles", [userProfileTuples]);
+    }
+
+    public async removeUserProfiles(userIds: string[]): Promise<void> {
+        await this.doCmd("removeUserProfile", [userIds]);
     }
 
     private ensureStarted(): Promise<void> {

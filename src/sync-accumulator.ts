@@ -26,10 +26,6 @@ import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
-import { NamespacedValue } from "./NamespacedValue.ts";
-import { type SyncUserProfile } from "./matrix.ts";
-
-const profileFieldsFilterName = new NamespacedValue("users", "org.matrix.msc4429.users");
 
 interface IOpts {
     /**
@@ -193,7 +189,7 @@ export interface IDeviceLists {
 
 export interface IUserUpdate {
     [userId: string]: {
-        profile_updates?: Record<string, unknown>;
+        profile_updates?: Record<string, unknown> | null;
     };
 }
 
@@ -244,7 +240,6 @@ export interface ISyncData {
     nextBatch: string;
     accountData: IMinimalEvent[];
     roomsData: IRooms;
-    userProfiles?: IUserUpdate;
 }
 
 type TaggedEvent = IRoomEvent & { _localTs?: number };
@@ -265,7 +260,7 @@ function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
  */
 export class SyncAccumulator {
     private accountData: Record<string, IMinimalEvent> = {}; // $event_type: Object
-    private userProfiles: Record<string, SyncUserProfile> = {}; // userId: Object
+
     private inviteRooms: Record<string, IInvitedRoom> = {}; // $roomId: { ... sync 'invite' json data ... }
     private knockRooms: Record<string, IKnockedRoom> = {}; // $roomId: { ... sync 'knock' json data ... }
     private joinRooms: { [roomId: string]: IRoom } = {};
@@ -282,7 +277,6 @@ export class SyncAccumulator {
     public accumulate(syncResponse: ISyncResponse, fromDatabase = false): void {
         this.accumulateRooms(syncResponse, fromDatabase);
         this.accumulateAccountData(syncResponse);
-        this.accumulateProfileInfo(syncResponse);
         this.nextBatch = syncResponse.next_batch;
     }
 
@@ -293,29 +287,6 @@ export class SyncAccumulator {
         // Clobbers based on event type.
         syncResponse.account_data.events.forEach((e) => {
             this.accountData[e.type] = e;
-        });
-    }
-
-    private accumulateProfileInfo(syncResponse: ISyncResponse): void {
-        let data: IUserUpdate;
-        if (this.opts.profileFieldsStable && syncResponse[profileFieldsFilterName.name]) {
-            data = syncResponse.users ?? {};
-        } else if (this.opts.profileFieldsStable === false && syncResponse[profileFieldsFilterName.unstable!]) {
-            data = syncResponse["org.matrix.msc4429.users"] ?? {};
-        } else {
-            return;
-        }
-        // Clobbers based on event type.
-        Object.entries(data).forEach(([userId, userData]) => {
-            if (!userData.profile_updates) {
-                return;
-            }
-            if (Object.keys(userData.profile_updates).length === 0) {
-                // Keep the object size down.
-                delete this.userProfiles[userId];
-            } else {
-                this.userProfiles[userId] = { ...this.userProfiles[userId], ...userData.profile_updates };
-            }
         });
     }
 
@@ -801,9 +772,6 @@ export class SyncAccumulator {
             nextBatch: this.nextBatch!,
             roomsData: data,
             accountData: accData,
-            userProfiles: Object.fromEntries(
-                Object.entries(this.userProfiles).map(([userId, profile]) => [userId, { profile_updates: profile }]),
-            ),
         };
     }
 

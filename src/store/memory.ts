@@ -443,16 +443,16 @@ export class MemoryStore implements IStore {
         return Promise.resolve();
     }
 
-    public getUserProfile(userId: string): SyncUserProfile | undefined {
+    public async getUserProfile(userId: string): Promise<SyncUserProfile | undefined> {
         return this.userProfiles.get(userId);
     }
 
-    public storeUserProfile(userId: string, fullUserProfile: SyncUserProfile): void {
-        this.userProfiles.set(userId, fullUserProfile);
+    public async storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void> {
+        userProfileTuples.forEach(([userId, profile]) => this.userProfiles.set(userId, profile));
     }
 
-    public removeUserProfile(userId: string): void {
-        this.userProfiles.delete(userId);
+    public async removeUserProfiles(userIds: string[]): Promise<void> {
+        userIds.forEach((userId) => this.userProfiles.delete(userId));
     }
 
     public async destroy(): Promise<void> {

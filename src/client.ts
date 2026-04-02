@@ -1179,7 +1179,13 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
-    [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown>) => void;
+    /**
+     *
+     * @param userId
+     * @param profile
+     * @returns
+     */
+    [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown> | null) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
@@ -7412,7 +7418,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         // NOTE: We only read individual keys from a cached profile as we don't have the full profile
         // cached, only the keys that the user has configured via their sync filter.
-        const storedProfile = this.store.getUserProfile(userId);
+        const storedProfile = await this.store.getUserProfile(userId);
         if (storedProfile?.[key] !== undefined) {
             return storedProfile[key];
         }

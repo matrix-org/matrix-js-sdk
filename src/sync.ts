@@ -24,12 +24,12 @@ limitations under the License.
  */
 
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
-import { User } from "./models/user.ts";
+import { SyncUserProfile, User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
 import { deepCopy, noUnsafeEventProps, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
-import { type Logger } from "./logger.ts";
+import { logger, type Logger } from "./logger.ts";
 import {
     ClientEvent,
     type IStoredClientOpts,
@@ -1151,12 +1151,23 @@ export class SyncApi {
 
         const userUpdate = data["users"] ?? data["org.matrix.msc4429.users"];
         if (typeof userUpdate === "object" && userUpdate !== null) {
+            const usersToRemove = [];
+            const profilesToAmend: Array<[string, SyncUserProfile]> = [];
             for (const [userId, userData] of Object.entries(userUpdate)) {
+                logger.info(`Storing user profile ${userId}`, userData);
                 if (userData.profile_updates) {
                     client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates);
                     const existingProfile = client.store.getUserProfile(userId);
-                    client.store.storeUserProfile(userId, { ...existingProfile, ...userData.profile_updates });
+                    profilesToAmend.push([userId, { ...existingProfile, ...userData.profile_updates }]);
+                } else if (userData.profile_updates === null) {
+                    usersToRemove.push(userId);
                 }
+            }
+            if (usersToRemove.length) {
+                await client.store.removeUserProfiles(usersToRemove);
+            }
+            if (profilesToAmend) {
+                await client.store.storeUserProfiles(profilesToAmend);
             }
         }
 
