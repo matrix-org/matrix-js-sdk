@@ -7410,6 +7410,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
+        // NOTE: We only read individual keys from a cached profile as we don't have the full profile
+        // cached, only the keys that the user has configured via their sync filter.
         const storedProfile = this.store.getUserProfile(userId);
         if (storedProfile?.[key] !== undefined) {
             return storedProfile[key];

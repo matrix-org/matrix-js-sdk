@@ -27,7 +27,7 @@ import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
 import { NamespacedValue } from "./NamespacedValue.ts";
-import { SyncUserProfile } from "./matrix.ts";
+import { type SyncUserProfile } from "./matrix.ts";
 
 const profileFieldsFilterName = new NamespacedValue("users", "org.matrix.msc4429.users");
 

@@ -20,7 +20,7 @@ limitations under the License.
 
 import { type EventType } from "../@types/event.ts";
 import { type Room } from "../models/room.ts";
-import { SyncUserProfile, type User } from "../models/user.ts";
+import { type SyncUserProfile, type User } from "../models/user.ts";
 import { type IEvent, type MatrixEvent } from "../models/event.ts";
 import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type RoomMember } from "../models/room-member.ts";
