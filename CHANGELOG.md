@@ -1,3 +1,10 @@
+Changes in [41.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.3.0) (2026-04-07)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Rotate the current room key when we see a member leave ([#5231](https://github.com/matrix-org/matrix-js-sdk/pull/5231)). Contributed by @kaylendog.
+
+
 Changes in [41.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.2.0) (2026-03-24)
 ==================================================================================================
 ## ✨ Features
