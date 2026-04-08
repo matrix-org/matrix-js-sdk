@@ -161,7 +161,7 @@ jobs:
             - name: Bump package.json versions
               run: |
                   for DIR in $DIRS; do
-                      pnpm --dir "$DIR" version --no-git-tag-version "${VERSION#v}"
+                      pnpm version -C "$DIR" --no-git-tag-version "${VERSION#v}"
                       git add "$DIR"/package.json
                   done
               env:
