@@ -806,7 +806,7 @@ export class RoomWidgetClient extends MatrixClient {
                     // Sliding Sync
                     await this.syncApi!.injectRoomEvents(this.room!, [event]);
                 }
-                logger.info(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
+                logger.debug(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
             } else {
                 const { event_id: eventId, room_id: roomId } = ev.detail.data;
                 logger.info(`Received state entry ${eventId} for a different room ${roomId}; discarding`);
