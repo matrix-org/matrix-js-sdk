@@ -80,7 +80,7 @@ jobs:
 
             - name: "🩻 SonarCloud Scan"
               id: sonarcloud
-              uses: matrix-org/sonarcloud-workflow-action@ea0cd9dbd5562e79816685972bc0d03c235a900c
+              uses: matrix-org/sonarcloud-workflow-action@13968a27c924fa19b1dacbce6ca3ff217daa775b
               # workflow_run fails report against the develop commit always, we don't want that for PRs
               continue-on-error: ${{ github.event.workflow_run.head_branch != 'develop' }}
               with:
