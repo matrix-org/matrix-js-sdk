@@ -2549,6 +2549,47 @@ describe("MatrixClient syncing", () => {
         });
     });
 
+    describe("user profiles", () => {
+        const TEST_STATUS_UPDATE = {
+            text: "Swimming in the Great Lakes!",
+            emoji: "🏊️",
+        };
+
+        beforeEach(() => {
+            vi.spyOn(client!, "doesServerSupportExtendedProfiles").mockResolvedValue(true);
+        });
+
+        it("should consume user profile updates from the sync response", async () => {
+            const fn = vi.fn();
+            client!.on(ClientEvent.UserProfileUpdate, fn);
+
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "batch_token",
+                rooms: {},
+                presence: {},
+                users: {
+                    ["@alice:localhost"]: {
+                        profile_updates: {
+                            ["m.status"]: TEST_STATUS_UPDATE,
+                        },
+                    },
+                },
+            });
+
+            await Promise.all([client!.startClient(), httpBackend!.flushAllExpected()]);
+
+            expect(await client!.getExtendedProfileProperty("@alice:localhost", "m.status")).toEqual(
+                TEST_STATUS_UPDATE,
+            );
+
+            expect(fn).toHaveBeenCalledWith("@alice:localhost", {
+                "m.status": TEST_STATUS_UPDATE,
+            });
+
+            client!.off(ClientEvent.UserProfileUpdate, fn);
+        });
+    });
+
     /**
      * waits for the MatrixClient to emit one or more 'sync' events.
      *
