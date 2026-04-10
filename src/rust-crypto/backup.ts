@@ -180,28 +180,35 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             // There is no server-side key backup.
             // This decryption key is useless to us.
             this.logger.warn(
-                "handleBackupSecretReceived: Received a backup decryption key, but there is no trusted server-side key backup",
+                "handleBackupSecretReceived: Received a backup decryption key, but there is no server-side key backup",
             );
             return false;
         }
 
+        let backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey;
         try {
-            const backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
+            backupDecryptionKey = RustSdkCryptoJs.BackupDecryptionKey.fromBase64(secret);
+        } catch (e) {
+            this.logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
+            return false;
+        }
+
+        try {
             const privateKeyMatches = this.backupInfoMatchesBackupDecryptionKey(latestBackupInfo, backupDecryptionKey);
             if (!privateKeyMatches) {
                 this.logger.warn(
-                    `handleBackupSecretReceived: Private decryption key does not match the public key of the current remote backup.`,
+                    `handleBackupSecretReceived: Private decryption key does not match the public key of the current server-side backup version (${latestBackupInfo.version})`,
                 );
                 // just ignore the secret
                 return false;
             }
             this.logger.info(
-                `handleBackupSecretReceived: A valid backup decryption key has been received and stored in cache.`,
+                `handleBackupSecretReceived: Valid decryption key for the current server-side backup version (${latestBackupInfo.version}) received`,
             );
             await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
             return true;
         } catch (e) {
-            this.logger.warn("handleBackupSecretReceived: Invalid backup decryption key", e);
+            this.logger.warn("handleBackupSecretReceived: Unable to validate backup decryption key", e);
         }
 
         return false;

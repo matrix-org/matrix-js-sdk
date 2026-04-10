@@ -33,10 +33,14 @@ on:
                 description: The number of expected assets, including signatures, excluding generated zip & tarball.
                 type: number
                 required: false
-            dir:
+            dist-dir:
                 description: The directory to release
                 type: string
                 default: "."
+            version-dirs:
+                description: Directories in which to update package.json `version` field
+                type: string
+                required: false
         outputs:
             npm-id:
                 description: "The npm package@version string we published"
@@ -96,7 +100,7 @@ jobs:
 
             - name: Prepare variables
               id: prepare
-              working-directory: ${{ inputs.dir }}
+              working-directory: ${{ inputs.dist-dir }}
               run: |
                   echo "VERSION=$VERSION" >> $GITHUB_ENV
 
@@ -134,13 +138,13 @@ jobs:
             - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
               with:
                   cache: "pnpm"
-                  node-version-file: ${{ inputs.dir }}/package.json
+                  node-version-file: ${{ inputs.dist-dir }}/package.json
 
             - name: Install dependencies
               run: "pnpm install --frozen-lockfile"
 
             - name: Handle develop dependencies
-              working-directory: ${{ inputs.dir }}
+              working-directory: ${{ inputs.dist-dir }}
               run: |
                   ret=0
                   cat package.json | jq -r '.dependencies | to_entries | .[] | "\(.key) \(.value)"' | grep '#develop$' | while read -r dep ; do
@@ -154,11 +158,14 @@ jobs:
                       git commit -m "Keep $PACKAGE at $VERSION"
                   done
 
-            - name: Bump package.json version
-              working-directory: ${{ inputs.dir }}
+            - name: Bump package.json versions
               run: |
-                  pnpm version --no-git-tag-version "${VERSION#v}"
-                  git add package.json
+                  for DIR in $DIRS; do
+                      pnpm version -C "$DIR" --no-git-tag-version "${VERSION#v}"
+                      git add "$DIR"/package.json
+                  done
+              env:
+                  DIRS: ${{ inputs.version-dirs || inputs.dist-dir }}
 
             - name: Add to CHANGELOG.md
               if: inputs.final
@@ -185,7 +192,7 @@ jobs:
 
             - name: Build assets
               if: steps.prepare.outputs.has-dist-script == '1'
-              working-directory: ${{ inputs.dir }}
+              working-directory: ${{ inputs.dist-dir }}
               run: DIST_VERSION="$VERSION" pnpm dist
 
             - name: Upload release assets & signatures
@@ -194,7 +201,7 @@ jobs:
               with:
                   gpg-fingerprint: ${{ inputs.gpg-fingerprint }}
                   upload-url: ${{ steps.draft-release.outputs.upload_url }}
-                  asset-path: ${{ inputs.dir }}/${{ inputs.asset-path }}
+                  asset-path: ${{ inputs.dist-dir }}/${{ inputs.asset-path }}
 
             - name: Create signed tag
               if: inputs.gpg-fingerprint
@@ -289,7 +296,7 @@ jobs:
         if: inputs.npm
         uses: matrix-org/matrix-js-sdk/.github/workflows/release-npm.yml@develop # zizmor: ignore[unpinned-uses]
         with:
-            dir: ${{ inputs.dir }}
+            dir: ${{ inputs.dist-dir }}
         permissions:
             contents: read
             id-token: write
