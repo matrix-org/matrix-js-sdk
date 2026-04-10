@@ -1168,7 +1168,7 @@ export class SyncApi {
                 logger.info(`Storing user profile ${userId}`, userData);
                 if (userData.profile_updates) {
                     client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates);
-                    const existingProfile = client.store.getUserProfile(userId);
+                    const existingProfile = await client.store.getUserProfile(userId);
                     profilesToAmend.push([userId, { ...existingProfile, ...userData.profile_updates }]);
                 } else if (userData.profile_updates === null) {
                     usersToRemove.push(userId);
@@ -1177,7 +1177,7 @@ export class SyncApi {
             if (usersToRemove.length) {
                 await client.store.removeUserProfiles(usersToRemove);
             }
-            if (profilesToAmend) {
+            if (profilesToAmend.length) {
                 await client.store.storeUserProfiles(profilesToAmend);
             }
         }
