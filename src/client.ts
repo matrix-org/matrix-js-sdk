@@ -1181,9 +1181,8 @@ export type ClientEventHandlerMap = {
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
     /**
      *
-     * @param userId
-     * @param profile
-     * @returns
+     * @param userId - the user ID of the profile which was updated
+     * @param profile - the updated profile information
      */
     [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown> | null) => void;
 } & RoomEventHandlerMap &
