@@ -1327,13 +1327,12 @@ describe("MatrixClient", function () {
             expect(httpLookups).toHaveLength(0);
         });
 
-        it("can fetch a property from a extended user profile with a cached profile", async () => {
+        it("can fetch a property from an extended user profile with a cached profile", async () => {
             const testProfile = {
                 test_key: "foo",
             };
             (client.store as MockedObject<IStore>).getUserProfile.mockImplementation(async (requestedUserId) => {
                 expect(requestedUserId).toEqual(userId);
-                expect("test_key").toEqual("test_key");
                 return testProfile;
             });
             await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
