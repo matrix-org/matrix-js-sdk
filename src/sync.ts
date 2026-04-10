@@ -622,7 +622,11 @@ export class SyncApi {
         return filter;
     };
 
-    private prepareLazyLoadingForSync = async (): Promise<void> => {
+    /**
+     * Sets up the sync filter options for lazy loading if enabled,
+     * (or force-disables lazy loading entirely if we're a guest).
+     */
+    private prepareSyncFilterLazyLoading = (): void => {
         this.syncOpts.logger.debug("Prepare lazy loading for sync...");
         if (this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
@@ -634,7 +638,12 @@ export class SyncApi {
             }
             this.opts.filter.setLazyLoadMembers(true);
         }
-        // I feel like this is the wrong home for this.
+    };
+
+    /**
+     * Preare sync filter options for the unstable MSC4429 user profile fields if enabled.
+     */
+    private prepareSyncFilterUserProfiles = async (): Promise<void> => {
         if (this.opts.unstableMSC4429SyncUserProfileFields?.length) {
             this.syncOpts.logger.debug("Enabling EXPERIMENTAL user profiles on sync filter...");
             if (!this.opts.filter) {
@@ -734,7 +743,8 @@ export class SyncApi {
         // take a while so if we set it going now, we can wait for it
         // to finish while we process our saved sync data.
         await this.getPushRules();
-        await this.prepareLazyLoadingForSync();
+        this.prepareSyncFilterLazyLoading();
+        await this.prepareSyncFilterUserProfiles();
         await this.storeClientOptions();
 
         const { filterId, filter } = await this.getFilter();
