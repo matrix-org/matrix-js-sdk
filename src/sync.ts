@@ -1159,6 +1159,7 @@ export class SyncApi {
             });
         }
 
+        // handle user profile updates (MSC4429)
         const userUpdate = data["users"] ?? data["org.matrix.msc4429.users"];
         if (typeof userUpdate === "object" && userUpdate !== null) {
             const usersToRemove = [];
