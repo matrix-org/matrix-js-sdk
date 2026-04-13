@@ -654,6 +654,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         return this.event.content || {};
     }
 
+    public replaceWireContent(content: IContent): void {
+        this.event.content = content;
+    }
+
     /**
      * Get the event ID of the thread head
      */
