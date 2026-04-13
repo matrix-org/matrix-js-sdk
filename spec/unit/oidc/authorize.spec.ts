@@ -175,6 +175,23 @@ describe("oidc authorization", () => {
 
             expect(authUrl.searchParams.get("login_hint")).toEqual("login1234");
         });
+
+        it("should generate url with response_mode=fragment", async () => {
+            const nonce = "abc123";
+
+            const authUrl = new URL(
+                await generateOidcAuthorizationUrl({
+                    metadata: delegatedAuthConfig,
+                    homeserverUrl: baseUrl,
+                    clientId,
+                    redirectUri: baseUrl,
+                    nonce,
+                    responseMode: "fragment",
+                }),
+            );
+
+            expect(authUrl.searchParams.get("response_mode")).toEqual("fragment");
+        });
     });
 
     describe("completeAuthorizationCodeGrant", () => {
