@@ -1183,6 +1183,8 @@ export type ClientEventHandlerMap = {
     HttpApiEventHandlerMap &
     BeaconEventHandlerMap;
 
+type ContentTransformCallback = (roomId: string, content: IContent) => IContent;
+
 const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
 
 /**
@@ -1315,6 +1317,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private serverCapabilitiesService: ServerCapabilities;
     public readonly retentionPolicyService: RetentionPolicyService;
     public readonly _unstable_shouldApplyMessageRetention: boolean;
+
+    /**
+     * When sending an event via {@link MatrixClient#sendEvent}, the unencrypted event content is replaced by the result of these
+     * callbacks.
+     */
+    private contentTransformCallbacks: ContentTransformCallback[] = [];
+    /**
+     * When sending an encrypted event, the encrypted event content is replaced by the result of these callbacks.
+     */
+    private encryptedContentTransformCallbacks: ContentTransformCallback[] = [];
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -2677,6 +2689,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Register a transform that will be applied to the content of any outgoing room event.
+     * This transform is applied to the content before it is encrypted.
+     * @param transform A callback that takes the room-id and content as argument and returns the modified content.
+     * @returns A callback that can be called ot unregister this transform.
+     */
+    public registerEventContentTransform(transform: ContentTransformCallback): () => void {
+        this.contentTransformCallbacks.push(transform);
+        return () => {
+            const index = this.contentTransformCallbacks.indexOf(transform);
+            if (index) this.contentTransformCallbacks.splice(index, 1);
+        };
+    }
+
+    /**
+     * Register a transform that will be applied to the encrypted content of any outgoing room event.
+     * @param transform A callback that takes the room-id and content as argument and returns the modified content.
+     * @returns A callback that can be called ot unregister this transform.
+     */
+    public registerEncryptedEventContentTransform(transform: ContentTransformCallback): () => void {
+        this.encryptedContentTransformCallbacks.push(transform);
+        return () => {
+            const index = this.encryptedContentTransformCallbacks.indexOf(transform);
+            if (index) this.encryptedContentTransformCallbacks.splice(index, 1);
+        };
+    }
+
+    /**
      * Send a Matrix timeline event.
      * @param roomId The room to send to.
      * @param eventType The event type.
@@ -2722,6 +2761,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
+        // Apply the content transforms
+        for (const transform of this.contentTransformCallbacks) {
+            content = transform(roomId, content);
+        }
         return this.sendCompleteEvent({ roomId, threadId, eventObject: { type: eventType, content }, txnId });
     }
 
@@ -2978,6 +3021,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
         await this.cryptoBackend.encryptEvent(event, room);
+
+        // Apply the encrypted content transforms
+        for (const transform of this.encryptedContentTransformCallbacks) {
+            const newContent = transform(room.roomId, event.getWireContent());
+            event.replaceWireContent(newContent);
+        }
     }
 
     /**
