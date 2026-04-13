@@ -608,7 +608,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         return Promise.resolve().then(() => {
             const txn = this.db!.transaction(["user_profile"], "readonly");
             const store = txn.objectStore("user_profile");
-            return selectQuery(store, userId, (cursor) => {
+            return selectQuery(store, [userId], (cursor) => {
                 return cursor.value?.profile;
             }).then((results) => results[0]);
         });
@@ -627,7 +627,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const txn = this.db!.transaction(["user_profile"], "readwrite");
         const store = txn.objectStore("user_profile");
         for (const userId of userIds) {
-            store.delete(userId);
+            store.delete([userId]);
         }
         await txnAsPromise(txn);
     }
