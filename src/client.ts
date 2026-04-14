@@ -7377,6 +7377,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Fetch a user's *extended* profile, which may include additional keys.
+     * Always returns all available profile fields, irrespective of what profile fields are set
+     * in the sync filter.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
@@ -7389,6 +7391,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
+
+        // Note that this does not look at the profile cache as this will only contain keys
+        // that we included in the sync filter and this function's purpose is to return the whole profile.
+
         return this.http.authedRequest(
             Method.Get,
             utils.encodeUri("/profile/$userId", { $userId: userId }),
