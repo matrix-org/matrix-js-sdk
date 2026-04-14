@@ -220,6 +220,7 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
 export const completeAuthorizationCodeGrant = async (
     code: string,
     state: string,
+    responseMode: SigninRequestCreateArgs["response_mode"] = "query",
 ): Promise<{
     oidcClientSettings: { clientId: string; issuer: string };
     tokenResponse: BearerTokenResponse;
@@ -233,13 +234,18 @@ export const completeAuthorizationCodeGrant = async (
      * so that oidc-client can parse it
      */
     const reconstructedUrl = new URL(window.location.origin);
-    reconstructedUrl.searchParams.append("code", code);
-    reconstructedUrl.searchParams.append("state", state);
+
+    const params = new URLSearchParams({ code, state });
+    if (responseMode === "query") {
+        reconstructedUrl.search = params.toString();
+    } else {
+        reconstructedUrl.hash = `#${params.toString()}`;
+    }
 
     // set oidc-client to use our logger
     Log.setLogger(logger);
     try {
-        const response = new SigninResponse(reconstructedUrl.searchParams);
+        const response = new SigninResponse(params);
 
         const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage });
 
