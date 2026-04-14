@@ -212,7 +212,8 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
  * request to the Token Endpoint, to obtain the access token, refresh token, etc.
  *
  * @param code - authorization code as returned by OP during authorization
- * @param storedAuthorizationParams - stored params from start of oidc login flow
+ * @param state - authorization state param as returned by OP during authorization
+ * @param responseMode - the response mode used for authentication
  * @returns valid bearer token response
  * @throws An `Error` with `message` set to an entry in {@link OidcError},
  *      when the request fails, or the returned token response is invalid.
