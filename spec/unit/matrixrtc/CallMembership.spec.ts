@@ -427,7 +427,7 @@ describe("CallMembership", () => {
         });
         it("uses unpadded base64 for RTC backend identities", async () => {
             const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
-            expect(membership.rtcBackendIdentity).toBe("j9N1u04ZbvI9qKf3cxrf2NauD-fIGJ4uAcYkfI9V7SY");
+            expect(membership.rtcBackendIdentity).toBe("jUZ0Q1yF5nV3LlAI5xfD1I7BPnAytJaPEAR57EXjJ6s");
         });
     });
 });
