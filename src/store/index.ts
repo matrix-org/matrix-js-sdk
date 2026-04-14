@@ -262,11 +262,14 @@ export interface IStore {
 
     /**
      * Delete stored profiles for the given users.
+     * @param userIds - The user IDs whose profiles should be deleted.
      */
     removeUserProfiles(userIds: string[]): Promise<void>;
 
     /**
-     * Delete a user profile based on a sync response.
+     * Retrieve a stored user profile for the given user ID, if it exists.
+     * @param userId - The user ID to retrieve the profile for.
+     * @returns The stored profile, or undefined if no profile is stored for this user ID.
      */
     getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
 
