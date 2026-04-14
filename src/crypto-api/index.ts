@@ -188,7 +188,9 @@ export interface CryptoApi {
     /**
      * Check if the given user has published cross-signing keys.
      *
-     * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is this user, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is tracked, any current `/keys/query` requests are awaited (with a timeout) and then
+     *   the locally cached information is used.
      * - If the user is not tracked locally and downloadUncached is set to true,
      *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
      * - Otherwise, return false
@@ -205,7 +207,10 @@ export interface CryptoApi {
      * Get the device information for the given list of users.
      *
      * For any users whose device lists are cached (due to sharing an encrypted room with the user), the
-     * cached device data is returned.
+     * cached device data is returned, unless it is stale.
+     *
+     * If there are users with stale cached entries, wait (with some timeout) for any in-progress
+     * `/keys/query` request to complete.
      *
      * If there are uncached users, and the `downloadUncached` parameter is set to `true`,
      * a `/keys/query` request is made to the server to retrieve these devices.
