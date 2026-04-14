@@ -212,7 +212,8 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
  * request to the Token Endpoint, to obtain the access token, refresh token, etc.
  *
  * @param code - authorization code as returned by OP during authorization
- * @param storedAuthorizationParams - stored params from start of oidc login flow
+ * @param state - authorization state param as returned by OP during authorization
+ * @param responseMode - the response mode used for authentication
  * @returns valid bearer token response
  * @throws An `Error` with `message` set to an entry in {@link OidcError},
  *      when the request fails, or the returned token response is invalid.
@@ -220,6 +221,7 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
 export const completeAuthorizationCodeGrant = async (
     code: string,
     state: string,
+    responseMode: SigninRequestCreateArgs["response_mode"] = "query",
 ): Promise<{
     oidcClientSettings: { clientId: string; issuer: string };
     tokenResponse: BearerTokenResponse;
@@ -233,13 +235,18 @@ export const completeAuthorizationCodeGrant = async (
      * so that oidc-client can parse it
      */
     const reconstructedUrl = new URL(window.location.origin);
-    reconstructedUrl.searchParams.append("code", code);
-    reconstructedUrl.searchParams.append("state", state);
+
+    const params = new URLSearchParams({ code, state });
+    if (responseMode === "query") {
+        reconstructedUrl.search = params.toString();
+    } else {
+        reconstructedUrl.hash = `#${params.toString()}`;
+    }
 
     // set oidc-client to use our logger
     Log.setLogger(logger);
     try {
-        const response = new SigninResponse(reconstructedUrl.searchParams);
+        const response = new SigninResponse(params);
 
         const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage });
 
