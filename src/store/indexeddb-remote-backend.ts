@@ -155,7 +155,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async removeUserProfiles(userIds: string[]): Promise<void> {
-        await this.doCmd("removeUserProfile", [userIds]);
+        await this.doCmd("removeUserProfiles", [userIds]);
     }
 
     private ensureStarted(): Promise<void> {
