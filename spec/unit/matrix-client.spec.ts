@@ -375,6 +375,7 @@ describe("MatrixClient", function () {
                 "startup",
                 "deleteAllData",
                 "setUserCreator",
+                "storeUserProfiles",
             ] as const
         ).reduce((r, k) => {
             r[k] = vi.fn();
