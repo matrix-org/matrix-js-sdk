@@ -62,6 +62,6 @@ export const validateAuthMetadataAndKeys = async (authMetadata: unknown): Promis
 
     return {
         ...validatedIssuerConfig,
-        signingKeys: await metadataService.getSigningKeys(),
+        signingKeys: validatedIssuerConfig.jwks_uri ? await metadataService.getSigningKeys() : null,
     };
 };
