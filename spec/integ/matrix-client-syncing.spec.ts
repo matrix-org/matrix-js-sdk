@@ -2563,6 +2563,20 @@ describe("MatrixClient syncing", () => {
             const fn = vi.fn();
             client!.on(ClientEvent.UserProfileUpdate, fn);
 
+            httpBackend!.expectedRequests = [];
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!
+                .when("POST", "/filter")
+                .check((req) => {
+                    expect(req.data).toEqual({
+                        "org.matrix.msc4429.profile_fields": {
+                            ids: ["m.status"],
+                        },
+                    });
+                })
+                .respond(200, { filter_id: "a filter id" });
+
             httpBackend!.when("GET", "/sync").respond(200, {
                 next_batch: "batch_token",
                 rooms: {},
@@ -2576,7 +2590,10 @@ describe("MatrixClient syncing", () => {
                 },
             });
 
-            await Promise.all([client!.startClient(), httpBackend!.flushAllExpected()]);
+            await Promise.all([
+                client!.startClient({ unstableMSC4429SyncUserProfileFields: ["m.status"] }),
+                httpBackend!.flushAllExpected(),
+            ]);
 
             expect(await client!.getExtendedProfileProperty("@alice:localhost", "m.status")).toEqual(
                 TEST_STATUS_UPDATE,
