@@ -7407,7 +7407,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetch a specific key from the user's *extended* profile.
+     * Fetch a specific key from the user's *extended* profile by checking local cache (which is updated from
+     * the sync) and querying the server if no data is cached locally.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
@@ -7436,6 +7437,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: await this.getExtendedProfileRequestPrefix(),
             },
         )) as Record<string, unknown>;
+
+        // write through to the cache
+        await this.store.storeUserProfiles([[userId, profile]]);
+
         return profile[key];
     }
 
