@@ -20,7 +20,7 @@ import type { RelationType } from "../../types.ts";
 import { type RtcSlotEventContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 import { sha256 } from "../../digest.ts";
-import { encodeUnpaddedBase64Url } from "../../base64.ts";
+import { encodeUnpaddedBase64 } from "../../base64.ts";
 import { slotIdToDescription } from "../utils.ts";
 
 /**
@@ -149,8 +149,9 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
 };
 
 export async function computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
-    const hashInput = `${userId}|${deviceId}|${memberId}`;
-    const hashBuffer = await sha256(hashInput);
-    const hashedString = encodeUnpaddedBase64Url(hashBuffer);
+    // canonical JSON serialization (Matrix canonical JSON for arrays)
+    const jsonStr = JSON.stringify([userId, deviceId, memberId]);
+    const hashBuffer = await sha256(jsonStr);
+    const hashedString = encodeUnpaddedBase64(hashBuffer);
     return hashedString;
 }
