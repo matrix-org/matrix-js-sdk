@@ -175,6 +175,23 @@ describe("oidc authorization", () => {
 
             expect(authUrl.searchParams.get("login_hint")).toEqual("login1234");
         });
+
+        it("should generate url with response_mode=fragment", async () => {
+            const nonce = "abc123";
+
+            const authUrl = new URL(
+                await generateOidcAuthorizationUrl({
+                    metadata: delegatedAuthConfig,
+                    homeserverUrl: baseUrl,
+                    clientId,
+                    redirectUri: baseUrl,
+                    nonce,
+                    responseMode: "fragment",
+                }),
+            );
+
+            expect(authUrl.searchParams.get("response_mode")).toEqual("fragment");
+        });
     });
 
     describe("completeAuthorizationCodeGrant", () => {
@@ -268,6 +285,32 @@ describe("oidc authorization", () => {
             const state = await setupState();
             const codeVerifier = getValueFromStorage(state, "code_verifier");
             await completeAuthorizationCodeGrant(code, state);
+
+            expect(fetchMock.callHistory.lastCall(metadata.token_endpoint)?.options).toStrictEqual(
+                expect.objectContaining({
+                    method: "post",
+                    credentials: "same-origin",
+                    headers: {
+                        "accept": "application/json",
+                        "content-type": "application/x-www-form-urlencoded",
+                    },
+                }),
+            );
+
+            // check body is correctly formed
+            const queryParams = fetchMock.callHistory.lastCall(metadata.token_endpoint)!.options
+                .body as URLSearchParams;
+            expect(queryParams.get("grant_type")).toEqual("authorization_code");
+            expect(queryParams.get("client_id")).toEqual(clientId);
+            expect(queryParams.get("code_verifier")).toEqual(codeVerifier);
+            expect(queryParams.get("redirect_uri")).toEqual(redirectUri);
+            expect(queryParams.get("code")).toEqual(code);
+        });
+
+        it("should make correct request to the token endpoint with response_mode=fragment", async () => {
+            const state = await setupState({ responseMode: "fragment" });
+            const codeVerifier = getValueFromStorage(state, "code_verifier");
+            await completeAuthorizationCodeGrant(code, state, "fragment");
 
             expect(fetchMock.callHistory.lastCall(metadata.token_endpoint)?.options).toStrictEqual(
                 expect.objectContaining({

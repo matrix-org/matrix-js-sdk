@@ -14,7 +14,15 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type IdTokenClaims, Log, OidcClient, SigninResponse, SigninState, WebStorageStateStore } from "oidc-client-ts";
+import {
+    type IdTokenClaims,
+    Log,
+    OidcClient,
+    type SigninRequestCreateArgs,
+    SigninResponse,
+    SigninState,
+    WebStorageStateStore,
+} from "oidc-client-ts";
 
 import { logger } from "../logger.ts";
 import { secureRandomString } from "../randomstring.ts";
@@ -127,6 +135,8 @@ export const generateAuthorizationUrl = async (
  * @param urlState - value to append to the opaque state identifier to uniquely identify the callback
  * @param loginHint - value to send as the `login_hint` to the OP, giving a hint about the login identifier the user might use to log in.
  *          See {@link https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest OIDC core 3.1.2.1}.
+ * @param responseMode - value to send as the `response_mode` to the OP, selecting how auth is passed back during redirect.
+ *          See {@link https://openid.net/specs/openid-connect-core-1_0.html#AuthRequest OIDC core 3.1.2.1}.
  * @returns a Promise with the url as a string
  */
 export const generateOidcAuthorizationUrl = async ({
@@ -139,6 +149,7 @@ export const generateOidcAuthorizationUrl = async ({
     prompt,
     urlState,
     loginHint,
+    responseMode = "query",
 }: {
     clientId: string;
     metadata: ValidatedAuthMetadata;
@@ -149,6 +160,7 @@ export const generateOidcAuthorizationUrl = async ({
     prompt?: string;
     urlState?: string;
     loginHint?: string;
+    responseMode?: SigninRequestCreateArgs["response_mode"];
 }): Promise<string> => {
     const scope = generateScope();
     const oidcClient = new OidcClient({
@@ -156,7 +168,7 @@ export const generateOidcAuthorizationUrl = async ({
         client_id: clientId,
         redirect_uri: redirectUri,
         authority: metadata.issuer,
-        response_mode: "query",
+        response_mode: responseMode,
         response_type: "code",
         scope,
         stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
@@ -200,7 +212,8 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
  * request to the Token Endpoint, to obtain the access token, refresh token, etc.
  *
  * @param code - authorization code as returned by OP during authorization
- * @param storedAuthorizationParams - stored params from start of oidc login flow
+ * @param state - authorization state param as returned by OP during authorization
+ * @param responseMode - the response mode used for authentication
  * @returns valid bearer token response
  * @throws An `Error` with `message` set to an entry in {@link OidcError},
  *      when the request fails, or the returned token response is invalid.
@@ -208,6 +221,7 @@ const normalizeBearerTokenResponseTokenType = (response: SigninResponse): Bearer
 export const completeAuthorizationCodeGrant = async (
     code: string,
     state: string,
+    responseMode: SigninRequestCreateArgs["response_mode"] = "query",
 ): Promise<{
     oidcClientSettings: { clientId: string; issuer: string };
     tokenResponse: BearerTokenResponse;
@@ -221,13 +235,18 @@ export const completeAuthorizationCodeGrant = async (
      * so that oidc-client can parse it
      */
     const reconstructedUrl = new URL(window.location.origin);
-    reconstructedUrl.searchParams.append("code", code);
-    reconstructedUrl.searchParams.append("state", state);
+
+    const params = new URLSearchParams({ code, state });
+    if (responseMode === "query") {
+        reconstructedUrl.search = params.toString();
+    } else {
+        reconstructedUrl.hash = `#${params.toString()}`;
+    }
 
     // set oidc-client to use our logger
     Log.setLogger(logger);
     try {
-        const response = new SigninResponse(reconstructedUrl.searchParams);
+        const response = new SigninResponse(params);
 
         const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage });
 

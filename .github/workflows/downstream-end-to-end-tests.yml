@@ -1,7 +1,7 @@
 # Triggers after the "Downstream artifacts" build has finished, to run the
-# matrix-react-sdk playwright tests (with access to repo secrets)
+# element-web playwright tests (with access to repo secrets)
 
-name: matrix-react-sdk End to End Tests
+name: Element Web End to End Tests
 on:
     merge_group:
         types: [checks_requested]

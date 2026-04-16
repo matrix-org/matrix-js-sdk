@@ -1971,14 +1971,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * the event.
      *
      * To counter this, we proactively discard any active outgoing Megolm
-     * session when we see a `leave` event. Note that we have to do this in
-     * `onRoomStateEvent` rather than `onRoomMembership`, because
-     * `onRoomMembership` is only called when we see a *change* in membership.
-     * In the case of a gappy sync, we might miss Charlie's invite and join,
-     * and only see the final `leave` event (sohis membership goes from `leave`
-     * to `leave`).
+     * session when we see an event indicating the user left.
+     *
+     * Note that we have to do this in `onRoomStateEvent` rather than
+     * `onRoomMembership`, because `onRoomMembership` is only called when we see
+     * a *change* in membership. In the case of a gappy sync, we might miss
+     * Charlie's invite and join, and only see the final `leave` event (so his
+     * membership goes from `leave` to `leave`).
      */
-    public onRoomStateEvent(event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null): void {
+    public onRoomStateEvent(event: MatrixEvent, _state: RoomState, _prevEvent: MatrixEvent | null): void {
         if (event.getType() != EventType.RoomMember) {
             // Ignore all events that aren't member updates.
             return;
@@ -1986,7 +1987,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         if (
             event.getStateKey()! !== this.olmMachine.userId.toString() &&
-            event.getContent().membership === KnownMembership.Leave
+            event.getContent().membership !== KnownMembership.Join
         ) {
             this.logger.info(`Rotating session for room ${event.getRoomId()} due to member leaving the room`);
             this.forceDiscardSession(event.getRoomId()!);
