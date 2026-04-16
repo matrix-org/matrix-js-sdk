@@ -742,9 +742,18 @@ describe("History Sharing", () => {
         ).toBeFalsy();
     });
 
-    test.each([false, true])(
-        "Room key is rotated after a member joins and leaves the room (gappy sync = %s)",
-        async (gappySync) => {
+    test.each([
+        { gappySync: false, leftState: KnownMembership.Ban },
+        { gappySync: false, leftState: KnownMembership.Invite },
+        { gappySync: false, leftState: KnownMembership.Knock },
+        { gappySync: false, leftState: KnownMembership.Leave },
+        { gappySync: true, leftState: KnownMembership.Ban },
+        { gappySync: true, leftState: KnownMembership.Invite },
+        { gappySync: true, leftState: KnownMembership.Knock },
+        { gappySync: true, leftState: KnownMembership.Leave },
+    ])(
+        "Room key is rotated after a member joins and leaves the room (%s)",
+        async (config) => {
             const [alice, bob, charlie] = await setupClients(3);
             const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
             const { homeserverUrl: bobHomeserverUrl, client: bobClient, syncResponder: bobSyncResponder } = bob;
@@ -890,7 +899,7 @@ describe("History Sharing", () => {
                             timeline: {
                                 events: [
                                     mkEventCustom({
-                                        content: { membership: KnownMembership.Leave },
+                                        content: { membership: config.leftState },
                                         type: EventType.RoomMember,
                                         sender: charlieClient.getSafeUserId(),
                                         state_key: charlieClient.getSafeUserId(),
@@ -922,13 +931,13 @@ describe("History Sharing", () => {
                     },
                 },
             } as any;
-            if (gappySync) {
+            if (config.gappySync) {
                 // In case of a gappy sync, the timeline is limited and we only see the leave event.
                 syncResponse.rooms.join[ROOM_ID].timeline.limited = true;
                 syncResponse.rooms.join[ROOM_ID].state = {
                     events: [
                         mkEventCustom({
-                            content: { membership: KnownMembership.Leave },
+                            content: { membership: config.leftState },
                             type: EventType.RoomMember,
                             sender: charlieClient.getSafeUserId(),
                             state_key: charlieClient.getSafeUserId(),
@@ -944,7 +953,7 @@ describe("History Sharing", () => {
                         state_key: charlieClient.getSafeUserId(),
                     }) as any,
                     mkEventCustom({
-                        content: { membership: KnownMembership.Leave },
+                        content: { membership: config.leftState },
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
@@ -967,8 +976,10 @@ describe("History Sharing", () => {
             expect(sentToDeviceRequest).toBeDefined();
             aliceToDeviceMessage = sentToDeviceRequest[aliceClient.getSafeUserId()][aliceClient.deviceId!];
 
-            // Charlie should not receive the room key
-            expect(sentToDeviceRequest[charlieClient.getSafeUserId()]).toBeUndefined();
+            // Charlie should not receive the room key, but may receive a
+            // different to-device message if he is invited.
+            const charliesToDevice = sentToDeviceRequest[charlieClient.getSafeUserId()];
+            expect(charliesToDevice === undefined || config.leftState === KnownMembership.Invite).toBeTruthy();
 
             debug(`Bob sent encrypted room event: ${JSON.stringify(bobEventM2Content)}`);
 
@@ -1009,7 +1020,10 @@ describe("History Sharing", () => {
             expect(aliceEventM2.getType()).toEqual("m.room.message");
             expect(aliceEventM2.getContent().body).toEqual("Charlie should not be able to read");
 
-            // Charlie rejoins the room by ID, receives M2, which he should not be able to decrypt.
+            // Charlie rejoins the room by ID, receives any supplied to-device
+            // messages, and receives M2, which he should not be able to
+            // decrypt. This proves that any to-device message he received was
+            // not the room key.
             fetchMock.postOnce(`${charlieHomeserverUrl}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
                 room_id: ROOM_ID,
             });
@@ -1031,6 +1045,15 @@ describe("History Sharing", () => {
                             },
                         },
                     },
+                },
+                to_device: {
+                    events: [
+                        {
+                            type: "m.room.encrypted",
+                            sender: bobClient.getSafeUserId(),
+                            content: charliesToDevice,
+                        },
+                    ],
                 },
             } as any;
             charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
