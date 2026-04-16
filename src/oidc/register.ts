@@ -111,6 +111,11 @@ export const registerOidcClient = async (
         throw new Error(OidcError.DynamicRegistrationNotSupported);
     }
 
+    // ask for device authorization grant if supported
+    if (delegatedAuthConfig.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
+        grantTypes.push(OAuthGrantType.DeviceAuthorization);
+    }
+
     const commonBase = new URL(clientMetadata.clientUri);
 
     // https://openid.net/specs/openid-connect-registration-1_0.html
