@@ -7,6 +7,7 @@
     },
     "scripts": {
         "prepare": "pnpm build",
+        "prepack": "pnpm build",
         "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel --delete-dir-on-start src -w -s -d lib --verbose --extensions \".ts,.js\"",
         "build": "pnpm build:compile && pnpm build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
