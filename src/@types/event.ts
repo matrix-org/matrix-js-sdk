@@ -431,6 +431,15 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
 
     [EventType.InvitePermissionConfig]: { default_action?: string };
+
+    // List of recently used reaction emojis
+    // https://spec.matrix.org/v1.18/client-server-api/#mrecent_emoji
+    "m.recent_emoji": {
+        recent_emoji: Array<{
+            emoji: string;
+            total: number;
+        }>;
+    };
 }
 
 /**
