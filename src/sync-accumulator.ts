@@ -260,7 +260,6 @@ function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
  */
 export class SyncAccumulator {
     private accountData: Record<string, IMinimalEvent> = {}; // $event_type: Object
-
     private inviteRooms: Record<string, IInvitedRoom> = {}; // $roomId: { ... sync 'invite' json data ... }
     private knockRooms: Record<string, IKnockedRoom> = {}; // $roomId: { ... sync 'knock' json data ... }
     private joinRooms: { [roomId: string]: IRoom } = {};
