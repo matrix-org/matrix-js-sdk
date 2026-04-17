@@ -1,5 +1,5 @@
 /*
-Copyright 2024 The Matrix.org Foundation C.I.C.
+Copyright 2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,10 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMock from "@fetch-mock/vitest";
+
 import { linkNewDeviceByGeneratingQR, MSC4108FailureReason, signInByGeneratingQR } from "../../../src/rendezvous";
 import { ClientPrefix, DEVICE_CODE_SCOPE, type IHttpOpts, type MatrixClient, MatrixHttpApi } from "../../../src";
 import { makeDelegatedAuthConfig } from "../../../src/testing.ts";
-import fetchMock from "@fetch-mock/vitest";
 
 function makeMockClient(): MatrixClient {
     const baseUrl = "https://example.com";

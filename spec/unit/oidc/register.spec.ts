@@ -134,4 +134,45 @@ describe("registerOidcClient()", () => {
             }),
         );
     });
+
+    it("should ask for device_code grant if supported", async () => {
+        const config = {
+            ...delegatedAuthConfig,
+            grant_types_supported: [
+                ...delegatedAuthConfig.grant_types_supported,
+                "urn:ietf:params:oauth:grant-type:device_code",
+            ],
+        };
+
+        fetchMock.post(config.registration_endpoint!, {
+            status: 200,
+            body: JSON.stringify({ client_id: dynamicClientId }),
+        });
+        expect(await registerOidcClient(config, metadata)).toEqual(dynamicClientId);
+        expect(fetchMock.fetchHandler).toHaveFetched(
+            config.registration_endpoint,
+            expect.objectContaining({
+                headers: {
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                },
+                method: "POST",
+            }),
+        );
+        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options!.body as string)).toEqual(
+            expect.objectContaining({
+                client_name: clientName,
+                client_uri: baseUrl,
+                response_types: ["code"],
+                grant_types: ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"],
+                redirect_uris: [baseUrl],
+                id_token_signed_response_alg: "RS256",
+                token_endpoint_auth_method: "none",
+                application_type: "web",
+                tos_uri: "https://just.testing/tos",
+                policy_uri: "https://policy.just.testing",
+                logo_uri: `${baseUrl}:8443/logo.png`,
+            }),
+        );
+    });
 });
