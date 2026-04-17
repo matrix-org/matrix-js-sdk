@@ -216,31 +216,41 @@ describe("MSC4108SignInWithQR", () => {
         it("should be able to connect with opponent and share secrets", async () => {
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
-            // We don't have the new device side of this flow implemented at this time so mock it
-            // @ts-ignore
-            ourLogin.expectingNewDeviceId = "DEADB33F";
+            vi.mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
+            fetchMock.post(metadata.device_authorization_endpoint!, {
+                device_code: "test",
+                verification_uri: verificationUriComplete,
+            });
 
-            const ourProm = ourLogin.shareSecrets();
-
-            // Consume the ProtocolAccepted message which would normally be handled by step 4 which we do not have here
-            // @ts-ignore
-            await opponentLogin.receive();
-
-            vi.mocked(client.getDevice).mockResolvedValue({} as IMyDevice);
+            await Promise.all([
+                ourLogin.deviceAuthorizationGrant(),
+                opponentLogin.deviceAuthorizationGrant({
+                    clientId,
+                    deviceId,
+                    metadata,
+                }),
+            ]);
 
             const secrets = {
                 cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
             };
             client.getCrypto()!.exportSecretsBundle = vi.fn().mockResolvedValue(secrets);
 
+            // simulate IdP issuing a token from the device_code flow
+            fetchMock.postOnce(metadata.token_endpoint, { access_token: "test", token_type: "Bearer" });
+            vi.mocked(client.getDevice).mockResolvedValue({} as IMyDevice);
+
+            const ourProm = ourLogin.shareSecrets();
+            const opponentProm = opponentLogin
+                .completeLoginOnNewDevice({ clientId })
+                .then(() => opponentLogin.shareSecrets());
+
             const payload = {
                 secrets: expect.objectContaining(secrets),
             };
-            await Promise.all([
-                expect(ourProm).resolves.toEqual(payload),
-                expect(opponentLogin.shareSecrets()).resolves.toEqual(payload),
-            ]);
-        });
+            await expect(ourProm).resolves.toEqual(payload);
+            await expect(opponentProm).resolves.toEqual(payload);
+        }, 20000);
 
         it("should abort if device doesn't come up by timeout", async () => {
             vi.spyOn(globalThis, "setTimeout").mockImplementation((fn) => {
@@ -310,10 +320,6 @@ describe("MSC4108SignInWithQR", () => {
 
             const ourProm = ourLogin.shareSecrets();
             const opponentProm = opponentLogin.shareSecrets();
-
-            // Consume the ProtocolAccepted message which would normally be handled by step 4 which we do not have here
-            // @ts-ignore
-            await opponentLogin.receive();
 
             const deviceResolvers = Promise.withResolvers<IMyDevice>();
             vi.mocked(client.getDevice).mockReturnValue(deviceResolvers.promise);
