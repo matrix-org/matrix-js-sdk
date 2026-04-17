@@ -361,6 +361,11 @@ export class MSC4108SignInWithQR {
         }
     }
 
+    /**
+     * The fourth step in the OIDC QR login process.
+     * The reciprocating device must perform step 5 for this method to resolve.
+     * To be called after {@link deviceAuthorizationGrant} only on the new device.
+     */
     public async completeLoginOnNewDevice({
         clientId,
     }: {
