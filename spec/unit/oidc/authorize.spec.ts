@@ -548,5 +548,23 @@ describe("oidc authorization", () => {
                 },
             });
         });
+
+        it("should handle session expiration", async () => {
+            fetchMock.post(metadata.token_endpoint, { status: 400, body: { error: "authorization_pending" } });
+            const promise = waitForDeviceAuthorization({ clientId, metadata, session });
+
+            vi.setSystemTime(Date.now() + session.expires_in * 1000);
+            await vi.runOnlyPendingTimersAsync();
+
+            await expect(promise).resolves.toStrictEqual({ error: "expired" });
+            expect(fetchMock).toHavePostedTimes(1, metadata.token_endpoint, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "device_code=device&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=xyz789",
+                    );
+                    return true;
+                },
+            });
+        });
     });
 });
