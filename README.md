@@ -202,11 +202,12 @@ client.startClient();
 As well as the primary entry point (`matrix-js-sdk`), there are several other entry points which may be useful:
 
 | Entry point                    | Description                                                                                         |
-| ------------------------------ | --------------------------------------------------------------------------------------------------- |
+|--------------------------------|-----------------------------------------------------------------------------------------------------|
 | `matrix-js-sdk`                | Primary entry point. High-level functionality, and lots of historical clutter in need of a cleanup. |
 | `matrix-js-sdk/lib/crypto-api` | Cryptography functionality.                                                                         |
 | `matrix-js-sdk/lib/types`      | Low-level types, reflecting data structures defined in the Matrix spec.                             |
 | `matrix-js-sdk/lib/testing`    | Test utilities, which may be useful in test code but should not be used in production code.         |
+| `matrix-js-sdk/lib/rendezvous` | Utilities around MSC4108 QR code login and rendezvous servers.                                      |
 | `matrix-js-sdk/lib/utils/*.js` | A set of modules exporting standalone functions (and their types).                                  |
 
 ## Examples

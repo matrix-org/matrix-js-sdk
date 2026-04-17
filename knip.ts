@@ -7,6 +7,7 @@ export default {
         "src/browser-index.ts",
         "src/indexeddb-worker.ts",
         "src/crypto-api/index.ts",
+        "src/rendezvous/index.ts",
         "src/testing.ts",
         "src/matrix.ts",
         "src/utils.ts", // not really an entrypoint but we have deprecated `defer` there
@@ -17,7 +18,6 @@ export default {
         "src/sliding-sync.ts",
         "src/webrtc/groupCall.ts",
         "src/webrtc/stats/media/mediaTrackStats.ts",
-        "src/rendezvous/RendezvousChannel.ts",
     ],
     project: ["**/*.{js,ts}"],
     ignore: ["examples/**"],
