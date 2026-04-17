@@ -79,6 +79,38 @@ describe("IndexedDBStore", () => {
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(2);
     });
 
+    it("should handle failed queries", async () => {
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+        await store.startup();
+
+        // Simulate a failed query
+        let txn: IDBRequest;
+        (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
+            return {
+                objectStore: (name: string) =>
+                    ({
+                        name,
+                        openCursor: (query: unknown) => {
+                            return (txn = {
+                                error: new DOMException("Expected error"),
+                            } as IDBRequest);
+                        },
+                    }) as IDBObjectStore,
+            } as IDBTransaction;
+        };
+
+        // Call backend directly as otherwise the error is masked.
+        const promise = store.backend.getClientOptions();
+        // Force an error
+        txn!.onerror!(new Event("we-ignore-this"));
+
+        await expect(() => promise).rejects.toThrow("selectQuery failed for client_options");
+    });
+
     it("Should load presence events on startup", async () => {
         // 1. Create idb database
         const indexedDB = new IDBFactory();

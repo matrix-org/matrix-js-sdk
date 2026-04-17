@@ -61,7 +61,7 @@ const VERSION = DB_MIGRATIONS.length;
  * Return the data you want to keep.
  * @returns Promise which resolves to an array of whatever you returned from
  * resultMapper.
- * @throws If there was a problem completing the query, such as a storage issue.
+ * @throws If there was an error completing the query.
  */
 function selectQuery<T>(
     store: IDBObjectStore,
@@ -72,7 +72,7 @@ function selectQuery<T>(
     return new Promise((resolve, reject) => {
         const results: T[] = [];
         query.onerror = (): void => {
-            reject(new Error(`selectQuery failed for ${store.name}:`, { cause: query.error }));
+            reject(new Error(`selectQuery failed for ${store.name}`, { cause: query.error }));
         };
         // collect results
         query.onsuccess = (): void => {
@@ -551,13 +551,11 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public getClientOptions(): Promise<IStoredClientOpts | undefined> {
-        return Promise.resolve().then(() => {
-            const txn = this.db!.transaction(["client_options"], "readonly");
-            const store = txn.objectStore("client_options");
-            return selectQuery(store, undefined, (cursor) => {
-                return cursor.value?.options;
-            }).then((results) => results[0]);
-        });
+        const txn = this.db!.transaction(["client_options"], "readonly");
+        const store = txn.objectStore("client_options");
+        return selectQuery(store, undefined, (cursor) => {
+            return cursor.value?.options;
+        }).then((results) => results[0]);
     }
 
     public async storeClientOptions(options: IStoredClientOpts): Promise<void> {
