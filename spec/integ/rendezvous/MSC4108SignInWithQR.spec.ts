@@ -428,5 +428,39 @@ describe("MSC4108SignInWithQR", () => {
                 expect(opponentLogin.deviceAuthorizationGrant()).rejects.toThrow("Specified device ID already exists"),
             ]);
         });
+
+        it("should abort on declined login", async () => {
+            await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
+
+            vi.mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
+            fetchMock.post(metadata.device_authorization_endpoint!, {
+                device_code: "test",
+                verification_uri: verificationUriComplete,
+            });
+
+            await Promise.all([
+                ourLogin.deviceAuthorizationGrant({
+                    clientId,
+                    deviceId,
+                    metadata,
+                }),
+                opponentLogin.deviceAuthorizationGrant(),
+            ]);
+
+            const secrets = {
+                cross_signing: { master_key: "mk", user_signing_key: "usk", self_signing_key: "ssk" },
+            };
+            client.getCrypto()!.exportSecretsBundle = vi.fn().mockResolvedValue(secrets);
+
+            fetchMock.postOnce(metadata.token_endpoint, { error: "access_denied" });
+
+            const ourProm = ourLogin.completeLoginOnNewDevice({ clientId });
+            const opponentProm = opponentLogin.shareSecrets();
+
+            await expect(ourProm).resolves.toBeUndefined();
+            await expect(opponentProm).rejects.toThrow(
+                new RendezvousError("Failed", MSC4108FailureReason.UserCancelled),
+            );
+        });
     });
 });
