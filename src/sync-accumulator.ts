@@ -187,7 +187,10 @@ export interface IDeviceLists {
     left?: string[];
 }
 
-export interface IUserUpdate {
+/**
+ * The "users" section of the sync update which contains extended profile updates.
+ */
+export interface UsersUpdate {
     [userId: string]: {
         profile_updates?: Record<string, unknown> | null;
     };
@@ -201,8 +204,8 @@ export interface ISyncResponse {
     "to_device"?: IToDevice;
     "device_lists"?: IDeviceLists;
     "device_one_time_keys_count"?: Record<string, number>;
-    "users"?: IUserUpdate;
-    "org.matrix.msc4429.users"?: IUserUpdate;
+    "users"?: UsersUpdate;
+    "org.matrix.msc4429.users"?: UsersUpdate;
     "device_unused_fallback_key_types"?: string[];
     "org.matrix.msc2732.device_unused_fallback_key_types"?: string[];
 }
