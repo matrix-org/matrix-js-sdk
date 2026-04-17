@@ -353,7 +353,7 @@ export const startDeviceAuthorization = async ({
     scope: string;
     metadata: ValidatedAuthMetadata;
 }): Promise<DeviceAuthorizationResponse> => {
-    const params = new URLSearchParams({ client_id: clientId, scope: scope });
+    const body = new URLSearchParams({ client_id: clientId, scope: scope }).toString();
 
     const url = metadata.device_authorization_endpoint;
     if (!url) {
@@ -365,7 +365,7 @@ export const startDeviceAuthorization = async ({
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
         },
-        body: params.toString(),
+        body,
     });
 
     return (await response.json()) as DeviceAuthorizationResponse;
@@ -396,7 +396,7 @@ export const waitForDeviceAuthorization = async ({
             device_code: session.device_code,
             grant_type: OAuthGrantType.DeviceAuthorization,
             client_id: clientId,
-        });
+        }).toString();
         const response = await fetch(metadata.token_endpoint, {
             method: Method.Post,
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
