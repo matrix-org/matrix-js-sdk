@@ -365,7 +365,6 @@ export const waitForDeviceAuthorization = async ({
         const body = new URLSearchParams({
             device_code: session.device_code,
             grant_type: OAuthGrantType.DeviceAuthorization,
-            // TODO: is auth required here? it is optional in RFC8628
             client_id: clientId,
         });
         const response = await fetch(metadata.token_endpoint, {
