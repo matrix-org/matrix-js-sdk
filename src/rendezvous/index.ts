@@ -79,7 +79,7 @@ export async function linkNewDeviceByGeneratingQR(
  * The existing client will then help complete the authentication of the new device and link it to the same account,
  * sharing the end-to-end encryption keys.
  *
- * @param tempClient temporary client used during the flow
+ * @param tempClient temporary client used during the flow for the rendezvous channel
  * @param onFailure callback for when the sign-in process fails
  * @returns a promise that resolves to an instance of the sign-in flow
  */
