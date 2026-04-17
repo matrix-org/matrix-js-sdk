@@ -614,10 +614,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         });
     }
 
-    public async storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void> {
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
         const txn = this.db!.transaction(["user_profile"], "readwrite");
         const store = txn.objectStore("user_profile");
-        for (const [userId, profile] of userProfileTuples) {
+        for (const [userId, profile] of userProfiles.entries()) {
             store.put({ profile, userId });
         }
         await txnAsPromise(txn);

@@ -256,9 +256,9 @@ export interface IStore {
 
     /**
      * Store user profile details from a sync. Existing profiles will be overwritten.
-     * @param userProfileTuples - A set of userIds to profiles.
+     * @param userProfiles - A map of userIds to profiles.
      */
-    storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void>;
+    storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void>;
 
     /**
      * Delete stored profiles for the given users.

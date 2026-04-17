@@ -447,8 +447,8 @@ export class MemoryStore implements IStore {
         return this.userProfiles.get(userId);
     }
 
-    public async storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void> {
-        userProfileTuples.forEach(([userId, profile]) => this.userProfiles.set(userId, profile));
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        userProfiles.forEach((profile, userId) => this.userProfiles.set(userId, profile));
     }
 
     public async removeUserProfiles(userIds: string[]): Promise<void> {

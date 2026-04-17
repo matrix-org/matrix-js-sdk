@@ -150,8 +150,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         return this.doCmd("getUserProfile", [userId]);
     }
 
-    public async storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void> {
-        await this.doCmd("storeUserProfiles", [userProfileTuples]);
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        await this.doCmd("storeUserProfiles", [userProfiles]);
     }
 
     public async removeUserProfiles(userIds: string[]): Promise<void> {

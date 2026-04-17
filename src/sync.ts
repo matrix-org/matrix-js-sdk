@@ -1163,13 +1163,13 @@ export class SyncApi {
         const userUpdate = data["users"] ?? data["org.matrix.msc4429.users"];
         if (typeof userUpdate === "object" && userUpdate !== null) {
             const usersToRemove: string[] = [];
-            const profilesToAmend: Array<[string, SyncUserProfile]> = [];
+            const profilesToAmend: Map<string, SyncUserProfile> = new Map();
             for (const [userId, userData] of Object.entries(userUpdate)) {
                 logger.info(`Storing user profile ${userId}`, userData);
                 if (userData.profile_updates) {
                     client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates);
                     const existingProfile = await client.store.getUserProfile(userId);
-                    profilesToAmend.push([userId, { ...existingProfile, ...userData.profile_updates }]);
+                    profilesToAmend.set(userId, { ...existingProfile, ...userData.profile_updates });
                 } else if (userData.profile_updates === null) {
                     usersToRemove.push(userId);
                 }
@@ -1177,7 +1177,7 @@ export class SyncApi {
             if (usersToRemove.length) {
                 await client.store.removeUserProfiles(usersToRemove);
             }
-            if (profilesToAmend.length) {
+            if (profilesToAmend.size) {
                 await client.store.storeUserProfiles(profilesToAmend);
             }
         }

@@ -390,8 +390,8 @@ export class IndexedDBStore extends MemoryStore {
         return this.backend.getUserProfile(userId);
     }
 
-    public async storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void> {
-        return this.backend.storeUserProfiles(userProfileTuples);
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        return this.backend.storeUserProfiles(userProfiles);
     }
 
     public async removeUserProfiles(userIds: string[]): Promise<void> {

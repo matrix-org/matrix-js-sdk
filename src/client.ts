@@ -7439,7 +7439,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         )) as Record<string, unknown>;
 
         // write through to the cache
-        await this.store.storeUserProfiles([[userId, profile]]);
+        await this.store.storeUserProfiles(new Map([[userId, profile]]));
 
         return profile[key];
     }

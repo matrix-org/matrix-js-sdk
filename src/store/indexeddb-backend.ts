@@ -37,7 +37,7 @@ export interface IIndexedDBBackend {
     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
     removeToDeviceBatch(id: number): Promise<void>;
     getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
-    storeUserProfiles(userProfileTuples: Array<[string, SyncUserProfile]>): Promise<void>;
+    storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void>;
     removeUserProfiles(userIds: string[]): Promise<void>;
     destroy(): Promise<void>;
 }

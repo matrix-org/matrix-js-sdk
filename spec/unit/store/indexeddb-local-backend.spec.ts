@@ -38,7 +38,7 @@ describe("LocalIndexedDBStoreBackend", () => {
             avatar_url: "mxc://example.org/avatar",
         };
 
-        await backend.storeUserProfiles([[userId, profile]]);
+        await backend.storeUserProfiles(new Map([[userId, profile]]));
 
         await expect(backend.getUserProfile(userId)).resolves.toEqual(profile);
     });
@@ -54,7 +54,7 @@ describe("LocalIndexedDBStoreBackend", () => {
             avatar_url: "mxc://example.org/avatar",
         };
 
-        await backend.storeUserProfiles([[userId, profile]]);
+        await backend.storeUserProfiles(new Map([[userId, profile]]));
 
         await expect(backend.getUserProfile(userId)).resolves.toEqual(profile);
         backend.removeUserProfiles([userId]);
