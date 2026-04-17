@@ -1,5 +1,8 @@
 import { KnipConfig } from "knip";
 
+// Specify this as knip loads config files which may conditionally add reporters, e.g. `vitest-sonar-reporter'
+process.env.GITHUB_ACTIONS = "1";
+
 export default {
     entry: [
         "src/index.ts",
@@ -28,10 +31,6 @@ export default {
         "husky",
         // Used in script which only runs in environment with `@octokit/rest` installed
         "@octokit/rest",
-        // Used by `vitest`
-        "vitest-sonar-reporter",
-        // Used by `@babel/plugin-transform-runtime`
-        "@babel/runtime",
     ],
     ignoreBinaries: [
         // Used when available by reusable workflow `.github/workflows/release-make.yml`
