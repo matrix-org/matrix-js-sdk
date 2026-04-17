@@ -61,6 +61,7 @@ const VERSION = DB_MIGRATIONS.length;
  * Return the data you want to keep.
  * @returns Promise which resolves to an array of whatever you returned from
  * resultMapper.
+ * @throws If there was a problem completing the query, such as a storage issue.
  */
 function selectQuery<T>(
     store: IDBObjectStore,
@@ -71,7 +72,7 @@ function selectQuery<T>(
     return new Promise((resolve, reject) => {
         const results: T[] = [];
         query.onerror = (): void => {
-            reject(new Error("Query failed: " + query.error?.name));
+            reject(new Error(`selectQuery failed for ${store.name}:`, { cause: query.error }));
         };
         // collect results
         query.onsuccess = (): void => {
