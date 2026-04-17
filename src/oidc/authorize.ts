@@ -39,7 +39,7 @@ import { sha256 } from "../digest.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { OAuthGrantType } from "./register.ts";
 import { sleep } from "../utils.ts";
-import { Method } from "../http-api";
+import { Method } from "../http-api/index.ts";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
