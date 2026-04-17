@@ -105,8 +105,11 @@ describe("IndexedDBStore", () => {
 
         // Call backend directly as otherwise the error is masked.
         const promise = store.backend.getClientOptions();
-        // Force an error
-        txn!.onerror!(new Event("we-ignore-this"));
+        // The function uses a Promise.then(() => trick to delay execution
+        // so we need to wait before we can call the txn onerror handler.
+        process.nextTick(() => {
+            txn!.onerror!(new Event("we-ignore-this"));
+        });
 
         await expect(() => promise).rejects.toThrow("selectQuery failed for client_options");
     });

@@ -551,11 +551,13 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public getClientOptions(): Promise<IStoredClientOpts | undefined> {
-        const txn = this.db!.transaction(["client_options"], "readonly");
-        const store = txn.objectStore("client_options");
-        return selectQuery(store, undefined, (cursor) => {
-            return cursor.value?.options;
-        }).then((results) => results[0]);
+        return Promise.resolve().then(() => {
+            const txn = this.db!.transaction(["client_options"], "readonly");
+            const store = txn.objectStore("client_options");
+            return selectQuery(store, undefined, (cursor) => {
+                return cursor.value?.options;
+            }).then((results) => results[0]);
+        });
     }
 
     public async storeClientOptions(options: IStoredClientOpts): Promise<void> {
