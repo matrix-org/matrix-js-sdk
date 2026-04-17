@@ -43,8 +43,8 @@ export interface IFilterDefinition {
     "presence"?: IFilterComponent;
     "account_data"?: IFilterComponent;
     "room"?: IRoomFilter;
-    "profile_fields"?: IProfileFieldsFilter;
-    "org.matrix.msc4429.profile_fields"?: IProfileFieldsFilter;
+    "profile_fields"?: ProfileFieldsFilter;
+    "org.matrix.msc4429.profile_fields"?: ProfileFieldsFilter;
 }
 
 export interface IRoomEventFilter extends IFilterComponent {
@@ -73,7 +73,10 @@ interface IRoomFilter {
     account_data?: IRoomEventFilter;
 }
 
-interface IProfileFieldsFilter {
+/**
+ * Filter section used for requesting a set of extended profile fields that will be sent down the sync stream.
+ */
+interface ProfileFieldsFilter {
     ids: string[];
 }
 
