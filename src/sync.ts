@@ -1162,7 +1162,7 @@ export class SyncApi {
         // handle user profile updates (MSC4429)
         const userUpdate = data["users"] ?? data["org.matrix.msc4429.users"];
         if (typeof userUpdate === "object" && userUpdate !== null) {
-            const usersToRemove = [];
+            const usersToRemove: string[] = [];
             const profilesToAmend: Array<[string, SyncUserProfile]> = [];
             for (const [userId, userData] of Object.entries(userUpdate)) {
                 logger.info(`Storing user profile ${userId}`, userData);

@@ -26,6 +26,9 @@ export enum UserEvent {
     LastPresenceTs = "User.lastPresenceTs",
 }
 
+/**
+ * An object of extended profile attributes for a user as it arrives down the sync stream.
+ */
 export type SyncUserProfile = Record<string, unknown>;
 
 export type UserEventHandlerMap = {
