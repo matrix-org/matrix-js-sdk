@@ -38,6 +38,8 @@ import {
 import { sha256 } from "../digest.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { OAuthGrantType } from "./register.ts";
+import { sleep } from "../utils.ts";
+import { Method } from "../http-api";
 
 // reexport for backwards compatibility
 export type { BearerTokenResponse };
@@ -298,6 +300,9 @@ export const completeAuthorizationCodeGrant = async (
     }
 };
 
+/**
+ * Response from the OIDC token endpoint when exchanging a token for grant_type device_code.
+ */
 export interface DeviceAccessTokenResponse {
     id_token?: string;
     access_token: string;
@@ -308,6 +313,9 @@ export interface DeviceAccessTokenResponse {
     session_state?: string;
 }
 
+/**
+ * Error from the OIDC token endpoint when exchanging a token for grant_type device_code.
+ */
 export interface DeviceAccessTokenError {
     error: string;
     error_description?: string;
@@ -315,6 +323,9 @@ export interface DeviceAccessTokenError {
     session_state?: string;
 }
 
+/**
+ * Response from the OIDC device authorization endpoint.
+ */
 export interface DeviceAuthorizationResponse {
     device_code: string;
     user_code: string;
@@ -323,6 +334,15 @@ export interface DeviceAuthorizationResponse {
     expires_in: number;
     interval?: number;
 }
+
+/**
+ * Begin OIDC device authorization flow.
+ * @param clientId - the client ID returned from client registration.
+ * @param scope - the scope to request for authorization.
+ * @param metadata - the validated OIDC metadata for the Identity Provider.
+ * @returns a promise that resolves to a device access token response,
+ *   or an error response if the user denies authorization or the device code expires.
+ */
 export const startDeviceAuthorization = async ({
     clientId,
     scope,
@@ -340,7 +360,7 @@ export const startDeviceAuthorization = async ({
     }
 
     const response = await fetch(url, {
-        method: "POST",
+        method: Method.Post,
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
         },
@@ -350,6 +370,14 @@ export const startDeviceAuthorization = async ({
     return (await response.json()) as DeviceAuthorizationResponse;
 };
 
+/**
+ * Polls the OIDC token endpoint until we get a device access token response, or encounter an unrecoverable error.
+ * @param session - the session returned from a previous call to {@link startDeviceAuthorization}.
+ * @param metadata - the validated OIDC metadata for the Identity Provider.
+ * @param clientId - the client ID returned from client registration.
+ * @returns a promise that resolves to a device access token response,
+ *   or an error response if the user denies authorization or the device code expires.
+ */
 export const waitForDeviceAuthorization = async ({
     session,
     metadata,
@@ -368,7 +396,7 @@ export const waitForDeviceAuthorization = async ({
             client_id: clientId,
         });
         const response = await fetch(metadata.token_endpoint, {
-            method: "POST",
+            method: Method.Post,
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
             body,
         });
@@ -387,7 +415,7 @@ export const waitForDeviceAuthorization = async ({
             case "expired_token":
                 return errorResponse;
         }
-        await new Promise((resolve) => setTimeout(resolve, interval));
+        await sleep(interval);
     } while (Date.now() < expiration);
     return { error: "expired" };
 };
