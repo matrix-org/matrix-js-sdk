@@ -257,6 +257,7 @@ export class Filter {
     }
 
     /**
+     * Set the list of fields to be included in the profile information sent down the sync stream.
      * @param ids The field IDs to sync.
      * @param stable Whether to use the stable or unstable versions of this filter.
      * @experimental
