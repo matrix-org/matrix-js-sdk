@@ -86,6 +86,7 @@ import {
     encryptGroupSessionKey,
     encryptMegolmEvent,
     encryptMegolmEventRawPlainText,
+    encryptOlmEvent,
     establishOlmSession,
     getTestOlmAccountKeys,
     expectSendRoomKey,
@@ -2356,6 +2357,66 @@ describe("crypto", () => {
             const decrypted = JSON.parse(olmSession.decrypt(0, ciphertext.body));
             expect(decrypted.type).toBe("io.element.msc4385.secret.push");
             expect(decrypted.content.name).toBe("m.megolm_backup.v1");
+        });
+
+        it("should receive pushed backup key", async () => {
+            // setup: alice has another device, DEVICE_ID, which is verified,
+            // and has a key backup set up and signed by DEVICE_ID
+            const crypto = aliceClient.getCrypto()!;
+            expectAliceKeyQuery(getTestKeysQueryResponse("@alice:localhost"));
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+            await startClientAndAwaitFirstSync();
+            const devices = await aliceClient.getCrypto()!.getUserDeviceInfo(["@alice:localhost"]);
+            expect(devices.get("@alice:localhost")!.keys()).toContain("DEVICE_ID");
+            await crypto.setDeviceVerified("@alice:localhost", "DEVICE_ID");
+
+            expectAliceKeyClaim(getTestKeysClaimResponse("@alice:localhost"));
+
+            // after we push the backup key to alice...
+
+            const senderIdentityKeys = JSON.parse(testOlmAccount.identity_keys());
+            const aliceDeviceKeys = await crypto.getOwnDeviceKeys();
+            const p2pSession = await createOlmSession(testOlmAccount, keyReceiver);
+            const secretPush = encryptOlmEvent({
+                sender: "@alice:localhost",
+                senderKey: senderIdentityKeys.curve25519,
+                senderSigningKey: senderIdentityKeys.ed25519,
+                p2pSession,
+                recipient: "@alice:localhost",
+                recipientCurve25519Key: aliceDeviceKeys.curve25519,
+                recipientEd25519Key: aliceDeviceKeys.ed25519,
+                plaincontent: {
+                    secret: testData.BACKUP_DECRYPTION_KEY_BASE64,
+                    name: "m.megolm_backup.v1",
+                },
+                plaintype: "io.element.msc4385.secret.push",
+            });
+
+            const syncResponse = {
+                next_batch: 1,
+                to_device: {
+                    events: [secretPush],
+                },
+            };
+
+            const backupKeyReceivedPromise = new Promise<string>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupDecryptionKeyCached, resolve);
+            });
+            const keyBackupEnabledPromise = new Promise<void>((resolve) => {
+                aliceClient.on(CryptoEvent.KeyBackupStatus, (enabled) => {
+                    if (enabled) {
+                        resolve();
+                    }
+                });
+            });
+
+            syncResponder.sendOrQueueSyncResponse(syncResponse);
+            await syncPromise(aliceClient);
+
+            // alice should be using backup now
+            expect(await backupKeyReceivedPromise).toBe(testData.SIGNED_BACKUP_DATA.version);
+            await keyBackupEnabledPromise;
+            expect(await crypto.getActiveSessionBackupVersion()).toBe(testData.SIGNED_BACKUP_DATA.version);
         });
     });
 });

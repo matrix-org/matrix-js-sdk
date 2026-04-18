@@ -2106,9 +2106,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Handles secret received from the rust secret inbox.
      *
-     * The gossipped secrets are received using the `m.secret.send` event type
-     * and are guaranteed to have been received over a 1-to-1 Olm
-     * Session from a verified device.
+     * The gossipped secrets are received using the `m.secret.send` or
+     * `io.element.msc4385.secret.push` event types and are guaranteed to have
+     * been received over a 1-to-1 Olm Session from a verified device.
      *
      * The only secret currently handled in this way is `m.megolm_backup.v1`.
      *
