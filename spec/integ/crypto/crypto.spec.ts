@@ -2315,4 +2315,47 @@ describe("crypto", () => {
             );
         }
     });
+
+    describe("secret pushing", () => {
+        it("should push a new backup key when a new backup key is set", async () => {
+            // setup: alice has another device, DEVICE_ID, which is verified
+            const crypto = aliceClient.getCrypto()!;
+            expectAliceKeyQuery(getTestKeysQueryResponse("@alice:localhost"));
+            await startClientAndAwaitFirstSync();
+            const devices = await aliceClient.getCrypto()!.getUserDeviceInfo(["@alice:localhost"]);
+            expect(devices.get("@alice:localhost")!.keys()).toContain("DEVICE_ID");
+            await crypto.setDeviceVerified("@alice:localhost", "DEVICE_ID");
+
+            expectAliceKeyClaim(getTestKeysClaimResponse("@alice:localhost"));
+
+            // when we set a new backup key
+            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                status: 404,
+                body: { errcode: "M_NOT_FOUND", error: "No current backup version." },
+            });
+            fetchMock.post("path:/_matrix/client/v3/room_keys/version", {
+                status: 200,
+                body: { version: "1" },
+            });
+            const secretPushPromise = new Promise<any>((resolve) => {
+                fetchMock.putOnce(new RegExp("/sendToDevice/m.room.encrypted/"), (callLog): RouteResponse => {
+                    const content = JSON.parse(callLog.options.body as string);
+                    resolve(content);
+                    return {};
+                });
+            });
+
+            await crypto.resetKeyBackup();
+
+            // we expect the other device to get a secret push
+            const content = await secretPushPromise;
+            const curve25519key = JSON.parse(testOlmAccount.identity_keys()).curve25519;
+            const ciphertext = content.messages["@alice:localhost"].DEVICE_ID.ciphertext[curve25519key];
+            const olmSession = new Olm.Session();
+            olmSession.create_inbound(testOlmAccount, ciphertext.body);
+            const decrypted = JSON.parse(olmSession.decrypt(0, ciphertext.body));
+            expect(decrypted.type).toBe("io.element.msc4385.secret.push");
+            expect(decrypted.content.name).toBe("m.megolm_backup.v1");
+        });
+    });
 });

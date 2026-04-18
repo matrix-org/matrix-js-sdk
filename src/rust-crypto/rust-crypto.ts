@@ -1376,6 +1376,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async resetKeyBackup(): Promise<void> {
         const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
 
+        await this.pushSecretToVerifiedDevices("m.megolm_backup.v1");
+
         // we want to store the private key in 4S
         // need to check if 4S is set up?
         if (await this.secretStorageHasAESKey()) {
@@ -2253,6 +2255,20 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             | RustSdkCryptoJs.OwnUserIdentity
             | undefined;
         return identity;
+    }
+
+    /**
+     * Push a secret to all of the current user's verified devices.
+     *
+     * <strong>This method is experimental and may change.</strong>
+     */
+    public async pushSecretToVerifiedDevices(name: string): Promise<void> {
+        const logger = new LogSpan(this.logger, "pushSecretToVerifiedDevices");
+        await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(this.userId)]);
+        await this.olmMachine.pushSecretToVerifiedDevices(name);
+        this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
+            this.logger.warn("onKeyVerificationRequest: Error processing outgoing requests", e);
+        });
     }
 }
 
