@@ -279,7 +279,7 @@ export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
 export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
 
-/** 
+/**
  * Per-room backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}`.
  * Contains the key from {prefix}MEGOLM_SESSION_DATA.
  */
@@ -422,7 +422,7 @@ def build_exported_megolm_key(device_curve_key: x25519.X25519PrivateKey) -> tupl
             "ed25519": encode_base64(ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32)).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
         },
         "forwarding_curve25519_key_chain": [],
-        "org.matrix.msc3061.shared_history": True,
+        "m.shared_history": True,
     }
 
     return megolm_export, private_key
