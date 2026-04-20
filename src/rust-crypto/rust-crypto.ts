@@ -2582,7 +2582,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
 }
 
 interface RoomKeyBundleMessage {
-    type: "io.element.msc4268.room_key_bundle";
+    type: "m.room_key_bundle" | "io.element.msc4268.room_key_bundle";
     content: {
         room_id: string;
     };
@@ -2592,13 +2592,16 @@ interface RoomKeyBundleMessage {
  * Determines if the given payload is a RoomKeyBundleMessage.
  *
  * A RoomKeyBundleMessage is identified by having a specific message type
- * ("io.element.msc4268.room_key_bundle") and a valid room_id in its content.
+ * ("m.room_key_bundle") and a valid room_id in its content.
  *
  * @param message - The received to-device message to check.
  * @returns True if the payload matches the RoomKeyBundleMessage structure, false otherwise.
  */
 function isRoomKeyBundleMessage(message: IToDeviceEvent): message is IToDeviceEvent & RoomKeyBundleMessage {
-    return message.type === "io.element.msc4268.room_key_bundle" && typeof message.content.room_id === "string";
+    return (
+        (message.type === "io.element.msc4268.room_key_bundle" || message.type === "m.room_key_bundle") &&
+        typeof message.content.room_id === "string"
+    );
 }
 
 type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
