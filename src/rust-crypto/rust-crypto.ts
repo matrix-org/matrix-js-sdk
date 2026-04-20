@@ -2259,15 +2259,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
     /**
      * Push a secret to all of the current user's verified devices.
-     *
-     * <strong>This method is experimental and may change.</strong>
      */
     public async pushSecretToVerifiedDevices(name: string): Promise<void> {
         const logger = new LogSpan(this.logger, "pushSecretToVerifiedDevices");
         await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(this.userId)]);
         await this.olmMachine.pushSecretToVerifiedDevices(name);
         this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
-            this.logger.warn("onKeyVerificationRequest: Error processing outgoing requests", e);
+            logger.warn("pushSecretToVerifiedDevices: Error processing outgoing requests", e);
         });
     }
 }
