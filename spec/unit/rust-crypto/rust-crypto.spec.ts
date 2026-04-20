@@ -790,6 +790,7 @@ describe("RustCrypto", () => {
                 undefined,
                 secretStorage,
             );
+            vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
 
             async function createSecretStorageKey() {
                 return {
@@ -837,6 +838,7 @@ describe("RustCrypto", () => {
                 {} as CryptoCallbacks,
                 false,
             );
+            vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
 
             async function createSecretStorageKey() {
                 return {
@@ -2324,6 +2326,7 @@ describe("RustCrypto", () => {
             });
 
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
+            vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
 
             // We have a key backup
             await waitFor(async () => expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull());
