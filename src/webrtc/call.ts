@@ -21,7 +21,6 @@ limitations under the License.
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
  */
 
-import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger.ts";
@@ -2490,7 +2489,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 sender_session_id: this.client.getSessionId(),
                 dest_session_id: this.opponentSessionId,
                 seq: toDeviceSeq,
-                [ToDeviceMessageId]: uuidv4(),
+                [ToDeviceMessageId]: globalThis.crypto.randomUUID(),
             };
 
             this.emit(
