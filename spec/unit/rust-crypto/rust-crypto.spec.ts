@@ -592,53 +592,31 @@ describe("RustCrypto", () => {
             expect(res.length).toEqual(0);
         });
 
-        it("should accept key bundles when we find out about them (stable)", async () => {
-            // Given we are faking that the received to-device message is a
-            // decrypted room key bundle.
+        it.each(["m.room_key_bundle", "io.element.msc4268.room_key_bundle"])(
+            "should accept key bundles when we find out about them",
+            async (type: string) => {
+                // Given we are faking that the received to-device message is a
+                // decrypted room key bundle.
 
-            // @ts-ignore Overriding a private function
-            rustCrypto.receiveSyncChanges = vi.fn().mockReturnValue([keyBundleEvent("m.room_key_bundle")]);
+                // @ts-ignore Overriding a private function
+                rustCrypto.receiveSyncChanges = vi.fn().mockReturnValue([keyBundleEvent(type)]);
 
-            // And that there is a pending key bundle
+                // And that there is a pending key bundle
 
-            // @ts-ignore Overriding a private function
-            rustCrypto.olmMachine.getPendingKeyBundleDetailsForRoom = vi.fn().mockReturnValue({
-                inviteAcceptedAtMillis: Date.now(),
-                inviterId: { toString: vi.fn().mockReturnValue("@inv:s.co") },
-            });
+                // @ts-ignore Overriding a private function
+                rustCrypto.olmMachine.getPendingKeyBundleDetailsForRoom = vi.fn().mockReturnValue({
+                    inviteAcceptedAtMillis: Date.now(),
+                    inviterId: { toString: vi.fn().mockReturnValue("@inv:s.co") },
+                });
 
-            // When we process to-device messages
-            rustCrypto.maybeAcceptKeyBundle = vi.fn().mockName("maybeAcceptKeyBundle").mockResolvedValue(null);
-            await rustCrypto.preprocessToDeviceMessages([]);
+                // When we process to-device messages
+                rustCrypto.maybeAcceptKeyBundle = vi.fn().mockName("maybeAcceptKeyBundle").mockResolvedValue(null);
+                await rustCrypto.preprocessToDeviceMessages([]);
 
-            // Then we accepted the key bundle
-            expect(rustCrypto.maybeAcceptKeyBundle).toHaveBeenCalledWith("!r:s.co", "@inv:s.co");
-        });
-
-        it("should accept key bundles when we find out about them (unstable)", async () => {
-            // Given we are faking that the received to-device message is a
-            // decrypted room key bundle (with the unstable type identifier).
-
-            // @ts-ignore Overriding a private function
-            rustCrypto.receiveSyncChanges = vi
-                .fn()
-                .mockReturnValue([keyBundleEvent("io.element.msc4268.room_key_bundle")]);
-
-            // And that there is a pending key bundle
-
-            // @ts-ignore Overriding a private function
-            rustCrypto.olmMachine.getPendingKeyBundleDetailsForRoom = vi.fn().mockReturnValue({
-                inviteAcceptedAtMillis: Date.now(),
-                inviterId: { toString: vi.fn().mockReturnValue("@inv:s.co") },
-            });
-
-            // When we process to-device messages
-            rustCrypto.maybeAcceptKeyBundle = vi.fn().mockName("maybeAcceptKeyBundle").mockResolvedValue(null);
-            await rustCrypto.preprocessToDeviceMessages([]);
-
-            // Then we accepted the key bundle
-            expect(rustCrypto.maybeAcceptKeyBundle).toHaveBeenCalledWith("!r:s.co", "@inv:s.co");
-        });
+                // Then we accepted the key bundle
+                expect(rustCrypto.maybeAcceptKeyBundle).toHaveBeenCalledWith("!r:s.co", "@inv:s.co");
+            },
+        );
 
         it("should not accept other to-device messages as key bundles when we receive them", async () => {
             // Given we are faking that the received to-device message looks
