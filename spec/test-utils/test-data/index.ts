@@ -130,7 +130,7 @@ export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
             "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0"
         },
         "forwarding_curve25519_key_chain": [],
-        "org.matrix.msc3061.shared_history": true
+        "m.shared_history": true
     },
     {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -142,7 +142,7 @@ export const MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
             "ed25519": "IrkbT6H+0urDf6wKDSyVC1fh1t84Vz6T62snni86Cog"
         },
         "forwarding_curve25519_key_chain": [],
-        "org.matrix.msc3061.shared_history": true
+        "m.shared_history": true
     }
 ];
 
@@ -157,7 +157,7 @@ export const MEGOLM_SESSION_DATA: IMegolmSessionData = {
         "ed25519": "Bhbpt6hqMZlSH4sJV7xiEEEiPVeTWz4Vkujl1EMdIPI"
     },
     "forwarding_curve25519_key_chain": [],
-    "org.matrix.msc3061.shared_history": true
+    "m.shared_history": true
 };
 
 /** A ratcheted version of MEGOLM_SESSION_DATA */
@@ -364,7 +364,7 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
             "ed25519": "F4P7f1Z0RjbiZMgHk1xBCG3KC4/Ng9PmxLJ4hQ13sHA"
         },
         "forwarding_curve25519_key_chain": [],
-        "org.matrix.msc3061.shared_history": true
+        "m.shared_history": true
     },
     {
         "algorithm": "m.megolm.v1.aes-sha2",
@@ -376,7 +376,7 @@ export const BOB_MEGOLM_SESSION_DATA_ARRAY: IMegolmSessionData[] = [
             "ed25519": "OsZMdC1gQ5nPr+L9tuT6xXsaFJkVPkgxP2FexHF1/QM"
         },
         "forwarding_curve25519_key_chain": [],
-        "org.matrix.msc3061.shared_history": true
+        "m.shared_history": true
     }
 ];
 
@@ -391,7 +391,7 @@ export const BOB_MEGOLM_SESSION_DATA: IMegolmSessionData = {
         "ed25519": "zBdpQwWYyz1MkZuEUhXqcdMfUNN/B9psLFDDDTJOg64"
     },
     "forwarding_curve25519_key_chain": [],
-    "org.matrix.msc3061.shared_history": true
+    "m.shared_history": true
 };
 
 /** A ratcheted version of BOB_MEGOLM_SESSION_DATA */
