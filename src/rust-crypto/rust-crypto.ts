@@ -1376,6 +1376,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async resetKeyBackup(): Promise<void> {
         const backupInfo = await this.backupManager.setupKeyBackup((o) => this.signObject(o));
 
+        await this.pushSecretToVerifiedDevices("m.megolm_backup.v1");
+
         // we want to store the private key in 4S
         // need to check if 4S is set up?
         if (await this.secretStorageHasAESKey()) {
@@ -2104,9 +2106,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     /**
      * Handles secret received from the rust secret inbox.
      *
-     * The gossipped secrets are received using the `m.secret.send` event type
-     * and are guaranteed to have been received over a 1-to-1 Olm
-     * Session from a verified device.
+     * The gossipped secrets are received using the `m.secret.send` or
+     * `io.element.msc4385.secret.push` event types and are guaranteed to have
+     * been received over a 1-to-1 Olm Session from a verified device.
      *
      * The only secret currently handled in this way is `m.megolm_backup.v1`.
      *
@@ -2253,6 +2255,18 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             | RustSdkCryptoJs.OwnUserIdentity
             | undefined;
         return identity;
+    }
+
+    /**
+     * Push a secret to all of the current user's verified devices.
+     */
+    public async pushSecretToVerifiedDevices(name: string): Promise<void> {
+        const logger = new LogSpan(this.logger, "pushSecretToVerifiedDevices");
+        await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(this.userId)]);
+        await this.olmMachine.pushSecretToVerifiedDevices(name);
+        this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
+            logger.warn("pushSecretToVerifiedDevices: Error processing outgoing requests", e);
+        });
     }
 }
 
@@ -2582,7 +2596,7 @@ function rustEncryptionInfoToJsEncryptionInfo(
 }
 
 interface RoomKeyBundleMessage {
-    type: "io.element.msc4268.room_key_bundle";
+    type: "m.room_key_bundle" | "io.element.msc4268.room_key_bundle";
     content: {
         room_id: string;
     };
@@ -2592,13 +2606,16 @@ interface RoomKeyBundleMessage {
  * Determines if the given payload is a RoomKeyBundleMessage.
  *
  * A RoomKeyBundleMessage is identified by having a specific message type
- * ("io.element.msc4268.room_key_bundle") and a valid room_id in its content.
+ * ("m.room_key_bundle") and a valid room_id in its content.
  *
  * @param message - The received to-device message to check.
  * @returns True if the payload matches the RoomKeyBundleMessage structure, false otherwise.
  */
 function isRoomKeyBundleMessage(message: IToDeviceEvent): message is IToDeviceEvent & RoomKeyBundleMessage {
-    return message.type === "io.element.msc4268.room_key_bundle" && typeof message.content.room_id === "string";
+    return (
+        (message.type === "io.element.msc4268.room_key_bundle" || message.type === "m.room_key_bundle") &&
+        typeof message.content.room_id === "string"
+    );
 }
 
 type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
