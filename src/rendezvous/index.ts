@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { OAuthGrantType, type MatrixClient } from "../matrix.ts";
+import { type MatrixClient, OAuthGrantType } from "../matrix.ts";
 import { MSC4108FailureReason, type RendezvousFailureListener } from "./RendezvousFailureReason.ts";
 import { MSC4108SignInWithQR } from "./MSC4108SignInWithQR.ts";
 import { MSC4108RendezvousSession } from "./transports/MSC4108RendezvousSession.ts";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";
+import { RendezvousIntent } from "./RendezvousIntent.ts";
 
 export * from "./MSC4108SignInWithQR.ts";
 export type * from "./RendezvousChannel.ts";
@@ -65,31 +66,7 @@ export async function linkNewDeviceByGeneratingQR(
     abortSignal: AbortSignal,
 ): Promise<MSC4108SignInWithQR> {
     // we assume rust crypto is already initialised
-    const session = new MSC4108RendezvousSession({
-        onFailure,
-        client,
-    });
-    const channel = new MSC4108SecureChannel(session, undefined, onFailure);
-    const flow = new MSC4108SignInWithQR(channel, false, client, onFailure);
-
-    abortSignal.onabort = (): void => {
-        // Detach failure handlers
-        session.onFailure = undefined;
-        channel.onFailure = undefined;
-        flow.onFailure = undefined;
-        // Cancel the session
-        flow.cancel(MSC4108FailureReason.UserCancelled);
-    };
-
-    if (!abortSignal.aborted) {
-        await session.send(""); // open channel
-    }
-
-    if (!abortSignal.aborted) {
-        await flow.generateCode();
-    }
-
-    return flow;
+    return initGenerateQrFlow(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE, client, onFailure, abortSignal);
 }
 
 /**
@@ -110,15 +87,29 @@ export async function signInByGeneratingQR(
     abortSignal: AbortSignal,
 ): Promise<MSC4108SignInWithQR> {
     // ensure rust crypto is initialized as needed for the secure channel
-    await initRustCrypto();
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
+    await RustSdkCryptoJs.initAsync();
 
+    return initGenerateQrFlow(RendezvousIntent.LOGIN_ON_NEW_DEVICE, tempClient, onFailure, abortSignal);
+}
+
+async function initGenerateQrFlow(
+    intent: RendezvousIntent,
+    client: MatrixClient,
+    onFailure: RendezvousFailureListener,
+    abortSignal: AbortSignal,
+): Promise<MSC4108SignInWithQR> {
     const session = new MSC4108RendezvousSession({
         onFailure,
-        client: tempClient,
+        client,
     });
-
     const channel = new MSC4108SecureChannel(session, undefined, onFailure);
-    const flow = new MSC4108SignInWithQR(channel, false, undefined, onFailure);
+    const flow = new MSC4108SignInWithQR(
+        channel,
+        false,
+        intent === RendezvousIntent.LOGIN_ON_NEW_DEVICE ? undefined : client,
+        onFailure,
+    );
 
     if (abortSignal.aborted) return flow;
 
@@ -131,16 +122,11 @@ export async function signInByGeneratingQR(
         flow.cancel(MSC4108FailureReason.UserCancelled);
     };
 
-    // open channel
-    await session.send("");
+    await session.send(""); // open channel
 
-    if (abortSignal.aborted) return flow;
+    if (!abortSignal.aborted) {
+        await flow.generateCode();
+    }
 
-    await flow.generateCode();
     return flow;
-}
-
-async function initRustCrypto(): Promise<void> {
-    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
-    await RustSdkCryptoJs.initAsync();
 }
