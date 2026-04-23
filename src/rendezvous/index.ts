@@ -120,9 +120,7 @@ export async function signInByGeneratingQR(
     const channel = new MSC4108SecureChannel(session, undefined, onFailure);
     const flow = new MSC4108SignInWithQR(channel, false, undefined, onFailure);
 
-    if (abortSignal.aborted) {
-        return flow;
-    }
+    if (abortSignal.aborted) return flow;
 
     abortSignal.onabort = (): void => {
         // Detach failure handlers
@@ -136,10 +134,9 @@ export async function signInByGeneratingQR(
     // open channel
     await session.send("");
 
-    if (!abortSignal.aborted) {
-        await flow.generateCode();
-    }
+    if (abortSignal.aborted) return flow;
 
+    await flow.generateCode();
     return flow;
 }
 
