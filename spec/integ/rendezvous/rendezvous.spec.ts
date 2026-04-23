@@ -62,7 +62,7 @@ describe("MSC4108", () => {
         it("should generate code successfully", async () => {
             mockRendezvousPaths();
             const onFailure = vi.fn();
-            const flow = await linkNewDeviceByGeneratingQR(client, onFailure);
+            const flow = await linkNewDeviceByGeneratingQR(client, onFailure, new AbortController().signal);
 
             expect(flow.isNewDevice).toBe(false);
             expect(flow.isExistingDevice).toBe(true);
@@ -74,7 +74,7 @@ describe("MSC4108", () => {
         it("should fire onFailure if flow was cancelled", async () => {
             mockRendezvousPaths();
             const onFailure = vi.fn();
-            const flow = await linkNewDeviceByGeneratingQR(client, onFailure);
+            const flow = await linkNewDeviceByGeneratingQR(client, onFailure, new AbortController().signal);
 
             expect(onFailure).not.toHaveBeenCalled();
             await flow.cancel(MSC4108FailureReason.UserCancelled);
@@ -86,7 +86,7 @@ describe("MSC4108", () => {
         it("should generate code successfully", async () => {
             mockRendezvousPaths();
             const onFailure = vi.fn();
-            const flow = await signInByGeneratingQR(client, onFailure);
+            const flow = await signInByGeneratingQR(client, onFailure, new AbortController().signal);
 
             expect(flow.isNewDevice).toBe(true);
             expect(flow.isExistingDevice).toBe(false);
@@ -98,7 +98,7 @@ describe("MSC4108", () => {
         it("should fire onFailure if flow was cancelled", async () => {
             mockRendezvousPaths();
             const onFailure = vi.fn();
-            const flow = await signInByGeneratingQR(client, onFailure);
+            const flow = await signInByGeneratingQR(client, onFailure, new AbortController().signal);
 
             expect(onFailure).not.toHaveBeenCalled();
             await flow.cancel(MSC4108FailureReason.UserCancelled);

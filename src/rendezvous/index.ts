@@ -54,7 +54,7 @@ export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boo
  *
  * @param client the existing client
  * @param onFailure callback for when the linking process fails
- * @param abortController an AbortController that can be used to cancel the linking process,
+ * @param abortSignal an AbortSignal that can be used to cancel the linking process,
  *   for example when the user cancels out of the flow.
  *   This will unbind the {@link onFailure} callback and prevent any further steps in the flow from being executed.
  * @returns a promise that resolves to an instance of the linking flow
@@ -62,7 +62,7 @@ export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boo
 export async function linkNewDeviceByGeneratingQR(
     client: MatrixClient,
     onFailure: RendezvousFailureListener,
-    abortController: AbortController,
+    abortSignal: AbortSignal,
 ): Promise<MSC4108SignInWithQR> {
     // we assume rust crypto is already initialised
     const session = new MSC4108RendezvousSession({
@@ -72,7 +72,7 @@ export async function linkNewDeviceByGeneratingQR(
     const channel = new MSC4108SecureChannel(session, undefined, onFailure);
     const flow = new MSC4108SignInWithQR(channel, false, client, onFailure);
 
-    abortController.signal.onabort = (): void => {
+    abortSignal.onabort = (): void => {
         // Detach failure handlers
         session.onFailure = undefined;
         channel.onFailure = undefined;
@@ -81,11 +81,11 @@ export async function linkNewDeviceByGeneratingQR(
         flow.cancel(MSC4108FailureReason.UserCancelled);
     };
 
-    if (!abortController.signal.aborted) {
+    if (!abortSignal.aborted) {
         await session.send(""); // open channel
     }
 
-    if (!abortController.signal.aborted) {
+    if (!abortSignal.aborted) {
         await flow.generateCode();
     }
 
@@ -99,7 +99,7 @@ export async function linkNewDeviceByGeneratingQR(
  *
  * @param tempClient temporary client used during the flow for the rendezvous channel
  * @param onFailure callback for when the sign-in process fails
- * @param abortController an AbortController that can be used to cancel the linking process,
+ * @param abortSignal an AbortSignal that can be used to cancel the linking process,
  *   for example when the user cancels out of the flow.
  *   This will unbind the {@link onFailure} callback and prevent any further steps in the flow from being executed.
  * @returns a promise that resolves to an instance of the sign-in flow
@@ -107,7 +107,7 @@ export async function linkNewDeviceByGeneratingQR(
 export async function signInByGeneratingQR(
     tempClient: MatrixClient,
     onFailure: RendezvousFailureListener,
-    abortController: AbortController,
+    abortSignal: AbortSignal,
 ): Promise<MSC4108SignInWithQR> {
     // ensure rust crypto is initialized as needed for the secure channel
     const rustCryptoPromise = await initRustCrypto();
@@ -120,11 +120,11 @@ export async function signInByGeneratingQR(
     const channel = new MSC4108SecureChannel(session, undefined, onFailure);
     const flow = new MSC4108SignInWithQR(channel, false, undefined, onFailure);
 
-    if (abortController.signal.aborted) {
+    if (abortSignal.aborted) {
         return flow;
     }
 
-    abortController.signal.onabort = (): void => {
+    abortSignal.onabort = (): void => {
         // Detach failure handlers
         session.onFailure = undefined;
         channel.onFailure = undefined;
@@ -139,7 +139,7 @@ export async function signInByGeneratingQR(
         rustCryptoPromise,
     ]);
 
-    if (!abortController.signal.aborted) {
+    if (!abortSignal.aborted) {
         await flow.generateCode();
     }
 
