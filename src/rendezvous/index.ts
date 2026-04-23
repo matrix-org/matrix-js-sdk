@@ -110,7 +110,7 @@ export async function signInByGeneratingQR(
     abortSignal: AbortSignal,
 ): Promise<MSC4108SignInWithQR> {
     // ensure rust crypto is initialized as needed for the secure channel
-    const rustCryptoPromise = await initRustCrypto();
+    await initRustCrypto();
 
     const session = new MSC4108RendezvousSession({
         onFailure,
@@ -133,11 +133,8 @@ export async function signInByGeneratingQR(
         flow.cancel(MSC4108FailureReason.UserCancelled);
     };
 
-    await Promise.all([
-        // open channel
-        session.send(""),
-        rustCryptoPromise,
-    ]);
+    // open channel
+    await session.send("");
 
     if (!abortSignal.aborted) {
         await flow.generateCode();
