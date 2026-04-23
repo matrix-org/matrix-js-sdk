@@ -164,7 +164,10 @@ export class MSC4108SecureChannel {
             logger.info("Waiting for LoginInitiateMessage");
             const loginInitiateMessage = await this.rendezvousSession.receive();
             if (!loginInitiateMessage) {
-                throw new Error("No response from other device");
+                throw new RendezvousError(
+                    "No response from other device",
+                    MSC4108FailureReason.UnexpectedMessageReceived,
+                );
             }
 
             const { channel, message: candidateLoginInitiateMessage } =
