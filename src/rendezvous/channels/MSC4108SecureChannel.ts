@@ -257,7 +257,12 @@ export class MSC4108SecureChannel {
             await this.rendezvousSession.cancel(reason);
             this.onFailure?.(reason);
         } finally {
-            await this.close();
+            if (
+                reason !== ClientRendezvousFailureReason.UserDeclined &&
+                reason !== MSC4108FailureReason.UserCancelled
+            ) {
+                await this.close();
+            }
         }
     }
 
