@@ -28,6 +28,7 @@ import { type EventEmitterEvents, TypedEventEmitter } from "../models/typed-even
 import { type IStateEventWithRoomId } from "../@types/search.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 import { type IStoredClientOpts } from "../client.ts";
+import { type SyncUserProfile } from "../models/user.ts";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -383,6 +384,18 @@ export class IndexedDBStore extends MemoryStore {
 
     public removeToDeviceBatch(id: number): Promise<void> {
         return this.backend.removeToDeviceBatch(id);
+    }
+
+    public async getUserProfile(userId: string): Promise<SyncUserProfile | undefined> {
+        return this.backend.getUserProfile(userId);
+    }
+
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        return this.backend.storeUserProfiles(userProfiles);
+    }
+
+    public async removeUserProfiles(userIds: string[]): Promise<void> {
+        return this.backend.removeUserProfiles(userIds);
     }
 }
 

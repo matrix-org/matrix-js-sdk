@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { type Json, type JsonValue } from "../@types/json.ts";
 import { type MatrixClient } from "../matrix.ts";
 import { type MatrixEvent } from "./event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
@@ -25,6 +26,11 @@ export enum UserEvent {
     CurrentlyActive = "User.currentlyActive",
     LastPresenceTs = "User.lastPresenceTs",
 }
+
+/**
+ * An object of extended profile attributes for a user as it arrives down the sync stream.
+ */
+export type SyncUserProfile = Record<string, Json | JsonValue>;
 
 export type UserEventHandlerMap = {
     /**

@@ -120,6 +120,15 @@ export class IndexedDBStoreWorker {
             case "removeToDeviceBatch":
                 prom = this.backend?.removeToDeviceBatch(msg.args[0]);
                 break;
+            case "getUserProfile":
+                prom = this.backend?.getUserProfile(msg.args[0]);
+                break;
+            case "storeUserProfiles":
+                prom = this.backend?.storeUserProfiles(msg.args[0]);
+                break;
+            case "removeUserProfiles":
+                prom = this.backend?.removeUserProfiles(msg.args[0]);
+                break;
         }
 
         if (prom === undefined) {

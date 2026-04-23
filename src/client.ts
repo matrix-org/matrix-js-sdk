@@ -78,7 +78,7 @@ import {
     type UploadOpts,
     type UploadResponse,
 } from "./http-api/index.ts";
-import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
+import { type SyncUserProfile, User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
 import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
@@ -539,6 +539,12 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
+
+    /**
+     * Include user profiles in sync responses.
+     * Will only work if the server supports MSC4429.
+     */
+    unstableMSC4429SyncUserProfileFields?: string[];
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -1102,6 +1108,7 @@ export enum ClientEvent {
     ReceivedVoipEvent = "received_voip_event",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
+    UserProfileUpdate = "userProfileUpdate",
 }
 
 type RoomEvents =
@@ -1172,6 +1179,12 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
+    /**
+     *
+     * @param userId - the user ID of the profile which was updated
+     * @param profile - the updated profile information
+     */
+    [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown> | null) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
@@ -7364,6 +7377,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Fetch a user's *extended* profile, which may include additional keys.
+     * Always returns all available profile fields, irrespective of what profile fields are set
+     * in the sync filter.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
@@ -7376,6 +7391,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
+
+        // Note that this does not look at the profile cache as this will only contain keys
+        // that we included in the sync filter and this function's purpose is to return the whole profile.
+
         return this.http.authedRequest(
             Method.Get,
             utils.encodeUri("/profile/$userId", { $userId: userId }),
@@ -7388,7 +7407,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetch a specific key from the user's *extended* profile.
+     * Fetch a specific key from the user's *extended* profile by checking local cache (which is updated from
+     * the sync) and querying the server if no data is cached locally.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
@@ -7402,6 +7422,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
+        // NOTE: We only read individual keys from a cached profile as we don't have the full profile
+        // cached, only the keys that the user has configured via their sync filter.
+        const storedProfile = await this.store.getUserProfile(userId);
+        if (storedProfile?.[key] !== undefined) {
+            return storedProfile[key];
+        }
         const profile = (await this.http.authedRequest(
             Method.Get,
             utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
@@ -7410,7 +7436,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             {
                 prefix: await this.getExtendedProfileRequestPrefix(),
             },
-        )) as Record<string, unknown>;
+        )) as SyncUserProfile;
+
+        // write through to the cache
+        await this.store.storeUserProfiles(new Map([[userId, profile]]));
+
         return profile[key];
     }
 

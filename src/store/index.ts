@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type EventType } from "../@types/event.ts";
 import { type Room } from "../models/room.ts";
-import { type User } from "../models/user.ts";
+import { type SyncUserProfile, type User } from "../models/user.ts";
 import { type IEvent, type MatrixEvent } from "../models/event.ts";
 import { type Filter } from "../filter.ts";
 import { type RoomSummary } from "../models/room-summary.ts";
@@ -253,6 +253,25 @@ export interface IStore {
      * Removes a specific batch of to-device messages from the queue
      */
     removeToDeviceBatch(id: number): Promise<void>;
+
+    /**
+     * Store user profile details from a sync. Existing profiles will be overwritten.
+     * @param userProfiles - A map of userIds to profiles.
+     */
+    storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void>;
+
+    /**
+     * Delete stored profiles for the given users.
+     * @param userIds - The user IDs whose profiles should be deleted.
+     */
+    removeUserProfiles(userIds: string[]): Promise<void>;
+
+    /**
+     * Retrieve a stored user profile for the given user ID, if it exists.
+     * @param userId - The user ID to retrieve the profile for.
+     * @returns The stored profile, or undefined if no profile is stored for this user ID.
+     */
+    getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
 
     /**
      * Stop the store and perform any appropriate cleanup
