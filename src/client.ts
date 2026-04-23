@@ -78,7 +78,7 @@ import {
     type UploadOpts,
     type UploadResponse,
 } from "./http-api/index.ts";
-import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
+import { type SyncUserProfile, User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
 import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
@@ -7436,7 +7436,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             {
                 prefix: await this.getExtendedProfileRequestPrefix(),
             },
-        )) as Record<string, unknown>;
+        )) as SyncUserProfile;
 
         // write through to the cache
         await this.store.storeUserProfiles(new Map([[userId, profile]]));

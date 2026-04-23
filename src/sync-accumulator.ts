@@ -26,6 +26,7 @@ import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
+import { type SyncUserProfile } from "./matrix.ts";
 
 interface IOpts {
     /**
@@ -192,7 +193,7 @@ export interface IDeviceLists {
  */
 export interface UsersUpdate {
     [userId: string]: {
-        profile_updates?: Record<string, unknown> | null;
+        profile_updates?: SyncUserProfile | null;
     };
 }
 
