@@ -225,7 +225,7 @@ describe("History Sharing", () => {
         const toDeviceMessageProm = expectSendToDeviceMessage(aliceHomeserverUrl, "m.room.encrypted");
         // POST https://alice-server.com/_matrix/client/v3/rooms/!room%3Aexample.com/invite
         fetchMock.postOnce(`${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
-        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId());
 
         const uploadedBlob = await uploadProm;
         const sentToDeviceRequest = await toDeviceMessageProm;
@@ -247,7 +247,7 @@ describe("History Sharing", () => {
         fetchMock.postOnce(`${bobHomeserverUrl}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
             room_id: ROOM_ID,
         });
-        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        await bobClient.joinRoom(ROOM_ID);
 
         // Bob receives and attempts to decrypt the megolm message, but should not be able to (yet).
         const event = await bobReceivesEvent(
@@ -318,7 +318,7 @@ describe("History Sharing", () => {
         const toDeviceMessageProm = expectSendToDeviceMessage(aliceHomeserverUrl, "m.room.encrypted");
         // POST https://alice-server.com/_matrix/client/v3/rooms/!room%3Aexample.com/invite
         fetchMock.postOnce(`${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
-        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId());
 
         const uploadedBlob = await uploadProm;
         const sentToDeviceRequest = await toDeviceMessageProm;
@@ -340,7 +340,7 @@ describe("History Sharing", () => {
         fetchMock.postOnce(`${bobHomeserverUrl}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
             room_id: ROOM_ID,
         });
-        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        await bobClient.joinRoom(ROOM_ID);
 
         // Bob receives and attempts to decrypt the megolm message, but should not be able to (yet).
         const event = await bobReceivesEvent(
@@ -406,7 +406,7 @@ describe("History Sharing", () => {
         const toDeviceMessageProm = expectSendToDeviceMessage(aliceHomeserverUrl, "m.room.encrypted");
         // POST https://alice-server.com/_matrix/client/v3/rooms/!room%3Aexample.com/invite
         fetchMock.postOnce(`${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
-        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId());
 
         const uploadedBlob = await uploadProm;
         const sentToDeviceRequest = await toDeviceMessageProm;
@@ -428,7 +428,7 @@ describe("History Sharing", () => {
         fetchMock.post(`${bobHomeserverUrl}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
             room_id: ROOM_ID,
         });
-        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        await bobClient.joinRoom(ROOM_ID);
 
         // Bob receives and attempts to decrypt the megolm message, but should not be able to (yet).
         const event = await bobReceivesEvent(
@@ -478,7 +478,7 @@ describe("History Sharing", () => {
         expect(room?.getMyMembership()).toEqual(KnownMembership.Leave);
 
         // Bob rejoins
-        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        await bobClient.joinRoom(ROOM_ID);
 
         // Now the bundle arrives
         fetchMock.getOnce(`begin:${bobHomeserverUrl}/_matrix/client/v1/media/download/alice-server/here`, {
@@ -563,7 +563,7 @@ describe("History Sharing", () => {
         const uploadProm = expectUploadRequest(alice);
         const toDeviceMessageProm = expectSendToDeviceMessage(aliceHomeserverUrl, "m.room.encrypted");
         fetchMock.postOnce(`${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
-        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId());
         const uploadedBlob = await uploadProm;
         const sentToDeviceRequest = await toDeviceMessageProm;
         debug(`Alice sent encrypted to-device events: ${JSON.stringify(sentToDeviceRequest)}`);
@@ -600,7 +600,7 @@ describe("History Sharing", () => {
             return new Promise(() => {});
         });
         // meaning the /join request will block
-        bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        bobClient.joinRoom(ROOM_ID);
         await downloadStarted.promise;
 
         // Tear down the client, and start again
@@ -673,7 +673,7 @@ describe("History Sharing", () => {
         debug(`Alice sent encrypted room event: ${JSON.stringify(secondMessage)}`);
 
         fetchMock.postOnce(`${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`, {});
-        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+        await aliceClient.invite(ROOM_ID, bobClient.getSafeUserId());
 
         const inviteEvent = mkEventCustom({
             type: "m.room.member",
@@ -697,7 +697,7 @@ describe("History Sharing", () => {
             room_id: ROOM_ID,
         });
 
-        await bobClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+        await bobClient.joinRoom(ROOM_ID);
 
         // Bob receives only the first message.
         const bobSyncResponse = getSyncResponse(
@@ -818,7 +818,7 @@ describe("History Sharing", () => {
                 `${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(ROOM_ID)}/invite`,
                 {},
             );
-            await aliceClient.invite(ROOM_ID, charlieClient.getSafeUserId(), { shareEncryptedHistory: true });
+            await aliceClient.invite(ROOM_ID, charlieClient.getSafeUserId());
             const uploadedBlob = await uploadProm;
             sentToDeviceRequest = await toDeviceMessageProm;
             debug(`Alice sent encrypted to-device events: ${JSON.stringify(sentToDeviceRequest)}`);
@@ -852,7 +852,7 @@ describe("History Sharing", () => {
             fetchMock.getOnce(`begin:${charlieHomeserverUrl}/_matrix/client/v1/media/download/alice-server/here`, {
                 body: uploadedBlob,
             });
-            await charlieClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+            await charlieClient.joinRoom(ROOM_ID);
 
             // Charlie syncs to receive M1 and ensure he can read it.
             syncResponse = getSyncResponse(
@@ -1013,7 +1013,7 @@ describe("History Sharing", () => {
             fetchMock.postOnce(`${charlieHomeserverUrl}/_matrix/client/v3/join/${encodeURIComponent(ROOM_ID)}`, {
                 room_id: ROOM_ID,
             });
-            await charlieClient.joinRoom(ROOM_ID, { acceptSharedHistory: true });
+            await charlieClient.joinRoom(ROOM_ID);
             syncResponse = {
                 next_batch: "4",
                 rooms: {
@@ -1076,7 +1076,7 @@ async function assertInviteAndShareHistory(alice: TestClient, bob: TestClient, r
     const uploadProm = expectUploadRequest(alice);
     const toDeviceMessageProm = expectSendToDeviceMessage(aliceHomeserverUrl, "m.room.encrypted");
     fetchMock.postOnce(`${aliceHomeserverUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/invite`, {});
-    await aliceClient.invite(roomId, bobClient.getSafeUserId(), { shareEncryptedHistory: true });
+    await aliceClient.invite(roomId, bobClient.getSafeUserId());
     const uploadedBlob = await uploadProm;
     const sentToDeviceRequest = await toDeviceMessageProm;
     debug(`Alice sent encrypted to-device events: ${JSON.stringify(sentToDeviceRequest)}`);
@@ -1108,7 +1108,7 @@ async function assertInviteAndShareHistory(alice: TestClient, bob: TestClient, r
     fetchMock.getOnce(`begin:${bobHomeserverUrl}/_matrix/client/v1/media/download/alice-server/here`, {
         body: uploadedBlob,
     });
-    await bobClient.joinRoom(roomId, { acceptSharedHistory: true });
+    await bobClient.joinRoom(roomId);
 }
 
 function mkInviteEvent(inviter: MatrixClient, recipient: MatrixClient): Partial<IRoomEvent> {
