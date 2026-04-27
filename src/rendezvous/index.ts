@@ -14,12 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixClient, OAuthGrantType } from "../matrix.ts";
+import { type MatrixClient, OAuthGrantType, type OidcClientConfig } from "../matrix.ts";
 import { MSC4108FailureReason, type RendezvousFailureListener } from "./RendezvousFailureReason.ts";
 import { MSC4108SignInWithQR } from "./MSC4108SignInWithQR.ts";
 import { MSC4108RendezvousSession } from "./transports/MSC4108RendezvousSession.ts";
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";
 import { RendezvousIntent } from "./RendezvousIntent.ts";
+import { logger } from "../logger.ts";
 
 export * from "./MSC4108SignInWithQR.ts";
 export type * from "./RendezvousChannel.ts";
@@ -38,8 +39,15 @@ export * from "./channels/index.ts";
  * @returns true if the homeserver that the client is connected to supports a variant of sign-in with QR that we can use, false otherwise.
  */
 export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boolean> {
+    let metadata: OidcClientConfig;
+    try {
+        metadata = await client.getAuthMetadata();
+    } catch (e) {
+        logger.warn("Failed to fetch auth metadata, assuming sign-in with QR is unavailable", e);
+        return false;
+    }
+
     // check for support of device authorization grant
-    const metadata = await client.getAuthMetadata();
     if (!metadata.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
         return false;
     }
