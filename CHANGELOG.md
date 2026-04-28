@@ -1,3 +1,20 @@
+Changes in [41.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.4.0) (2026-04-28)
+==================================================================================================
+## ✨ Features
+
+* Handle secret pushing for key backups ([#5189](https://github.com/matrix-org/matrix-js-sdk/pull/5189)). Contributed by @uhoreg.
+* Add support for `m.recent_emoji` account data event ([#5280](https://github.com/matrix-org/matrix-js-sdk/pull/5280)). Contributed by @t3chguy.
+* Adapt LiveKit Identity hash calculation to latest MSC4195 update ([#5268](https://github.com/matrix-org/matrix-js-sdk/pull/5268)). Contributed by @fkwp.
+* Support the stable prefix for MSC4287 (key backup preference) ([#5258](https://github.com/matrix-org/matrix-js-sdk/pull/5258)). Contributed by @andybalaam.
+* Handle response\_mode=fragment in completeAuthorizationCodeGrant ([#5266](https://github.com/matrix-org/matrix-js-sdk/pull/5266)). Contributed by @t3chguy.
+* Allow generating OIDC URIs with response\_mode=fragment ([#5265](https://github.com/matrix-org/matrix-js-sdk/pull/5265)). Contributed by @t3chguy.
+* Expose `UserVerificationStatus.known` flag ([#5255](https://github.com/matrix-org/matrix-js-sdk/pull/5255)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Allow oidc jwks\_uri to be omitted ([#5271](https://github.com/matrix-org/matrix-js-sdk/pull/5271)). Contributed by @t3chguy.
+
+
 Changes in [41.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.3.0) (2026-04-07)
 ==================================================================================================
 ## 🐛 Bug Fixes
