@@ -2441,7 +2441,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryParams, data);
 
         const roomId = res.room_id;
-        if (opts.acceptSharedHistory && inviter && this.cryptoBackend) {
+        if (inviter && this.cryptoBackend) {
             // Flag upfront that we are waiting for a key bundle, so that if we crash mid-import, we can try again.
             await this.cryptoBackend.markRoomAsPendingKeyBundle(roomId, inviter);
             // Try to accept the room key bundle specified in a `m.room_key_bundle` to-device message we (might have) already received.
@@ -4099,14 +4099,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             opts = { reason: opts };
         }
 
-        if (opts.shareEncryptedHistory) {
-            const historyVisibility = this.getRoom(roomId)?.getHistoryVisibility() ?? HistoryVisibility.Shared;
-            // We should only share room history if the *current* visibility allows it.
-            if ([HistoryVisibility.Invited, HistoryVisibility.Joined].includes(historyVisibility)) {
-                this.logger.debug("Not sharing message history as the room history visibility is currently unshared");
-            } else {
-                await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
-            }
+        const historyVisibility = this.getRoom(roomId)?.getHistoryVisibility() ?? HistoryVisibility.Shared;
+        // We should only share room history if the *current* visibility allows it.
+        if ([HistoryVisibility.Invited, HistoryVisibility.Joined].includes(historyVisibility)) {
+            this.logger.debug("Not sharing message history as the room history visibility is currently unshared");
+        } else {
+            await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
         }
 
         return await this.membershipChange(roomId, userId, KnownMembership.Invite, opts.reason);
