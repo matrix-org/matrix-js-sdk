@@ -30,7 +30,7 @@ export class MSC4108RendezvousSession {
     private readonly client?: MatrixClient;
     private readonly fallbackRzServer?: string;
     private readonly fetchFn?: typeof globalThis.fetch;
-    private readonly onFailure?: RendezvousFailureListener;
+    public onFailure?: RendezvousFailureListener;
     private etag?: string;
     private expiresAt?: Date;
     private expiresTimer?: ReturnType<typeof setTimeout>;

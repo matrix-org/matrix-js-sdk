@@ -29,6 +29,9 @@ import {
     generateAuthorizationParams,
     generateAuthorizationUrl,
     generateOidcAuthorizationUrl,
+    generateScope,
+    startDeviceAuthorization,
+    waitForDeviceAuthorization,
 } from "../../../src/oidc/authorize";
 import { OidcError } from "../../../src/oidc/error";
 import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
@@ -39,6 +42,7 @@ describe("oidc authorization", () => {
     const delegatedAuthConfig = makeDelegatedAuthConfig();
     const authorizationEndpoint = delegatedAuthConfig.authorization_endpoint;
     const clientId = "xyz789";
+    const deviceId = "deadbeef";
     const baseUrl = "https://test.com";
 
     // 14.03.2022 16:15
@@ -441,6 +445,126 @@ describe("oidc authorization", () => {
             await expect(completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
                 new Error(OidcError.InvalidIdToken),
             );
+        });
+    });
+
+    describe("startDeviceAuthorization", () => {
+        it("should make the request with the expected parameters", async () => {
+            const metadata = mockOpenIdConfiguration();
+
+            fetchMock.postOnce(metadata.device_authorization_endpoint!, { device_code: "test" });
+
+            const scope = generateScope(deviceId);
+            const response = await startDeviceAuthorization({ clientId, metadata, scope });
+
+            expect(response).toStrictEqual({ device_code: "test" });
+            expect(fetchMock).toHavePosted(metadata.device_authorization_endpoint!, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "client_id=xyz789&scope=openid+urn%3Amatrix%3Aorg.matrix.msc2967.client%3Aapi%3A*+urn%3Amatrix%3Aorg.matrix.msc2967.client%3Adevice%3Adeadbeef",
+                    );
+                    return true;
+                },
+            });
+        });
+    });
+
+    describe("waitForDeviceAuthorization", () => {
+        const metadata = mockOpenIdConfiguration();
+        const session = {
+            device_code: "device",
+            user_code: "user",
+            verification_uri: "https://verification.uri",
+            expires_in: 10000,
+        };
+
+        it("should resolve to token payload on success", async () => {
+            fetchMock.postOnce(metadata.token_endpoint, { access_token: "test", token_type: "Bearer" });
+            const response = await waitForDeviceAuthorization({ clientId, metadata, session });
+
+            expect(response).toStrictEqual({ access_token: "test", token_type: "Bearer" });
+            expect(fetchMock).toHavePosted(metadata.token_endpoint, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "device_code=device&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=xyz789",
+                    );
+                    return true;
+                },
+            });
+        });
+
+        it("should handle 'authorization_pending' error", async () => {
+            fetchMock.postOnce(metadata.token_endpoint, { status: 400, body: { error: "authorization_pending" } });
+            fetchMock.postOnce(metadata.token_endpoint, { status: 400, body: { error: "authorization_pending" } });
+            fetchMock.postOnce(metadata.token_endpoint, { access_token: "test", token_type: "Bearer" });
+            const promise = waitForDeviceAuthorization({ clientId, metadata, session });
+
+            await vi.advanceTimersByTimeAsync(10000); // two sleeps
+
+            await expect(promise).resolves.toStrictEqual({ access_token: "test", token_type: "Bearer" });
+            expect(fetchMock).toHavePostedTimes(3, metadata.token_endpoint, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "device_code=device&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=xyz789",
+                    );
+                    return true;
+                },
+            });
+        });
+
+        it("should handle 'slow_down' error", async () => {
+            fetchMock.postOnce(metadata.token_endpoint, { status: 400, body: { error: "slow_down" } });
+            fetchMock.postOnce(metadata.token_endpoint, { access_token: "test", token_type: "Bearer" });
+            const promise = waitForDeviceAuthorization({ clientId, metadata, session });
+
+            await vi.advanceTimersByTimeAsync(9000);
+            // We were asked to slow down so should not have retried yet
+            expect(fetchMock).toHavePostedTimes(1, metadata.token_endpoint);
+
+            await vi.advanceTimersByTimeAsync(1000);
+
+            await expect(promise).resolves.toStrictEqual({ access_token: "test", token_type: "Bearer" });
+            expect(fetchMock).toHavePostedTimes(2, metadata.token_endpoint, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "device_code=device&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=xyz789",
+                    );
+                    return true;
+                },
+            });
+        });
+
+        it.each(["access_denied", "expired_token"])("should handle '%s' error", async (error) => {
+            fetchMock.postOnce(metadata.token_endpoint, { status: 400, body: { error } });
+            const response = await waitForDeviceAuthorization({ clientId, metadata, session });
+
+            expect(response).toStrictEqual({ error });
+            expect(fetchMock).toHavePostedTimes(1, metadata.token_endpoint, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "device_code=device&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=xyz789",
+                    );
+                    return true;
+                },
+            });
+        });
+
+        it("should handle session expiration", async () => {
+            fetchMock.post(metadata.token_endpoint, { status: 400, body: { error: "authorization_pending" } });
+            const promise = waitForDeviceAuthorization({ clientId, metadata, session });
+
+            vi.setSystemTime(Date.now() + session.expires_in * 1000);
+            await vi.runOnlyPendingTimersAsync();
+
+            await expect(promise).resolves.toStrictEqual({ error: "expired" });
+            expect(fetchMock).toHavePostedTimes(1, metadata.token_endpoint, {
+                matcherFunction: (callLog) => {
+                    expect(callLog.options.body).toBe(
+                        "device_code=device&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&client_id=xyz789",
+                    );
+                    return true;
+                },
+            });
         });
     });
 });
