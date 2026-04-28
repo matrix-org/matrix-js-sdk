@@ -7,7 +7,7 @@
     },
     "scripts": {
         "prepare": "pnpm build",
-        "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel --delete-dir-on-start src -w -s -d lib --verbose --extensions \".ts,.js\"",
+        "start": "concurrently 'pnpm run build:compile --watch' 'pnpm run build:types --watch'",
         "build": "pnpm build:compile && pnpm build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel --delete-dir-on-start -d lib --verbose --extensions \".ts,.js\" src",
@@ -90,6 +90,7 @@
         "@vitest/eslint-plugin": "^1.6.6",
         "@vitest/ui": "^4.0.17",
         "babel-plugin-search-and-replace": "^1.1.1",
+        "concurrently": "^9.2.1",
         "debug": "^4.3.4",
         "eslint": "8.57.1",
         "eslint-config-google": "^0.14.0",
