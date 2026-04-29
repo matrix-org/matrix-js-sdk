@@ -274,8 +274,16 @@ export const completeAuthorizationCodeGrant = async (
 
         // throws when response is invalid
         validateBearerTokenResponse(signinResponse);
-        // throws when token is invalid
-        validateIdToken(signinResponse.id_token, client.settings.authority, client.settings.client_id, userState.nonce);
+        if (signinResponse.id_token) {
+            // The token is not yet in the Matrix spec so consider it optional
+            // throws when token is invalid
+            validateIdToken(
+                signinResponse.id_token,
+                client.settings.authority,
+                client.settings.client_id,
+                userState.nonce,
+            );
+        }
         const normalizedTokenResponse = normalizeBearerTokenResponseTokenType(signinResponse);
 
         return {
