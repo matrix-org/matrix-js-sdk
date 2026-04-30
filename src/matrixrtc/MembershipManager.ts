@@ -36,6 +36,7 @@ import {
 import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
 import { isLivekitTransportConfig } from "./LivekitTransport.ts";
+import { promiseWithResolvers } from "../promise.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────┐   ┌───────────────(1)───────────┐
@@ -255,7 +256,7 @@ export class MembershipManager
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseResolvers) {
             // reset scheduled actions so we will not do any new actions.
-            this.leavePromiseResolvers = Promise.withResolvers<boolean>();
+            this.leavePromiseResolvers = promiseWithResolvers<boolean>();
             this.activated = false;
             this.scheduler.initiateLeave();
             if (timeout) setTimeout(() => this.leavePromiseResolvers?.resolve(false), timeout);

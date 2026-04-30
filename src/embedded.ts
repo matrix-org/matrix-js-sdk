@@ -59,6 +59,7 @@ import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { MapWithDefault, type QueryDict, recursiveMapToObject } from "./utils.ts";
 import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
+import { promiseWithResolvers } from "./promise.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -291,7 +292,7 @@ export class RoomWidgetClient extends MatrixClient {
         return (await this.widgetApi.getClientVersions()).includes(UnstableApiVersion.MSC2762_UPDATE_STATE);
     }
 
-    private readonly syncApiResolver = Promise.withResolvers<void>();
+    private readonly syncApiResolver = promiseWithResolvers<void>();
     public async startClient(opts: IStartClientOpts = {}): Promise<void> {
         this.lifecycle = new AbortController();
 

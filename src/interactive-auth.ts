@@ -20,6 +20,7 @@ import { logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
 import { MatrixError } from "./http-api/index.ts";
 import { type UserIdentifier } from "./@types/auth.ts";
+import { promiseWithResolvers } from "./promise.ts";
 
 const EMAIL_STAGE_TYPE = "m.login.email.identity";
 const MSISDN_STAGE_TYPE = "m.login.msisdn";
@@ -302,7 +303,7 @@ export class InteractiveAuth<T> {
     public async attemptAuth(): Promise<T> {
         // This promise will be quite long-lived and will resolve when the
         // request is authenticated and completes successfully.
-        this.attemptAuthDeferred = Promise.withResolvers();
+        this.attemptAuthDeferred = promiseWithResolvers();
         // pluck the promise out now, as doRequest may clear before we return
         const promise = this.attemptAuthDeferred.promise;
 

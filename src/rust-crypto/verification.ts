@@ -36,6 +36,7 @@ import { type MatrixEvent } from "../models/event.ts";
 import { EventType, MsgType } from "../@types/event.ts";
 import { VerificationMethod } from "../types.ts";
 import type { Logger } from "../logger.ts";
+import { promiseWithResolvers } from "../promise.ts";
 
 /**
  * An incoming, or outgoing, request to verify a user or a device via cross-signing.
@@ -485,7 +486,7 @@ abstract class BaseRustVerifer<InnerType extends RustSdkCryptoJs.Qr | RustSdkCry
     ) {
         super();
 
-        this.completionDeferred = Promise.withResolvers();
+        this.completionDeferred = promiseWithResolvers();
 
         // As with RustVerificationRequest, we need to avoid a reference cycle.
         // See the comments in RustVerificationRequest.

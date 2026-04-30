@@ -29,6 +29,7 @@ import * as callbacks from "../realtime-callbacks.ts";
 import { Method } from "./method.ts";
 import { ConnectionError } from "./errors.ts";
 import { parseErrorResponse } from "./utils.ts";
+import { promiseWithResolvers } from "../promise.ts";
 
 export * from "./interface.ts";
 export * from "./prefix.ts";
@@ -65,7 +66,7 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             total: 0,
             abortController,
         } as Upload;
-        const uploadResolvers = Promise.withResolvers<UploadResponse>();
+        const uploadResolvers = promiseWithResolvers<UploadResponse>();
 
         if (globalThis.XMLHttpRequest) {
             const xhr = new globalThis.XMLHttpRequest();

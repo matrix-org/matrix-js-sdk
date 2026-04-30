@@ -21,6 +21,7 @@ import { type IStateEventWithRoomId, type ISyncResponse } from "../matrix.ts";
 import { type IIndexedDBBackend, type UserTuple } from "./indexeddb-backend.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 import { type SyncUserProfile } from "../models/user.ts";
+import { promiseWithResolvers } from "../promise.ts";
 
 export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private worker?: Worker;
@@ -176,7 +177,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         // the promise automatically gets rejected
         return Promise.resolve().then(() => {
             const seq = this.nextSeq++;
-            const def = Promise.withResolvers<T>();
+            const def = promiseWithResolvers<T>();
 
             this.inFlight[seq] = def;
 

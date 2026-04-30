@@ -19,6 +19,7 @@ import { type OlmMachine, type OutgoingRequest } from "@matrix-org/matrix-sdk-cr
 import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { type Logger } from "../logger.ts";
 import { logDuration } from "../utils.ts";
+import { promiseWithResolvers } from "../promise.ts";
 
 /**
  * OutgoingRequestsManager: responsible for processing outgoing requests from the OlmMachine.
@@ -74,7 +75,7 @@ export class OutgoingRequestsManager {
         // In order to circumvent the race, we set a flag which tells the loop to go round once again even if the
         // queue appears to be empty.
         if (!this.nextLoopDeferred) {
-            this.nextLoopDeferred = Promise.withResolvers();
+            this.nextLoopDeferred = promiseWithResolvers();
         }
 
         // ... and wait for it to complete.

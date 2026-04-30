@@ -130,6 +130,7 @@ import {
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
 } from "./@types/requests.ts";
+import { promiseWithResolvers } from "./promise.ts";
 import {
     type AccountDataEvents,
     EventType,
@@ -2258,7 +2259,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (existingData && deepCompare(existingData.event.content, content)) return {};
 
         // Create a promise which will resolve when the update is received
-        const updatedResolvers = Promise.withResolvers<void>();
+        const updatedResolvers = promiseWithResolvers<void>();
         function accountDataListener(event: MatrixEvent): void {
             // Note that we cannot safely check that the content matches what we expected, because there is a race:
             //   * We set the new content
@@ -5568,7 +5569,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             } else if (!hasDontNotifyRule) {
                 // Remove the existing one before setting the mute push rule
                 // This is a workaround to SYN-590 (Push rule update fails)
-                const doneResolvers = Promise.withResolvers<void>();
+                const doneResolvers = promiseWithResolvers<void>();
                 this.deletePushRule(scope, PushRuleKind.RoomSpecific, roomPushRule.rule_id)
                     .then(() => {
                         this.addPushRule(scope, PushRuleKind.RoomSpecific, roomId, {

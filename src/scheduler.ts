@@ -24,6 +24,7 @@ import { EventType } from "./@types/event.ts";
 import { removeElement } from "./utils.ts";
 import { calculateRetryBackoff, type MatrixError } from "./http-api/index.ts";
 import { type ISendEventResponse } from "./@types/requests.ts";
+import { promiseWithResolvers } from "./promise.ts";
 
 const DEBUG = false; // set true to enable console logging.
 
@@ -188,7 +189,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
         if (!this.queues[queueName]) {
             this.queues[queueName] = [];
         }
-        const eventResolvers = Promise.withResolvers<T>();
+        const eventResolvers = promiseWithResolvers<T>();
         this.queues[queueName].push({
             event: event,
             resolvers: eventResolvers,

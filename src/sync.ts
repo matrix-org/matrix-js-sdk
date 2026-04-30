@@ -65,6 +65,7 @@ import { type IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
 import { KnownMembership } from "./@types/membership.ts";
+import { promiseWithResolvers } from "./promise.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -1606,7 +1607,7 @@ export class SyncApi {
             this.pokeKeepAlive();
         }
         if (!this.connectionReturnedResolvers) {
-            this.connectionReturnedResolvers = Promise.withResolvers();
+            this.connectionReturnedResolvers = promiseWithResolvers();
         }
         return this.connectionReturnedResolvers.promise;
     }
