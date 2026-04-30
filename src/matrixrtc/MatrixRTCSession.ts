@@ -755,9 +755,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         this.membershipNeedsRecalculation = true;
         // Chain the recalculation.
-        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise
-            .finally()
-            .then(() => this.recalculateSessionMembers());
+        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise.then(
+            () => this.recalculateSessionMembers(),
+            () => this.recalculateSessionMembers(),
+        );
         return this.recalculateSessionMembersPromise;
     }
 
