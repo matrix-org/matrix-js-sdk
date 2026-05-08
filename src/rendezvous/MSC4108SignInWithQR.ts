@@ -418,7 +418,8 @@ export class MSC4108SignInWithQR {
                 reason,
             };
             await this.send(payload);
-            return undefined;
+
+            throw new RendezvousError("Rejection from device authorization endpoint", reason);
         }
 
         return res;

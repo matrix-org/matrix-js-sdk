@@ -457,7 +457,9 @@ describe("MSC4108SignInWithQR", () => {
             const ourProm = ourLogin.completeLoginOnNewDevice({ clientId });
             const opponentProm = opponentLogin.shareSecrets();
 
-            await expect(ourProm).resolves.toBeUndefined();
+            await expect(ourProm).rejects.toThrow(
+                new RendezvousError("Rejection from device authorization endpoint", MSC4108FailureReason.UserCancelled),
+            );
             await expect(opponentProm).rejects.toThrow(
                 new RendezvousError("Failed", MSC4108FailureReason.UserCancelled),
             );
