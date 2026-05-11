@@ -35,10 +35,6 @@ jobs:
                   registry-url: "https://registry.npmjs.org"
                   node-version-file: ${{ inputs.dir }}/package.json
 
-            # Ensure npm 11.5.1 or later is installed
-            - name: Update npm
-              run: npm install -g npm@latest
-
             - name: 🔨 Install dependencies
               run: "pnpm install --frozen-lockfile"
 
