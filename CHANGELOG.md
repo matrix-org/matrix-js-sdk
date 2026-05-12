@@ -1,3 +1,15 @@
+Changes in [41.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.5.0) (2026-05-12)
+==================================================================================================
+## ✨ Features
+
+* MSC4108v2024 iteration and support for sign in on new device ([#5283](https://github.com/matrix-org/matrix-js-sdk/pull/5283)). Contributed by @t3chguy.
+* Enable encrypted history sharing by default ([#5300](https://github.com/matrix-org/matrix-js-sdk/pull/5300)). Contributed by @richvdh.
+* Restore functional `start` command ([#5298](https://github.com/matrix-org/matrix-js-sdk/pull/5298)). Contributed by @t3chguy.
+* Support stable identifiers for MSC4268 and MSC4287 ([#5299](https://github.com/matrix-org/matrix-js-sdk/pull/5299)). Contributed by @andybalaam.
+* Implement MSC4429: Profile Updates for Legacy Sync ([#5246](https://github.com/matrix-org/matrix-js-sdk/pull/5246)). Contributed by @Half-Shot.
+* Support stable identifiers for MSC4268 ([#5290](https://github.com/matrix-org/matrix-js-sdk/pull/5290)). Contributed by @andybalaam.
+
+
 Changes in [41.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.4.0) (2026-04-28)
 ==================================================================================================
 ## ✨ Features
