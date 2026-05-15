@@ -43,7 +43,7 @@ export interface IProfileFieldsCapability extends ICapability {}
 export enum RoomVersionStability {
     Stable = "stable",
     Unstable = "unstable",
-    Deprecated = "uk.timedout.msc4472.deprecated"
+    Deprecated = "uk.timedout.msc4472.deprecated",
 }
 
 export interface IRoomVersionsCapability {
