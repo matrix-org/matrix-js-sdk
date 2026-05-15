@@ -77,7 +77,7 @@ import { compareEventOrdering } from "./compare-event-ordering.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 import { type MSC4186Hero } from "../sliding-sync.ts";
-import { RoomStickyEventsStore, RoomStickyEventsEvent, type RoomStickyEventsMap } from "./room-sticky-events.ts";
+import { RoomStickyEventsEvent, type RoomStickyEventsMap, RoomStickyEventsStore } from "./room-sticky-events.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -108,6 +108,7 @@ export interface IRecommendedVersion {
     version: string;
     needsUpgrade: boolean;
     urgent: boolean;
+    deprecated: boolean;
 }
 
 // When inserting a visibility event affecting event `eventId`, we
@@ -685,20 +686,22 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             version: currentVersion,
             needsUpgrade: false,
             urgent: false,
+            deprecated: false,
         };
 
         // If the room is on the default version then nothing needs to change
         if (currentVersion === versionCap.default) return result;
 
-        const stableVersions = Object.keys(versionCap.available).filter((v) => versionCap.available[v] === "stable");
+        const currentStability = versionCap.available[currentVersion] ?? RoomVersionStability.Unstable;
 
         // Check if the room is on an unstable version. We determine urgency based
         // off the version being in the Matrix spec namespace or not (if the version
         // is in the current namespace and unstable, the room is probably vulnerable).
-        if (!stableVersions.includes(currentVersion)) {
+        if (currentStability !== RoomVersionStability.Stable) {
             result.version = versionCap.default;
+            result.deprecated = currentStability === RoomVersionStability.Deprecated;
             result.needsUpgrade = true;
-            result.urgent = !!this.getVersion().match(/^[0-9]+[0-9.]*$/g);
+            result.urgent = result.deprecated || !!this.getVersion().match(/^[0-9]+[0-9.]*$/g);
             if (result.urgent) {
                 logger.warn(`URGENT upgrade required on ${this.roomId}`);
             } else {
