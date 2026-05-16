@@ -47,6 +47,14 @@ import { type IMegolmSessionData } from "../@types/crypto.ts";
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
 
+// Server backup info is public API data and may be malformed; enabling a backup
+// requires the version to have been checked or supplied by backup creation.
+type KeyBackupInfoWithVersion = KeyBackupInfo & { version: string };
+
+function hasBackupVersion(backupInfo: KeyBackupInfo): backupInfo is KeyBackupInfoWithVersion {
+    return !!backupInfo.version;
+}
+
 /**
  * Holds information of a created keybackup.
  * Useful to get the generated private key material and save it securely somewhere.
@@ -315,7 +323,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
         this.checkedForBackup = true;
 
-        if (backupInfo && !backupInfo.version) {
+        if (backupInfo && !hasBackupVersion(backupInfo)) {
             this.logger.warn("active backup lacks a useful 'version'; ignoring it");
             backupInfo = undefined;
         }
@@ -345,34 +353,41 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 this.logger.debug("Key backup present on server but not trusted: not enabling key backup");
             }
         } else {
-            if (activeVersion === null) {
-                this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
-                await this.enableKeyBackup(backupInfo);
-            } else if (activeVersion !== backupInfo.version) {
-                this.logger.debug(
-                    `On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`,
-                );
-                // This will remove any pending backup request, remove the backup key and reset the backup state of each room key we have.
-                await this.disableKeyBackup();
-                // Enabling will now trigger re-upload of all the keys
-                await this.enableKeyBackup(backupInfo);
-            } else {
-                this.logger.debug(`Backup version ${backupInfo.version} still current`);
-            }
+            await this.enableOrSwitchKeyBackup(backupInfo, activeVersion);
         }
         return { backupInfo, trustInfo };
     }
 
-    private async enableKeyBackup(backupInfo: KeyBackupInfo): Promise<void> {
+    private async enableOrSwitchKeyBackup(
+        backupInfo: KeyBackupInfoWithVersion,
+        activeVersion?: string | null,
+    ): Promise<void> {
+        if (activeVersion === undefined) {
+            activeVersion = await this.getActiveBackupVersion();
+        }
+
+        if (activeVersion === null) {
+            this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
+            await this.enableKeyBackup(backupInfo);
+        } else if (activeVersion !== backupInfo.version) {
+            this.logger.debug(`On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`);
+            // This will remove any pending backup request, remove the backup key and reset the backup state of each room key we have.
+            await this.disableKeyBackup();
+            // Enabling will now trigger re-upload of all the keys
+            await this.enableKeyBackup(backupInfo);
+        } else {
+            this.logger.debug(`Backup version ${backupInfo.version} still current`);
+        }
+    }
+
+    private async enableKeyBackup(backupInfo: KeyBackupInfoWithVersion): Promise<void> {
         // we know for certain it must be a Curve25519 key, because we have verified it and only Curve25519
         // keys can be verified.
-        //
-        // we also checked it has a valid `version`.
         await this.olmMachine.enableBackupV1(
             (backupInfo.auth_data as Curve25519AuthData).public_key,
-            backupInfo.version!,
+            backupInfo.version,
         );
-        this.activeBackupVersion = backupInfo.version!;
+        this.activeBackupVersion = backupInfo.version;
 
         this.emit(CryptoEvent.KeyBackupStatus, true);
 
@@ -559,6 +574,10 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a KeyBackupCreationInfo - All information related to the backup.
      */
     public async setupKeyBackup(signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        if (this.keyBackupCheckInProgress) {
+            await this.keyBackupCheckInProgress;
+        }
+
         // Clean up any existing backup
         await this.deleteAllKeyBackupVersions();
 
@@ -582,6 +601,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             },
         );
 
+        const backupInfo: KeyBackupInfoWithVersion = {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+            version: res.version,
+        };
+        // saveBackupDecryptionKey emits KeyBackupDecryptionKeyCached. Cache and
+        // enable the created backup first so listeners observe the new version.
+        // This backup was just created and signed locally, so use the creation
+        // response instead of doing another discovery/trust check before the event.
+        this.serverBackupInfo = backupInfo;
+        this.checkedForBackup = true;
+        await this.enableOrSwitchKeyBackup(backupInfo);
         await this.saveBackupDecryptionKey(randomKey, res.version);
 
         return {
