@@ -78,6 +78,7 @@ import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
 import { type MSC4186Hero } from "../sliding-sync.ts";
 import { RoomStickyEventsStore, RoomStickyEventsEvent, type RoomStickyEventsMap } from "./room-sticky-events.ts";
+import { RoomRetentionPolicy } from "./room-retention.ts";
 
 // These constants are used as sane defaults when the homeserver doesn't support
 // the m.room_versions capability. In practice, KNOWN_SAFE_ROOM_VERSION should be
@@ -454,6 +455,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private stickyEvents = new RoomStickyEventsStore();
 
+    private readonly retention: RoomRetentionPolicy;
+
     /**
      * Construct a new Room.
      *
@@ -530,6 +533,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.membersPromise = undefined;
         }
+
+        this.retention = new RoomRetentionPolicy(this);
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
@@ -2620,7 +2625,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    private tryApplyRedaction = (event: MatrixEvent): void => {
+    public readonly tryApplyRedaction = (event: MatrixEvent): void => {
         // FIXME: apply redactions to notification list
 
         // NB: We continue to add the redaction event to the timeline at the
