@@ -51,7 +51,7 @@
         "@matrix-org/matrix-sdk-crypto-wasm": "^18.2.0",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
-        "content-type": "^1.0.4",
+        "content-type": "^2.0.0",
         "jwt-decode": "^4.0.0",
         "loglevel": "^1.9.2",
         "matrix-events-sdk": "0.0.1",
