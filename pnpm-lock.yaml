@@ -20,7 +20,7 @@ importers:
         version: 7.29.2
       '@matrix-org/matrix-sdk-crypto-wasm':
         specifier: ^18.2.0
-        version: 18.2.0
+        version: 18.3.0
       another-json:
         specifier: ^0.2.0
         version: 0.2.0
@@ -1088,8 +1088,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@matrix-org/matrix-sdk-crypto-wasm@18.2.0':
-    resolution: {integrity: sha512-puyZefvq6sHfqlmkri8umhA44724H2JL0YtX8wlvhGuNl8awX/Q1tZyW2Iekm9ZJP7BtuOqlNdg9oQd6iaGbNw==}
+  '@matrix-org/matrix-sdk-crypto-wasm@18.3.0':
+    resolution: {integrity: sha512-9a4feyt8QLysARu7PHKaRWT+wcCd+IYH074LXp9QK5WqfN4zUXueRhiSSMNT18Bm+8q3sBR/4zxDxOSDR0M8Kg==}
     engines: {node: '>= 18'}
 
   '@matrix-org/olm@3.2.15':
@@ -5261,7 +5261,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@matrix-org/matrix-sdk-crypto-wasm@18.2.0': {}
+  '@matrix-org/matrix-sdk-crypto-wasm@18.3.0': {}
 
   '@matrix-org/olm@3.2.15': {}
 
