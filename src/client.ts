@@ -3742,7 +3742,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $delayId: delayId,
                 $action: action,
             });
-            return await this.http.request(Method.Post, path, undefined, undefined, {
+            return await this.http.authedRequest(Method.Post, path, undefined, undefined, {
                 ...requestOptions,
                 prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
             });
