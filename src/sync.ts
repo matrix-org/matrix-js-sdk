@@ -924,12 +924,6 @@ export class SyncApi {
             this.updateSyncState(SyncState.Syncing, syncEventData);
 
             if (this.client.store.wantsSave()) {
-                // MSC1763: piggyback on the 5-minute persistence cadence to sweep for
-                // expired events. Running just before save() means the next persisted
-                // snapshot reflects the post-expiry state. The sweep yields to the
-                // event loop in chunks (see Room.sweepRetentionPolicy), so awaiting it
-                // here doesn't block the UI even on large accounts.
-                await this.client.sweepRetentionPolicies();
                 // tell databases that everything is now in a consistent state and can be saved.
                 await this.client.store.save();
             }

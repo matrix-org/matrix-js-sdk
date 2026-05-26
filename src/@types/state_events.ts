@@ -130,17 +130,6 @@ export interface RoomTombstoneEventContent {
     replacement_room: string;
 }
 
-/**
- * Content of `m.room.retention` per MSC1763.
- * `max_lifetime` is the maximum lifetime of an event in milliseconds; events older
- * than this should be expired by participating servers and by clients.
- */
-export interface RoomRetentionEventContent {
-    max_lifetime?: number;
-    min_lifetime?: number;
-    expire_on_clients?: boolean;
-}
-
 export interface SpaceChildEventContent {
     order?: string;
     suggested?: boolean;

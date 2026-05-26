@@ -1813,61 +1813,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.livekitServiceURL = newURL;
     }
 
-    // MSC1763: client-side message retention default. Used as the fallback when a room
-    // does not have its own m.room.retention state event. There's no spec'd capability
-    // for advertising this, so callers (e.g. config / .well-known) populate it directly.
-    private serverDefaultMaxLifetime?: number;
-
-    /**
-     * Get the server's advertised default `max_lifetime` (ms) used as a fallback when
-     * a room has no `m.room.retention` state event. Returns `undefined` if not set.
-     */
-    public getServerDefaultMaxLifetime(): number | undefined {
-        return this.serverDefaultMaxLifetime;
-    }
-
-    /**
-     * Set the server's advertised default `max_lifetime` (ms). Pass `undefined` to clear.
-     */
-    public setServerDefaultMaxLifetime(maxLifetime: number | undefined): void {
-        this.serverDefaultMaxLifetime = maxLifetime;
-    }
-
-    private retentionSweepInFlight = false;
-
-    /**
-     * Sweep every in-memory room and locally redact events whose age exceeds the room's
-     * MSC1763 `max_lifetime`. Existing redactions and state events are skipped.
-     *
-     * Cooperative: each room's sweep yields to the event loop every N events
-     * ({@link Room.RETENTION_SWEEP_YIELD_EVERY}) so the UI stays responsive, and we
-     * yield between rooms as well. Concurrent invocations are coalesced — a second call
-     * while one is in flight returns 0 immediately.
-     *
-     * Called periodically from the sync loop alongside the 5-minute store persistence
-     * pass; application code may also call it manually.
-     *
-     * @returns the total number of events expired across all rooms in this sweep.
-     */
-    public async sweepRetentionPolicies(): Promise<number> {
-        if (this.retentionSweepInFlight) return 0;
-        this.retentionSweepInFlight = true;
-        try {
-            let expired = 0;
-            for (const room of this.getRooms()) {
-                try {
-                    expired += await room.sweepRetentionPolicy();
-                } catch (e) {
-                    this.logger.warn(`Retention sweep failed for room ${room.roomId}`, e);
-                }
-                await sleep(0);
-            }
-            return expired;
-        } finally {
-            this.retentionSweepInFlight = false;
-        }
-    }
-
     /**
      * Wait until an initial state for the given room has been processed by the
      * client and the client is aware of any ongoing group calls. Awaiting on
@@ -5205,10 +5150,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                         .filter(getRelationsThreadFilter(thread.id))
                         .map(mapper);
 
-                    // MSC1763: expire events older than the room's retention policy before
-                    // they are added to the thread timeline.
-                    room.applyRetentionPolicy(matrixEvents);
-
                     // Process latest events first
                     for (const event of matrixEvents.slice().reverse()) {
                         await thread?.processEvent(event);
@@ -5262,10 +5203,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     }
                     const token = res.end;
                     const matrixEvents = res.chunk.filter(noUnsafeEventProps).map(this.getEventMapper());
-
-                    // MSC1763: expire events older than the room's retention policy before
-                    // they are added to the timeline.
-                    room.applyRetentionPolicy(matrixEvents);
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
