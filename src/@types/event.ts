@@ -31,6 +31,7 @@ import {
     type RoomPinnedEventsEventContent,
     type RoomPolicyContent,
     type RoomPowerLevelsEventContent,
+    type RoomRetentionEventContent,
     type RoomServerAclEventContent,
     type RoomThirdPartyInviteEventContent,
     type RoomTombstoneEventContent,
@@ -84,6 +85,8 @@ export enum EventType {
     RoomServerAcl = "m.room.server_acl",
     RoomTombstone = "m.room.tombstone",
     RoomPredecessor = "org.matrix.msc3946.room_predecessor",
+    // MSC1763: client-side enforcement of message retention.
+    RoomRetention = "m.room.retention",
 
     // Moderation policy lists
     PolicyRuleUser = "m.policy.rule.user",
@@ -377,6 +380,7 @@ export interface StateEvents {
     [EventType.RoomGuestAccess]: RoomGuestAccessEventContent;
     [EventType.RoomServerAcl]: RoomServerAclEventContent;
     [EventType.RoomTombstone]: RoomTombstoneEventContent;
+    [EventType.RoomRetention]: RoomRetentionEventContent | EmptyObject;
     [EventType.SpaceChild]: SpaceChildEventContent;
     [EventType.SpaceParent]: SpaceParentEventContent;
 
