@@ -118,18 +118,5 @@
         "vitest": "^4.0.17",
         "vitest-sonar-reporter": "^3.0.0"
     },
-    "pnpm": {
-        "peerDependencyRules": {
-            "allowedVersions": {
-                "eslint": "8"
-            }
-        },
-        "allowedDeprecatedVersions": {
-            "eslint": "8"
-        },
-        "overrides": {
-            "expect": "30.4.1"
-        }
-    },
     "packageManager": "pnpm@11.2.2"
 }
