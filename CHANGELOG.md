@@ -1,3 +1,10 @@
+Changes in [41.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.6.0) (2026-05-26)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Throw sane error on completeLoginOnNewDevice IdP rejection ([#5321](https://github.com/matrix-org/matrix-js-sdk/pull/5321)). Contributed by @t3chguy.
+
+
 Changes in [41.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.5.0) (2026-05-12)
 ==================================================================================================
 ## ✨ Features
