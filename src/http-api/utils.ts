@@ -139,12 +139,7 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
 function getResponseContentType(headers: Headers): ContentType | null {
     const contentType = headers.get("Content-Type");
     if (contentType === null) return null;
-
-    try {
-        return parseContentType(contentType);
-    } catch (e) {
-        throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
-    }
+    return parseContentType(contentType);
 }
 
 /**
