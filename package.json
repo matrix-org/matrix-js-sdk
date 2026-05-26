@@ -80,7 +80,6 @@
         "@matrix-org/olm": "3.2.15",
         "@peculiar/webcrypto": "^1.4.5",
         "@stylistic/eslint-plugin": "^5.0.0",
-        "@types/content-type": "^2.0.0",
         "@types/debug": "^4.1.7",
         "@types/node": "22",
         "@types/sdp-transform": "^2.4.5",
