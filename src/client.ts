@@ -3742,7 +3742,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $delayId: delayId,
                 $action: action,
             });
-            return await this.http.request(Method.Post, path, undefined, undefined, {
+            // Although this endpoint supports being used without authentication,
+            // do authenticate here to make ratelimiting apply per user instead of per source IP address,
+            // if the server supports that
+            return await this.http.authedRequest(Method.Post, path, undefined, undefined, {
                 ...requestOptions,
                 prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
             });
