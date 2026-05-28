@@ -1,1 +1,14 @@
 nodeLinker: hoisted
+
+peerDependencyRules:
+    allowedVersions:
+        eslint: "8"
+
+allowedDeprecatedVersions:
+    eslint: "8"
+
+overrides:
+    expect: 30.4.1
+
+allowBuilds:
+    unrs-resolver: false
