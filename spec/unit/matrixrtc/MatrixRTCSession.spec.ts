@@ -911,6 +911,31 @@ describe("MatrixRTCSession", () => {
             expect(sess!.membershipStatus).toBe(Status.Connecting);
         });
     });
+    it("ensureRecalculateSessionMembers still runs after a rejected promise (React Native / Hermes regression)", async () => {
+        // Regression test for: .finally() without an argument throws a TypeError on the
+        // React Native Promise polyfill used by Hermes, permanently breaking the
+        // recalculation chain. The fix uses .then(onFulfilled, onRejected) instead.
+        const mockRoom = makeMockRoom([sessionMembershipTemplate]);
+        sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+        await sess.initialMembershipCalculated;
+
+        const privateSession = sess as unknown as {
+            recalculateSessionMembersPromise: Promise<void>;
+            membershipNeedsRecalculation: boolean;
+            ensureRecalculateSessionMembers: () => Promise<void>;
+        };
+
+        // Inject a rejected promise to simulate what the Hermes TypeError would produce.
+        privateSession.recalculateSessionMembersPromise = Promise.reject(new Error("simulated rejection"));
+        // Reset the deduplication flag so a new recalculation is scheduled.
+        privateSession.membershipNeedsRecalculation = false;
+
+        // Must resolve (not reject) — recalculation runs regardless of prior rejection.
+        await expect(privateSession.ensureRecalculateSessionMembers()).resolves.toBeUndefined();
+        // Membership list is still usable after the recovery.
+        expect(sess.memberships).toBeDefined();
+    });
+
     it("reemits membershipManager events", () => {
         sess = MatrixRTCSession.sessionForSlot(client, makeMockRoom([rtcMembershipTemplate]), callSession);
         const delayIdChanged = vi.fn();
