@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MockedObject } from "vitest";
+import { type Mock, type MockedObject } from "vitest";
 
 import { type ClientEventHandlerMap, type EmittedEvents, type MatrixClient } from "../../src/client";
 import { TypedEventEmitter } from "../../src/models/typed-event-emitter";
@@ -65,14 +65,14 @@ export const getMockClientWithEventEmitter = (
  * ```
  */
 export const mockClientMethodsUser = (userId = "@alice:domain") => ({
-    getUserId: vi.fn().mockReturnValue(userId),
-    getSafeUserId: vi.fn().mockReturnValue(userId),
-    getUser: vi.fn().mockReturnValue(new User(userId)),
-    isGuest: vi.fn().mockReturnValue(false),
-    mxcUrlToHttp: vi.fn().mockReturnValue("mock-mxcUrlToHttp"),
+    getUserId: vi.fn().mockReturnValue(userId) as Mock,
+    getSafeUserId: vi.fn().mockReturnValue(userId) as Mock,
+    getUser: vi.fn().mockReturnValue(new User(userId)) as Mock,
+    isGuest: vi.fn().mockReturnValue(false) as Mock,
+    mxcUrlToHttp: vi.fn().mockReturnValue("mock-mxcUrlToHttp") as Mock,
     credentials: { userId },
-    getThreePids: vi.fn().mockResolvedValue({ threepids: [] }),
-    getAccessToken: vi.fn(),
+    getThreePids: vi.fn().mockResolvedValue({ threepids: [] }) as Mock,
+    getAccessToken: vi.fn() as Mock,
 });
 
 /**
@@ -84,8 +84,8 @@ export const mockClientMethodsUser = (userId = "@alice:domain") => ({
  * ```
  */
 export const mockClientMethodsEvents = () => ({
-    decryptEventIfNeeded: vi.fn(),
-    getPushActionsForEvent: vi.fn(),
+    decryptEventIfNeeded: vi.fn() as Mock,
+    getPushActionsForEvent: vi.fn() as Mock,
 });
 
 /**
