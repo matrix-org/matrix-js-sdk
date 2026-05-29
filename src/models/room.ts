@@ -920,10 +920,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         return this.myUserId;
     }
 
-    public foobar(): string {
-        return this.roomId + "foobar";
-    }
-
     /**
      * Gets the "functional members" in this room.
      *
