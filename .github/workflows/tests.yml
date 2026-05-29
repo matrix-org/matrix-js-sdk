@@ -128,13 +128,5 @@ jobs:
                   fail-under: 80
 
             - name: Check status of tests
-              if: needs.test.result != 'skipped' && needs.test.result != 'success'
-              run: exit 1
-
-            - name: Check status of element-web downstream tests
-              if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
-              run: exit 1
-
-            - name: Check status of complement-crypto downstream tests
-              if: needs.complement-crypto.result != 'skipped' && needs.complement-crypto.result != 'success'
+              if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
               run: exit 1
