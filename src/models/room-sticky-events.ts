@@ -156,6 +156,12 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         const stickyEvent = event as StickyMatrixEvent;
 
         if (stickyKey === undefined) {
+            // Encrypted stickies have no readable msc4354_sticky_key yet. They will be re-added
+            // after decryption via Room._unstable_addStickyEvents. Storing them now would create a
+            // duplicate unkeyed entry alongside the later keyed one.
+            // See https://github.com/matrix-org/matrix-js-sdk/issues/5205
+            if (event.isEncrypted() || type === "m.room.encrypted") return { added: false };
+
             this.unkeyedStickyEvents.add(stickyEvent);
             // Recalculate the next expiry time.
             this.nextStickyEventExpiryTs = Math.min(event.unstableStickyExpiresAt, this.nextStickyEventExpiryTs);

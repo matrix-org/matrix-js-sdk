@@ -27,6 +27,7 @@
         "lint:knip": "knip",
         "test": "vitest run",
         "test:watch": "vitest watch",
+        "test:bug-5205": "vitest run spec/unit/models/room-sticky-events.spec.ts -t \"issue #5205\"",
         "coverage": "pnpm test --coverage"
     },
     "repository": {

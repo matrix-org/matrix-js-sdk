@@ -421,4 +421,73 @@ describe("RoomStickyEvents", () => {
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
         });
     });
+
+    /**
+     * https://github.com/matrix-org/matrix-js-sdk/issues/5205
+     *
+     * Regression guard for the *bug*, not the fix: passes while duplicate stickies exist,
+     * fails once duplicate sticky memberships are prevented.
+     */
+    describe("issue #5205", () => {
+        const rtcStickyBase = {
+            room_id: "!room:example.org",
+            type: "m.rtc.member",
+            msc4354_sticky: { duration_ms: 15000 },
+            sender: "@bob:example.org",
+            origin_server_ts: Date.now(),
+            unsigned: {},
+        };
+
+        it("proves duplicate unkeyed + keyed RTC membership stickies exist (bug #5205)", () => {
+            const unkeyedPreDecrypt = new MatrixEvent({
+                ...rtcStickyBase,
+                event_id: "$unkeyed:example.org",
+                type: "m.room.encrypted",
+                content: {},
+            });
+            const keyedAfterDecrypt = new MatrixEvent({
+                ...rtcStickyBase,
+                event_id: "$keyed:example.org",
+                content: { msc4354_sticky_key: "member-uuid-1" },
+            });
+
+            stickyEvents.addStickyEvents([unkeyedPreDecrypt]);
+            stickyEvents.addStickyEvents([keyedAfterDecrypt]);
+
+            const active = [...stickyEvents.getStickyEvents()];
+            const unkeyed = stickyEvents.getUnkeyedStickyEvent(rtcStickyBase.sender, "m.room.encrypted");
+            const keyed = stickyEvents.getKeyedStickyEvent(rtcStickyBase.sender, rtcStickyBase.type, "member-uuid-1");
+
+            expect(active).toHaveLength(2);
+            expect(unkeyed).toHaveLength(1);
+            expect(keyed).toBe(keyedAfterDecrypt);
+            expect(active).toContain(unkeyedPreDecrypt);
+            expect(active).toContain(keyedAfterDecrypt);
+        });
+
+        it("proves duplicate for Matrix 2.0 org.matrix.msc4143.rtc.member (bug #5205)", () => {
+            const msc4143Type = "org.matrix.msc4143.rtc.member";
+            const unkeyedPreDecrypt = new MatrixEvent({
+                ...rtcStickyBase,
+                event_id: "$unkeyed-m2:example.org",
+                type: "m.room.encrypted",
+                content: {},
+            });
+            const keyedAfterDecrypt = new MatrixEvent({
+                ...rtcStickyBase,
+                event_id: "$keyed-m2:example.org",
+                type: msc4143Type,
+                content: { msc4354_sticky_key: "member-uuid-1" },
+            });
+
+            stickyEvents.addStickyEvents([unkeyedPreDecrypt]);
+            stickyEvents.addStickyEvents([keyedAfterDecrypt]);
+
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(2);
+            expect(stickyEvents.getKeyedStickyEvent(rtcStickyBase.sender, msc4143Type, "member-uuid-1")).toBe(
+                keyedAfterDecrypt,
+            );
+            expect(stickyEvents.getUnkeyedStickyEvent(rtcStickyBase.sender, "m.room.encrypted")).toHaveLength(1);
+        });
+    });
 });

@@ -3471,12 +3471,65 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Add a series of sticky events, emitting `RoomEvent.StickyEvents` if any
      * changes were made.
+     *
+     * Encrypted sticky events are decrypted before being passed to the store so that
+     * their `msc4354_sticky_key` is available. This prevents a duplicate unkeyed entry
+     * being created alongside the keyed one that arrives after decryption.
+     * See https://github.com/matrix-org/matrix-js-sdk/issues/5205
+     *
      * @param events A set of new sticky events.
      * @internal
      */
     // eslint-disable-next-line
-    public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEventsStore["addStickyEvents"]> {
-        return this.stickyEvents.addStickyEvents(events);
+    public async _unstable_addStickyEvents(
+        events: MatrixEvent[],
+    ): Promise<ReturnType<RoomStickyEventsStore["addStickyEvents"]>> {
+        const results = await Promise.allSettled(events.map((event) => this.decryptStickyEvent(event)));
+        const decrypted = results.flatMap((r) => (r.status === "fulfilled" && r.value !== null ? [r.value] : []));
+        return this.stickyEvents.addStickyEvents(decrypted);
+    }
+
+    /**
+     * Resolves a sticky event to its decrypted form before it is inserted into the store.
+     *
+     * Returns `null` for events that should not be stored: those with missing sticky metadata,
+     * or encrypted events that still lack a `msc4354_sticky_key` after a decryption attempt.
+     * Never throws — decrypt failures are logged and treated as skipped events so that a single
+     * undecryptable sticky cannot abort the surrounding sync processing.
+     */
+    private async decryptStickyEvent(event: MatrixEvent): Promise<MatrixEvent | null> {
+        if (event.unstableStickyInfo === undefined) return null;
+
+        // Already has a key — nothing to do.
+        if (typeof event.getContent().msc4354_sticky_key === "string") return event;
+
+        // Plain (non-encrypted) unkeyed sticky — allowed through as-is.
+        if (!event.isEncrypted() && !event.shouldAttemptDecryption()) return event;
+
+        if (!this.client.getCrypto()) {
+            logger.debug(`Skipping encrypted sticky event ${event.getId()}: crypto not available`);
+            return null;
+        }
+
+        try {
+            await this.client.decryptEventIfNeeded(event);
+            if (event.isBeingDecrypted()) await event.getDecryptionPromise();
+        } catch (e) {
+            logger.warn(`Failed to decrypt sticky event ${event.getId()}, skipping`, e);
+            return null;
+        }
+
+        if (typeof event.getContent().msc4354_sticky_key === "string") {
+            return event;
+        }
+
+        // Still encrypted after decrypt attempt — drop it; the store would reject it anyway.
+        if (event.isEncrypted()) {
+            logger.debug(`Skipping sticky event ${event.getId()}: still encrypted after decryption attempt`);
+            return null;
+        }
+
+        return event;
     }
 
     /**
