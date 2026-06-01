@@ -1466,7 +1466,7 @@ export class SyncApi {
                 );
                 // Note: We calculate sticky events before emitting `.Room` as it's nice to have
                 // sticky events calculated and ready to go.
-                room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
+                await room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
 
                 room.recalculate();
                 if (joinObj.isBrandNewRoom) {

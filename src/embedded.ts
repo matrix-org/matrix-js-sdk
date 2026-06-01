@@ -758,7 +758,7 @@ export class RoomWidgetClient extends MatrixClient {
             }
 
             this.emit(ClientEvent.Event, event);
-            if (event.unstableStickyInfo !== undefined) this.room!._unstable_addStickyEvents([event]);
+            if (event.unstableStickyInfo !== undefined) await this.room!._unstable_addStickyEvents([event]);
             this.setSyncState(SyncState.Syncing);
             logger.info(`Received event ${event.getId()} ${event.getType()}`);
         } else {

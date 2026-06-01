@@ -1,4 +1,5 @@
 import { logger as loggerInstance } from "../logger.ts";
+import { EventType } from "../@types/event.ts";
 import { type MatrixEvent } from "./event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 
@@ -156,6 +157,8 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         const stickyEvent = event as StickyMatrixEvent;
 
         if (stickyKey === undefined) {
+            if (event.isEncrypted() || type === EventType.RoomMessageEncrypted) return { added: false };
+
             this.unkeyedStickyEvents.add(stickyEvent);
             // Recalculate the next expiry time.
             this.nextStickyEventExpiryTs = Math.min(event.unstableStickyExpiresAt, this.nextStickyEventExpiryTs);

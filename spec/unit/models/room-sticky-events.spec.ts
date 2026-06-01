@@ -2,6 +2,7 @@ import { type Mock } from "vitest";
 
 import { type IStickyEvent, MatrixEvent } from "../../../src";
 import { RoomStickyEventsStore, RoomStickyEventsEvent } from "../../../src/models/room-sticky-events";
+import { EventType } from "../../../src/@types/event";
 
 describe("RoomStickyEvents", () => {
     let stickyEvents: RoomStickyEventsStore;
@@ -116,6 +117,18 @@ describe("RoomStickyEvents", () => {
             expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], [], []);
         });
+
+        it("should not add an unkeyed event whose type is m.room.encrypted", () => {
+            stickyEvents.addStickyEvents([
+                new MatrixEvent({
+                    ...stickyEvent,
+                    type: EventType.RoomMessageEncrypted,
+                    content: {},
+                }),
+            ]);
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+        });
+
         it("should emit when a new unkeyed sticky event is added", () => {
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             const ev = new MatrixEvent({

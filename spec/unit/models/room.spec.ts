@@ -17,6 +17,7 @@ limitations under the License.
 import { type MockedObject } from "vitest";
 
 import { Direction, EventType, type MatrixClient, MatrixEvent, Room } from "../../../src";
+import { RoomStickyEventsEvent } from "../../../src/models/room-sticky-events";
 
 const CREATOR_USER_ID = "@creator:example.org";
 const MODERATOR_USER_ID = "@moderator:example.org";
@@ -235,6 +236,75 @@ describe("Room", () => {
             room.recalculate();
 
             expect(room.getAltAliases()).toEqual(["#foo:bar"]);
+        });
+    });
+
+    describe("_unstable_addStickyEvents", () => {
+        function createMockClientWithCrypto(): MockedObject<MatrixClient> {
+            return {
+                supportsThreads: vi.fn().mockReturnValue(true),
+                decryptEventIfNeeded: vi.fn().mockResolvedValue(undefined),
+                getUserId: vi.fn().mockReturnValue(CREATOR_USER_ID),
+                getCrypto: vi.fn().mockReturnValue({}),
+            } as unknown as MockedObject<MatrixClient>;
+        }
+
+        it("should call decryptEventIfNeeded for an encrypted sticky event, then add it to the store", async () => {
+            const mockClient = createMockClientWithCrypto();
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+
+            const encryptedStickyEvent = new MatrixEvent({
+                type: EventType.RoomMessageEncrypted,
+                event_id: "$encrypted-sticky",
+                room_id: room.roomId,
+                sender: CREATOR_USER_ID,
+                origin_server_ts: Date.now(),
+                msc4354_sticky: { duration_ms: 15000 },
+                content: {},
+            });
+
+            mockClient.decryptEventIfNeeded.mockImplementation(async (event) => {
+                // `clearEvent` is a private field on MatrixEvent; casting to any is the only way
+                // to inject a decrypted payload without going through the full crypto stack.
+                (event as any).clearEvent = {
+                    type: "org.example.message",
+                    content: { msc4354_sticky_key: "my-key" },
+                };
+            });
+
+            const emitSpy = vi.fn();
+            room.on(RoomStickyEventsEvent.Update, emitSpy);
+
+            await room._unstable_addStickyEvents([encryptedStickyEvent]);
+
+            expect(mockClient.decryptEventIfNeeded).toHaveBeenCalledWith(encryptedStickyEvent);
+            expect([...room._unstable_getStickyEvents()]).toContain(encryptedStickyEvent);
+            expect(emitSpy).toHaveBeenCalled();
+        });
+
+        it("should skip an encrypted sticky event when crypto is unavailable", async () => {
+            const mockClient = {
+                supportsThreads: vi.fn().mockReturnValue(true),
+                decryptEventIfNeeded: vi.fn().mockResolvedValue(undefined),
+                getUserId: vi.fn().mockReturnValue(CREATOR_USER_ID),
+                getCrypto: vi.fn().mockReturnValue(null),
+            } as unknown as MockedObject<MatrixClient>;
+            const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
+
+            const encryptedStickyEvent = new MatrixEvent({
+                type: EventType.RoomMessageEncrypted,
+                event_id: "$encrypted-sticky-no-crypto",
+                room_id: room.roomId,
+                sender: CREATOR_USER_ID,
+                origin_server_ts: Date.now(),
+                msc4354_sticky: { duration_ms: 15000 },
+                content: {},
+            });
+
+            await room._unstable_addStickyEvents([encryptedStickyEvent]);
+
+            expect(mockClient.decryptEventIfNeeded).not.toHaveBeenCalled();
+            expect([...room._unstable_getStickyEvents()]).toHaveLength(0);
         });
     });
 
