@@ -27,7 +27,8 @@
         "lint:knip": "knip",
         "test": "vitest run",
         "test:watch": "vitest watch",
-        "coverage": "pnpm test --coverage"
+        "coverage": "pnpm test --coverage",
+        "coverage:diff": "diff-cover --config-file diff-cover.toml coverage/lcov.info"
     },
     "repository": {
         "type": "git",
@@ -121,7 +122,6 @@
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "^6.0.0",
-        "vitest": "^4.0.17",
-        "vitest-sonar-reporter": "^3.0.0"
+        "vitest": "^4.0.17"
     }
 }
