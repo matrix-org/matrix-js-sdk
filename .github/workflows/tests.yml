@@ -71,6 +71,9 @@ jobs:
         if: github.event_name == 'merge_group'
         uses: element-hq/element-web/.github/workflows/tests.yml@develop # zizmor: ignore[unpinned-uses]
         permissions:
+            contents: read
+            pull-requests: read
+            checks: write
             statuses: write
         with:
             disable_coverage: true
