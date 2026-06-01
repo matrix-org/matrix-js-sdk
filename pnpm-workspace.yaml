@@ -1,5 +1,3 @@
-nodeLinker: hoisted
-
 peerDependencyRules:
     allowedVersions:
         eslint: "8"
