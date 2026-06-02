@@ -781,6 +781,15 @@ export class SyncAccumulator {
     public getNextBatchToken(): string {
         return this.nextBatch!;
     }
+
+    public vapeEventsFromRoom(roomId: string, eventIds: string[]): void {
+        this.joinRooms[roomId]._timeline = this.joinRooms[roomId]._timeline.filter(
+            (ev) => !eventIds.includes(ev.event.event_id),
+        );
+        this.joinRooms[roomId]._stickyEvents = this.joinRooms[roomId]._stickyEvents.filter(
+            (ev) => !eventIds.includes(ev.event.event_id),
+        );
+    }
 }
 
 function setState(eventMap: Record<string, Record<string, IStateEvent>>, event: IRoomEvent | IStateEvent): void {

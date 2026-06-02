@@ -274,6 +274,13 @@ export interface IStore {
     getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
 
     /**
+     * TODO
+     * @param roomId
+     * @param eventIds
+     */
+    vapeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void>;
+
+    /**
      * Stop the store and perform any appropriate cleanup
      */
     destroy(): Promise<void>;

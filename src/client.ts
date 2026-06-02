@@ -545,6 +545,11 @@ export interface IStartClientOpts {
      * Will only work if the server supports MSC4429.
      */
     unstableMSC4429SyncUserProfileFields?: string[];
+
+    /**
+     * Locally remove events past the server global or per room retention setting.
+     */
+    unstableMSC1763Retention?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -1451,6 +1456,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public get store(): Store {
         return this._store;
+    }
+
+    // eslint-disable-next-line
+    public get _unstable_shouldApplyMessageRetention(): boolean {
+        return !!this.clientOpts?.unstableMSC1763Retention;
     }
 
     /**

@@ -455,6 +455,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private stickyEvents = new RoomStickyEventsStore();
 
+    //@ts-expect-error
     private readonly retention: RoomRetentionPolicy;
 
     /**
@@ -533,8 +534,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.membersPromise = undefined;
         }
-
-        this.retention = new RoomRetentionPolicy(this);
+        if (this.client._unstable_shouldApplyMessageRetention) {
+            this.retention = new RoomRetentionPolicy(this);
+        }
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;

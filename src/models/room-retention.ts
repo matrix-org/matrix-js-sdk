@@ -29,14 +29,14 @@ import { EventType } from "../@types/event";
  *   - Loop
  */
 export class RoomRetentionPolicy {
-    private minRetention: number | null = null;
+    // minRetention is not implemented.
     private maxRetention: number | null = null;
     private retentionTimeout?: ReturnType<typeof setTimeout>;
     private readonly logger: Logger;
 
     public constructor(private readonly room: Room) {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
-        room.on(RoomEvent.Timeline, this.timelineUpdated);
+        room.on(RoomEvent.Timeline, () => this.timelineUpdated());
         room.on(RoomStateEvent.Events, this.roomStateUpdate);
     }
 
@@ -62,7 +62,6 @@ export class RoomRetentionPolicy {
 
         if (!content) {
             this.maxRetention = null;
-            this.minRetention = null;
             return;
         }
 
@@ -83,34 +82,43 @@ export class RoomRetentionPolicy {
             }
         }
         this.maxRetention = maxLifetime;
-        this.minRetention = minLifetime ?? null;
-
         this.logger.info("currentStateUpdated", minLifetime, maxLifetime);
         this.processTimeline();
     };
 
-    private readonly timelineUpdated = (): void => {
+    private readonly timelineUpdated = (nextTs = 200): void => {
+        this.logger.info("timelineUpdated");
         if (this.retentionTimeout) {
             clearTimeout(this.retentionTimeout);
         }
         this.retentionTimeout = setTimeout(() => {
             this.processTimeline();
             this.retentionTimeout = undefined;
-        }, 200);
-        this.logger.info("timelineUpdated");
+        }, nextTs);
     };
 
     private processTimeline(): void {
         if (!this.maxRetention) {
             return; // No policy, skip.
         }
+        this.logger.info(`Running processTimeline`);
         const expireBefore = Date.now() - this.maxRetention;
-        const expiredEvents = this.room
+        const events = this.room
             .getLiveTimeline()
             .getEvents()
-            .filter((ev) => ev.getTs() < expireBefore);
+            .filter((ev) => ev.getStateKey() === undefined || ev.isRedacted() || ev.getType() === "m.room.redacation");
+
+        const expiredEvents = events.filter((ev) => ev.getTs() < expireBefore);
+        const [earliestExpiringEvent] = events.filter((ev) => ev.getTs() >= expireBefore).sort((ev) => ev.getTs());
+
+        if (earliestExpiringEvent) {
+            const nextTs = earliestExpiringEvent.getTs() + this.maxRetention - Date.now();
+            this.logger.info(`Next expiry scheduled for ${nextTs}`);
+            this.timelineUpdated(nextTs);
+        }
+
         if (expiredEvents.length === 0) {
-            this.logger.info(`Found no expired events`, expireBefore, this.room.getLiveTimeline().getEvents());
+            this.logger.info("Found no expired events");
             return;
         }
         this.logger.info(`Found ${expiredEvents.length} expired events`);
@@ -118,14 +126,26 @@ export class RoomRetentionPolicy {
             this.room.tryApplyRedaction(
                 new MatrixEvent({
                     type: EventType.RoomRedaction,
+                    sender: event.getSender(),
                     event_id: "$synthetic_redaction",
                     room_id: this.room.roomId,
                     redacts: event.getId(),
-                    content: {},
+                    content: {
+                        reason: "Retention policy",
+                    },
                     origin_server_ts: Date.now(),
                     unsigned: {},
                 }),
             );
         }
+        // TODO: Asyncify
+        void this.room.client.store
+            .vapeEventsFromRoom(
+                this.room.roomId,
+                expiredEvents.map((e) => e.getId()!),
+            )
+            .catch((ex) => {
+                this.logger.warn(`Failed to vape events from store`, ex);
+            });
     }
 }

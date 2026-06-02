@@ -633,6 +633,16 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         await txnAsPromise(txn);
     }
 
+    public async vapeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        try {
+            this.syncAccumulator.vapeEventsFromRoom(roomId, eventIds);
+            const syncData = this.syncAccumulator.getJSON(true);
+            await Promise.all([this.persistSyncData(syncData.nextBatch, syncData.roomsData)]);
+        } finally {
+            this.syncToDatabasePromise = undefined;
+        }
+    }
+
     /*
      * Close the database
      */
