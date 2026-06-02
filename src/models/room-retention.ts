@@ -37,11 +37,11 @@ export class RoomRetentionPolicy {
 
     public constructor(private readonly room: Room) {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
-        room.on(RoomEvent.Timeline, () => this.timelineUpdated());
+        // Only bind RoomEvent.Timeline once we know we have a retention policy.
         room.on(RoomStateEvent.Events, (...params) => {
             void (async (): Promise<void> => {
                 try {
-                    await this.roomStateUpdate(...params);
+                    this.roomStateUpdate(...params);
                 } catch (ex) {
                     this.logger.warn("Failed to calculate new retention rules", ex);
                 }
@@ -62,7 +62,16 @@ export class RoomRetentionPolicy {
         } // otherwise, call this every time we see a state update.
 
         this.logger.info("roomStateUpdate", event.getType(), event.getContent());
+        const hadRetentionPeriod = this.maxRetention !== null;
         this.currentStateUpdated(state);
+        if (hadRetentionPeriod !== (this.maxRetention !== null)) {
+            // We've changed
+            if (this.maxRetention) {
+                this.room.on(RoomEvent.Timeline, this.timelineUpdated);
+            } else {
+                this.room.off(RoomEvent.Timeline, this.timelineUpdated);
+            }
+        }
     };
 
     private readonly currentStateUpdated = async (roomState: RoomState): Promise<void> => {
@@ -134,8 +143,12 @@ export class RoomRetentionPolicy {
         this.processTimeline();
     };
 
-    private readonly timelineUpdated = (nextTs = 200): void => {
+    private readonly timelineUpdated = (): void => {
         this.logger.info("timelineUpdated");
+        this.scheduleTimelineCheck(200);
+    };
+
+    private readonly scheduleTimelineCheck = (nextTs: number): void => {
         if (this.retentionTimeout) {
             clearTimeout(this.retentionTimeout);
         }
@@ -162,7 +175,7 @@ export class RoomRetentionPolicy {
         if (earliestExpiringEvent) {
             const nextTs = earliestExpiringEvent.getTs() + this.maxRetention - Date.now();
             this.logger.info(`Next expiry scheduled for ${nextTs}`);
-            this.timelineUpdated(nextTs);
+            this.scheduleTimelineCheck(nextTs);
         }
 
         if (expiredEvents.length === 0) {
