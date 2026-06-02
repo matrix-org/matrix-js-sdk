@@ -65,7 +65,7 @@ jobs:
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
-                  pnpm add -C "$DIR" "$DEPENDENCY" --save-exact
+                  pnpm add -C "$DIR" "$DEPENDENCY" --save-exact --ignore-scripts
                   git add "$DIR"/package.json pnpm-lock.yaml
                   git commit -am"Upgrade dependency to $DEPENDENCY"
                   git push origin staging
