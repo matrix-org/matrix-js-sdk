@@ -1,6 +1,6 @@
 import { KnipConfig } from "knip";
 
-// Specify this as knip loads config files which may conditionally add reporters, e.g. `vitest-sonar-reporter'
+// Specify this as knip loads config files which may conditionally load plugins
 process.env.GITHUB_ACTIONS = "1";
 
 export default {
@@ -35,6 +35,8 @@ export default {
     ignoreBinaries: [
         // Used when available by reusable workflow `.github/workflows/release-make.yml`
         "dist",
+        // Optional for coverage:diff development script
+        "diff-cover",
     ],
     ignoreExportsUsedInFile: true,
     includeEntryExports: false,
