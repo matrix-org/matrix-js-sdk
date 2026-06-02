@@ -17,6 +17,9 @@ limitations under the License.
 import { LocationAssetType, M_ASSET, M_LOCATION, M_TIMESTAMP } from "../../src/@types/location";
 import { M_TOPIC } from "../../src/@types/topic";
 import {
+    makeLetroLetterContent,
+    makeLetroRoomCreationContent,
+    makeLetroRoomMarkerStateEvent,
     makeBeaconContent,
     makeBeaconInfoContent,
     makeTopicContent,
@@ -24,6 +27,55 @@ import {
     parseTopicContent,
 } from "../../src/content-helpers";
 import { REFERENCE_RELATION } from "../../src/@types/extensible_events";
+import { LetroRoomMarkerEventType, MsgType, RoomCreateTypeField, RoomType } from "../../src";
+
+describe("Letro content helpers", () => {
+    it("creates Letro letter message content", () => {
+        expect(makeLetroLetterContent("Hello", "<strong>Hello</strong>")).toEqual({
+            msgtype: MsgType.Letter,
+            body: "Hello",
+            format: "org.matrix.custom.html",
+            formatted_body: "<strong>Hello</strong>",
+        });
+    });
+
+    it("creates Letro letter message content with custom data", () => {
+        expect(
+            makeLetroLetterContent(
+                "Dear Alice",
+                {
+                    letter_id: "lt-123",
+                    version: 1,
+                    msgtype: "org.example.ignored",
+                    body: "ignored",
+                },
+                "<p>Dear Alice</p>",
+            ),
+        ).toEqual({
+            letter_id: "lt-123",
+            version: 1,
+            msgtype: MsgType.Letter,
+            body: "Dear Alice",
+            format: "org.matrix.custom.html",
+            formatted_body: "<p>Dear Alice</p>",
+        });
+    });
+
+    it("creates Letro room creation content", () => {
+        expect(makeLetroRoomCreationContent({ purpose: "letters" })).toEqual({
+            purpose: "letters",
+            [RoomCreateTypeField]: RoomType.Letter,
+        });
+    });
+
+    it("creates Letro room marker state", () => {
+        expect(makeLetroRoomMarkerStateEvent({ version: 1 })).toEqual({
+            type: LetroRoomMarkerEventType,
+            state_key: "",
+            content: { version: 1 },
+        });
+    });
+});
 
 describe("Beacon content helpers", () => {
     describe("makeBeaconInfoContent()", () => {

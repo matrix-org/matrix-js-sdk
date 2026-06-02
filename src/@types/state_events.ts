@@ -32,7 +32,7 @@ export interface RoomCreateEventContent {
         room_id: string;
     };
     "room_version"?: string;
-    "type"?: RoomType;
+    "type"?: RoomType | string;
 }
 
 export interface RoomJoinRulesEventContent {

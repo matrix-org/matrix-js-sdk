@@ -185,6 +185,7 @@ export enum MsgType {
     Location = "m.location",
     Video = "m.video",
     KeyVerificationRequest = "m.key.verification.request",
+    Letter = "org.letro.letter",
 }
 
 export const RoomCreateTypeField = "type";
@@ -193,9 +194,12 @@ export enum RoomType {
     Space = "m.space",
     UnstableCall = "org.matrix.msc3417.call",
     ElementVideo = "io.element.video",
+    Letter = "org.letro.letter",
 }
 
 export const ToDeviceMessageId = "org.matrix.msgid";
+
+export const LetroRoomMarkerEventType = "org.letro.room";
 
 /**
  * Identifier for an [MSC3088](https://github.com/matrix-org/matrix-doc/pull/3088)

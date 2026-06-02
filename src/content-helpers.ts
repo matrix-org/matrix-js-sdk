@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { type MBeaconEventContent, type MBeaconInfoContent, type MBeaconInfoEventContent } from "./@types/beacon.ts";
-import { MsgType } from "./@types/event.ts";
+import { LetroRoomMarkerEventType, MsgType, RoomCreateTypeField, RoomType } from "./@types/event.ts";
 import { type IMessageRendering, M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events.ts";
 import { isProvided } from "./extensible_events_v1/utilities.ts";
 import {
@@ -30,7 +30,8 @@ import {
     type LegacyLocationEventContent,
 } from "./@types/location.ts";
 import { type MRoomTopicEventContent, type MTopicContent, M_TOPIC, type MTopicEvent } from "./@types/topic.ts";
-import { type RoomMessageEventContent } from "./@types/events.ts";
+import { type ICreateRoomStateEvent } from "./@types/requests.ts";
+import { type LetroLetterEventContent, type RoomMessageEventContent } from "./@types/events.ts";
 
 /**
  * Generates the content for a HTML Message event
@@ -110,6 +111,74 @@ export function makeEmoteMessage(body: string): RoomMessageEventContent {
     return {
         msgtype: MsgType.Emote,
         body: body,
+    };
+}
+
+export type LetroLetterCustomData = Record<string, unknown>;
+
+export type LetroRoomCreationContent = Record<string, unknown> & {
+    [RoomCreateTypeField]: RoomType.Letter;
+};
+
+export type LetroRoomMarkerEventContent = Record<string, unknown>;
+
+/**
+ * Generates the content for a Letro letter message event.
+ * @param body - the plaintext body of the letter
+ * @param customData - optional custom letter fields
+ * @param htmlBody - optional HTML representation of the letter
+ * @returns
+ */
+export function makeLetroLetterContent(body: string, htmlBody?: string): LetroLetterEventContent;
+export function makeLetroLetterContent(
+    body: string,
+    customData?: LetroLetterCustomData,
+    htmlBody?: string,
+): LetroLetterEventContent;
+export function makeLetroLetterContent(
+    body: string,
+    customDataOrHtmlBody: LetroLetterCustomData | string = {},
+    htmlBody?: string,
+): LetroLetterEventContent {
+    const customData = typeof customDataOrHtmlBody === "string" ? {} : customDataOrHtmlBody;
+    const formattedHtmlBody = typeof customDataOrHtmlBody === "string" ? customDataOrHtmlBody : htmlBody;
+    const htmlContent = formattedHtmlBody
+        ? {
+              format: "org.matrix.custom.html" as const,
+              formatted_body: formattedHtmlBody,
+          }
+        : {};
+
+    return {
+        ...customData,
+        msgtype: MsgType.Letter,
+        body,
+        ...htmlContent,
+    };
+}
+
+/**
+ * Generates the creation content required for a Letro letter room.
+ * @param content - additional creation content fields
+ * @returns
+ */
+export function makeLetroRoomCreationContent(content: Record<string, unknown> = {}): LetroRoomCreationContent {
+    return {
+        ...content,
+        [RoomCreateTypeField]: RoomType.Letter,
+    };
+}
+
+/**
+ * Generates the initial state marker event required for a Letro letter room.
+ * @param content - marker event content
+ * @returns
+ */
+export function makeLetroRoomMarkerStateEvent(content: LetroRoomMarkerEventContent = {}): ICreateRoomStateEvent {
+    return {
+        type: LetroRoomMarkerEventType,
+        state_key: "",
+        content,
     };
 }
 

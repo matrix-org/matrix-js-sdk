@@ -77,6 +77,26 @@ export interface RoomMessageTextEventContent extends BaseTimelineEvent {
 }
 
 /**
+ * Content format of Letro letter timeline events.
+ */
+export interface LetroLetterEventContent extends BaseTimelineEvent {
+    msgtype: MsgType.Letter;
+    format?: "org.matrix.custom.html";
+    formatted_body?: string;
+    [key: string]: unknown;
+}
+
+/**
+ * Content format for custom `m.room.message` msgtypes.
+ */
+export interface RoomMessageCustomEventContent extends BaseTimelineEvent {
+    msgtype: MsgType | string;
+    format?: string;
+    formatted_body?: string;
+    [key: string]: unknown;
+}
+
+/**
  * Content format of timeline events with type `m.room.message` and `msgtype` `m.location`
  *
  * @see https://spec.matrix.org/v1.9/client-server-api/#mlocation
@@ -88,7 +108,12 @@ export interface RoomMessageLocationEventContent extends BaseTimelineEvent {
     msgtype: MsgType.Location;
 }
 
-type MessageEventContent = RoomMessageTextEventContent | RoomMessageLocationEventContent | MediaEventContent;
+type MessageEventContent =
+    | RoomMessageTextEventContent
+    | LetroLetterEventContent
+    | RoomMessageLocationEventContent
+    | MediaEventContent
+    | RoomMessageCustomEventContent;
 
 export type RoomMessageEventContent = BaseTimelineEvent &
     XOR<XOR<ReplacementEvent<MessageEventContent>, RelationEvent>, XOR<ReplyEvent, NoRelationEvent>> &
