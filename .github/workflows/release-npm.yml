@@ -42,7 +42,7 @@ jobs:
               id: npm-publish
               working-directory: ${{ inputs.dir }}
               run: |
-                  npm publish --provenance --access public --tag "$TAG"
+                  pnpm publish --provenance --access public --tag "$TAG"
                   release=$(jq -r '"\(.name)@\(.version)"' package.json)
                   echo "id=$release" >> $GITHUB_OUTPUT
               env:
