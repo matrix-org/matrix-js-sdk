@@ -249,6 +249,8 @@ import {
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
+import type { RetentionConfigurationResponse } from "./models/room-retention.ts";
+import { RetentionPolicyService } from "./retentionPolicy.ts";
 
 export type Store = IStore;
 
@@ -1332,6 +1334,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
+    private retentionPolicyService: RetentionPolicyService;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1410,6 +1413,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC = new MatrixRTCSessionManager(this.logger, this);
 
         this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
+        this.retentionPolicyService = new RetentionPolicyService(this.logger, this.http);
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1540,6 +1544,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
+        if (opts?.unstableMSC1763Retention) {
+            this.retentionPolicyService?.start();
+        }
     }
 
     /**
@@ -1946,9 +1953,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise resolving with The capabilities of the homeserver
      */
     public async getCapabilities(): Promise<Capabilities> {
-        const caps = this.serverCapabilitiesService.getCachedCapabilities();
+        const caps = this.serverCapabilitiesService.getCached();
         if (caps) return caps;
-        return this.serverCapabilitiesService.fetchCapabilities();
+        return this.serverCapabilitiesService.fetch();
     }
 
     /**
@@ -1958,7 +1965,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The capabilities of the homeserver
      */
     public getCachedCapabilities(): Capabilities | undefined {
-        return this.serverCapabilitiesService.getCachedCapabilities();
+        return this.serverCapabilitiesService.getCached();
     }
 
     /**
@@ -1968,7 +1975,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns A promise which resolves to the capabilities of the homeserver
      */
     public fetchCapabilities(): Promise<Capabilities> {
-        return this.serverCapabilitiesService.fetchCapabilities();
+        return this.serverCapabilitiesService.fetch();
+    }
+
+    /**
+     * Gets the cached retention policy of the homeserver, returning cached ones if available.
+     * If there are no cached retention policies and none can be fetched, throw an exception.
+     *
+     * @returns Promise resolving with The capabilities of the homeserver
+     */
+    public async getRetentionPolicy(): Promise<RetentionConfigurationResponse> {
+        const caps = this.retentionPolicyService.getCached();
+        if (caps) return caps;
+        return this.retentionPolicyService.fetch();
     }
 
     /**
@@ -6213,6 +6232,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
             })
         ).rtc_transports;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    public async _unstable_getMessageRetentionConfiguration(): Promise<RetentionConfigurationResponse> {
+        return await this.http.authedRequest<RetentionConfigurationResponse>(
+            Method.Get,
+            "/retention/configuration",
+            undefined,
+            undefined,
+            {
+                prefix: `${ClientPrefix.Unstable}/org.matrix.msc1763`,
+            },
+        );
     }
 
     /**

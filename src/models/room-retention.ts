@@ -14,11 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixEvent } from "../models/event";
-import { RoomEvent, type Room } from "./room";
-import { RoomStateEvent, type RoomState } from "./room-state";
-import { type Logger, logger as rootLogger } from "../logger";
-import { EventType } from "../@types/event";
+import { MatrixEvent } from "../models/event.ts";
+import { RoomEvent, type Room } from "./room.ts";
+import { RoomStateEvent, type RoomState } from "./room-state.ts";
+import { type Logger, logger as rootLogger } from "../logger.ts";
+import { EventType } from "../@types/event.ts";
+import { type RetentionConfigurationResponse } from "../retentionPolicy.ts";
 
 /**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
@@ -37,52 +38,99 @@ export class RoomRetentionPolicy {
     public constructor(private readonly room: Room) {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
         room.on(RoomEvent.Timeline, () => this.timelineUpdated());
-        room.on(RoomStateEvent.Events, this.roomStateUpdate);
+        room.on(RoomStateEvent.Events, (...params) => {
+            void (async (): Promise<void> => {
+                try {
+                    await this.roomStateUpdate(...params);
+                } catch (ex) {
+                    this.logger.warn("Failed to calculate new retention rules", ex);
+                }
+            })();
+        });
     }
 
     private readonly roomStateUpdate = (event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null): void => {
-        if (
-            event.getStateKey() !== "" ||
-            (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
-        ) {
-            return;
-        }
+        // TODO: Make this cheaper.
+        if (this.maxRetention) {
+            // If we *have* a room retention policy, only update if a state event appears.
+            if (
+                event.getStateKey() !== "" ||
+                (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
+            ) {
+                return;
+            }
+        } // otherwise, call this every time we see a state update.
+
         this.logger.info("roomStateUpdate", event.getType(), event.getContent());
         this.currentStateUpdated(state);
     };
 
-    private readonly currentStateUpdated = (roomState: RoomState): void => {
+    private readonly currentStateUpdated = async (roomState: RoomState): Promise<void> => {
         const unstableEvent = roomState
             .getStateEvents("org.matrix.msc1763.retention")
             .find((e) => e.getStateKey() === "");
         const stableEvent = roomState.getStateEvents("m.room.retention").find((e) => e.getStateKey() === "");
         this.logger.info("currentStateUpdated", unstableEvent, stableEvent);
 
-        const content = unstableEvent?.getContent() ?? stableEvent?.getContent();
+        // TODO: Error handle.
+        const serverPolicy: RetentionConfigurationResponse | null = await this.room.client
+            .getRetentionPolicy()
+            .catch((ex) => null);
+
+        const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
+        const roomStatePolicy = unstableEvent?.getContent() ?? stableEvent?.getContent();
+
+        const content =
+            // * if the homeserver defines a specific retention policy for this room, then use this policy as the effective retention policy of the room.
+            serverRoomPolicy ??
+            // * otherwise, if the state of the room includes a `m.room.retention` event with an empty state key:
+            roomStatePolicy ??
+            // * otherwise, if the state of the room does not include a m.room.retention event with an empty state key:
+            serverPolicy?.policies?.["*"];
 
         if (!content) {
+            // * otherwise, don't apply a retention policy in this room.
             this.maxRetention = null;
             return;
         }
 
+        const validatePolicy = !serverRoomPolicy && roomStatePolicy;
+
         // Parse it
-        const { min_lifetime: minLifetime, max_lifetime: maxLifetime } = content;
+        let { max_lifetime: maxLifetime } = content;
+
+        if (!maxLifetime && validatePolicy) {
+            // if there is no value specified in the room's state, use the limit's min value for the effective retention policy of the room (which can be null or absent).
+            maxLifetime = serverPolicy?.limits?.max_lifetime?.min;
+            if (!maxLifetime) {
+                this.maxRetention = null;
+                return;
+            }
+        }
+
         if (typeof maxLifetime !== "number") {
             throw Error(`max_lifetime must be a number, got "${maxLifetime}"`);
         }
         if (maxLifetime < 0 || !Number.isInteger(maxLifetime)) {
             throw Error(`max_lifetime must be >= 0, got ${maxLifetime}`);
         }
-        if (minLifetime !== undefined) {
-            if (typeof minLifetime !== "number") {
-                throw Error(`min_lifetime must be a number, got "${minLifetime}"`);
-            }
-            if (minLifetime < 0 || !Number.isInteger(minLifetime)) {
-                throw Error(`min_lifetime must be >= 0, got ${minLifetime}`);
-            }
-        }
         this.maxRetention = maxLifetime;
-        this.logger.info("currentStateUpdated", minLifetime, maxLifetime);
+
+        if (validatePolicy && serverPolicy?.limits?.max_lifetime) {
+            // We're using room state so we need to validate this policy matches the server.
+            /**
+            if the value specified in the room's state complies with the limit, use this value for the effective retention policy of the room.
+            if the value specified in the room's state is lower than the limit's min value, use the min value for the effective retention policy of the room.
+            if the value specified in the room's state is greater than the limit's max value, use the max value for the effective retention policy of the room.
+            */
+            this.maxRetention = Math.max(this.maxRetention, serverPolicy.limits.max_lifetime.min ?? 0);
+            this.maxRetention = Math.min(
+                this.maxRetention,
+                serverPolicy.limits.max_lifetime.max ?? Number.MAX_SAFE_INTEGER,
+            );
+        }
+
+        this.logger.info("calculated new maxLifetime", maxLifetime, "ms");
         this.processTimeline();
     };
 
