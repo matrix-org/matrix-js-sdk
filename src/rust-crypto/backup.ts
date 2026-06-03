@@ -146,7 +146,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Re-check the key backup and enable/disable it as appropriate.
      *
-     * @param force - whether we should force a re-check even if one has already happened.
+     * @param force - whether we should force a re-check even if one has already happened. If this is
+     *   `false`, and we have already done a check, `null` is returned rather than the actual info on the key backup.
      */
     public checkKeyBackupAndEnable(force: boolean): Promise<KeyBackupCheck | null> {
         if (!force && this.checkedForBackup) {
@@ -164,6 +165,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Handles a backup secret received event and store it if it matches the current backup version.
+     *
+     * Also enables key backup upload if it was not previously enabled, and the encryption key matches the received
+     * decryption key.
      *
      * @param secret - The secret as received from a `m.secret.send` or `io.element.msc4385.secret.push` event for secret `m.megolm_backup.v1`.
      * @returns true if the secret is valid and has been stored, false otherwise.
