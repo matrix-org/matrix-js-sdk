@@ -240,6 +240,10 @@ describe("Room", () => {
     });
 
     describe("_unstable_addStickyEvents", () => {
+        function flushPromises(): Promise<void> {
+            return new Promise((r) => setTimeout(r, 0));
+        }
+
         function createMockClientWithCrypto(): MockedObject<MatrixClient> {
             return {
                 supportsThreads: vi.fn().mockReturnValue(true),
@@ -274,7 +278,8 @@ describe("Room", () => {
             const emitSpy = vi.fn();
             room.on(RoomStickyEventsEvent.Update, emitSpy);
 
-            await room._unstable_addStickyEvents([encryptedStickyEvent]);
+            room._unstable_addStickyEvents([encryptedStickyEvent]);
+            await flushPromises();
 
             expect(mockClient.decryptEventIfNeeded).toHaveBeenCalledWith(encryptedStickyEvent);
             expect([...room._unstable_getStickyEvents()]).toContain(encryptedStickyEvent);
@@ -295,7 +300,8 @@ describe("Room", () => {
                 content: {},
             });
 
-            await room._unstable_addStickyEvents([encryptedStickyEvent]);
+            room._unstable_addStickyEvents([encryptedStickyEvent]);
+            await flushPromises();
 
             expect(mockClient.decryptEventIfNeeded).toHaveBeenCalledWith(encryptedStickyEvent);
             expect([...room._unstable_getStickyEvents()]).toHaveLength(0);

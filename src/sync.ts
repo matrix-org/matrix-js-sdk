@@ -1468,9 +1468,7 @@ export class SyncApi {
                 const stickyEventsAndStickyEventsFromTheTimeline = stickyEvents.concat(
                     timelineEvents.filter((e) => e.unstableStickyInfo !== undefined),
                 );
-                // Note: We calculate sticky events before emitting `.Room` as it's nice to have
-                // sticky events calculated and ready to go.
-                await room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
+                room._unstable_addStickyEvents(stickyEventsAndStickyEventsFromTheTimeline);
 
                 room.recalculate();
                 if (joinObj.isBrandNewRoom) {
