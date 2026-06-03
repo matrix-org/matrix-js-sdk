@@ -15,4 +15,4 @@ minimumReleaseAgeExclude:
     # Bypassing for this version, obviously this is only necessary
     # temporarily so if you're reading this, you can almost certainly
     # remove it
-    - "@matrix-org/matrix-sdk-crypto-wasm@18.3.1"
+    - "@matrix-org/*"
