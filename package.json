@@ -56,7 +56,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^18.2.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^18.3.1",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^2.0.0",
