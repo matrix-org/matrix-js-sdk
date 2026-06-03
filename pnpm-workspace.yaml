@@ -12,7 +12,4 @@ allowBuilds:
     unrs-resolver: false
 
 minimumReleaseAgeExclude:
-    # Bypassing for this version, obviously this is only necessary
-    # temporarily so if you're reading this, you can almost certainly
-    # remove it
     - "@matrix-org/*"
