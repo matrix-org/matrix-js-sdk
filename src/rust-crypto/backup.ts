@@ -210,11 +210,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 `handleBackupSecretReceived: Valid decryption key for the current server-side backup version (${latestBackupInfo.version}) received`,
             );
             await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
-            // Check if the backup should be enabled (e.g. if it's properly
-            // signed), and enable it if it should
+
+            // Check if backup upload should be enabled (e.g. the encryption key matches the decryption key),
+            // and enable it if so.
             if (this.keyBackupCheckInProgress) {
+                this.logger.debug("handleBackupSecretReceived: waiting for ongoing keybackup check to complete");
                 await this.keyBackupCheckInProgress;
             }
+            this.logger.debug("handleBackupSecretReceived: checking if we can enable keybackup upload");
             this.keyBackupCheckInProgress = this.doCheckKeyBackup(latestBackupInfo).finally(() => {
                 this.keyBackupCheckInProgress = null;
             });
