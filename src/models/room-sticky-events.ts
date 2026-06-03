@@ -219,15 +219,13 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     public async addStickyEvents(events: MatrixEvent[]): Promise<void> {
         const added: StickyMatrixEvent[] = [];
         const updated: { current: StickyMatrixEvent; previous: StickyMatrixEvent }[] = [];
-        // We use allSettled (instead of a for loop) as we do not care about the order.
-        // addStickyEvent will ignore updates if it already has a newer event.
+
         await Promise.allSettled(
             events.map(async (event) => {
                 try {
                     const result = await this.addStickyEvent(event);
                     if (result.added) {
                         if (result.prevEvent) {
-                            // event is validated as a StickyMatrixEvent by virtue of `addStickyEvent` returning added: true.
                             updated.push({ current: event as StickyMatrixEvent, previous: result.prevEvent });
                         } else {
                             added.push(event as StickyMatrixEvent);
@@ -238,7 +236,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                 }
             }),
         );
+
         if (added.length || updated.length) this.emit(RoomStickyEventsEvent.Update, added, updated, []);
+
         this.scheduleStickyTimer();
     }
 
