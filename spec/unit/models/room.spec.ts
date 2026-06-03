@@ -245,7 +245,6 @@ describe("Room", () => {
                 supportsThreads: vi.fn().mockReturnValue(true),
                 decryptEventIfNeeded: vi.fn().mockResolvedValue(undefined),
                 getUserId: vi.fn().mockReturnValue(CREATOR_USER_ID),
-                getCrypto: vi.fn().mockReturnValue({}),
             } as unknown as MockedObject<MatrixClient>;
         }
 
@@ -282,13 +281,8 @@ describe("Room", () => {
             expect(emitSpy).toHaveBeenCalled();
         });
 
-        it("should skip an encrypted sticky event when crypto is unavailable", async () => {
-            const mockClient = {
-                supportsThreads: vi.fn().mockReturnValue(true),
-                decryptEventIfNeeded: vi.fn().mockResolvedValue(undefined),
-                getUserId: vi.fn().mockReturnValue(CREATOR_USER_ID),
-                getCrypto: vi.fn().mockReturnValue(null),
-            } as unknown as MockedObject<MatrixClient>;
+        it("should not add an encrypted sticky event to the store when decryption leaves it encrypted", async () => {
+            const mockClient = createMockClientWithCrypto();
             const room = new Room("!room:example.org", mockClient, CREATOR_USER_ID);
 
             const encryptedStickyEvent = new MatrixEvent({
@@ -303,7 +297,7 @@ describe("Room", () => {
 
             await room._unstable_addStickyEvents([encryptedStickyEvent]);
 
-            expect(mockClient.decryptEventIfNeeded).not.toHaveBeenCalled();
+            expect(mockClient.decryptEventIfNeeded).toHaveBeenCalledWith(encryptedStickyEvent);
             expect([...room._unstable_getStickyEvents()]).toHaveLength(0);
         });
     });

@@ -452,7 +452,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Stores and tracks sticky events
      */
-    private stickyEvents = new RoomStickyEventsStore();
+    private stickyEvents = new RoomStickyEventsStore((event) => this.client.decryptEventIfNeeded(event));
 
     /**
      * Construct a new Room.
@@ -3475,48 +3475,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @internal
      */
     // eslint-disable-next-line
-    public async _unstable_addStickyEvents(
-        events: MatrixEvent[],
-    ): Promise<ReturnType<RoomStickyEventsStore["addStickyEvents"]>> {
-        const results = await Promise.allSettled(events.map((event) => this.decryptStickyEvent(event)));
-        const decrypted = results.flatMap((r) => (r.status === "fulfilled" && r.value !== null ? [r.value] : []));
-        return this.stickyEvents.addStickyEvents(decrypted);
-    }
-
-    /**
-     * Resolves a sticky event to its decrypted form before it is inserted into the store.
-     *
-     * Returns `null` for events that should not be stored: those with missing sticky metadata,
-     * or encrypted events that still lack a `msc4354_sticky_key` after a decryption attempt.
-     * Encryption failures are logged and treated as skipped events so that a single
-     * undecryptable sticky cannot abort the surrounding sync processing.
-     */
-    private async decryptStickyEvent(event: MatrixEvent): Promise<MatrixEvent | null> {
-        if (event.unstableStickyInfo === undefined) return null;
-
-        if (typeof event.getContent().msc4354_sticky_key === "string" || !event.isEncrypted()) return event;
-
-        if (!this.client.getCrypto()) {
-            logger.debug(`Skipping encrypted sticky event ${event.getId()}: crypto not available`);
-            return null;
-        }
-
-        try {
-            await this.client.decryptEventIfNeeded(event);
-            if (event.isBeingDecrypted()) await event.getDecryptionPromise();
-        } catch (e) {
-            logger.warn(`Failed to decrypt sticky event ${event.getId()}, skipping`, e);
-            return null;
-        }
-
-        if (typeof event.getContent().msc4354_sticky_key === "string") return event;
-
-        if (event.isEncrypted()) {
-            logger.debug(`Skipping sticky event ${event.getId()}: still encrypted after decryption attempt`);
-            return null;
-        }
-
-        return event;
+    public _unstable_addStickyEvents(events: MatrixEvent[]): Promise<void> {
+        return this.stickyEvents.addStickyEvents(events);
     }
 
     /**
