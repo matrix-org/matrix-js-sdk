@@ -80,13 +80,17 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /** whether {@link backupKeysLoop} is currently running */
     private backupKeysLoopRunning = false;
 
+    /** The logger to use */
+    private readonly logger: Logger;
+
     public constructor(
-        private readonly logger: Logger,
+        logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
+        this.logger = logger.getChild("[RustBackupManager]");
     }
 
     /**
