@@ -1871,6 +1871,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         timeline: EventTimeline,
         paginationToken?: string,
     ): void {
+        // ALWAYS filter out any events that are past retention
+        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
         timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, addToState, timeline, paginationToken);
     }
 
@@ -2461,6 +2463,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     private addThreadedEvents(threadId: string, events: MatrixEvent[], toStartOfTimeline = false): void {
         const thread = this.getThread(threadId);
+        // ALWAYS filter out any events that are past retention
+        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
         if (thread) {
             thread.addEvents(events, toStartOfTimeline);
         } else {
@@ -2474,6 +2478,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
         events.forEach(this.tryApplyRedaction);
+        // ALWAYS filter out any events that are past retention
+        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
@@ -3089,6 +3095,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             throw new Error("duplicateStrategy MUST be either 'replace' or 'ignore'");
         }
 
+        // ALWAYS filter out any events that are past retention
+        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
+
         // sanity check that the live timeline is still live
         this.assertTimelineSetsAreLive();
 
@@ -3483,6 +3492,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     // eslint-disable-next-line
     public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEventsStore["addStickyEvents"]> {
+        // ALWAYS filter out any events that are past retention
+        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
+
         return this.stickyEvents.addStickyEvents(events);
     }
 

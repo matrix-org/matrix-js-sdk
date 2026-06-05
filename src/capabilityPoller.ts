@@ -16,6 +16,8 @@ limitations under the License.
 
 import { type IHttpOpts, type MatrixHttpApi } from "./http-api/index.ts";
 import { type Logger } from "./logger.ts";
+import { TypedEventEmitter } from "./models/typed-event-emitter.ts";
+import { deepCompare } from "./utils.ts";
 
 // How often we update the server capabilities.
 // 6 hours - an arbitrary value, but they should change very infrequently.
@@ -27,7 +29,10 @@ const CAPABILITIES_RETRY_MS = 30 * 1000;
 /**
  * Manages storing and periodically refreshing the server capabilities.
  */
-export abstract class CapabilityPoller<ResponseType> {
+export abstract class CapabilityPoller<ResponseType> extends TypedEventEmitter<
+    "update",
+    { update: (data: ResponseType) => void }
+> {
     protected cached?: ResponseType;
     private retryTimeout?: ReturnType<typeof setTimeout>;
     private refreshTimeout?: ReturnType<typeof setInterval>;
@@ -35,7 +40,10 @@ export abstract class CapabilityPoller<ResponseType> {
     public constructor(
         protected readonly logger: Logger,
         protected readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    ) {}
+        private readonly name: string,
+    ) {
+        super();
+    }
 
     /**
      * Starts periodically fetching the server capabilities.
@@ -62,16 +70,21 @@ export abstract class CapabilityPoller<ResponseType> {
     public abstract fetch(): Promise<ResponseType>;
 
     private poll = async (): Promise<void> => {
+        this.logger.debug("Checking capabilites");
         try {
+            const current = this.cached;
             await this.fetch();
             this.clearTimeouts();
-            this.refreshTimeout = setTimeout(this.poll, CAPABILITIES_CACHE_MS);
-            this.logger.debug("Fetched new server capabilities");
+            this.refreshTimeout = globalThis.setTimeout(this.poll, CAPABILITIES_CACHE_MS);
+            this.logger.debug(`Fetched new server ${this.name}`);
+            if (this.cached && !deepCompare(current, this.cached)) {
+                this.emit("update", this.cached);
+            }
         } catch (e) {
             this.clearTimeouts();
             const howLong = Math.floor(CAPABILITIES_RETRY_MS + Math.random() * 5000);
-            this.retryTimeout = setTimeout(this.poll, howLong);
-            this.logger.warn(`Failed to refresh capabilities: retrying in ${howLong}ms`, e);
+            this.retryTimeout = globalThis.setTimeout(this.poll, howLong);
+            this.logger.warn(`Failed to refresh ${this.name}: retrying in ${howLong}ms`, e);
         }
     };
 

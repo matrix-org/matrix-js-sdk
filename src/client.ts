@@ -249,8 +249,7 @@ import {
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
-import type { RetentionConfigurationResponse } from "./models/room-retention.ts";
-import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { RetentionPolicyService, type RetentionConfigurationResponse } from "./retentionPolicy.ts";
 
 export type Store = IStore;
 
@@ -1334,7 +1333,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
-    private retentionPolicyService: RetentionPolicyService;
+    public readonly retentionPolicyService: RetentionPolicyService;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1976,18 +1975,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public fetchCapabilities(): Promise<Capabilities> {
         return this.serverCapabilitiesService.fetch();
-    }
-
-    /**
-     * Gets the cached retention policy of the homeserver, returning cached ones if available.
-     * If there are no cached retention policies and none can be fetched, throw an exception.
-     *
-     * @returns Promise resolving with The capabilities of the homeserver
-     */
-    public async getRetentionPolicy(): Promise<RetentionConfigurationResponse> {
-        const caps = this.retentionPolicyService.getCached();
-        if (caps) return caps;
-        return this.retentionPolicyService.fetch();
     }
 
     /**

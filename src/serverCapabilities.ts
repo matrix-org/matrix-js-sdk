@@ -15,7 +15,8 @@ limitations under the License.
 */
 
 import { CapabilityPoller } from "./capabilityPoller.ts";
-import { Method } from "./http-api/index.ts";
+import { IHttpOpts, MatrixHttpApi, Method } from "./http-api/index.ts";
+import { Logger } from "./logger.ts";
 
 export interface ICapability {
     enabled: boolean;
@@ -71,6 +72,9 @@ type CapabilitiesResponse = {
  * Manages storing and periodically refreshing the server capabilities.
  */
 export class ServerCapabilities extends CapabilityPoller<Capabilities> {
+    public constructor(logger: Logger, http: MatrixHttpApi<IHttpOpts & { onlyData: true }>) {
+        super(logger, http, "server capabilities");
+    }
     /**
      * Fetches the latest server capabilities from the homeserver and returns them, or rejects
      * on failure.

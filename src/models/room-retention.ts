@@ -19,7 +19,6 @@ import { RoomEvent, type Room } from "./room.ts";
 import { RoomStateEvent, type RoomState } from "./room-state.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { EventType } from "../@types/event.ts";
-import { type RetentionConfigurationResponse } from "../retentionPolicy.ts";
 
 /**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
@@ -37,34 +36,51 @@ export class RoomRetentionPolicy {
 
     public constructor(private readonly room: Room) {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
-        // Only bind RoomEvent.Timeline once we know we have a retention policy.
-        room.on(RoomStateEvent.Events, (...params) => {
-            void (async (): Promise<void> => {
-                try {
-                    this.roomStateUpdate(...params);
-                } catch (ex) {
-                    this.logger.warn("Failed to calculate new retention rules", ex);
-                }
-            })();
-        });
-    }
 
-    private readonly roomStateUpdate = (event: MatrixEvent, state: RoomState, prevEvent: MatrixEvent | null): void => {
-        // TODO: Make this cheaper.
-        if (this.maxRetention) {
-            // If we *have* a room retention policy, only update if a state event appears.
+        // Recalculate on room state update.
+        room.on(RoomStateEvent.Events, (event) => {
             if (
                 event.getStateKey() !== "" ||
                 (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
             ) {
                 return;
             }
-        } // otherwise, call this every time we see a state update.
+            void this.handleRetentionUpdate();
+        });
 
-        this.logger.info("roomStateUpdate", event.getType(), event.getContent());
+        // Recalculate our retention whenever the global policy changes.
+        this.room.client.retentionPolicyService.on("update", () => {
+            this.logger.info("Got global retention policy update!");
+            void this.handleRetentionUpdate();
+        });
+        // Do an initial check on construction.
+        void this.handleRetentionUpdate();
+
+        // Only bind RoomEvent.Timeline once we know we have a retention policy.
+    }
+
+    public shouldEventBeRetained(ev: MatrixEvent): boolean {
+        if (!this.maxRetention) {
+            return true;
+        }
+        const expireBefore = Date.now() - this.maxRetention;
+        return ev.getTs() > expireBefore;
+    }
+
+    private readonly handleRetentionUpdate = async (): Promise<void> => {
+        // First store if we currently have a retention period.
         const hadRetentionPeriod = this.maxRetention !== null;
-        this.currentStateUpdated(state);
+
+        try {
+            await this.recalculateRetention(this.room.currentState);
+        } catch (err) {
+            this.logger.warn("Failed to recalculate retention policy", err);
+            return;
+        }
+
+        // Bind/unbind the Timeline event handler based on whether we should be running retention.
         if (hadRetentionPeriod !== (this.maxRetention !== null)) {
+            this.logger.info("retention recalculated to be", this.maxRetention);
             // We've changed
             if (this.maxRetention) {
                 this.room.on(RoomEvent.Timeline, this.timelineUpdated);
@@ -74,17 +90,14 @@ export class RoomRetentionPolicy {
         }
     };
 
-    private readonly currentStateUpdated = async (roomState: RoomState): Promise<void> => {
+    private readonly recalculateRetention = async (roomState: RoomState): Promise<void> => {
         const unstableEvent = roomState
             .getStateEvents("org.matrix.msc1763.retention")
             .find((e) => e.getStateKey() === "");
         const stableEvent = roomState.getStateEvents("m.room.retention").find((e) => e.getStateKey() === "");
-        this.logger.info("currentStateUpdated", unstableEvent, stableEvent);
 
         // TODO: Error handle.
-        const serverPolicy: RetentionConfigurationResponse | null = await this.room.client
-            .getRetentionPolicy()
-            .catch((ex) => null);
+        const serverPolicy = await this.room.client.retentionPolicyService.getCached();
 
         const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
         const roomStatePolicy = unstableEvent?.getContent() ?? stableEvent?.getContent();
@@ -139,7 +152,6 @@ export class RoomRetentionPolicy {
             );
         }
 
-        this.logger.info("calculated new maxLifetime", maxLifetime, "ms");
         this.processTimeline();
     };
 
@@ -167,10 +179,10 @@ export class RoomRetentionPolicy {
         const events = this.room
             .getLiveTimeline()
             .getEvents()
-            .filter((ev) => ev.getStateKey() === undefined || ev.isRedacted() || ev.getType() === "m.room.redacation");
+            .filter((ev) => ev.getStateKey() === undefined && !ev.isRedacted() && ev.getType() !== "m.room.redaction");
 
         const expiredEvents = events.filter((ev) => ev.getTs() < expireBefore);
-        const [earliestExpiringEvent] = events.filter((ev) => ev.getTs() >= expireBefore).sort((ev) => ev.getTs());
+        const [earliestExpiringEvent] = events.filter((ev) => ev.getTs() >= expireBefore).sort((a, b) => a.getTs() - b.getTs());
 
         if (earliestExpiringEvent) {
             const nextTs = earliestExpiringEvent.getTs() + this.maxRetention - Date.now();
