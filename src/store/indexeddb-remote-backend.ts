@@ -158,8 +158,8 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         await this.doCmd("removeUserProfiles", [userIds]);
     }
 
-    public async vapeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
-        await this.doCmd("vapeEventsFromRoom", [roomId, eventIds]);
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        await this.doCmd("removeEventsFromRoom", [roomId, eventIds]);
     }
 
     private ensureStarted(): Promise<void> {

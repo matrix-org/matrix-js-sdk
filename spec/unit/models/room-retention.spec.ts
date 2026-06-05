@@ -28,16 +28,14 @@ const ONE_WEEK_MS = 7 * ONE_DAY_MS;
 describe("RoomRetentionPolicy", () => {
     let room: Room;
     let getCachedMock: ReturnType<typeof vi.fn>;
-    let vapeEventsFromRoom: ReturnType<typeof vi.fn>;
+    let removeEventsFromRoom: ReturnType<typeof vi.fn>;
     let retentionPolicyUpdateHandler: (() => void) | undefined;
     let eventCounter = 0;
 
-    // Access the private retention policy via the room instance
     function getPolicy(): RoomRetentionPolicy {
         return (room as unknown as { retention: RoomRetentionPolicy }).retention;
     }
 
-    // Trigger a policy recalculation using the current getCachedMock return value
     async function applyPolicy(): Promise<void> {
         retentionPolicyUpdateHandler!();
         await flushPromises();
@@ -71,7 +69,7 @@ describe("RoomRetentionPolicy", () => {
         eventCounter = 0;
         retentionPolicyUpdateHandler = undefined;
         getCachedMock = vi.fn().mockResolvedValue(undefined);
-        vapeEventsFromRoom = vi.fn().mockResolvedValue(undefined);
+        removeEventsFromRoom = vi.fn().mockResolvedValue(undefined);
 
         const mockClient = {
             supportsThreads: vi.fn().mockReturnValue(true),
@@ -83,7 +81,7 @@ describe("RoomRetentionPolicy", () => {
                 }),
                 getCached: getCachedMock,
             },
-            store: { vapeEventsFromRoom },
+            store: { removeEventsFromRoom },
             // Enable retention so Room creates a RoomRetentionPolicy and addLiveEvents works
             _unstable_shouldApplyMessageRetention: true,
         } as unknown as MockedObject<MatrixClient>;
@@ -239,15 +237,15 @@ describe("RoomRetentionPolicy", () => {
             expect(redactSpy.mock.calls[0][0].event.redacts).toBe(expiredEvent.getId());
         });
 
-        it("calls vapeEventsFromRoom for expired events", async () => {
+        it("calls removeEventsFromRoom for expired events", async () => {
             const expiredEvent = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS);
             await room.addLiveEvents([expiredEvent], { addToState: false });
 
             getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
-            await flushPromises(); // vapeEventsFromRoom is fire-and-forget
+            await flushPromises(); // removeEventsFromRoom is fire-and-forget
 
-            expect(vapeEventsFromRoom).toHaveBeenCalledWith(ROOM_ID, [expiredEvent.getId()]);
+            expect(removeEventsFromRoom).toHaveBeenCalledWith(ROOM_ID, [expiredEvent.getId()]);
         });
 
         it("does not include state events in expiry processing", async () => {
@@ -472,6 +470,13 @@ describe("RoomRetentionPolicy", () => {
             // Only one timer should be pending; advance past the debounce
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
             vi.advanceTimersByTime(200);
+
+            // processTimeline ran once; no expired events
+            expect(redactSpy).not.toHaveBeenCalled();
+        });
+    });
+});
+ime(200);
 
             // processTimeline ran once; no expired events
             expect(redactSpy).not.toHaveBeenCalled();

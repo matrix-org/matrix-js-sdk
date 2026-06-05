@@ -782,7 +782,7 @@ export class SyncAccumulator {
         return this.nextBatch!;
     }
 
-    public vapeEventsFromRoom(roomId: string, eventIds: string[]): void {
+    public removeEventsFromRoom(roomId: string, eventIds: string[]): void {
         this.joinRooms[roomId]._timeline = this.joinRooms[roomId]._timeline.filter(
             (ev) => !eventIds.includes(ev.event.event_id),
         );

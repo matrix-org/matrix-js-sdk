@@ -455,7 +455,7 @@ export class MemoryStore implements IStore {
         userIds.forEach((userId) => this.userProfiles.delete(userId));
     }
 
-    public async vapeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
         // Can ignore as there is no backing store.
     }
 

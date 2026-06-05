@@ -221,7 +221,7 @@ export class RoomRetentionPolicy {
         }
         // TODO: Asyncify
         void this.store
-            .vapeEventsFromRoom(
+            .removeEventsFromRoom(
                 this.room.roomId,
                 expiredEvents.map((e) => e.getId()!),
             )

@@ -274,11 +274,12 @@ export interface IStore {
     getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
 
     /**
-     * TODO
-     * @param roomId
-     * @param eventIds
+     * Remove all stored events matching the given IDs from the stored accumulated
+     * sync.
+     * @param roomId The target room.
+     * @param eventIds IDs of events to remove.
      */
-    vapeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void>;
+    removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void>;
 
     /**
      * Stop the store and perform any appropriate cleanup
