@@ -102,7 +102,6 @@ export class RoomRetentionPolicy {
             .find((e) => e.getStateKey() === "");
         const stableEvent = roomState.getStateEvents("m.room.retention").find((e) => e.getStateKey() === "");
 
-        // TODO: Error handle.
         const serverPolicy = await this.retentionService.getCached();
 
         const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
@@ -219,14 +218,13 @@ export class RoomRetentionPolicy {
                 }),
             );
         }
-        // TODO: Asyncify
         void this.store
             .removeEventsFromRoom(
                 this.room.roomId,
                 expiredEvents.map((e) => e.getId()!),
             )
             .catch((ex) => {
-                this.logger.warn(`Failed to vape events from store`, ex);
+                this.logger.warn(`Failed to remove events from store`, ex);
             });
     }
 }

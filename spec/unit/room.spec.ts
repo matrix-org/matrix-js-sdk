@@ -4344,6 +4344,7 @@ describe("Room", function () {
             content: {
                 msc4354_sticky_key: "foobar",
             },
+            origin_server_ts: 0,
             sender: "@alice:example.org",
             unsigned: {},
         };
