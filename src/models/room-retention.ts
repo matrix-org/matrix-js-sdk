@@ -102,7 +102,7 @@ export class RoomRetentionPolicy {
             .find((e) => e.getStateKey() === "");
         const stableEvent = roomState.getStateEvents("m.room.retention").find((e) => e.getStateKey() === "");
 
-        const serverPolicy = await this.retentionService.getCached();
+        const serverPolicy = this.retentionService.getCached();
 
         const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
         const roomStatePolicy = unstableEvent?.getContent() ?? stableEvent?.getContent();
