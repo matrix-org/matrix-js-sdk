@@ -249,7 +249,7 @@ import {
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
-import { RetentionPolicyService, type RetentionConfigurationResponse } from "./retentionPolicy.ts";
+import { RetentionPolicyService } from "./retentionPolicy.ts";
 
 export type Store = IStore;
 
@@ -1541,7 +1541,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
-        if (opts?.unstableMSC1763Retention) {
+        if (this._unstable_shouldApplyMessageRetention) {
             this.retentionPolicyService?.start();
         }
     }
