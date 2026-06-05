@@ -29,7 +29,7 @@ describe("Relations", function () {
     });
 
     it("should deduplicate annotations", function () {
-        const room = new Room("room123", null!, null!);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
         const relations = new Relations("m.annotation", "m.reaction", room);
 
         // Create an instance of an annotation
@@ -193,7 +193,7 @@ describe("Relations", function () {
 
         // Add the target event first, then the relation event
         {
-            const room = new Room("room123", null!, null!);
+            const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
             const relationsCreated = new Promise((resolve) => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
@@ -207,7 +207,7 @@ describe("Relations", function () {
 
         // Add the relation event first, then the target event
         {
-            const room = new Room("room123", null!, null!);
+            const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
             const relationsCreated = new Promise((resolve) => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
@@ -221,7 +221,7 @@ describe("Relations", function () {
     });
 
     it("should re-use Relations between all timeline sets in a room", async () => {
-        const room = new Room("room123", null!, null!);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
         const timelineSet1 = new EventTimelineSet(room);
         const timelineSet2 = new EventTimelineSet(room);
         expect(room.relations).toBe(timelineSet1.relations);
@@ -230,7 +230,7 @@ describe("Relations", function () {
 
     it("should ignore m.replace for state events", async () => {
         const userId = "@bob:example.com";
-        const room = new Room("room123", null!, userId);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), userId);
         const relations = new Relations("m.replace", "m.room.topic", room);
 
         // Create an instance of a state event with rel_type m.replace
