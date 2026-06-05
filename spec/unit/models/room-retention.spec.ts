@@ -476,10 +476,3 @@ describe("RoomRetentionPolicy", () => {
         });
     });
 });
-ime(200);
-
-            // processTimeline ran once; no expired events
-            expect(redactSpy).not.toHaveBeenCalled();
-        });
-    });
-});
