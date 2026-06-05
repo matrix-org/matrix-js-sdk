@@ -17,7 +17,7 @@ limitations under the License.
 import { type MockedObject } from "vitest";
 
 import { EventType, type MatrixClient, MatrixEvent, Room, RoomEvent, RoomStateEvent } from "../../../src";
-import { type RoomRetentionPolicy } from "../../../src/models/room-retention";
+import type { RoomRetentionPolicy } from "../../../src/models/room-retention";
 import { flushPromises } from "../../test-utils/flushPromises";
 
 const ROOM_ID = "!room:example.org";
@@ -288,9 +288,7 @@ describe("RoomRetentionPolicy", () => {
             expect(redactSpy).toHaveBeenCalledOnce();
         });
 
-        it("schedules next check based on the earliest-expiring event, not the latest", async () => {
-            // BUG: A wrong sort comparator causes the LATEST-expiring event to be scheduled,
-            // so the EARLIEST-expiring event is not processed on time.
+        it("schedules next check based on the earliest-expiring event", async () => {
             const soonExpiry = 1000; // expires in 1 second
             const laterExpiry = ONE_DAY_MS / 2; // expires in 12 hours
 

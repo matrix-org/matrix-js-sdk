@@ -463,6 +463,11 @@ export interface ICreateClientOpts {
      * Defaults to the built-in global logger; see {@link DebugLogger} for an alternative.
      */
     logger?: Logger;
+
+    /**
+     * Locally remove events past the server global or per room retention setting.
+     */
+    unstableMSC1763Retention?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -546,11 +551,6 @@ export interface IStartClientOpts {
      * Will only work if the server supports MSC4429.
      */
     unstableMSC4429SyncUserProfileFields?: string[];
-
-    /**
-     * Locally remove events past the server global or per room retention setting.
-     */
-    unstableMSC1763Retention?: boolean;
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -1334,6 +1334,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private serverCapabilitiesService: ServerCapabilities;
     public readonly retentionPolicyService: RetentionPolicyService;
+    // eslint-disable-next-line
+    public readonly _unstable_shouldApplyMessageRetention: boolean;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1413,6 +1415,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
         this.retentionPolicyService = new RetentionPolicyService(this.logger, this.http);
+        this._unstable_shouldApplyMessageRetention = opts.unstableMSC1763Retention ?? false;
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1459,11 +1462,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public get store(): Store {
         return this._store;
-    }
-
-    // eslint-disable-next-line
-    public get _unstable_shouldApplyMessageRetention(): boolean {
-        return !!this.clientOpts?.unstableMSC1763Retention;
     }
 
     /**
@@ -6219,19 +6217,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
             })
         ).rtc_transports;
-    }
-
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    public async _unstable_getMessageRetentionConfiguration(): Promise<RetentionConfigurationResponse> {
-        return await this.http.authedRequest<RetentionConfigurationResponse>(
-            Method.Get,
-            "/retention/configuration",
-            undefined,
-            undefined,
-            {
-                prefix: `${ClientPrefix.Unstable}/org.matrix.msc1763`,
-            },
-        );
     }
 
     /**

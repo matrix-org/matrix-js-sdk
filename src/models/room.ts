@@ -535,7 +535,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.membersPromise = undefined;
         }
         if (this.client._unstable_shouldApplyMessageRetention) {
-            this.retention = new RoomRetentionPolicy(this);
+            this.retention = new RoomRetentionPolicy(this, client.retentionPolicyService, client.store);
         }
     }
 
@@ -2389,6 +2389,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         threadId?: string;
     } {
         if (!this.client?.supportsThreads()) {
+            console.log("no thready!");
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -2408,6 +2409,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const parentEventId = event.getAssociatedId();
         const threadRootId = event.threadRootId;
 
+        console.log("eventShouldLiveIn", isThreadRelation, parentEventId, threadRootId);
         // Where the parent is the thread root and this is a non-thread relation this should live only in the main timeline
         if (!!parentEventId && !isThreadRelation && (threadRootId === parentEventId || roots?.has(parentEventId!))) {
             return {
@@ -2462,9 +2464,8 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     private addThreadedEvents(threadId: string, events: MatrixEvent[], toStartOfTimeline = false): void {
+        console.log("AddThreadedEvents", threadId);
         const thread = this.getThread(threadId);
-        // ALWAYS filter out any events that are past retention
-        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
         if (thread) {
             thread.addEvents(events, toStartOfTimeline);
         } else {
@@ -2477,13 +2478,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Adds events to a thread's timeline. Will fire "Thread.update"
      */
     public processThreadedEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
-        events.forEach(this.tryApplyRedaction);
         // ALWAYS filter out any events that are past retention
         events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
+        events.forEach(this.tryApplyRedaction);
 
         const eventsByThread: { [threadId: string]: MatrixEvent[] } = {};
         for (const event of events) {
             const { threadId, shouldLiveInThread } = this.eventShouldLiveIn(event);
+            console.log("processThreadedEvents", threadId, shouldLiveInThread);
             if (shouldLiveInThread && !eventsByThread[threadId!]) {
                 eventsByThread[threadId!] = [];
             }

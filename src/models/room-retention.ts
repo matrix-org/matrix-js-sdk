@@ -19,6 +19,8 @@ import { RoomEvent, type Room } from "./room.ts";
 import { RoomStateEvent, type RoomState } from "./room-state.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { EventType } from "../@types/event.ts";
+import type { RetentionPolicyService } from "../retentionPolicy.ts";
+import type { IStore } from "../store/index.ts";
 
 /**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
@@ -34,7 +36,11 @@ export class RoomRetentionPolicy {
     private retentionTimeout?: ReturnType<typeof setTimeout>;
     private readonly logger: Logger;
 
-    public constructor(private readonly room: Room) {
+    public constructor(
+        private readonly room: Room,
+        private readonly retentionService: RetentionPolicyService,
+        private readonly store: IStore,
+    ) {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
 
         // Recalculate on room state update.
@@ -49,7 +55,7 @@ export class RoomRetentionPolicy {
         });
 
         // Recalculate our retention whenever the global policy changes.
-        this.room.client.retentionPolicyService.on("update", () => {
+        this.retentionService.on("update", () => {
             this.logger.info("Got global retention policy update!");
             void this.handleRetentionUpdate();
         });
@@ -97,7 +103,7 @@ export class RoomRetentionPolicy {
         const stableEvent = roomState.getStateEvents("m.room.retention").find((e) => e.getStateKey() === "");
 
         // TODO: Error handle.
-        const serverPolicy = await this.room.client.retentionPolicyService.getCached();
+        const serverPolicy = await this.retentionService.getCached();
 
         const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
         const roomStatePolicy = unstableEvent?.getContent() ?? stableEvent?.getContent();
@@ -182,7 +188,9 @@ export class RoomRetentionPolicy {
             .filter((ev) => ev.getStateKey() === undefined && !ev.isRedacted() && ev.getType() !== "m.room.redaction");
 
         const expiredEvents = events.filter((ev) => ev.getTs() < expireBefore);
-        const [earliestExpiringEvent] = events.filter((ev) => ev.getTs() >= expireBefore).sort((a, b) => a.getTs() - b.getTs());
+        const [earliestExpiringEvent] = events
+            .filter((ev) => ev.getTs() >= expireBefore)
+            .sort((a, b) => a.getTs() - b.getTs());
 
         if (earliestExpiringEvent) {
             const nextTs = earliestExpiringEvent.getTs() + this.maxRetention - Date.now();
@@ -212,7 +220,7 @@ export class RoomRetentionPolicy {
             );
         }
         // TODO: Asyncify
-        void this.room.client.store
+        void this.store
             .vapeEventsFromRoom(
                 this.room.roomId,
                 expiredEvents.map((e) => e.getId()!),

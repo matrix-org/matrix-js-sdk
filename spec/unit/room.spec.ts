@@ -35,10 +35,12 @@ import {
     type IEvent,
     type IRelationsRequestOpts,
     type IStateEventWithRoomId,
+    IStickyEvent,
     JoinRule,
-    type MatrixClient,
+    MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
+    MatrixHttpApi,
     PendingEventOrdering,
     PollEvent,
     RelationType,
@@ -58,6 +60,7 @@ import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
 import type { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
+import { RetentionPolicyService } from "../../src/retentionPolicy";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -2024,7 +2027,7 @@ describe("Room", function () {
         });
 
         it("should remove cancelled events from the timeline", function () {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, new MatrixClient({ baseUrl: "http://example.org" }), userA);
             const eventA = utils.mkMessage({
                 room: roomId,
                 user: userA,
@@ -2169,12 +2172,12 @@ describe("Room", function () {
 
     describe("getMyMembership", function () {
         it("should return synced membership if membership isn't available yet", function () {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, new MatrixClient({ baseUrl: "http://example.org" }), userA);
             room.updateMyMembership(KnownMembership.Invite);
             expect(room.getMyMembership()).toEqual(JoinRule.Invite);
         });
         it("should emit a Room.myMembership event on a change", function () {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, new MatrixClient({ baseUrl: "http://example.org" }), userA);
             const events: {
                 membership: string;
                 oldMembership?: string;
@@ -2196,7 +2199,7 @@ describe("Room", function () {
 
     describe("getDMInviter", () => {
         it("should delegate to RoomMember::getDMInviter if available", () => {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, new MatrixClient({ baseUrl: "http://example.org" }), userA);
             room.currentState.markOutOfBandMembersStarted();
             room.currentState.setOutOfBandMembers([
                 new MatrixEvent({
@@ -2214,7 +2217,7 @@ describe("Room", function () {
         });
 
         it("should fall back to summary heroes and return the first one", () => {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, new MatrixClient({ baseUrl: "http://example.org" }), userA);
             room.updateMyMembership(KnownMembership.Invite);
             room.setSummary({
                 "m.heroes": [userA, userC],
@@ -2226,7 +2229,7 @@ describe("Room", function () {
         });
 
         it("should return undefined if we're not joined or invited to the room", () => {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, new MatrixClient({ baseUrl: "http://example.org" }), userA);
             expect(room.getDMInviter()).toBeUndefined();
             room.updateMyMembership(KnownMembership.Leave);
             expect(room.getDMInviter()).toBeUndefined();
@@ -2265,15 +2268,16 @@ describe("Room", function () {
     });
 
     describe("getAvatarFallbackMember", () => {
+        const client = new MatrixClient({ baseUrl: "any" });
         it("should return undefined if the room isn't a 1:1", () => {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, client, userA);
             room.currentState.setJoinedMemberCount(2);
             room.currentState.setInvitedMemberCount(1);
             expect(room.getAvatarFallbackMember()).toBeUndefined();
         });
 
         it("should use summary heroes member if 1:1", () => {
-            const room = new Room(roomId, null!, userA);
+            const room = new Room(roomId, client, userA);
             room.currentState.markOutOfBandMembersStarted();
             room.currentState.setOutOfBandMembers([
                 new MatrixEvent({
@@ -2293,9 +2297,9 @@ describe("Room", function () {
             expect(room.getAvatarFallbackMember()?.userId).toBe(userD);
         });
 
-        it("should return undefined if the room is a 1:1 plus functional member", async function () {
-            const room = new Room(roomId, null!, userA);
-            await room.currentState.setStateEvents([
+        it("should return undefined if the room is a 1:1 plus functional member", function () {
+            const room = new Room(roomId, client, userA);
+            room.currentState.setStateEvents([
                 utils.mkMembership({
                     user: userA,
                     mship: "join",
@@ -2323,9 +2327,9 @@ describe("Room", function () {
             expect(room.getAvatarFallbackMember()).toBeUndefined();
         });
 
-        it("should pick nonfunctional member from summary heroes if room is a 1:1 plus functional member", async function () {
-            const room = new Room(roomId, null!, userA);
-            await room.currentState.setStateEvents([
+        it("should pick nonfunctional member from summary heroes if room is a 1:1 plus functional member", function () {
+            const room = new Room(roomId, client, userA);
+            room.currentState.setStateEvents([
                 utils.mkMembership({
                     user: userA,
                     mship: "join",
@@ -4298,5 +4302,76 @@ describe("Room", function () {
     it("saves and retrieves the bump stamp", () => {
         room.setBumpStamp(123456789);
         expect(room.getBumpStamp()).toEqual(123456789);
+    });
+
+    describe.only("should handle retention", () => {
+        let room: Room;
+        beforeEach(async () => {
+            vitest.useFakeTimers();
+            const client = vitest.mockObject(
+                new MatrixClient({
+                    baseUrl: "http://example.org",
+                    unstableMSC1763Retention: true,
+                }),
+            );
+            client.retentionPolicyService.getCached = vitest.fn().mockReturnValue({
+                policies: {
+                    "*": {
+                        max_lifetime: 1000,
+                    },
+                },
+            });
+            client.supportsThreads.mockReturnValue(true);
+            room = new Room("!room:id", client, "@my:user");
+        });
+
+        it("should NOT filter live events before the retention period", async () => {
+            const events = [mkMessage({ ts: Date.now() - 999 })];
+            await room.addLiveEvents(events, { addToState: false });
+            expect(room.getLiveTimeline().getEvents()).toHaveLength(1);
+        });
+        it("should filter live events before the retention period", async () => {
+            const events = [mkMessage({ ts: Date.now() - 1000 })];
+            await room.addLiveEvents(events, { addToState: false });
+            expect(room.getLiveTimeline().getEvents()).toHaveLength(0);
+        });
+
+        const stickyEvent: IStickyEvent = {
+            event_id: "$foo:bar",
+            room_id: "!roomId",
+            type: "org.example.any_type",
+            msc4354_sticky: {
+                duration_ms: 15000,
+            },
+            content: {
+                msc4354_sticky_key: "foobar",
+            },
+            sender: "@alice:example.org",
+            unsigned: {},
+        };
+        it("should NOT filter sticky events before the retention period", async () => {
+            const events = [new MatrixEvent({ ...stickyEvent, origin_server_ts: Date.now() - 999 })];
+            room._unstable_addStickyEvents(events);
+            expect([...room._unstable_getStickyEvents()]).toHaveLength(1);
+        });
+        it("should filter sticky events after the retention period", async () => {
+            const events = [new MatrixEvent({ ...stickyEvent, origin_server_ts: Date.now() - 1000 })];
+            room._unstable_addStickyEvents(events);
+            expect([...room._unstable_getStickyEvents()]).toHaveLength(0);
+        });
+        it("should NOT filter threaded events before the retention period", async () => {
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot, { ts: Date.now() - 999 });
+            await room.addLiveEvents([threadRoot], { addToState: false });
+            room.processThreadedEvents([threadResponse1], false);
+            expect(room.getThreads()).toHaveLength(1);
+        });
+        it("should filter threaded events after the retention period", async () => {
+            const threadRoot = mkMessage();
+            const threadResponse1 = mkThreadResponse(threadRoot, { ts: Date.now() - 1000 });
+            await room.addLiveEvents([threadRoot], { addToState: false });
+            room.processThreadedEvents([threadResponse1], false);
+            expect(room.getThreads()).toHaveLength(0);
+        });
     });
 });

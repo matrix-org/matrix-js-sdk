@@ -20,7 +20,7 @@ import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations, RelationsEvent } from "../../src/models/relations";
 import { TestClient } from "../TestClient";
-import { RelationType } from "../../src";
+import { MatrixClient, RelationType } from "../../src";
 import { logger } from "../../src/logger";
 
 describe("Relations", function () {
@@ -86,7 +86,7 @@ describe("Relations", function () {
         const relationType = RelationType.Reference;
         const eventType = M_POLL_START.stable!;
         const altEventTypes = [M_POLL_START.unstable!];
-        const room = new Room("room123", null!, null!);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
 
         it("should not add events without a relation", async () => {
             // dont pollute console
