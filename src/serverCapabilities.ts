@@ -15,8 +15,8 @@ limitations under the License.
 */
 
 import { CapabilityPoller } from "./capabilityPoller.ts";
-import { IHttpOpts, MatrixHttpApi, Method } from "./http-api/index.ts";
-import { Logger } from "./logger.ts";
+import { type IHttpOpts, type MatrixHttpApi, Method } from "./http-api/index.ts";
+import type { Logger } from "./logger.ts";
 
 export interface ICapability {
     enabled: boolean;

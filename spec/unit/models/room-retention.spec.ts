@@ -463,7 +463,7 @@ describe("RoomRetentionPolicy", () => {
 
             // Emit several rapid timeline update events (simulating a burst of live events)
             for (let i = 0; i < 5; i++) {
-                room.emit(RoomEvent.Timeline, recentEvent, room, undefined, false, { liveEvent: true });
+                room.emit(RoomEvent.Timeline, recentEvent, room, undefined, false, { liveEvent: true } as any);
             }
             await flushPromises();
 

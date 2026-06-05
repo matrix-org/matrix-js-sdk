@@ -35,12 +35,11 @@ import {
     type IEvent,
     type IRelationsRequestOpts,
     type IStateEventWithRoomId,
-    IStickyEvent,
+    type IStickyEvent,
     JoinRule,
     MatrixClient,
     MatrixEvent,
     MatrixEventEvent,
-    MatrixHttpApi,
     PendingEventOrdering,
     PollEvent,
     RelationType,
@@ -60,7 +59,6 @@ import { logger } from "../../src/logger";
 import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
 import type { CryptoBackend } from "../../src/common-crypto/CryptoBackend";
-import { RetentionPolicyService } from "../../src/retentionPolicy";
 
 describe("Room", function () {
     const roomId = "!foo:bar";
@@ -4304,7 +4302,7 @@ describe("Room", function () {
         expect(room.getBumpStamp()).toEqual(123456789);
     });
 
-    describe.only("should handle retention", () => {
+    describe("should handle retention", () => {
         let room: Room;
         beforeEach(async () => {
             vitest.useFakeTimers();
