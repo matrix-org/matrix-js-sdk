@@ -68,7 +68,7 @@ describe("RoomRetentionPolicy", () => {
         vi.useFakeTimers();
         eventCounter = 0;
         retentionPolicyUpdateHandler = undefined;
-        getCachedMock = vi.fn().mockResolvedValue(undefined);
+        getCachedMock = vi.fn().mockReturnValue(undefined);
         removeEventsFromRoom = vi.fn().mockResolvedValue(undefined);
 
         const mockClient = {
@@ -101,14 +101,14 @@ describe("RoomRetentionPolicy", () => {
         });
 
         it("retains recent events within max_lifetime", async () => {
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
             await applyPolicy();
 
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(Date.now() - 1000))).toBe(true);
         });
 
         it("does not retain events older than max_lifetime", async () => {
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
             await applyPolicy();
 
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(Date.now() - ONE_WEEK_MS - 1000))).toBe(false);
@@ -152,7 +152,7 @@ describe("RoomRetentionPolicy", () => {
         it("server room-specific policy overrides room state policy", async () => {
             // Room state says 1 day, server says 1 week for this specific room
             room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_DAY_MS })]);
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
             await applyPolicy();
 
             // A 2-day-old event should be retained (server says 1 week)
@@ -162,7 +162,7 @@ describe("RoomRetentionPolicy", () => {
         });
 
         it("uses server wildcard policy when no room-specific policy exists", async () => {
-            getCachedMock.mockResolvedValue({ policies: { "*": { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { "*": { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(Date.now() - ONE_DAY_MS - 1000))).toBe(false);
@@ -171,7 +171,7 @@ describe("RoomRetentionPolicy", () => {
         it("clamps room state max_lifetime to server maximum limit", async () => {
             // Room says 1 week, server caps max at 1 day — effective policy is 1 day
             room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_WEEK_MS })]);
-            getCachedMock.mockResolvedValue({ limits: { max_lifetime: { max: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ limits: { max_lifetime: { max: ONE_DAY_MS } } });
             await applyPolicy();
 
             // 2-day-old event should be expired (clamped down to 1 day)
@@ -181,7 +181,7 @@ describe("RoomRetentionPolicy", () => {
         it("clamps room state max_lifetime to server minimum limit", async () => {
             // Room says 1 day, server requires minimum 1 week — effective policy is 1 week
             room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_DAY_MS })]);
-            getCachedMock.mockResolvedValue({ limits: { max_lifetime: { min: ONE_WEEK_MS } } });
+            getCachedMock.mockReturnValue({ limits: { max_lifetime: { min: ONE_WEEK_MS } } });
             await applyPolicy();
 
             // A 2-day-old event should still be retained (clamped up to 1 week)
@@ -191,7 +191,7 @@ describe("RoomRetentionPolicy", () => {
         it("uses server min limit when room state has no max_lifetime", async () => {
             // Room state exists but omits max_lifetime; server limit provides the fallback min
             room.currentState.setStateEvents([makeRetentionStateEvent({})]);
-            getCachedMock.mockResolvedValue({ limits: { max_lifetime: { min: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ limits: { max_lifetime: { min: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(Date.now() - ONE_DAY_MS - 1000))).toBe(false);
@@ -204,7 +204,7 @@ describe("RoomRetentionPolicy", () => {
             await room.addLiveEvents([expiredEvent], { addToState: false });
 
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(redactSpy).toHaveBeenCalledOnce();
@@ -218,7 +218,7 @@ describe("RoomRetentionPolicy", () => {
             await room.addLiveEvents([makeMessageEvent(Date.now() - 1000)], { addToState: false });
 
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_WEEK_MS } } });
             await applyPolicy();
 
             expect(redactSpy).not.toHaveBeenCalled();
@@ -230,7 +230,7 @@ describe("RoomRetentionPolicy", () => {
             await room.addLiveEvents([expiredEvent, recentEvent], { addToState: false });
 
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(redactSpy).toHaveBeenCalledOnce();
@@ -241,7 +241,7 @@ describe("RoomRetentionPolicy", () => {
             const expiredEvent = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS);
             await room.addLiveEvents([expiredEvent], { addToState: false });
 
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
             await flushPromises(); // removeEventsFromRoom is fire-and-forget
 
@@ -261,7 +261,7 @@ describe("RoomRetentionPolicy", () => {
             room.currentState.setStateEvents([oldStateEvent]);
 
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             const stateEventRedacted = redactSpy.mock.calls.some(
@@ -276,7 +276,7 @@ describe("RoomRetentionPolicy", () => {
             await room.addLiveEvents([soonToExpire], { addToState: false });
 
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(redactSpy).not.toHaveBeenCalled(); // not expired yet
@@ -296,7 +296,7 @@ describe("RoomRetentionPolicy", () => {
             await room.addLiveEvents([laterToExpire, soonToExpire], { addToState: false });
 
             const redactSpy = vi.spyOn(room, "tryApplyRedaction");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(redactSpy).not.toHaveBeenCalled();
@@ -323,7 +323,7 @@ describe("RoomRetentionPolicy", () => {
     describe("event listener binding", () => {
         it("binds timeline listener when retention policy becomes active", async () => {
             const onSpy = vi.spyOn(room, "on");
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             const timelineBindings = onSpy.mock.calls.filter(([event]) => event === RoomEvent.Timeline);
@@ -340,13 +340,13 @@ describe("RoomRetentionPolicy", () => {
         });
 
         it("unbinds timeline listener when retention policy is removed", async () => {
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             const offSpy = vi.spyOn(room, "off");
 
             // Remove the policy
-            getCachedMock.mockResolvedValue(undefined);
+            getCachedMock.mockReturnValue(undefined);
             await applyPolicy();
 
             const timelineUnbindings = offSpy.mock.calls.filter(([event]) => event === RoomEvent.Timeline);
@@ -375,7 +375,7 @@ describe("RoomRetentionPolicy", () => {
         });
 
         it("ignores irrelevant room state events", async () => {
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             const callsBefore = getCachedMock.mock.calls.length;
@@ -414,7 +414,7 @@ describe("RoomRetentionPolicy", () => {
         it("recalculates policy on global retention service update", async () => {
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(0))).toBe(true);
 
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(0))).toBe(false);
@@ -437,7 +437,7 @@ describe("RoomRetentionPolicy", () => {
 
     describe("timeline update debouncing", () => {
         it("processes timeline after the 200ms debounce following a timeline update", async () => {
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             const recentEvent = makeMessageEvent(Date.now() - 1000);
@@ -456,7 +456,7 @@ describe("RoomRetentionPolicy", () => {
         });
 
         it("debounces multiple rapid timeline updates into a single processing pass", async () => {
-            getCachedMock.mockResolvedValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
             await applyPolicy();
 
             const recentEvent = makeMessageEvent(Date.now() - 1000);
