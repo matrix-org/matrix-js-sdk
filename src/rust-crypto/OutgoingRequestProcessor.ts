@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import {
+    DeviceLists,
     KeysBackupRequest,
     KeysClaimRequest,
     KeysQueryRequest,
@@ -26,6 +27,7 @@ import {
     SignatureUploadRequest,
     ToDeviceRequest,
     UploadSigningKeysRequest,
+    UserId,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { type Logger } from "../logger.ts";
@@ -124,6 +126,24 @@ export class OutgoingRequestProcessor {
             }
         } else {
             this.logger.trace(`Outgoing request type:${msg.type} does not have an ID`);
+        }
+
+        // After uploading cross-signing signatures, immediately notify the OlmMachine
+        // that the signed users' device lists have changed. This causes it to schedule
+        // a KeysQueryRequest for those users in the current outgoing-requests loop,
+        // so trust status is updated without waiting for the next /sync to deliver
+        // device_lists.changed.
+        if (msg instanceof SignatureUploadRequest) {
+            const signedUsers = Object.keys(
+                (JSON.parse(msg.body) as { signed_keys: Record<string, unknown> }).signed_keys,
+            );
+            if (signedUsers.length > 0) {
+                const devices = new DeviceLists(
+                    signedUsers.map((u) => new UserId(u)),
+                    [],
+                );
+                await this.olmMachine.receiveSyncChanges("[]", devices, new Map(), undefined);
+            }
         }
     }
 
