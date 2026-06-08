@@ -158,6 +158,10 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
         await this.doCmd("removeUserProfiles", [userIds]);
     }
 
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        await this.doCmd("removeEventsFromRoom", [roomId, eventIds]);
+    }
+
     private ensureStarted(): Promise<void> {
         if (!this.startPromise) {
             this.worker = this.workerFactory();

@@ -71,6 +71,7 @@ export * from "./@types/location.ts";
 export * from "./@types/threepids.ts";
 export * from "./@types/auth.ts";
 export * from "./@types/polls.ts";
+export * from "./@types/retention.ts";
 export type * from "./@types/local_notifications.ts";
 export type * from "./@types/registration.ts";
 export * from "./@types/read_receipts.ts";
