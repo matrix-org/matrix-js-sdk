@@ -21,6 +21,7 @@ import { type Logger, logger as rootLogger } from "../logger.ts";
 import { EventType } from "../@types/event.ts";
 import type { RetentionPolicyService } from "../retentionPolicy.ts";
 import type { IStore } from "../store/index.ts";
+import { ROOM_RETENTION_TYPE, type RoomRetentionContent } from "../@types/retention.ts";
 
 /**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
@@ -97,15 +98,14 @@ export class RoomRetentionPolicy {
     };
 
     private readonly recalculateRetention = async (roomState: RoomState): Promise<void> => {
-        const unstableEvent = roomState
-            .getStateEvents("org.matrix.msc1763.retention")
-            .find((e) => e.getStateKey() === "");
-        const stableEvent = roomState.getStateEvents("m.room.retention").find((e) => e.getStateKey() === "");
+        const unstableEvent = roomState.getStateEvents(ROOM_RETENTION_TYPE.name).find((e) => e.getStateKey() === "");
+        const stableEvent = roomState.getStateEvents(ROOM_RETENTION_TYPE.altName).find((e) => e.getStateKey() === "");
 
         const serverPolicy = this.retentionService.getCached();
 
         const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
-        const roomStatePolicy = unstableEvent?.getContent() ?? stableEvent?.getContent();
+        const roomStatePolicy =
+            unstableEvent?.getContent<RoomRetentionContent>() ?? stableEvent?.getContent<RoomRetentionContent>();
 
         const content =
             // * if the homeserver defines a specific retention policy for this room, then use this policy as the effective retention policy of the room.
