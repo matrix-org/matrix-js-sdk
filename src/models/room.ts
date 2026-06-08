@@ -455,8 +455,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private stickyEvents = new RoomStickyEventsStore();
 
-    //@ts-expect-error
-    private readonly retention: RoomRetentionPolicy;
+    private readonly retention?: RoomRetentionPolicy;
 
     /**
      * Construct a new Room.
