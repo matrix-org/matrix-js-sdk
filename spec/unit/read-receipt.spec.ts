@@ -16,10 +16,10 @@ limitations under the License.
 
 import MockHttpBackend from "matrix-mock-request";
 
-import { MAIN_ROOM_TIMELINE, ReceiptType, type WrappedReceipt } from "../../src/@types/read_receipts";
+import { MAIN_ROOM_TIMELINE, type ReceiptContent, ReceiptType } from "../../src/@types/read_receipts";
 import { MatrixClient } from "../../src/client";
 import { EventType, type MatrixEvent, RelationType, Room, threadIdForReceipt } from "../../src/matrix";
-import { synthesizeReceipt } from "../../src/models/read-receipt";
+import { synthesizeReceipt } from "../../src/models/room-receipts";
 import { encodeUri } from "../../src/utils";
 import * as utils from "../test-utils/test-utils";
 import { flushPromises } from "../test-utils/flushPromises.ts";
@@ -224,42 +224,32 @@ describe("Read receipt", () => {
         });
     });
 
-    describe("addReceiptToStructure", () => {
-        it("should not allow an older unthreaded receipt to clobber a `main` threaded one", () => {
+    describe("addReceipt", () => {
+        function receiptEvent(event: MatrixEvent, userId: string, receiptType: ReceiptType, ts: number): MatrixEvent {
+            const content: ReceiptContent = {
+                [event.getId()!]: {
+                    [receiptType]: {
+                        [userId]: { ts },
+                    },
+                },
+            };
+            return utils.mkEvent({ event: true, type: EventType.Receipt, content, room: ROOM_ID });
+        }
+
+        it("should not allow an older receipt to clobber a newer one of the same type", async () => {
             const userId = client.getSafeUserId();
             const room = new Room(ROOM_ID, client, userId);
-            room.findEventById = vi.fn().mockReturnValue({} as MatrixEvent);
 
-            const unthreadedReceipt: WrappedReceipt = {
-                eventId: "$olderEvent",
-                data: {
-                    ts: 1234567880,
-                },
-            };
-            const mainTimelineReceipt: WrappedReceipt = {
-                eventId: "$newerEvent",
-                data: {
-                    ts: 1234567890,
-                },
-            };
+            const olderEvent = utils.mkMessage({ room: ROOM_ID, user: userId, msg: "older", event: true });
+            const newerEvent = utils.mkMessage({ room: ROOM_ID, user: userId, msg: "newer", event: true });
+            await room.addLiveEvents([olderEvent, newerEvent], { addToState: false });
 
-            room.addReceiptToStructure(
-                mainTimelineReceipt.eventId,
-                ReceiptType.ReadPrivate,
-                userId,
-                mainTimelineReceipt.data,
-                false,
-            );
-            expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
+            room.addReceipt(receiptEvent(newerEvent, userId, ReceiptType.ReadPrivate, 1234567890));
+            expect(room.getEventReadUpTo(userId)).toBe(newerEvent.getId());
 
-            room.addReceiptToStructure(
-                unthreadedReceipt.eventId,
-                ReceiptType.ReadPrivate,
-                userId,
-                unthreadedReceipt.data,
-                false,
-            );
-            expect(room.getEventReadUpTo(userId)).toBe(mainTimelineReceipt.eventId);
+            // An older receipt for the same (user, type) must not overwrite the newer one.
+            room.addReceipt(receiptEvent(olderEvent, userId, ReceiptType.ReadPrivate, 1234567880));
+            expect(room.getEventReadUpTo(userId)).toBe(newerEvent.getId());
         });
     });
 

@@ -1878,11 +1878,7 @@ describe("MatrixClient syncing", () => {
                 const room = client?.getRoom(roomOne);
                 expect(room).toBeInstanceOf(Room);
 
-                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(true);
-
                 const thread = room!.createThread(THREAD_ID, undefined, [], true);
-
-                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(false);
 
                 const receipt = thread.getReadReceiptForUserId("@alice:localhost");
 
@@ -1924,11 +1920,7 @@ describe("MatrixClient syncing", () => {
                 const room = client?.getRoom(roomOne);
                 expect(room).toBeInstanceOf(Room);
 
-                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(true);
-
                 const thread = room!.createThread(THREAD_ID, undefined, [], true);
-
-                expect(room?.cachedThreadReadReceipts.has(THREAD_ID)).toBe(false);
 
                 const receipt = thread.getReadReceiptForUserId("@alice:localhost");
 

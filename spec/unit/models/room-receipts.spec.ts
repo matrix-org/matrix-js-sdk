@@ -19,6 +19,7 @@ import {
     type MatrixClient,
     MatrixEvent,
     type ReceiptContent,
+    ReceiptType,
     THREAD_RELATION_TYPE,
     Thread,
 } from "../../../src";
@@ -371,6 +372,209 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, thread2bId)).toBe(true);
     });
 
+    describe("RoomReceipts public surface", () => {
+        // These tests target the new `RoomReceipts` methods directly. PR 2 will
+        // wire them up to `Room`; until then we go through `getRoomReceipts`.
+
+        describe("getReceiptsForEvent / getUsersReadUpTo", () => {
+            it("returns an empty list when no receipts are known", () => {
+                const room = createRoom();
+                const [, eventId] = createEvent();
+                // Event not pushed into the timeline, so no synthetic receipt is created.
+                expect(getRoomReceipts(room).getReceiptsForEvent(eventId)).toEqual([]);
+                expect(getRoomReceipts(room).getUsersReadUpTo(eventId)).toEqual([]);
+            });
+
+            it("returns the user's receipt cached by event", () => {
+                const room = createRoom();
+                const [event, eventId] = createEvent();
+                room.addReceipt(createReceipt(readerId, event));
+                expect(getRoomReceipts(room).getReceiptsForEvent(eventId)).toEqual([
+                    { type: ReceiptType.Read, userId: readerId, data: { ts: 123 } },
+                ]);
+                expect(getRoomReceipts(room).getUsersReadUpTo(eventId)).toEqual([readerId]);
+            });
+
+            it("preserves insertion order across multiple receipt types for the same user/event", () => {
+                const room = createRoom();
+                const [event, eventId] = createEvent();
+                room.addReceipt(makeMultiTypeReceipt(readerId, event, ["m.delivered", "m.read", "m.seen"]));
+
+                expect(
+                    getRoomReceipts(room)
+                        .getReceiptsForEvent(eventId)
+                        .map((r) => r.type),
+                ).toEqual(["m.delivered", "m.read", "m.seen"]);
+            });
+
+            it("evicts the user's prior cache entry when their receipt moves to a later event", () => {
+                const room = createRoom();
+                const [event1, event1Id] = createEvent();
+                const [event2, event2Id] = createEvent();
+                room.addLiveEvents([event1, event2], { addToState: false });
+
+                room.addReceipt(createReceipt(readerId, event1));
+                expect(
+                    getRoomReceipts(room)
+                        .getReceiptsForEvent(event1Id)
+                        .filter((r) => r.userId === readerId),
+                ).toHaveLength(1);
+
+                room.addReceipt(createReceipt(readerId, event2));
+                expect(
+                    getRoomReceipts(room)
+                        .getReceiptsForEvent(event1Id)
+                        .filter((r) => r.userId === readerId),
+                ).toEqual([]);
+                expect(
+                    getRoomReceipts(room)
+                        .getReceiptsForEvent(event2Id)
+                        .filter((r) => r.userId === readerId),
+                ).toHaveLength(1);
+            });
+
+            it("filters m.fully_read out of getUsersReadUpTo but keeps it in getReceiptsForEvent", () => {
+                const room = createRoom();
+                const [event, eventId] = createEvent();
+                room.addReceipt(makeMultiTypeReceipt(readerId, event, ["m.fully_read", "m.read"]));
+
+                expect(
+                    getRoomReceipts(room)
+                        .getReceiptsForEvent(eventId)
+                        .map((r) => r.type)
+                        .sort(),
+                ).toEqual(["m.fully_read", "m.read"].sort());
+                expect(getRoomReceipts(room).getUsersReadUpTo(eventId)).toEqual([readerId]);
+            });
+
+            it("populates the cache for dangling receipts whose event is not loaded yet", () => {
+                const room = createRoom();
+                const [event, eventId] = createEvent();
+                // Event not added to the timeline — receipt is dangling.
+                room.addReceipt(createReceipt(readerId, event));
+
+                expect(getRoomReceipts(room).getReceiptsForEvent(eventId)).toEqual([
+                    { type: ReceiptType.Read, userId: readerId, data: { ts: 123 } },
+                ]);
+            });
+        });
+
+        describe("synthetic vs real receipts", () => {
+            it("the synthetic wins when it points at a later event", () => {
+                const room = createRoom();
+                const [event1] = createEvent();
+                const [event2, event2Id] = createEvent();
+                room.addLiveEvents([event1, event2], { addToState: false });
+
+                room.addReceipt(createReceipt(readerId, event1));
+                room.addReceipt(createReceipt(readerId, event2), true);
+
+                expect(getRoomReceipts(room).getEventReadUpTo(readerId)).toEqual(event2Id);
+                expect(
+                    getRoomReceipts(room)
+                        .getReceiptsForEvent(event2Id)
+                        .filter((r) => r.userId === readerId),
+                ).toHaveLength(1);
+            });
+
+            it("ignoreSynthesized exposes the most recent real receipt", () => {
+                const room = createRoom();
+                const [event1] = createEvent();
+                const [event2, event2Id] = createEvent();
+                const [event3, event3Id] = createEvent();
+                room.addLiveEvents([event1, event2, event3], { addToState: false });
+
+                room.addReceipt(createReceipt(readerId, event1));
+                room.addReceipt(createReceipt(readerId, event3), true);
+                room.addReceipt(createReceipt(readerId, event2));
+
+                expect(getRoomReceipts(room).getEventReadUpTo(readerId)).toEqual(event3Id);
+                expect(getRoomReceipts(room).getEventReadUpTo(readerId, true)).toEqual(event2Id);
+            });
+        });
+
+        describe("Read vs ReadPrivate precedence", () => {
+            it("getEventReadUpTo prefers the later receipt across types", () => {
+                const room = createRoom();
+                const [event1] = createEvent();
+                const [event2, event2Id] = createEvent();
+                room.addLiveEvents([event1, event2], { addToState: false });
+
+                room.addReceipt(createReceipt(readerId, event1, ReceiptType.Read));
+                room.addReceipt(createReceipt(readerId, event2, ReceiptType.ReadPrivate));
+
+                expect(getRoomReceipts(room).getEventReadUpTo(readerId)).toEqual(event2Id);
+            });
+
+            it("getReadReceiptForUserId can be scoped to a specific receipt type", () => {
+                const room = createRoom();
+                const [event1, event1Id] = createEvent();
+                const [event2, event2Id] = createEvent();
+                room.addLiveEvents([event1, event2], { addToState: false });
+
+                room.addReceipt(createReceipt(readerId, event1, ReceiptType.Read));
+                room.addReceipt(createReceipt(readerId, event2, ReceiptType.ReadPrivate));
+
+                expect(
+                    getRoomReceipts(room).getReadReceiptForUserId(readerId, false, ReceiptType.Read)?.eventId,
+                ).toEqual(event1Id);
+                expect(
+                    getRoomReceipts(room).getReadReceiptForUserId(readerId, false, ReceiptType.ReadPrivate)?.eventId,
+                ).toEqual(event2Id);
+            });
+        });
+
+        describe("getEventReadUpTo validity", () => {
+            it("returns null when the receipt points at an event we don't have", () => {
+                const room = createRoom();
+                const [missing] = createEvent();
+                room.addReceipt(createReceipt(readerId, missing));
+                expect(getRoomReceipts(room).getEventReadUpTo(readerId)).toBeNull();
+            });
+        });
+
+        describe("getLastUnthreadedReceiptFor", () => {
+            it("returns the raw unthreaded Receipt", () => {
+                const room = createRoom();
+                const [event] = createEvent();
+                room.addLiveEvents([event], { addToState: false });
+                room.addReceipt(createReceipt(readerId, event));
+                expect(getRoomReceipts(room).getLastUnthreadedReceiptFor(readerId)).toEqual({ ts: 123 });
+            });
+
+            it("returns undefined when only threaded receipts exist", () => {
+                const room = createRoom();
+                const [root] = createEvent();
+                const [event] = createThreadedEvent(root);
+                setupThread(room, root);
+                room.addLiveEvents([root, event], { addToState: false });
+                room.addReceipt(createThreadedReceipt(readerId, event, root.getId()!));
+                expect(getRoomReceipts(room).getLastUnthreadedReceiptFor(readerId)).toBeUndefined();
+            });
+        });
+
+        describe("getOldestThreadedReceiptTs", () => {
+            it("tracks the minimum ts of threaded receipts per user", () => {
+                const room = createRoom();
+                const [root] = createEvent();
+                const [event1] = createThreadedEvent(root);
+                const [event2] = createThreadedEvent(root);
+                setupThread(room, root);
+                room.addLiveEvents([root, event1, event2], { addToState: false });
+
+                room.addReceipt(threadedReceiptWithTs(readerId, event1, root.getId()!, 500));
+                room.addReceipt(threadedReceiptWithTs(readerId, event2, root.getId()!, 200));
+
+                expect(getRoomReceipts(room).getOldestThreadedReceiptTs(readerId)).toEqual(200);
+            });
+
+            it("returns Infinity if the user has no threaded receipts", () => {
+                const room = createRoom();
+                expect(getRoomReceipts(room).getOldestThreadedReceiptTs(readerId)).toEqual(Infinity);
+            });
+        });
+    });
+
     describe("dangling receipts", () => {
         it("reports unread if the unthreaded receipt is in a dangling state", () => {
             const room = createRoom();
@@ -454,6 +658,25 @@ function createRoom(): Room {
     return new Room("!rid", createFakeClient(), "@u:s.nz", { timelineSupport: true });
 }
 
+// PR 1 of the receipt-storage migration adds the new public surface to
+// `RoomReceipts` but does not yet wire it up to `Room`. Until PR 2 lands,
+// tests for the new methods reach into the private field.
+function getRoomReceipts(room: Room): {
+    getReceiptsForEvent: (eventId: string) => Array<{ type: string; userId: string; data: { ts: number } }>;
+    getUsersReadUpTo: (eventId: string) => string[];
+    getReadReceiptForUserId: (
+        userId: string,
+        ignoreSynthesized?: boolean,
+        receiptType?: ReceiptType,
+    ) => { eventId: string; data: { ts: number } } | null;
+    getEventReadUpTo: (userId: string, ignoreSynthesized?: boolean) => string | null;
+    getLastUnthreadedReceiptFor: (userId: string) => { ts: number } | undefined;
+    getOldestThreadedReceiptTs: (userId: string) => number;
+} {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (room as any).roomReceipts;
+}
+
 let idCounter = 0;
 function nextId(): string {
     return "$" + (idCounter++).toString(10);
@@ -495,10 +718,14 @@ function createThreadedEvent(root: MatrixEvent): [MatrixEvent, string] {
     return [event, event.getId()!];
 }
 
-function createReceipt(userId: string, referencedEvent: MatrixEvent): MatrixEvent {
+function createReceipt(
+    userId: string,
+    referencedEvent: MatrixEvent,
+    receiptType: string = ReceiptType.Read,
+): MatrixEvent {
     const content: ReceiptContent = {
         [referencedEvent.getId()!]: {
-            "m.read": {
+            [receiptType]: {
                 [userId]: {
                     ts: 123,
                 },
@@ -510,6 +737,31 @@ function createReceipt(userId: string, referencedEvent: MatrixEvent): MatrixEven
         type: "m.receipt",
         content,
     });
+}
+
+function makeMultiTypeReceipt(userId: string, referencedEvent: MatrixEvent, receiptTypes: string[]): MatrixEvent {
+    const perType: Record<string, Record<string, { ts: number }>> = {};
+    for (const t of receiptTypes) {
+        perType[t] = { [userId]: { ts: 123 } };
+    }
+    const content: ReceiptContent = { [referencedEvent.getId()!]: perType };
+    return new MatrixEvent({ type: "m.receipt", content });
+}
+
+function threadedReceiptWithTs(
+    userId: string,
+    referencedEvent: MatrixEvent,
+    threadId: string,
+    ts: number,
+): MatrixEvent {
+    const content: ReceiptContent = {
+        [referencedEvent.getId()!]: {
+            "m.read": {
+                [userId]: { ts, thread_id: threadId },
+            },
+        },
+    };
+    return new MatrixEvent({ type: "m.receipt", content });
 }
 
 function createThreadedReceipt(userId: string, referencedEvent: MatrixEvent, threadId: string): MatrixEvent {
