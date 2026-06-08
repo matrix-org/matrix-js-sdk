@@ -533,7 +533,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         } else {
             this.membersPromise = undefined;
         }
-        if (this.client._unstable_shouldApplyMessageRetention) {
+        if (this.client?._unstable_shouldApplyMessageRetention) {
             this.retention = new RoomRetentionPolicy(this, client.retentionPolicyService, client.store);
         }
     }
