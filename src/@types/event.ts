@@ -65,7 +65,7 @@ import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
-import { ROOM_RETENTION_TYPE, type RoomRetentionContent } from "./retention.ts";
+import type { ROOM_RETENTION_TYPE, RoomRetentionContent } from "./retention.ts";
 
 export enum EventType {
     // Room state events
