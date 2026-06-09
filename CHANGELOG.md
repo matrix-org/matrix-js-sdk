@@ -1,3 +1,15 @@
+Changes in [41.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.7.0) (2026-06-09)
+==================================================================================================
+## ✨ Features
+
+* MSC4140: use auth for delayed event management ([#5340](https://github.com/matrix-org/matrix-js-sdk/pull/5340)). Contributed by @AndrewFerr.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] SECURITY: Update matrix-sdk-crypto-wasm to v18.3.1 ([#5356](https://github.com/matrix-org/matrix-js-sdk/pull/5356)). Contributed by @RiotRobot.
+* fix(MatrixRTCSession): replace no-arg .finally() with .then(fn, fn) to fix crash on React Native / Hermes ([#5307](https://github.com/matrix-org/matrix-js-sdk/pull/5307)). Contributed by @JeanLuX.
+
+
 Changes in [41.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.6.0) (2026-05-26)
 ==================================================================================================
 ## 🐛 Bug Fixes
