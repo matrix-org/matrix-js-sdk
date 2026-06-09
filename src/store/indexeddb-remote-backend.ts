@@ -29,7 +29,7 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     private inFlight: Record<number, PromiseWithResolvers<any>> = {}; // seq: promise
     // Once we start connecting, we keep the promise and re-use it
     // if we try to connect again
-    private startPromise?: Promise<void>;
+    private startPromiseResolvers?: PromiseWithResolvers<void>;
     // Callback for when the IndexedDB gets closed unexpectedly
     private onClose?(): void;
 
@@ -163,16 +163,26 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     private ensureStarted(): Promise<void> {
-        if (!this.startPromise) {
-            this.worker = this.workerFactory();
+        if (!this.startPromiseResolvers) {
+            this.startPromiseResolvers = Promise.withResolvers();
+
+            try {
+                this.worker = this.workerFactory();
+            } catch (e) {
+                logger.error("IndexedDB worker failed to start", e);
+                this.startPromiseResolvers.reject(new Error("IndexedDB worker failed to start"));
+                return this.startPromiseResolvers.promise;
+            }
             this.worker.onmessage = this.onWorkerMessage;
+            this.worker.onerror = this.onWorkerError;
 
             // tell the worker the db name.
-            this.startPromise = this.doCmd("setupWorker", [this.dbName]).then(() => {
+            this.doCmd("setupWorker", [this.dbName]).then(() => {
                 logger.log("IndexedDB worker is ready");
+                this.startPromiseResolvers?.resolve();
             });
         }
-        return this.startPromise;
+        return this.startPromiseResolvers.promise;
     }
 
     private doCmd<T>(command: string, args?: any): Promise<T> {
@@ -189,6 +199,11 @@ export class RemoteIndexedDBStoreBackend implements IIndexedDBBackend {
             return def.promise;
         });
     }
+
+    private onWorkerError = (ev: ErrorEvent): void => {
+        logger.error("IndexedDB worker failed to connect", ev);
+        this.startPromiseResolvers?.reject(ev.message ?? new Error("IndexedDB worker failed to connect"));
+    };
 
     private onWorkerMessage = (ev: MessageEvent): void => {
         const msg = ev.data;
