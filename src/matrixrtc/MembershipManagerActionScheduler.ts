@@ -104,10 +104,9 @@ export class ActionScheduler {
                         handlerResult = await this.membershipLoopHandler(nextAction.type as MembershipActionType);
                     } catch (e) {
                         // Preserve the original error as `cause`.
-                        throw new Error(
-                            `The MembershipManager shut down because of the end condition: ${e}`,
-                            { cause: e },
-                        );
+                        throw new Error(`The MembershipManager shut down because of the end condition: ${e}`, {
+                            cause: e,
+                        });
                     }
                 }
                 // remove the processed action only after we are done processing
