@@ -48,6 +48,8 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     public deviceKeys?: IDeviceKeys | null;
     public oneTimeKeys?: Record<string, IOneTimeKey>;
 
+    public readonly _unstable_shouldApplyMessageRetention = false;
+
     constructor(
         public readonly userId?: string,
         public readonly deviceId?: string,

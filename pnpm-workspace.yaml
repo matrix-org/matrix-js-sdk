@@ -10,3 +10,6 @@ overrides:
 
 allowBuilds:
     unrs-resolver: false
+
+minimumReleaseAgeExclude:
+    - "@matrix-org/*"

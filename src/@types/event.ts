@@ -65,6 +65,7 @@ import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import type { ROOM_RETENTION_TYPE, RoomRetentionContent } from "./retention.ts";
 
 export enum EventType {
     // Room state events
@@ -162,6 +163,10 @@ export enum EventType {
 
     // Policy servers
     RoomPolicy = "org.matrix.msc4284.policy",
+
+    // Retention
+    RetentionPolicy = "m.room.retention",
+    RetentionPolicyUnstable = "org.matrix.msc1763.retention",
 }
 
 export enum RelationType {
@@ -396,6 +401,10 @@ export interface StateEvents {
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+
+    // MSC1763
+    [ROOM_RETENTION_TYPE.name]: RoomRetentionContent | EmptyObject;
+    [ROOM_RETENTION_TYPE.altName]: RoomRetentionContent | EmptyObject;
 }
 
 /**
