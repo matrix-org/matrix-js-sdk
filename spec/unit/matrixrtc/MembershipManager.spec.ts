@@ -22,6 +22,7 @@ import {
     HTTPError,
     MatrixError,
     UnsupportedDelayedEventsEndpointError,
+    UnsupportedStickyEventsEndpointError,
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
@@ -1036,6 +1037,27 @@ describe("MembershipManager", () => {
                     // ..once
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
                 });
+            });
+            it("preserves UnsupportedStickyEventsEndpointError on `cause` when wrapping", async () => {
+                const stickyError = new UnsupportedStickyEventsEndpointError(
+                    "Server does not support the sticky events",
+                    "sendStickyEvent",
+                );
+                (client._unstable_sendStickyEvent as Mock<any>).mockRejectedValue(stickyError);
+
+                const unrecoverableError = vi.fn();
+                const memberManager = new StickyEventMembershipManager(
+                    undefined,
+                    room,
+                    client,
+                    callSession,
+                    "@alice:example.org:AAAAAAA_m.call",
+                );
+                memberManager.join([], focus, unrecoverableError);
+                await vi.advanceTimersByTimeAsync(1);
+
+                expect(unrecoverableError).toHaveBeenCalled();
+                expect(unrecoverableError.mock.lastCall![0].cause).toBe(stickyError);
             });
         });
     });
