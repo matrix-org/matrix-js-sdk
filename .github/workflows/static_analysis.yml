@@ -14,7 +14,7 @@ jobs:
         name: "Typescript Syntax Check"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   persist-credentials: false
 
@@ -34,7 +34,7 @@ jobs:
         name: "ESLint"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   persist-credentials: false
 
@@ -54,7 +54,7 @@ jobs:
         name: "Node.js example"
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   persist-credentials: false
 
@@ -88,7 +88,7 @@ jobs:
         permissions:
             security-events: write
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   persist-credentials: false
 
@@ -111,7 +111,7 @@ jobs:
         name: "JSDoc Checker"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   persist-credentials: false
 
@@ -139,7 +139,7 @@ jobs:
         name: "Analyse Dead Code"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   persist-credentials: false
 
@@ -160,7 +160,7 @@ jobs:
         if: github.event_name == 'merge_group'
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
               with:
                   repository: element-hq/element-web
                   persist-credentials: false
