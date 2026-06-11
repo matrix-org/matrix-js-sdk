@@ -90,7 +90,7 @@
         "@stylistic/eslint-plugin": "^5.0.0",
         "@types/debug": "^4.1.7",
         "@types/node": "22",
-        "@types/sdp-transform": "^2.4.5",
+        "@types/sdp-transform": "^3.0.0",
         "@typescript-eslint/eslint-plugin": "^8.0.0",
         "@typescript-eslint/parser": "^8.0.0",
         "@vitest/coverage-v8": "^4.0.17",
