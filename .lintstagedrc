@@ -1,4 +1,4 @@
 {
-    "*.(ts|tsx)": ["eslint --fix", "prettier --write"],
-    "*.(py|md|yaml)": ["prettier --write"]
+    "*.(ts|tsx)": ["eslint --fix", "oxfmt --no-error-on-unmatched-pattern"],
+    "*.(py|md|yaml)": ["oxfmt --no-error-on-unmatched-pattern"]
 }

@@ -484,8 +484,8 @@ function createThreadedEvent(root: MatrixEvent): [MatrixEvent, string] {
         event_id: nextId(),
         content: {
             "m.relates_to": {
-                event_id: rootEventId,
-                rel_type: THREAD_RELATION_TYPE.name,
+                "event_id": rootEventId,
+                "rel_type": THREAD_RELATION_TYPE.name,
                 ["m.in_reply_to"]: {
                     event_id: rootEventId,
                 },

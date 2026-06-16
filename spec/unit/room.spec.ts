@@ -3986,8 +3986,8 @@ describe("Room", function () {
         function roomCreateEvent(newRoomId: string, predecessorRoomId: string | null): MatrixEvent {
             const content: {
                 ["m.federate"]: boolean;
-                room_version: string;
-                predecessor: { event_id: string; room_id: string } | undefined;
+                "room_version": string;
+                "predecessor": { event_id: string; room_id: string } | undefined;
             } = {
                 "predecessor": undefined,
                 "m.federate": true,
