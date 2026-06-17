@@ -26,6 +26,7 @@ import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test
 import { ReEmitter } from "../../../src/ReEmitter";
 import { Feature, ServerSupport } from "../../../src/feature";
 import { eventMapperFor } from "../../../src/event-mapper";
+import { sleep } from "../../../src/utils.ts";
 
 describe("Thread", () => {
     describe("constructor", () => {
@@ -666,6 +667,7 @@ describe("Thread", () => {
                 const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
                 thread.addEvent(messageToEdit, false);
                 thread.addEvent(editEvent, false);
+                await sleep(0); // wait for events to update
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
@@ -698,6 +700,7 @@ describe("Thread", () => {
                     }
                 });
                 thread.addEvent(messageToEdit, false);
+                await sleep(0); // wait for events to update
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
@@ -872,6 +875,7 @@ describe("Thread", () => {
                 for (const event of replayEvents) {
                     thread.addEvent(event, false);
                 }
+                await sleep(0); // wait for events to update
 
                 // After replay, check aggregation
                 const replacingEvent = originalMessage.replacingEvent();
