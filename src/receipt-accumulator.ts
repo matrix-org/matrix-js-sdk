@@ -65,6 +65,7 @@ export class ReceiptAccumulator {
     /**
      * @returns an iterator of pairs of [userId, AccumulatedReceipt] - all the
      *          most recently-received unthreaded receipts for each user.
+     * @yields pairs of [userId, AccumulatedReceipt]
      */
     private allUnthreaded(): IterableIterator<[string, AccumulatedReceipt]> {
         return this.unthreadedReadReceipts.entries();
@@ -74,6 +75,7 @@ export class ReceiptAccumulator {
      * @returns an iterator of pairs of [userId, AccumulatedReceipt] - all the
      *          most recently-received threaded receipts for each user, in all
      *          threads.
+     * @yields pairs of [userId, AccumulatedReceipt]
      */
     private *allThreaded(): IterableIterator<[string, AccumulatedReceipt]> {
         for (const receiptsForThread of this.threadedReadReceipts.values()) {

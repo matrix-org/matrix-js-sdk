@@ -72,7 +72,7 @@ export class FilterComponent {
      * @param event - event to be checked against the filter
      * @returns true if the event matches the filter
      */
-    public check(event: MatrixEvent): boolean {
+    public check = (event: MatrixEvent): boolean => {
         const bundledRelationships = event.getUnsigned()?.["m.relations"] || {};
         const relations: Array<string | RelationType> = Object.keys(bundledRelationships);
         // Relation senders allows in theory a look-up of any senders
@@ -93,7 +93,7 @@ export class FilterComponent {
             relations,
             relationSenders,
         );
-    }
+    };
 
     /**
      * Converts the filter component into the form expected over the wire
@@ -195,7 +195,7 @@ export class FilterComponent {
      * @returns events which matched the filter component
      */
     public filter(events: MatrixEvent[]): MatrixEvent[] {
-        return events.filter(this.check, this);
+        return events.filter(this.check);
     }
 
     /**

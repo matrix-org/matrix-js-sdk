@@ -469,7 +469,7 @@ describe("MatrixClient.clearStores", () => {
 
         await matrixClient.initRustCrypto({ storagePassword: "testKey" });
         expect(await indexedDB.databases()).toHaveLength(2);
-        await matrixClient.stopClient();
+        matrixClient.stopClient();
 
         await matrixClient.clearStores();
         expect(await indexedDB.databases()).toHaveLength(0);
@@ -485,7 +485,7 @@ describe("MatrixClient.clearStores", () => {
             deviceId: "aliceDevice",
         });
 
-        await matrixClient.stopClient();
+        matrixClient.stopClient();
 
         await matrixClient.clearStores();
         // No error thrown in clearStores
@@ -503,7 +503,7 @@ describe("MatrixClient.clearStores", () => {
 
         await matrixClient.initRustCrypto({ cryptoDatabasePrefix: "my-prefix" });
         expect(await indexedDB.databases()).toHaveLength(1);
-        await matrixClient.stopClient();
+        matrixClient.stopClient();
 
         await matrixClient.clearStores({ cryptoDatabasePrefix: "my-prefix" });
         expect(await indexedDB.databases()).toHaveLength(0);

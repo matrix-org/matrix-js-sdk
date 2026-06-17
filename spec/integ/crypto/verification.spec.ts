@@ -169,6 +169,7 @@ describe("verification", () => {
             }
 
             // have alice initiate a verification. She should send a m.key.verification.request
+            // oxlint-disable-next-line prefer-const
             let [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),

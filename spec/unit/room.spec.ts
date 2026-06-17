@@ -174,7 +174,7 @@ describe("Room", function () {
      *
      * @param room - Room to add the message to
      * @param timestamp - Timestamp of the message
-     * @return The message event
+     * @returns The message event
      */
     const mkMessageInRoom = async (room: Room, timestamp: number) => {
         const message = mkMessage({ ts: timestamp });

@@ -1490,10 +1490,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // periodically poll for turn servers if we support voip
         if (this.supportsVoip()) {
             this.checkTurnServersIntervalID = setInterval(() => {
-                this.checkTurnServers();
+                void this.checkTurnServers();
             }, TURN_CHECK_INTERVAL);
-            // noinspection ES6MissingAwait
-            this.checkTurnServers();
+            void this.checkTurnServers();
         }
 
         if (this.syncApi) {
@@ -1534,9 +1533,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
-                this.fetchClientWellKnown();
+                void this.fetchClientWellKnown();
             }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            this.fetchClientWellKnown();
+            void this.fetchClientWellKnown();
         }
 
         this.toDeviceMessageQueue.start();
@@ -1922,7 +1921,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public retryImmediately(): boolean {
         // don't await for this promise: we just want to kick it off
-        this.toDeviceMessageQueue.sendQueue();
+        void this.toDeviceMessageQueue.sendQueue();
         return this.syncApi?.retryImmediately() ?? false;
     }
 
@@ -2056,7 +2055,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
         this.on(RoomStateEvent.Events, rustCrypto.onRoomStateEvent.bind(rustCrypto));
         this.on(ClientEvent.Event, (event) => {
-            rustCrypto.onLiveEventFromSync(event);
+            void rustCrypto.onLiveEventFromSync(event);
         });
 
         // re-emit the events emitted by the crypto impl
@@ -2514,7 +2513,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public resendEvent(event: MatrixEvent, room: Room): Promise<ISendEventResponse> {
         // also kick the to-device queue to retry
-        this.toDeviceMessageQueue.sendQueue();
+        void this.toDeviceMessageQueue.sendQueue();
 
         this.updatePendingEventStatus(room, event, EventStatus.SENDING);
         return this.encryptAndSendEvent(room, event);
@@ -5918,7 +5917,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.isInitialSyncComplete()) {
             if (supportsMatrixCall()) {
                 this.callEventHandler!.start();
-                this.groupCallEventHandler!.start();
+                void this.groupCallEventHandler!.start();
             }
 
             this.off(ClientEvent.Sync, this.startCallEventHandler);
@@ -6432,7 +6431,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (event.shouldAttemptDecryption() && this.getCrypto()) {
-            event.attemptDecryption(this.cryptoBackend!, options);
+            void event.attemptDecryption(this.cryptoBackend!, options);
         }
 
         if (event.isBeingDecrypted()) {
@@ -8836,8 +8835,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!events?.length) return;
         if (!room) return;
 
-        room.currentState.processBeaconEvents(events, this);
-        room.processPollEvents(events);
+        void room.currentState.processBeaconEvents(events, this);
+        void room.processPollEvents(events);
     }
 
     /**

@@ -609,7 +609,7 @@ describe("Thread", () => {
                 room: room.roomId,
                 ts: message1Ts,
             });
-            await thread.addEvent(message1, false, true);
+            thread.addEvent(message1, false, true);
             await awaitTimelineEvent;
 
             // Sanity: the thread now has a properly-added event, so this event
@@ -625,7 +625,7 @@ describe("Thread", () => {
                 room: room.roomId,
                 ts: message2Ts,
             });
-            await thread.addEvent(message2, false, true);
+            thread.addEvent(message2, false, true);
             await awaitTimelineEvent;
 
             return { thread, message1, message2 };
@@ -664,8 +664,8 @@ describe("Thread", () => {
                 // When a message and an edit are added to the thread
                 const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
                 const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
-                await thread.addEvent(messageToEdit, false);
-                await thread.addEvent(editEvent, false);
+                thread.addEvent(messageToEdit, false);
+                thread.addEvent(editEvent, false);
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
@@ -697,7 +697,7 @@ describe("Thread", () => {
                         return { events: [] };
                     }
                 });
-                await thread.addEvent(messageToEdit, false);
+                thread.addEvent(messageToEdit, false);
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
@@ -737,8 +737,8 @@ describe("Thread", () => {
                 const message2 = createThreadMessage(thread.id, user, room, "message2");
                 message2.localTimestamp -= 10000;
 
-                await thread.addEvent(message1, false);
-                await thread.addEvent(message2, false);
+                thread.addEvent(message1, false);
+                thread.addEvent(message2, false);
 
                 // Then both events end up in the timeline
                 expect(thread.timeline.length - prevNumEvents).toEqual(2);
@@ -761,8 +761,8 @@ describe("Thread", () => {
                 const message2 = createThreadMessage(thread.id, user, room, "message2");
                 message2.localTimestamp -= 10000;
 
-                await thread.addEvent(message1, false);
-                await thread.addEvent(message2, true);
+                thread.addEvent(message1, false);
+                thread.addEvent(message2, true);
 
                 // Then both events end up in the timeline
                 expect(thread.timeline.length - prevNumEvents).toEqual(2);
@@ -830,7 +830,7 @@ describe("Thread", () => {
 
                 // CRITICAL: Add edits while thread is NOT initialized
                 // They will be queued in replayEvents and aggregation will be attempted but fail
-                await thread.addEvent(edit1, false);
+                thread.addEvent(edit1, false);
 
                 // Check the aggregation state after adding first edit
                 // With our fix: edits should NOT be aggregated yet (thread not initialized)
@@ -846,8 +846,8 @@ describe("Thread", () => {
                 expect(relationsAfterFirstEdit).toBeUndefined();
 
                 // Add remaining edits
-                await thread.addEvent(edit2, false);
-                await thread.addEvent(edit3, false);
+                thread.addEvent(edit2, false);
+                thread.addEvent(edit3, false);
 
                 // Check that edits went to replayEvents
                 expect(thread.replayEvents).toHaveLength(3);
@@ -860,7 +860,7 @@ describe("Thread", () => {
                 thread.replayEvents = [];
 
                 // Add original message first
-                await thread.addEvent(originalMessage, false);
+                thread.addEvent(originalMessage, false);
 
                 // At this point, the original message should NOT have the edits aggregated yet
                 // because they were attempted when the target wasn't in timeline
@@ -870,7 +870,7 @@ describe("Thread", () => {
 
                 // Then replay the edits
                 for (const event of replayEvents) {
-                    await thread.addEvent(event, false);
+                    thread.addEvent(event, false);
                 }
 
                 // After replay, check aggregation

@@ -37,7 +37,7 @@ describe("Device dehydration", () => {
             deviceId: "aliceDevice",
             cryptoCallbacks: {
                 getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                    return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                 },
             },
             logger: new DebugLogger(debug(`matrix-js-sdk:dehydration`)),
@@ -221,7 +221,7 @@ async function initializeSecretStorage(
     const crypto = matrixClient.getCrypto()! as RustCrypto;
     // we need to process a sync so that the OlmMachine will upload keys
     await crypto.preprocessToDeviceMessages([]);
-    await crypto.onSyncCompleted({});
+    crypto.onSyncCompleted({});
 
     // create initial secret storage
     async function createSecretStorageKey() {
