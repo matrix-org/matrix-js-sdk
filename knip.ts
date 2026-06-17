@@ -41,4 +41,5 @@ export default {
     ignoreExportsUsedInFile: true,
     includeEntryExports: false,
     exclude: ["enumMembers"],
+    treatConfigHintsAsErrors: true,
 } satisfies KnipConfig;
