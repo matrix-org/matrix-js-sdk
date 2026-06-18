@@ -8,7 +8,6 @@
     "options": {
         "typeAware": true,
         "reportUnusedDisableDirectives": "off",
-        "maxWarnings": 0,
         "denyWarnings": true,
     },
     "env": {
@@ -112,8 +111,6 @@
         "typescript/no-implied-eval": "off",
         "typescript/no-misused-spread": "off",
         "promise/valid-params": "off",
-
-        // TEST
     },
     "overrides": [
         {
