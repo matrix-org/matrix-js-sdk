@@ -885,6 +885,7 @@ describe("RustCrypto", () => {
                     asJSON: vi.fn().mockReturnValue("{}"),
                 }),
                 saveBackupDecryptionKey: vi.fn(),
+                enableBackupV1: vi.fn(),
                 exportCrossSigningKeys: vi.fn().mockResolvedValue({
                     masterKey: "sosecret",
                     userSigningKey: "secrets",

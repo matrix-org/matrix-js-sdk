@@ -54,6 +54,7 @@ describe("Upload keys to backup", () => {
             backupRoomKeys: vi.fn(),
             isBackupEnabled: vi.fn().mockResolvedValue(true),
             enableBackupV1: vi.fn(),
+            saveBackupDecryptionKey: vi.fn(),
             verifyBackup: vi.fn().mockResolvedValue({
                 trusted: vi.fn().mockResolvedValue(true),
             } as unknown as RustSdkCryptoJs.SignatureVerification),
@@ -139,5 +140,47 @@ describe("Upload keys to backup", () => {
 
         expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
         expect(mockOlmMachine.roomKeyCounts).toHaveBeenCalledTimes(0);
+    });
+
+    it("Should emit key cached after enabling a newly-created backup", async () => {
+        fetchMock.hardReset();
+        fetchMock.mockGlobal();
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+            status: 404,
+            body: {
+                errcode: "M_NOT_FOUND",
+                error: "No backup found",
+            },
+        });
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "42" });
+
+        await rustBackupManager.checkKeyBackupAndEnable(false);
+
+        const keyCachedEventState = Promise.withResolvers<{
+            activeBackupVersion: string | null;
+            eventVersion: string;
+            serverBackupVersion: string | undefined;
+        }>();
+        rustBackupManager.on(CryptoEvent.KeyBackupDecryptionKeyCached, async (eventVersion) => {
+            const [activeBackupVersion, serverBackupInfo] = await Promise.all([
+                rustBackupManager.getActiveBackupVersion(),
+                rustBackupManager.getServerBackupInfo(),
+            ]);
+            keyCachedEventState.resolve({
+                activeBackupVersion,
+                eventVersion,
+                serverBackupVersion: serverBackupInfo?.version,
+            });
+        });
+
+        await rustBackupManager.setupKeyBackup(async () => {});
+
+        await expect(keyCachedEventState.promise).resolves.toEqual({
+            activeBackupVersion: "42",
+            eventVersion: "42",
+            serverBackupVersion: "42",
+        });
+        expect(mockOlmMachine.enableBackupV1).toHaveBeenCalledWith(expect.any(String), "42");
+        expect(mockOlmMachine.saveBackupDecryptionKey).toHaveBeenCalledWith(expect.anything(), "42");
     });
 });
