@@ -24,7 +24,7 @@
         "lint:js-fix": "oxfmt --log-level=warn --write . && eslint --fix src spec",
         "lint:types": "tsc --noEmit",
         "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
-        "lint:knip": "knip",
+        "lint:knip": "knip && knip --strict --exclude unlisted,dependencies,binaries",
         "test": "vitest run",
         "test:watch": "vitest watch",
         "coverage": "pnpm test --coverage",
