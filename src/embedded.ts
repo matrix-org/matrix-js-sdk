@@ -532,7 +532,7 @@ export class RoomWidgetClient extends MatrixClient {
                 await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
             case UpdateDelayedEventAction.Restart:
-                await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+                await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
             case UpdateDelayedEventAction.Send:
                 await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
