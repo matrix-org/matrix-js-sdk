@@ -582,19 +582,20 @@ describe("megolm-keys backup", () => {
 
             const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
 
-            const uploadPromises = someRoomKeys.map((data) => {
-                new Promise<void>((resolve) => {
-                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
-                        if (
-                            data.room_id == roomId &&
-                            data.session_id == sessionId &&
-                            version == testData.SIGNED_BACKUP_DATA.version
-                        ) {
-                            resolve();
-                        }
-                    });
-                });
-            });
+            const uploadPromises = someRoomKeys.map(
+                (data) =>
+                    new Promise<void>((resolve) => {
+                        uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                            if (
+                                data.room_id == roomId &&
+                                data.session_id == sessionId &&
+                                version == testData.SIGNED_BACKUP_DATA.version
+                            ) {
+                                resolve();
+                            }
+                        });
+                    }),
+            );
 
             fetchMock.modifyRoute("room-keys-version", {
                 response: { status: 200, body: testData.SIGNED_BACKUP_DATA },
@@ -680,15 +681,16 @@ describe("megolm-keys backup", () => {
 
             // If we import a new key the loop will try to upload to old version, it will
             // fail then check the current version and switch if trusted
-            const uploadPromises = someRoomKeys.map((data) => {
-                new Promise<void>((resolve) => {
-                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
-                        if (data.room_id == roomId && data.session_id == sessionId && version == newBackupVersion) {
-                            resolve();
-                        }
-                    });
-                });
-            });
+            const uploadPromises = someRoomKeys.map(
+                (data) =>
+                    new Promise<void>((resolve) => {
+                        uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                            if (data.room_id == roomId && data.session_id == sessionId && version == newBackupVersion) {
+                                resolve();
+                            }
+                        });
+                    }),
+            );
 
             const disableOldBackup = new Promise<void>((resolve) => {
                 aliceClient.on(CryptoEvent.KeyBackupFailed, (errCode) => {

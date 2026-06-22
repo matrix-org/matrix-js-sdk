@@ -231,7 +231,7 @@ describe("initRustCrypto", () => {
             const storeSecretKey = (type: string, key: string) =>
                 encryptAndStoreSecretKey(type, new TextEncoder().encode(key), PICKLE_KEY, legacyStore);
 
-            await legacyStore.storeAccount({}, "not a real account");
+            legacyStore.storeAccount({}, "not a real account");
             await storeSecretKey("m.megolm_backup.v1", "backup key");
             await storeSecretKey("master", "master key");
             await storeSecretKey("self_signing", "ssk");
@@ -361,7 +361,7 @@ describe("initRustCrypto", () => {
             const storeSecretKey = (type: string, key: string) =>
                 storeSecretKeyInClear(type, new TextEncoder().encode(key), legacyStore);
 
-            await legacyStore.storeAccount({}, "not a real account");
+            legacyStore.storeAccount({}, "not a real account");
             await storeSecretKey("master", "master key");
             await storeSecretKey("self_signing", "ssk");
             await storeSecretKey("user_signing", "usk");
@@ -761,7 +761,7 @@ describe("RustCrypto", () => {
     it("bootstrapSecretStorage creates new backup when requested", async () => {
         const secretStorageCallbacks = {
             getSecretStorageKey: async (keys: any, name: string) => {
-                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                return [Object.keys(keys.keys)[0], new Uint8Array(32)];
             },
         } as SecretStorageCallbacks;
         const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -817,7 +817,7 @@ describe("RustCrypto", () => {
     describe("upload existing key backup key to new 4S store", () => {
         const secretStorageCallbacks = {
             getSecretStorageKey: async (keys: any, name: string) => {
-                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                return [Object.keys(keys.keys)[0], new Uint8Array(32)];
             },
         } as SecretStorageCallbacks;
         let secretStorage: ServerSideSecretStorageImpl;
@@ -1623,7 +1623,7 @@ describe("RustCrypto", () => {
         beforeEach(async () => {
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                    return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                 },
             } as SecretStorageCallbacks;
             const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -1868,7 +1868,7 @@ describe("RustCrypto", () => {
         it("should load the dehydration key from SSSS if available", async () => {
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                    return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                 },
             } as SecretStorageCallbacks;
             const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -2018,7 +2018,7 @@ describe("RustCrypto", () => {
                 // Set up a RustCrypto object with secret storage and cross-signing.
                 const secretStorageCallbacks = {
                     getSecretStorageKey: async (keys: any, name: string) => {
-                        return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                        return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                     },
                 } as SecretStorageCallbacks;
                 secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -2636,7 +2636,7 @@ describe("RustCrypto", () => {
             roomId: string | null,
             senderId: string | null,
             eventType: string,
-            msgtype?: string | undefined,
+            msgtype?: string,
         ): MatrixEvent {
             return {
                 isState: vi.fn().mockReturnValue(false),

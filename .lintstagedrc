@@ -1,4 +1,4 @@
 {
-    "*.(ts|tsx)": ["eslint --fix", "oxfmt --no-error-on-unmatched-pattern"],
+    "*.(ts|tsx)": ["oxlint --fix", "oxfmt --no-error-on-unmatched-pattern"],
     "*.(py|md|yaml)": ["oxfmt --no-error-on-unmatched-pattern"]
 }

@@ -231,7 +231,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
      * Calling this will register a response for `/sync`, and then, in the background, flush a single `/sync` request.
      * Try calling {@link syncPromise} to wait for the sync to complete.
      *
-     * @param response - response to /sync request
+     * @param syncResponse - response to /sync request
      */
     public sendOrQueueSyncResponse(syncResponse: object): void {
         this.httpBackend.when("GET", "/sync").respond(200, syncResponse);
@@ -241,7 +241,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     /**
      * flush a single /sync request, and wait for the syncing event
      *
-     * @deprecated: prefer to use {@link #sendOrQueueSyncResponse} followed by {@link syncPromise}.
+     * @deprecated prefer to use {@link #sendOrQueueSyncResponse} followed by {@link syncPromise}.
      */
     public flushSync(): Promise<void> {
         logger.log(`${this}: flushSync`);

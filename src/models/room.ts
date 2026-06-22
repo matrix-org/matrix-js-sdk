@@ -1352,11 +1352,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    private onReceipt(event: MatrixEvent): void {
+    private onReceipt = (event: MatrixEvent): void => {
         if (this.hasEncryptionStateEvent()) {
             this.clearNotificationsOnReceipt(event);
         }
-    }
+    };
 
     private clearNotificationsOnReceipt(event: MatrixEvent): void {
         // Like above, we have to listen for read receipts from ourselves in order to
@@ -1598,9 +1598,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const notification: NotificationCount = {
             highlight: this.threadNotifications.get(threadId)?.highlight,
             total: this.threadNotifications.get(threadId)?.total,
-            ...{
-                [type]: count,
-            },
+            [type]: count,
         };
 
         this.threadNotifications.set(threadId, notification);
@@ -2327,15 +2325,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
-    private onThreadUpdate(thread: Thread): void {
+    private onThreadUpdate = (thread: Thread): void => {
         this.updateThreadRootEvents(thread, false, false);
-    }
+    };
 
-    private onThreadReply(thread: Thread): void {
+    private onThreadReply = (thread: Thread): void => {
         this.updateThreadRootEvents(thread, false, true);
-    }
+    };
 
-    private onThreadDelete(thread: Thread): void {
+    private onThreadDelete = (thread: Thread): void => {
         this.threads.delete(thread.id);
 
         const timeline = this.getTimelineForEvent(thread.id);
@@ -2348,7 +2346,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         for (const timelineSet of this.threadsTimelineSets) {
             timelineSet.removeEvent(thread.id);
         }
-    }
+    };
 
     /**
      * Forget the timelineSet for this room with the given filter

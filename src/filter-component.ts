@@ -195,6 +195,7 @@ export class FilterComponent {
      * @returns events which matched the filter component
      */
     public filter(events: MatrixEvent[]): MatrixEvent[] {
+        // oxlint-disable-next-line typescript/unbound-method
         return events.filter(this.check, this);
     }
 

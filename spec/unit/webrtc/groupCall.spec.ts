@@ -732,7 +732,8 @@ describe("Group Call", function () {
                 const bobDeviceMessage = toDeviceBobDevices?.get(FAKE_DEVICE_ID_2);
                 expect(bobDeviceMessage?.conf_id).toBe(FAKE_CONF_ID);
             } finally {
-                await Promise.all([groupCall1.leave(), groupCall2.leave()]);
+                groupCall1.leave();
+                groupCall2.leave();
             }
         });
 
@@ -795,7 +796,8 @@ describe("Group Call", function () {
 
                 expect(client1.sendToDevice).toHaveBeenCalledWith(EventType.CallInvite, expect.objectContaining({}));
             } finally {
-                await Promise.all([groupCall1.leave(), groupCall2.leave()]);
+                groupCall1.leave();
+                groupCall2.leave();
             }
         });
 
@@ -831,7 +833,8 @@ describe("Group Call", function () {
                 expect(call.setMicrophoneMuted).toHaveBeenCalledWith(false);
                 expect(call.setLocalVideoMuted).toHaveBeenCalledWith(false);
             } finally {
-                await Promise.all([groupCall1.leave(), groupCall2.leave()]);
+                groupCall1.leave();
+                groupCall2.leave();
             }
         });
     });

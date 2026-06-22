@@ -39,7 +39,7 @@ export function timeoutSignal(ms: number): AbortSignal {
 
 export function anySignal(signals: AbortSignal[]): {
     signal: AbortSignal;
-    cleanup(): void;
+    cleanup(this: void): void;
 } {
     const controller = new AbortController();
 
