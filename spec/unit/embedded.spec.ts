@@ -558,7 +558,7 @@ describe("RoomWidgetClient", () => {
                             updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
                             break;
                         case UpdateDelayedEventAction.Restart:
-                            updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
+                            updateDelayedEvent = widgetApi.restartScheduledDelayedEvent;
                             break;
                         case UpdateDelayedEventAction.Send:
                             updateDelayedEvent = widgetApi.sendScheduledDelayedEvent;
