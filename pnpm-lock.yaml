@@ -277,6 +277,9 @@ importers:
       '@babel/plugin-transform-runtime':
         specifier: ^8.0.0
         version: 8.0.1(@babel/core@8.0.1)
+      '@babel/plugin-transform-typescript':
+        specifier: ^8.0.0
+        version: 8.0.1(@babel/core@8.0.1)
       '@babel/preset-env':
         specifier: ^8.0.0
         version: 8.0.2(@babel/core@8.0.1)
