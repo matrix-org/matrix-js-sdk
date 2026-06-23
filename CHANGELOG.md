@@ -1,3 +1,15 @@
+Changes in [41.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.8.0) (2026-06-23)
+==================================================================================================
+## ✨ Features
+
+* MatrixRTC: Preserve original error as `cause` when wrapping in scheduler ([#5363](https://github.com/matrix-org/matrix-js-sdk/pull/5363)). Contributed by @fkwp.
+* Add mechanism to locally enforce MSC1763 retention rules ([#5353](https://github.com/matrix-org/matrix-js-sdk/pull/5353)). Contributed by @Half-Shot.
+
+## 🐛 Bug Fixes
+
+* Fall back to local indexeddb backend when worker fails to start ([#5361](https://github.com/matrix-org/matrix-js-sdk/pull/5361)). Contributed by @t3chguy.
+
+
 Changes in [41.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.7.0) (2026-06-09)
 ==================================================================================================
 ## ✨ Features
