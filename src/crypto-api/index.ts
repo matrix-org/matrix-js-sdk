@@ -74,8 +74,6 @@ export interface StartDehydrationOpts {
 
 /**
  * Public interface to the cryptography parts of the js-sdk
- *
- * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
     /**
