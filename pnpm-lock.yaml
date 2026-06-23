@@ -310,9 +310,6 @@ importers:
       '@vitest/ui':
         specifier: ^4.0.17
         version: 4.1.9(vitest@4.1.9)
-      babel-plugin-search-and-replace:
-        specifier: ^1.1.1
-        version: 1.1.1
       concurrently:
         specifier: ^10.0.0
         version: 10.0.3
@@ -1804,9 +1801,6 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     peerDependencies:
       '@babel/core': ^7.4.0 || ^8.0.0
-
-  babel-plugin-search-and-replace@1.1.1:
-    resolution: {integrity: sha512-fjP2VTF3mxxOUnc96mdK22llH92A6gu7A5AFapJmgnqsQi3bqLduIRP0FpA2r5vRZOYPpnX4rE5izQlpsMBjSA==}
 
   balanced-match@4.0.4:
     resolution: {integrity: sha512-BLrgEcRTwX2o6gGxGOCNyMvGSp35YofuYzw9h1IMTRmKqttAZZVU67bdb9Pr2vUHA8+j3i2tJfjO6C6+4myGTA==}
@@ -4064,8 +4058,6 @@ snapshots:
       '@babel/core': 8.0.1
       '@babel/helper-define-polyfill-provider': 1.0.0(@babel/core@8.0.1)
       core-js-compat: 3.49.0
-
-  babel-plugin-search-and-replace@1.1.1: {}
 
   balanced-match@4.0.4: {}
 

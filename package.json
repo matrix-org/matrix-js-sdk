@@ -90,7 +90,6 @@
         "@types/sdp-transform": "^3.0.0",
         "@vitest/coverage-v8": "^4.0.17",
         "@vitest/ui": "^4.0.17",
-        "babel-plugin-search-and-replace": "^1.1.1",
         "concurrently": "^10.0.0",
         "debug": "^4.3.4",
         "fake-indexeddb": "^5.0.2",
