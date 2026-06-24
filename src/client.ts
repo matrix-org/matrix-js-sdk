@@ -241,11 +241,7 @@ import { type RoomMessageEventContent, type StickerEventContent } from "./@types
 import { type ImageInfo } from "./@types/media.ts";
 import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
-import {
-    discoverAndValidateOIDCIssuerWellKnown,
-    type OidcClientConfig,
-    validateAuthMetadataAndKeys,
-} from "./oidc/index.ts";
+import { type ValidatedAuthMetadata, validateAuthMetadataAndKeys } from "./oidc/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
@@ -8897,32 +8893,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Discover and validate the auth metadata for the OAuth 2.0 API.
      *
-     * Fetches /auth_metadata falling back to legacy implementation using /auth_issuer followed by
-     * https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
      * When successful, validated metadata is returned.
      *
-     * @returns validated authentication metadata and optionally signing keys
+     * @returns validated authentication metadata
      * @throws when delegated auth config is invalid or unreachable
      */
-    public async getAuthMetadata(): Promise<OidcClientConfig> {
-        let authMetadata: unknown | undefined;
-        try {
-            const useStable = await this.isVersionSupported("v1.15");
-            authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
-                prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
-            });
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                // Fall back to older variant of MSC2965
-                const { issuer } = await this.http.request<{
-                    issuer: string;
-                }>(Method.Get, "/auth_issuer", undefined, undefined, {
-                    prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
-                });
-                return discoverAndValidateOIDCIssuerWellKnown(issuer);
-            }
-            throw e;
-        }
+    public async getAuthMetadata(): Promise<ValidatedAuthMetadata> {
+        const useStable = await this.isVersionSupported("v1.15");
+        const authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
+            prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
+        });
 
         return validateAuthMetadataAndKeys(authMetadata);
     }

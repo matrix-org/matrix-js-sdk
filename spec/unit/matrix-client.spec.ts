@@ -3932,31 +3932,6 @@ describe("MatrixClient", function () {
             expect(httpLookups.length).toEqual(0);
         });
 
-        it("should fall back to auth_issuer + openid-configuration", async () => {
-            const metadata = mockOpenIdConfiguration();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-                {
-                    method: "GET",
-                    path: `/auth_issuer`,
-                    data: { issuer: metadata.issuer },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
-
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
-            expect(httpLookups.length).toEqual(0);
-        });
-
         it("should handle no jwks_uri", async () => {
             const { jwks_uri: _, ...metadata } = mockOpenIdConfiguration();
             httpLookups = [
