@@ -1114,7 +1114,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             // Make sure we do not add the alias to the transport.
             // It is not needed in matrix2.0. The additional session information will be used to find the right alias on the sfu.
             rtc_transports: livekitTransport
-                ? [{ type: livekitTransport.type, livekit_service_url: livekitTransport.livekit_service_url }]
+                ? [{ type: livekitTransport.type, livekit_service_url: livekitTransport.livekit_service_url, address: livekitTransport.address }]
                 : [],
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],

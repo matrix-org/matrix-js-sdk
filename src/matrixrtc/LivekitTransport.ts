@@ -19,6 +19,7 @@ import { type Transport } from "./types.ts";
 export interface LivekitTransportConfig extends Transport {
     type: "livekit";
     livekit_service_url: string;
+    address?: string;
 }
 
 export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
