@@ -706,6 +706,20 @@ export interface CryptoApi {
      */
     startDehydration(opts?: StartDehydrationOpts | boolean): Promise<void>;
 
+    /**
+     * Return whether there is a dehydrated device on the server for which this client does not hold the
+     * dehydration key.
+     *
+     * This happens when device dehydration was set up on another of the user's devices, so a dehydrated
+     * device exists on the server, but this device has never received the dehydration key (it is neither
+     * cached locally nor read from Secret Storage). Applications can use this to detect the situation and
+     * prompt the user to unlock Secret Storage so the key can be recovered.
+     *
+     * @returns `true` if a dehydrated device exists on the server but the dehydration key is not held by
+     *     this client; `false` otherwise (no dehydrated device, dehydration unsupported, or key present).
+     */
+    isDehydratedDeviceKeyMissing(): Promise<boolean>;
+
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Import/export of secret keys

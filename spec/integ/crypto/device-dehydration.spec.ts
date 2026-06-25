@@ -15,12 +15,13 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 import fetchMock from "@fetch-mock/vitest";
 import { type CallLog } from "fetch-mock";
 import debug from "debug";
 
 import { ClientEvent, createClient, DebugLogger, type MatrixClient, MatrixEvent } from "../../../src";
-import { CryptoEvent } from "../../../src/crypto-api/index";
+import { type CryptoApi, CryptoEvent } from "../../../src/crypto-api/index";
 import { type RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { type AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -174,6 +175,80 @@ describe("Device dehydration", () => {
         await rehydrationErrorEventPromise;
 
         matrixClient.stopClient();
+    });
+});
+
+describe("isDehydratedDeviceKeyMissing", () => {
+    const DEHYDRATED_DEVICE_PATH = "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device";
+    let matrixClient: MatrixClient;
+    let crypto: CryptoApi;
+
+    beforeEach(async () => {
+        vi.useFakeTimers();
+        // The rust crypto store uses a fixed indexeddb prefix, so reset the database to get a fresh
+        // account with no dehydration key cached by an earlier test in this file.
+        indexedDB = new IDBFactory();
+        matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+            cryptoCallbacks: {
+                getSecretStorageKey: async (keys: any) => [Object.keys(keys.keys)[0], new Uint8Array(32)],
+            },
+        });
+        await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
+        crypto = matrixClient.getCrypto()!;
+    });
+
+    afterEach(() => {
+        matrixClient.stopClient();
+        vi.useRealTimers();
+    });
+
+    it("is false when the server has no dehydrated device", async () => {
+        fetchMock.get(DEHYDRATED_DEVICE_PATH, { status: 404, body: { errcode: "M_NOT_FOUND", error: "Not found" } });
+        await expect(crypto.isDehydratedDeviceKeyMissing()).resolves.toBe(false);
+    });
+
+    it("is false when the server does not support dehydration", async () => {
+        fetchMock.get(DEHYDRATED_DEVICE_PATH, {
+            status: 400,
+            body: { errcode: "M_UNRECOGNIZED", error: "Unrecognised request" },
+        });
+        await expect(crypto.isDehydratedDeviceKeyMissing()).resolves.toBe(false);
+    });
+
+    it("is true when a dehydrated device exists but its key is not held locally", async () => {
+        fetchMock.get(DEHYDRATED_DEVICE_PATH, {
+            device_id: "DEHYDRATED",
+            device_data: { algorithm: "org.matrix.msc3814.v1.olm" },
+        });
+        await expect(crypto.isDehydratedDeviceKeyMissing()).resolves.toBe(true);
+    });
+
+    it("is false, without querying the server, once the dehydration key is held locally", async () => {
+        fetchMock.get(
+            DEHYDRATED_DEVICE_PATH,
+            { status: 404, body: { errcode: "M_NOT_FOUND", error: "Not found" } },
+            { name: "get-dehydrated-device" },
+        );
+        fetchMock.put(DEHYDRATED_DEVICE_PATH, {});
+        await crypto.startDehydration();
+
+        // The dehydration key is now cached locally, so the check must short-circuit without a
+        // request — even if the server would now error.
+        fetchMock.modifyRoute("get-dehydrated-device", {
+            response: { status: 500, body: { errcode: "M_UNKNOWN", error: "Internal server error" } },
+        });
+        await expect(crypto.isDehydratedDeviceKeyMissing()).resolves.toBe(false);
+    });
+
+    it("rethrows unexpected server errors", async () => {
+        fetchMock.get(DEHYDRATED_DEVICE_PATH, {
+            status: 500,
+            body: { errcode: "M_UNKNOWN", error: "Internal server error" },
+        });
+        await expect(crypto.isDehydratedDeviceKeyMissing()).rejects.toThrow();
     });
 });
 
