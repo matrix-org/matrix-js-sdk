@@ -64,14 +64,16 @@ export type AuthorizationParams = {
  */
 export const generateScope = (deviceId?: string): string => {
     const safeDeviceId = deviceId ?? secureRandomString(10);
-    return `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
+    return `openid offline_access urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${safeDeviceId}`;
 };
 
 // https://www.rfc-editor.org/rfc/rfc7636
 const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
     if (!globalThis.crypto.subtle) {
         // @TODO(kerrya) should this be allowed? configurable?
-        logger.warn("A secure context is required to generate code challenge. Using plain text code challenge");
+        logger.warn(
+            "A secure context is required to generate code challenge. Using plain text code challenge",
+        );
         return codeVerifier;
     }
 
@@ -87,7 +89,11 @@ const generateCodeChallenge = async (codeVerifier: string): Promise<string> => {
  * @param redirectUri - absolute url for OP to redirect to after authorization
  * @returns AuthorizationParams
  */
-export const generateAuthorizationParams = ({ redirectUri }: { redirectUri: string }): AuthorizationParams => ({
+export const generateAuthorizationParams = ({
+    redirectUri,
+}: {
+    redirectUri: string;
+}): AuthorizationParams => ({
     scope: generateScope(),
     redirectUri,
     state: secureRandomString(8),
@@ -119,7 +125,10 @@ export const generateAuthorizationUrl = async (
     url.searchParams.append("nonce", nonce);
 
     url.searchParams.append("code_challenge_method", "S256");
-    url.searchParams.append("code_challenge", await generateCodeChallenge(codeVerifier));
+    url.searchParams.append(
+        "code_challenge",
+        await generateCodeChallenge(codeVerifier),
+    );
 
     return url.toString();
 };
@@ -174,7 +183,10 @@ export const generateOidcAuthorizationUrl = async ({
         response_mode: responseMode,
         response_type: "code",
         scope,
-        stateStore: new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage }),
+        stateStore: new WebStorageStateStore({
+            prefix: "mx_oidc_",
+            store: window.sessionStorage,
+        }),
     });
     const userState: UserState = { homeserverUrl, nonce, identityServerUrl };
     const request = await oidcClient.createSigninRequest({
@@ -197,7 +209,9 @@ export const generateOidcAuthorizationUrl = async ({
  * @param response - validated token response
  * @returns response with token_type set to 'Bearer'
  */
-const normalizeBearerTokenResponseTokenType = (response: SigninResponse): BearerTokenResponse =>
+const normalizeBearerTokenResponseTokenType = (
+    response: SigninResponse,
+): BearerTokenResponse =>
     ({
         id_token: response.id_token,
         scope: response.scope,
@@ -251,7 +265,10 @@ export const completeAuthorizationCodeGrant = async (
     try {
         const response = new SigninResponse(params);
 
-        const stateStore = new WebStorageStateStore({ prefix: "mx_oidc_", store: window.sessionStorage });
+        const stateStore = new WebStorageStateStore({
+            prefix: "mx_oidc_",
+            store: window.sessionStorage,
+        });
 
         // retrieve the state we put in storage at the start of oidc auth flow
         const stateString = await stateStore.get(response.state!);
@@ -265,7 +282,9 @@ export const completeAuthorizationCodeGrant = async (
         const client = new OidcClient({ ...signInState, stateStore });
 
         // validate the code and state, and attempt to swap the code for tokens
-        const signinResponse = await client.processSigninResponse(reconstructedUrl.href);
+        const signinResponse = await client.processSigninResponse(
+            reconstructedUrl.href,
+        );
 
         // extra values we stored at the start of the login flow
         // used to complete login in the client
@@ -284,7 +303,8 @@ export const completeAuthorizationCodeGrant = async (
                 userState.nonce,
             );
         }
-        const normalizedTokenResponse = normalizeBearerTokenResponseTokenType(signinResponse);
+        const normalizedTokenResponse =
+            normalizeBearerTokenResponseTokenType(signinResponse);
 
         return {
             oidcClientSettings: {
@@ -361,7 +381,10 @@ export const startDeviceAuthorization = async ({
     scope: string;
     metadata: ValidatedAuthMetadata;
 }): Promise<DeviceAuthorizationResponse> => {
-    const body = new URLSearchParams({ client_id: clientId, scope: scope }).toString();
+    const body = new URLSearchParams({
+        client_id: clientId,
+        scope: scope,
+    }).toString();
 
     const url = metadata.device_authorization_endpoint;
     if (!url) {
