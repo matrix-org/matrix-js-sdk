@@ -1,4 +1,4 @@
-import { KnipConfig } from "knip";
+import { type KnipConfig } from "knip";
 
 // Specify this as knip loads config files which may conditionally load plugins
 process.env.GITHUB_ACTIONS = "1";
@@ -41,4 +41,5 @@ export default {
     ignoreExportsUsedInFile: true,
     includeEntryExports: false,
     exclude: ["enumMembers"],
+    treatConfigHintsAsErrors: true,
 } satisfies KnipConfig;

@@ -249,6 +249,7 @@ import {
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
+import { RetentionPolicyService } from "./retentionPolicy.ts";
 
 export type Store = IStore;
 
@@ -462,6 +463,11 @@ export interface ICreateClientOpts {
      * Defaults to the built-in global logger; see {@link DebugLogger} for an alternative.
      */
     logger?: Logger;
+
+    /**
+     * Locally remove events past the server global or per room retention setting.
+     */
+    unstableMSC1763Retention?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1327,6 +1333,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
+    public readonly retentionPolicyService: RetentionPolicyService;
+    // eslint-disable-next-line
+    public readonly _unstable_shouldApplyMessageRetention: boolean;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1405,6 +1414,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC = new MatrixRTCSessionManager(this.logger, this);
 
         this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
+        this.retentionPolicyService = new RetentionPolicyService(this.logger, this.http);
+        this._unstable_shouldApplyMessageRetention = opts.unstableMSC1763Retention ?? false;
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1479,10 +1490,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // periodically poll for turn servers if we support voip
         if (this.supportsVoip()) {
             this.checkTurnServersIntervalID = setInterval(() => {
-                this.checkTurnServers();
+                void this.checkTurnServers();
             }, TURN_CHECK_INTERVAL);
-            // noinspection ES6MissingAwait
-            this.checkTurnServers();
+            void this.checkTurnServers();
         }
 
         if (this.syncApi) {
@@ -1523,13 +1533,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
-                this.fetchClientWellKnown();
+                void this.fetchClientWellKnown();
             }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            this.fetchClientWellKnown();
+            void this.fetchClientWellKnown();
         }
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
+        if (this._unstable_shouldApplyMessageRetention) {
+            this.retentionPolicyService?.start();
+        }
     }
 
     /**
@@ -1908,7 +1921,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public retryImmediately(): boolean {
         // don't await for this promise: we just want to kick it off
-        this.toDeviceMessageQueue.sendQueue();
+        void this.toDeviceMessageQueue.sendQueue();
         return this.syncApi?.retryImmediately() ?? false;
     }
 
@@ -1936,9 +1949,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise resolving with The capabilities of the homeserver
      */
     public async getCapabilities(): Promise<Capabilities> {
-        const caps = this.serverCapabilitiesService.getCachedCapabilities();
+        const caps = this.serverCapabilitiesService.getCached();
         if (caps) return caps;
-        return this.serverCapabilitiesService.fetchCapabilities();
+        return this.serverCapabilitiesService.fetch();
     }
 
     /**
@@ -1948,7 +1961,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The capabilities of the homeserver
      */
     public getCachedCapabilities(): Capabilities | undefined {
-        return this.serverCapabilitiesService.getCachedCapabilities();
+        return this.serverCapabilitiesService.getCached();
     }
 
     /**
@@ -1958,7 +1971,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns A promise which resolves to the capabilities of the homeserver
      */
     public fetchCapabilities(): Promise<Capabilities> {
-        return this.serverCapabilitiesService.fetchCapabilities();
+        return this.serverCapabilitiesService.fetch();
     }
 
     /**
@@ -2042,7 +2055,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
         this.on(RoomStateEvent.Events, rustCrypto.onRoomStateEvent.bind(rustCrypto));
         this.on(ClientEvent.Event, (event) => {
-            rustCrypto.onLiveEventFromSync(event);
+            void rustCrypto.onLiveEventFromSync(event);
         });
 
         // re-emit the events emitted by the crypto impl
@@ -2500,7 +2513,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public resendEvent(event: MatrixEvent, room: Room): Promise<ISendEventResponse> {
         // also kick the to-device queue to retry
-        this.toDeviceMessageQueue.sendQueue();
+        void this.toDeviceMessageQueue.sendQueue();
 
         this.updatePendingEventStatus(room, event, EventStatus.SENDING);
         return this.encryptAndSendEvent(room, event);
@@ -5904,7 +5917,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.isInitialSyncComplete()) {
             if (supportsMatrixCall()) {
                 this.callEventHandler!.start();
-                this.groupCallEventHandler!.start();
+                void this.groupCallEventHandler!.start();
             }
 
             this.off(ClientEvent.Sync, this.startCallEventHandler);
@@ -6418,7 +6431,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (event.shouldAttemptDecryption() && this.getCrypto()) {
-            event.attemptDecryption(this.cryptoBackend!, options);
+            void event.attemptDecryption(this.cryptoBackend!, options);
         }
 
         if (event.isBeingDecrypted()) {
@@ -8822,8 +8835,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!events?.length) return;
         if (!room) return;
 
-        room.currentState.processBeaconEvents(events, this);
-        room.processPollEvents(events);
+        void room.currentState.processBeaconEvents(events, this);
+        void room.processPollEvents(events);
     }
 
     /**

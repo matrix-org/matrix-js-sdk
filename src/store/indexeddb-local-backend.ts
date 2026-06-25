@@ -323,10 +323,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const roomRange = IDBKeyRange.only(roomId);
 
         const minStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "next")).then(
-            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1],
+            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)?.[1],
         );
         const maxStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "prev")).then(
-            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1],
+            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)?.[1],
         );
         const [minStateKey, maxStateKey] = await Promise.all([minStateKeyProm, maxStateKeyProm]);
 
@@ -631,6 +631,16 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             store.delete([userId]);
         }
         await txnAsPromise(txn);
+    }
+
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        try {
+            this.syncAccumulator.removeEventsFromRoom(roomId, eventIds);
+            const syncData = this.syncAccumulator.getJSON(true);
+            await this.persistSyncData(syncData.nextBatch, syncData.roomsData);
+        } finally {
+            this.syncToDatabasePromise = undefined;
+        }
     }
 
     /*

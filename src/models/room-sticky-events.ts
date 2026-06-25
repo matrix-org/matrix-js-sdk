@@ -85,6 +85,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     /**
      * Get all sticky events that are currently active.
      * @returns An iterable set of events.
+     * @yields {@link StickyMatrixEvent}
      */
     public *getStickyEvents(): Iterable<StickyMatrixEvent> {
         yield* this.unkeyedStickyEvents;

@@ -9,14 +9,14 @@ import { defineConfig, type ViteUserConfig } from "vitest/config";
 import { type Reporter } from "vitest/reporters";
 import { env } from "process";
 
-const reporters: ViteUserConfig["test"]["reporters"] = [["default"]];
+const reporters: NonNullable<ViteUserConfig["test"]>["reporters"] = [["default"]];
 
 const slowTestReporter: Reporter = {
     onTestRunEnd(testModules, unhandledErrors, reason) {
         const tests = testModules
             .flatMap((m) => Array.from(m.children.allTests()))
             .filter((test) => test.diagnostic()?.slow);
-        tests.sort((x, y) => x.diagnostic()?.duration! - y.diagnostic()?.duration!);
+        tests.sort((x, y) => x.diagnostic()!.duration! - y.diagnostic()!.duration!);
         tests.reverse();
 
         if (tests.length > 0) {

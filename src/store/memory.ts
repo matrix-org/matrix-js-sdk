@@ -455,6 +455,10 @@ export class MemoryStore implements IStore {
         userIds.forEach((userId) => this.userProfiles.delete(userId));
     }
 
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        // Can ignore as there is no backing store.
+    }
+
     public async destroy(): Promise<void> {
         // Nothing to do
     }

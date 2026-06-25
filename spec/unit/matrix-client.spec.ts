@@ -334,7 +334,7 @@ describe("MatrixClient", function () {
             store: store,
             scheduler: scheduler,
             userId: userId,
-            ...(opts || {}),
+            ...opts,
         });
         // FIXME: We shouldn't be yanking http like this.
         client.http = (
@@ -2021,27 +2021,29 @@ describe("MatrixClient", function () {
 
     describe("redactEvent", () => {
         const roomId = "!room:example.org";
-        const mockRoom = {
-            getMyMembership: () => KnownMembership.Join,
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
-            getThread: vi.fn(),
-            addPendingEvent: vi.fn(),
-            updatePendingEvent: vi.fn(),
-            reEmitter: {
-                reEmit: vi.fn(),
-            },
-        } as unknown as Room;
+        let mockRoom: Room;
 
         beforeEach(() => {
+            mockRoom = {
+                getMyMembership: () => KnownMembership.Join,
+                currentState: {
+                    getStateEvents: (eventType, stateKey) => {
+                        if (eventType === EventType.RoomEncryption) {
+                            expect(stateKey).toEqual("");
+                            return new MatrixEvent({ content: {} });
+                        } else {
+                            throw new Error("Unexpected event type or state key");
+                        }
+                    },
+                } as Room["currentState"],
+                getThread: vi.fn(),
+                addPendingEvent: vi.fn(),
+                updatePendingEvent: vi.fn(),
+                reEmitter: {
+                    reEmit: vi.fn(),
+                },
+            } as unknown as Room;
+
             client.getRoom = (getRoomId) => {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
@@ -2146,7 +2148,7 @@ describe("MatrixClient", function () {
                             `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
                             `/${encodeURIComponent(txnId)}`,
                         expectBody: {
-                            reason: "redaction test",
+                            "reason": "redaction test",
                             ["org.matrix.msc3912.with_relations"]: ["m.reference"],
                         },
                         data: { event_id: eventId },
@@ -2901,7 +2903,7 @@ describe("MatrixClient", function () {
             const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID) as WrappedRoom;
 
             // Fetch the list of sources and check that we do not have the new room yet.
-            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
+            const policies = client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies).toBeTruthy();
             const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites).toBeTruthy();
@@ -2915,7 +2917,7 @@ describe("MatrixClient", function () {
             expect(added2).toBe(false);
 
             // Fetch the list of sources and check that we have added the new room.
-            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
+            const policies2 = client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies2).toBeTruthy();
             const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites2).toBeTruthy();

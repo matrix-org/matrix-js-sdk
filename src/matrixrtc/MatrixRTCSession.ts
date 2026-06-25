@@ -816,7 +816,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        this.encryptionManager?.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
     };

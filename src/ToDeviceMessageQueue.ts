@@ -77,7 +77,7 @@ export class ToDeviceMessageQueue {
         }
 
         await this.client.store.saveToDeviceBatches(batches);
-        this.sendQueue();
+        void this.sendQueue();
     }
 
     public sendQueue = async (): Promise<void> => {
@@ -150,7 +150,7 @@ export class ToDeviceMessageQueue {
     private onResumedSync = (state: SyncState | null, oldState: SyncState | null): void => {
         if (state === SyncState.Syncing && oldState !== SyncState.Syncing) {
             this.logger.info(`Resuming queue after resumed sync`);
-            this.sendQueue();
+            void this.sendQueue();
         }
     };
 }

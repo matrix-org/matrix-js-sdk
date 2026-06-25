@@ -127,7 +127,7 @@ async function initGenerateQrFlow(
         channel.onFailure = undefined;
         flow.onFailure = undefined;
         // Cancel the session
-        flow.cancel(MSC4108FailureReason.UserCancelled);
+        void flow.cancel(MSC4108FailureReason.UserCancelled);
     };
 
     await session.send(""); // open channel

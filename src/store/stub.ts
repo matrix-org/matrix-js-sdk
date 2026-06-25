@@ -289,4 +289,7 @@ export class StubStore implements IStore {
     public async destroy(): Promise<void> {
         // Nothing to do
     }
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        // Nothing to do
+    }
 }
