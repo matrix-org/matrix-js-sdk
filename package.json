@@ -21,7 +21,7 @@
         "gendoc": "typedoc",
         "lint": "pnpm lint:types && pnpm lint:js && pnpm lint:workflows",
         "lint:js": "oxlint && oxfmt --check",
-        "lint:js-fix": "oxfmt --log-level=warn --write . && oxlint --fix src spec",
+        "lint:js-fix": "oxfmt --write . && oxlint --fix src spec",
         "lint:types": "tsc --noEmit",
         "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
         "lint:knip": "knip && knip --strict --exclude unlisted,dependencies,binaries",
