@@ -15,12 +15,14 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
+import { IDBFactory } from "fake-indexeddb";
 import fetchMock from "@fetch-mock/vitest";
 import { type CallLog } from "fetch-mock";
 import debug from "debug";
 
 import { ClientEvent, createClient, DebugLogger, type MatrixClient, MatrixEvent } from "../../../src";
-import { CryptoEvent } from "../../../src/crypto-api/index";
+import { encodeBase64 } from "../../../src/base64";
+import { type CryptoApi, CryptoEvent } from "../../../src/crypto-api/index";
 import { type RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { type AddSecretStorageKeyOpts } from "../../../src/secret-storage";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -174,6 +176,66 @@ describe("Device dehydration", () => {
         await rehydrationErrorEventPromise;
 
         matrixClient.stopClient();
+    });
+});
+
+describe("reconciling the dehydration key with secret storage", () => {
+    const DEHYDRATED_DEVICE_PATH = "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device";
+    let matrixClient: MatrixClient;
+    let crypto: CryptoApi;
+    let keyCachedCounter: EventCounter;
+
+    beforeEach(async () => {
+        vi.useFakeTimers();
+        // The rust crypto store uses a fixed indexeddb prefix, so reset the database for a fresh account.
+        indexedDB = new IDBFactory();
+        matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+            cryptoCallbacks: {
+                getSecretStorageKey: async (keys: any) => [Object.keys(keys.keys)[0], new Uint8Array(32)],
+            },
+        });
+        await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
+        crypto = matrixClient.getCrypto()!;
+
+        // Start dehydration: this stores a fresh key in secret storage and caches it locally.
+        fetchMock.get(DEHYDRATED_DEVICE_PATH, { status: 404, body: { errcode: "M_NOT_FOUND", error: "Not found" } });
+        fetchMock.put(DEHYDRATED_DEVICE_PATH, {});
+        await crypto.startDehydration();
+
+        // Count dehydration-key caching from here on (i.e. only what reconciliation triggers).
+        keyCachedCounter = new EventCounter(matrixClient, CryptoEvent.DehydrationKeyCached);
+    });
+
+    afterEach(() => {
+        matrixClient.stopClient();
+        vi.useRealTimers();
+    });
+
+    it("keeps using the cached key when secret storage is unchanged", async () => {
+        await crypto.startDehydration({ rehydrate: false });
+        expect(keyCachedCounter.counter).toBe(0);
+    });
+
+    it("adopts a dehydration key that another device rotated in secret storage", async () => {
+        // Another of the user's devices replaced the key in 4S with a different one.
+        const rotatedKey = encodeBase64(new Uint8Array(32).fill(1));
+        await matrixClient.secretStorage.store("org.matrix.msc3814", rotatedKey);
+
+        await crypto.startDehydration({ rehydrate: false });
+
+        // The changed key was read from 4S and adopted (re-cached) locally.
+        expect(keyCachedCounter.counter).toBe(1);
+    });
+
+    it("keeps the cached key (best-effort) when secret storage can't be read", async () => {
+        vi.spyOn(matrixClient.secretStorage, "get").mockRejectedValueOnce(new Error("4S is locked"));
+
+        // Reconciliation must not throw or block on a recovery-key prompt.
+        await expect(crypto.startDehydration({ rehydrate: false })).resolves.toBeUndefined();
+        expect(keyCachedCounter.counter).toBe(0);
     });
 });
 

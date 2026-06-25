@@ -296,11 +296,48 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
     }
 
     /**
+     * Reconcile our cached dehydration key with the one in Secret Storage.
+     *
+     * Another of the user's devices may have rotated the dehydration key in 4S (e.g. by changing the
+     * recovery key). If we keep using our locally-cached key we will upload a dehydrated device encrypted
+     * with a key that no other device can read, defeating dehydration. So, before creating a dehydrated
+     * device, re-read the key from 4S and adopt it if it differs from our cache.
+     *
+     * This is best-effort: if 4S is not currently accessible the read is skipped and we keep using the
+     * cached key (a background rotation must not block on prompting the user for their recovery key).
+     * See https://github.com/element-hq/element-web/issues/28760.
+     */
+    private async reconcileKeyWithSecretStorage(): Promise<void> {
+        const cachedKey = await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey();
+        if (!cachedKey) return; // nothing cached yet — getKey() will read 4S as usual
+
+        let keyB64: string | undefined;
+        try {
+            keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME);
+        } catch (e) {
+            // 4S not accessible right now (e.g. no key cached): keep the cached key rather than failing.
+            this.logger.info("dehydration: could not read dehydration key from secret storage to reconcile", e);
+            return;
+        }
+        if (keyB64 === undefined) return; // no key in 4S
+        if (keyB64 === cachedKey.toBase64()) return; // already in sync
+
+        this.logger.info("dehydration: dehydration key in secret storage changed; adopting the new key");
+        const bytes = decodeBase64(keyB64);
+        try {
+            await this.cacheKey(RustSdkCryptoJs.DehydratedDeviceKey.createKeyFromArray(bytes));
+        } finally {
+            bytes.fill(0);
+        }
+    }
+
+    /**
      * Creates and uploads a new dehydrated device.
      *
      * Creates and stores a new key in secret storage if none is available.
      */
     public async createAndUploadDehydratedDevice(): Promise<void> {
+        await this.reconcileKeyWithSecretStorage();
         const key = (await this.getKey(true))!;
 
         const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
