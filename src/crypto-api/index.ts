@@ -1222,10 +1222,15 @@ export interface CreateSecretStorageOpts {
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
-    Master = "master",
-    SelfSigning = "self_signing",
-    UserSigning = "user_signing",
+    Master = "master_key",
+    SelfSigning = "self_signing_key",
+    UserSigning = "user_signing_key",
 }
+
+/** All of a user's cross-signing keys.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
+ */
+export type CrossSigningKeys = Record<CrossSigningKey, CrossSigningKeyInfo>;
 
 /**
  * Information on one of the cross-signing keys.
