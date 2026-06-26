@@ -265,9 +265,17 @@ export interface CryptoApi {
      *
      * This is useful if the user was previously verified but is not anymore
      * ({@link UserVerificationStatus.wasCrossSigningVerified}) and it is not possible to verify him again now.
-     *
      */
     withdrawVerificationRequirement(userId: string): Promise<void>;
+
+    /**
+     * Get the given user's public cross-signing keys, if they have published any, and we have fetched them to
+     * our store.
+     *
+     * Normally this is only useful to applications as debug info, since the SDK handles keeping track of a
+     * user's identity, and whether their devices are verified.
+     */
+    getUserCrossSigningKeys(userId: string): Promise<Partial<CrossSigningKeys> | null>;
 
     /**
      * Get the verification status of a given device.

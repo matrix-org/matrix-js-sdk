@@ -2137,6 +2137,21 @@ describe("crypto", () => {
                 expect(verificationStatus.needsUserApproval).toBe(false);
             }
         });
+
+        describe("getUserCrossSigningKeys", () => {
+            it("returns null for unknown user", async () => {
+                const id = await aliceClient.getCrypto()!.getUserCrossSigningKeys("@unknown:xyz");
+                expect(id).toBe(null);
+            });
+
+            it("returns three keys for local user", async () => {
+                const id = await aliceClient.getCrypto()!.getUserCrossSigningKeys(TEST_USER_ID);
+
+                expect(id?.master_key).toEqual(SIGNED_CROSS_SIGNING_KEYS_DATA.master_keys![TEST_USER_ID]);
+                expect(id?.self_signing_key).toEqual(SIGNED_CROSS_SIGNING_KEYS_DATA.self_signing_keys![TEST_USER_ID]);
+                expect(id?.user_signing_key).toEqual(SIGNED_CROSS_SIGNING_KEYS_DATA.user_signing_keys![TEST_USER_ID]);
+            });
+        });
     });
 
     /** Guards against downgrade attacks from servers hiding or manipulating the crypto settings. */

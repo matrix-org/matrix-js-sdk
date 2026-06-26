@@ -42,6 +42,7 @@ import {
     type BackupTrustInfo,
     type BootstrapCrossSigningOpts,
     type CreateSecretStorageOpts,
+    type CrossSigningKeys,
     CrossSigningKey,
     type CrossSigningKeyInfo,
     type CrossSigningStatus,
@@ -769,6 +770,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         }
 
         await userIdentity.withdrawVerification();
+    }
+
+    /**
+     * Implementation of {@link CryptoApi#getUserCrossSigningKeys}.
+     */
+    public async getUserCrossSigningKeys(userId: string): Promise<Partial<CrossSigningKeys> | null> {
+        const userIdentity = await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
+
+        if (!userIdentity) {
+            return null;
+        }
+
+        const result: Partial<CrossSigningKeys> = {
+            master_key: JSON.parse(userIdentity.masterKey),
+            self_signing_key: JSON.parse(userIdentity.selfSigningKey),
+        };
+
+        // The USK is only visible for our own identity
+        if ("userSigningKey" in userIdentity) {
+            result.user_signing_key = JSON.parse(userIdentity.userSigningKey);
+        }
+
+        return result;
     }
 
     /**
