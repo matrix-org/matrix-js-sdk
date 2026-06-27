@@ -36,7 +36,7 @@ interface DehydratedDeviceResp {
     };
 }
 /**
- * The response body of `POST /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/events`.
+ * The response body of `GET /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/{device_id}/events`.
  */
 interface DehydratedDeviceEventsResp {
     events: IToDeviceEvent[];
@@ -270,10 +270,10 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
         // eslint-disable-next-line no-constant-condition
         while (true) {
             const eventResp: DehydratedDeviceEventsResp = await this.http.authedRequest<DehydratedDeviceEventsResp>(
-                Method.Post,
+                Method.Get,
                 path,
+                nextBatch ? { next_batch: nextBatch } : undefined,
                 undefined,
-                nextBatch ? { next_batch: nextBatch } : {},
                 {
                     prefix: UnstablePrefix,
                 },
