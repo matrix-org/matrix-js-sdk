@@ -54,12 +54,6 @@ export const OAUTH_AWARE_PREFERRED_FLOW_FIELD = new UnstableValue(
 );
 
 /**
- * @alias
- * @deprecated use `OAUTH_AWARE_PREFERRED_FLOW_FIELD` instead.
- */
-export const DELEGATED_OIDC_COMPATIBILITY = OAUTH_AWARE_PREFERRED_FLOW_FIELD;
-
-/**
  * Representation of SSO flow as per https://spec.matrix.org/v1.3/client-server-api/#client-login-via-sso
  */
 export interface ISSOFlow extends ILoginFlow {
