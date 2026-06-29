@@ -35,8 +35,7 @@ import {
     startDeviceAuthorization,
     type ValidatedAuthMetadata,
     waitForDeviceAuthorization,
-    type OidcClientConfig,
-} from "../oidc/index.ts";
+} from "../oauth/index.ts";
 import { type CryptoApi } from "../crypto-api/index.ts";
 
 /**
@@ -113,7 +112,7 @@ interface SecretsPayload extends MSC4108Payload, Awaited<ReturnType<NonNullable<
 
 /**
  * Prototype of the unstable [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
- * sign in with QR + OIDC flow.
+ * sign in with QR + OAuth2 flow.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
 export class MSC4108SignInWithQR {
@@ -182,7 +181,7 @@ export class MSC4108SignInWithQR {
     }
 
     /**
-     * The first step in the OIDC QR login process.
+     * The first step in the OAuth2 QR login process.
      * To be called after the QR code has been rendered or scanned.
      * The scanning device has to discover the homeserver details, if they scanned the code then they already have it.
      * If the new device is the one rendering the QR code then it has to wait be sent the homeserver details via the rendezvous channel.
@@ -198,14 +197,14 @@ export class MSC4108SignInWithQR {
                 // MSC4108-Flow: ExistingScanned - take homeserver from QR code which should already be set
             } else {
                 // MSC4108-Flow: NewScanned -send protocols message
-                let oidcClientConfig: OidcClientConfig | undefined;
+                let authMetadata: ValidatedAuthMetadata | undefined;
                 try {
-                    oidcClientConfig = await this.client!.getAuthMetadata();
+                    authMetadata = await this.client!.getAuthMetadata();
                 } catch (e) {
-                    logger.error("Failed to discover OIDC metadata", e);
+                    logger.error("Failed to discover OAuth2 metadata", e);
                 }
 
-                if (oidcClientConfig?.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
+                if (authMetadata?.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
                     await this.send<ProtocolsPayload>({
                         type: PayloadType.Protocols,
                         protocols: ["device_authorization_grant"],
@@ -250,9 +249,9 @@ export class MSC4108SignInWithQR {
     }
 
     /**
-     * The second & third step in the OIDC QR login process.
+     * The second & third step in the OAuth2 QR login process.
      * To be called after `negotiateProtocols` for the existing device.
-     * To be called after OIDC negotiation for the new device.
+     * To be called after OAuth2 negotiation for the new device.
      *
      * @param input - Required for the new device to start the device authorization grant, not required for the existing device reciprocating the login
      */
@@ -362,7 +361,7 @@ export class MSC4108SignInWithQR {
     }
 
     /**
-     * The fourth step in the OIDC QR login process.
+     * The fourth step in the OAuth2 QR login process.
      * The reciprocating device must perform step 5 for this method to resolve.
      * To be called after {@link deviceAuthorizationGrant} only on the new device.
      */
@@ -426,7 +425,7 @@ export class MSC4108SignInWithQR {
     }
 
     /**
-     * The fifth (and final) step in the OIDC QR login process.
+     * The fifth (and final) step in the OAuth2 QR login process.
      * To be called after the new device has completed authentication.
      */
     public async shareSecrets(): Promise<{ secrets?: Omit<SecretsPayload, "type"> }> {

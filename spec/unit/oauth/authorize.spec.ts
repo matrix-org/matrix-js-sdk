@@ -19,31 +19,22 @@ limitations under the License.
 */
 
 import fetchMock from "@fetch-mock/vitest";
-import { jwtDecode } from "jwt-decode";
 import { Crypto } from "@peculiar/webcrypto";
 import { getRandomValues } from "node:crypto";
 
 import { logger } from "../../../src/logger";
-import {
-    completeAuthorizationCodeGrant,
-    generateAuthorizationParams,
-    generateAuthorizationUrl,
-    generateOidcAuthorizationUrl,
-    generateScope,
-    startDeviceAuthorization,
-    waitForDeviceAuthorization,
-} from "../../../src/oidc/authorize";
-import { OidcError } from "../../../src/oidc/error";
-import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
+import { OAuth2, generateScope, startDeviceAuthorization, waitForDeviceAuthorization } from "../../../src/oauth";
+import { OAuth2Error } from "../../../src/oauth/error";
+import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
+import { HTTPError } from "../../../src";
 
-vi.mock("jwt-decode");
-
-describe("oidc authorization", () => {
-    const delegatedAuthConfig = makeDelegatedAuthConfig();
-    const authorizationEndpoint = delegatedAuthConfig.authorization_endpoint;
+describe("authorization", () => {
+    const delegatedAuthConfig = makeDelegatedAuthMetadata();
     const clientId = "xyz789";
     const deviceId = "deadbeef";
     const baseUrl = "https://test.com";
+
+    const auth = new OAuth2(delegatedAuthConfig, { clientId, redirectUri: baseUrl, deviceId });
 
     // 14.03.2022 16:15
     const now = 1647270879403;
@@ -52,8 +43,6 @@ describe("oidc authorization", () => {
         vi.spyOn(logger, "warn");
         vi.useFakeTimers();
         vi.setSystemTime(now);
-
-        fetchMock.get(delegatedAuthConfig.issuer + ".well-known/openid-configuration", mockOpenIdConfiguration());
 
         const webCrypto = new Crypto();
         Object.defineProperty(window, "crypto", {
@@ -65,143 +54,38 @@ describe("oidc authorization", () => {
         });
     });
 
-    it("should generate authorization params", () => {
-        const result = generateAuthorizationParams({ redirectUri: baseUrl });
+    describe("generateAuthorizationCodeGrantUrl()", () => {
+        const state = "abc123";
 
-        expect(result.redirectUri).toEqual(baseUrl);
-
-        // random strings
-        expect(result.state.length).toEqual(8);
-        expect(result.nonce.length).toEqual(8);
-        expect(result.codeVerifier.length).toEqual(64);
-
-        const expectedScope =
-            "openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:";
-        expect(result.scope.startsWith(expectedScope)).toBeTruthy();
-        // deviceId of 10 characters is appended to the device scope
-        expect(result.scope.length).toEqual(expectedScope.length + 10);
-    });
-
-    describe("generateAuthorizationUrl()", () => {
         it("should generate url with correct parameters", async () => {
-            const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
-            authorizationParams.codeVerifier = "test-code-verifier";
-            const authUrl = new URL(
-                await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
-            );
+            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state));
 
-            expect(authUrl.searchParams.get("response_mode")).toEqual("query");
+            expect(authUrl.searchParams.get("response_mode")).toEqual("fragment");
             expect(authUrl.searchParams.get("response_type")).toEqual("code");
             expect(authUrl.searchParams.get("client_id")).toEqual(clientId);
             expect(authUrl.searchParams.get("code_challenge_method")).toEqual("S256");
-            expect(authUrl.searchParams.get("scope")).toEqual(authorizationParams.scope);
-            expect(authUrl.searchParams.get("state")).toEqual(authorizationParams.state);
-            expect(authUrl.searchParams.get("nonce")).toEqual(authorizationParams.nonce);
-            expect(authUrl.searchParams.get("code_challenge")).toEqual("0FLIKahrX7kqxncwhV5WD82lu_wi5GA8FsRSLubaOpU");
-        });
-
-        it("should log a warning if crypto is not available", async () => {
-            // test the no crypto case here
-            // @ts-ignore mocking
-            globalThis.crypto.subtle = undefined;
-
-            const authorizationParams = generateAuthorizationParams({ redirectUri: baseUrl });
-            const authUrl = new URL(
-                await generateAuthorizationUrl(authorizationEndpoint, clientId, authorizationParams),
+            expect(authUrl.searchParams.get("scope")!.slice(0, -deviceId.length)).toEqual(
+                "urn:matrix:client:api:* urn:matrix:client:device:",
             );
-
-            // crypto not available, plain text code_challenge is used
-            expect(authUrl.searchParams.get("code_challenge")).toEqual(authorizationParams.codeVerifier);
-            expect(logger.warn).toHaveBeenCalledWith(
-                "A secure context is required to generate code challenge. Using plain text code challenge",
-            );
-        });
-    });
-
-    describe("generateOidcAuthorizationUrl()", () => {
-        it("should generate url with correct parameters", async () => {
-            const nonce = "abc123";
-
-            const authUrl = new URL(
-                await generateOidcAuthorizationUrl({
-                    metadata: delegatedAuthConfig,
-                    homeserverUrl: baseUrl,
-                    clientId,
-                    redirectUri: baseUrl,
-                    nonce,
-                }),
-            );
-
-            expect(authUrl.searchParams.get("response_mode")).toEqual("query");
-            expect(authUrl.searchParams.get("response_type")).toEqual("code");
-            expect(authUrl.searchParams.get("client_id")).toEqual(clientId);
-            expect(authUrl.searchParams.get("code_challenge_method")).toEqual("S256");
-            // scope minus the 10char random device id at the end
-            expect(authUrl.searchParams.get("scope")!.slice(0, -10)).toEqual(
-                "openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:",
-            );
-            expect(authUrl.searchParams.get("state")).toBeTruthy();
-            expect(authUrl.searchParams.get("nonce")).toEqual(nonce);
+            expect(authUrl.searchParams.get("state")).toBe(state);
 
             expect(authUrl.searchParams.get("code_challenge")).toBeTruthy();
         });
 
         it("should generate url with create prompt", async () => {
-            const nonce = "abc123";
-
-            const authUrl = new URL(
-                await generateOidcAuthorizationUrl({
-                    metadata: delegatedAuthConfig,
-                    homeserverUrl: baseUrl,
-                    clientId,
-                    redirectUri: baseUrl,
-                    nonce,
-                    prompt: "create",
-                }),
-            );
+            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, "fragment", "create"));
 
             expect(authUrl.searchParams.get("prompt")).toEqual("create");
         });
 
-        it("should generate url with login_hint", async () => {
-            const nonce = "abc123";
+        it("should generate url with response_mode=query", async () => {
+            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, "query"));
 
-            const authUrl = new URL(
-                await generateOidcAuthorizationUrl({
-                    metadata: delegatedAuthConfig,
-                    homeserverUrl: baseUrl,
-                    clientId,
-                    redirectUri: baseUrl,
-                    nonce,
-                    loginHint: "login1234",
-                }),
-            );
-
-            expect(authUrl.searchParams.get("login_hint")).toEqual("login1234");
-        });
-
-        it("should generate url with response_mode=fragment", async () => {
-            const nonce = "abc123";
-
-            const authUrl = new URL(
-                await generateOidcAuthorizationUrl({
-                    metadata: delegatedAuthConfig,
-                    homeserverUrl: baseUrl,
-                    clientId,
-                    redirectUri: baseUrl,
-                    nonce,
-                    responseMode: "fragment",
-                }),
-            );
-
-            expect(authUrl.searchParams.get("response_mode")).toEqual("fragment");
+            expect(authUrl.searchParams.get("response_mode")).toEqual("query");
         });
     });
 
     describe("completeAuthorizationCodeGrant", () => {
-        const homeserverUrl = "https://server.org/";
-        const identityServerUrl = "https://id.org/";
-        const nonce = "hRpB6pkE06";
         const redirectUri = baseUrl;
         const code = "auth_code_xyz";
         const validBearerTokenResponse = {
@@ -213,47 +97,17 @@ describe("oidc authorization", () => {
             expires_in: 300,
         };
 
-        const metadata = mockOpenIdConfiguration();
-
-        const validDecodedIdToken = {
-            // nonce matches
-            nonce,
-            // not expired
-            exp: Date.now() / 1000 + 100000,
-            // audience is this client
-            aud: clientId,
-            // issuer matches
-            iss: metadata.issuer,
-            sub: "123",
-        };
-
-        const getValueFromStorage = <T = string>(state: string, key: string): T => {
-            const storedState = window.sessionStorage.getItem(`mx_oidc_${state}`)!;
-            return JSON.parse(storedState)[key] as unknown as T;
-        };
+        const metadata = makeDelegatedAuthMetadata();
 
         /**
-         * These tests kind of integration test oidc auth, by using `generateOidcAuthorizationUrl` and mocked storage
-         * to mock the use case of initiating oidc auth, putting state in storage, redirecting to OP,
-         * then returning and using state to verfiy.
+         * These tests kind of integration test oauth2 auth, by using `generateOidcAuthorizationUrl` and mocked storage
+         * to mock the use case of initiating oauth2 auth, putting state in storage, redirecting to IdP,
+         * then returning and using state to verify.
          * Returns random state string used to access storage
          * @param params
          */
-        const setupState = async (params = {}): Promise<string> => {
-            const url = await generateOidcAuthorizationUrl({
-                metadata,
-                redirectUri,
-                clientId,
-                homeserverUrl,
-                identityServerUrl,
-                nonce,
-                ...params,
-            });
-
-            const state = new URL(url).searchParams.get("state")!;
-
-            // add the scope with correct deviceId to the mocked bearer token response
-            const scope = getValueFromStorage(state, "scope");
+        const setupState = async (params = {}): Promise<[code: string, scope: string]> => {
+            const scope = generateScope();
             fetchMock.post(
                 metadata.token_endpoint,
                 {
@@ -261,39 +115,26 @@ describe("oidc authorization", () => {
                     headers: {
                         "Content-Type": "application/json",
                     },
-                    ...validBearerTokenResponse,
-                    scope,
+                    body: { ...validBearerTokenResponse, scope },
                 },
                 { name: "token-endpoint" },
             );
 
-            return state;
+            return [code, scope];
         };
 
         beforeEach(() => {
             sessionStorage.clear();
-
-            fetchMock.get(`${metadata.issuer}.well-known/openid-configuration`, metadata);
-            fetchMock.get(`${metadata.issuer}jwks`, {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                keys: [],
-            });
-
-            vi.mocked(jwtDecode).mockReturnValue(validDecodedIdToken);
         });
 
         it("should make correct request to the token endpoint", async () => {
-            const state = await setupState();
-            const codeVerifier = getValueFromStorage(state, "code_verifier");
-            await completeAuthorizationCodeGrant(code, state);
+            const [code] = await setupState();
+            const codeVerifier = auth.context.codeVerifier;
+            await auth.completeAuthorizationCodeGrant(code);
 
             expect(fetchMock.callHistory.lastCall(metadata.token_endpoint)?.options).toStrictEqual(
                 expect.objectContaining({
                     method: "post",
-                    credentials: "same-origin",
                     headers: {
                         "accept": "application/json",
                         "content-type": "application/x-www-form-urlencoded",
@@ -312,14 +153,13 @@ describe("oidc authorization", () => {
         });
 
         it("should make correct request to the token endpoint with response_mode=fragment", async () => {
-            const state = await setupState({ responseMode: "fragment" });
-            const codeVerifier = getValueFromStorage(state, "code_verifier");
-            await completeAuthorizationCodeGrant(code, state, "fragment");
+            const [code] = await setupState({ responseMode: "fragment" });
+            const codeVerifier = auth.context.codeVerifier;
+            await auth.completeAuthorizationCodeGrant(code);
 
             expect(fetchMock.callHistory.lastCall(metadata.token_endpoint)?.options).toStrictEqual(
                 expect.objectContaining({
                     method: "post",
-                    credentials: "same-origin",
                     headers: {
                         "accept": "application/json",
                         "content-type": "application/x-www-form-urlencoded",
@@ -338,33 +178,22 @@ describe("oidc authorization", () => {
         });
 
         it("should return with valid bearer token", async () => {
-            const state = await setupState();
-            const scope = getValueFromStorage(state, "scope");
-            const result = await completeAuthorizationCodeGrant(code, state);
+            const [code, scope] = await setupState();
+            const result = await auth.completeAuthorizationCodeGrant(code);
 
             expect(result).toEqual({
-                homeserverUrl,
-                identityServerUrl,
-                oidcClientSettings: {
-                    clientId,
-                    issuer: metadata.issuer,
-                },
-                tokenResponse: {
-                    access_token: validBearerTokenResponse.access_token,
-                    id_token: validBearerTokenResponse.id_token,
-                    refresh_token: validBearerTokenResponse.refresh_token,
-                    token_type: validBearerTokenResponse.token_type,
-                    // this value is slightly unstable because it uses the clock
-                    expires_at: result.tokenResponse.expires_at,
-                    scope,
-                },
-                idTokenClaims: result.idTokenClaims,
+                access_token: validBearerTokenResponse.access_token,
+                id_token: validBearerTokenResponse.id_token,
+                refresh_token: validBearerTokenResponse.refresh_token,
+                token_type: validBearerTokenResponse.token_type,
+                // this value is slightly unstable because it uses the clock
+                expires_in: result.expires_in,
+                scope,
             });
         });
 
         it("should return with valid bearer token where token_type is lowercase", async () => {
-            const state = await setupState();
-            const scope = getValueFromStorage(state, "scope");
+            const [code, scope] = await setupState();
             const tokenResponse = {
                 ...validBearerTokenResponse,
                 scope,
@@ -374,55 +203,33 @@ describe("oidc authorization", () => {
                 response: tokenResponse,
             });
 
-            const result = await completeAuthorizationCodeGrant(code, state);
+            const result = await auth.completeAuthorizationCodeGrant(code);
 
             expect(result).toEqual({
-                homeserverUrl,
-                identityServerUrl,
-                oidcClientSettings: {
-                    clientId,
-                    issuer: metadata.issuer,
-                },
-                // results in token that uses 'Bearer' token type
-                tokenResponse: {
-                    access_token: validBearerTokenResponse.access_token,
-                    id_token: validBearerTokenResponse.id_token,
-                    refresh_token: validBearerTokenResponse.refresh_token,
-                    token_type: "Bearer",
-                    // this value is slightly unstable because it uses the clock
-                    expires_at: result.tokenResponse.expires_at,
-                    scope,
-                },
-                idTokenClaims: result.idTokenClaims,
+                access_token: validBearerTokenResponse.access_token,
+                id_token: validBearerTokenResponse.id_token,
+                refresh_token: validBearerTokenResponse.refresh_token,
+                token_type: "Bearer",
+                // this value is slightly unstable because it uses the clock
+                expires_in: result.expires_in,
+                scope,
             });
 
-            expect(result.tokenResponse.token_type).toEqual("Bearer");
-        });
-
-        it("should throw when state is not found in storage", async () => {
-            // don't setup sessionStorage with expected state
-            sessionStorage.clear();
-            const state = "abc123";
-            fetchMock.post(metadata.token_endpoint, {
-                status: 500,
-            });
-            await expect(() => completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
-                new Error(OidcError.MissingOrInvalidStoredState),
-            );
+            expect(result.token_type).toEqual("Bearer");
         });
 
         it("should throw with code exchange failed error when request fails", async () => {
-            const state = await setupState();
+            const [code] = await setupState();
             fetchMock.modifyRoute("token-endpoint", {
                 response: { status: 500 },
             });
-            await expect(completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
-                new Error(OidcError.CodeExchangeFailed),
+            await expect(auth.completeAuthorizationCodeGrant(code)).rejects.toThrow(
+                new HTTPError(OAuth2Error.CodeExchangeFailed, 500, expect.anything()),
             );
         });
 
         it("should throw invalid token error when token is invalid", async () => {
-            const state = await setupState();
+            const [code] = await setupState();
             const invalidBearerTokenResponse = {
                 ...validBearerTokenResponse,
                 access_token: null,
@@ -430,38 +237,36 @@ describe("oidc authorization", () => {
             fetchMock.modifyRoute("token-endpoint", {
                 response: invalidBearerTokenResponse,
             });
-            await expect(completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
-                new Error(OidcError.InvalidBearerTokenResponse),
-            );
-        });
-
-        it("should throw invalid id token error when id_token is invalid", async () => {
-            const state = await setupState();
-            vi.mocked(jwtDecode).mockReturnValue({
-                ...validDecodedIdToken,
-                // invalid audience
-                aud: "something-else",
-            });
-            await expect(completeAuthorizationCodeGrant(code, state)).rejects.toThrow(
-                new Error(OidcError.InvalidIdToken),
+            await expect(auth.completeAuthorizationCodeGrant(code)).rejects.toThrow(
+                new Error(OAuth2Error.InvalidBearerTokenResponse),
             );
         });
     });
 
     describe("startDeviceAuthorization", () => {
         it("should make the request with the expected parameters", async () => {
-            const metadata = mockOpenIdConfiguration();
+            const metadata = makeDelegatedAuthMetadata();
 
-            fetchMock.postOnce(metadata.device_authorization_endpoint!, { device_code: "test" });
+            fetchMock.postOnce(metadata.device_authorization_endpoint!, {
+                device_code: "test",
+                user_code: "uc",
+                verification_uri: "https://url",
+                expires_in: 9999,
+            });
 
             const scope = generateScope(deviceId);
             const response = await startDeviceAuthorization({ clientId, metadata, scope });
 
-            expect(response).toStrictEqual({ device_code: "test" });
+            expect(response).toStrictEqual({
+                device_code: "test",
+                user_code: "uc",
+                verification_uri: "https://url",
+                expires_in: 9999,
+            });
             expect(fetchMock).toHavePosted(metadata.device_authorization_endpoint!, {
                 matcherFunction: (callLog) => {
                     expect(callLog.options.body).toBe(
-                        "client_id=xyz789&scope=openid+urn%3Amatrix%3Aorg.matrix.msc2967.client%3Aapi%3A*+urn%3Amatrix%3Aorg.matrix.msc2967.client%3Adevice%3Adeadbeef",
+                        "client_id=xyz789&scope=urn%3Amatrix%3Aclient%3Aapi%3A*+urn%3Amatrix%3Aclient%3Adevice%3Adeadbeef",
                     );
                     return true;
                 },
@@ -470,7 +275,7 @@ describe("oidc authorization", () => {
     });
 
     describe("waitForDeviceAuthorization", () => {
-        const metadata = mockOpenIdConfiguration();
+        const metadata = makeDelegatedAuthMetadata();
         const session = {
             device_code: "device",
             user_code: "user",

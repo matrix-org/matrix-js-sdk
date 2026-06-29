@@ -27,7 +27,7 @@ import { type RoomMember } from "./models/room-member.ts";
 import { EventType } from "./@types/event.ts";
 import { type DecryptionFailureCode } from "./crypto-api/index.ts";
 import { DecryptionError, type EventDecryptionResult } from "./common-crypto/CryptoBackend.ts";
-import { OAuthGrantType, type OidcClientConfig, type ValidatedAuthMetadata } from "./oidc/index.ts";
+import { OAuthGrantType, type ValidatedAuthMetadata } from "./oauth/index.ts";
 
 /**
  * Create a {@link MatrixEvent}.
@@ -195,26 +195,7 @@ export async function decryptExistingEvent(
  * @returns OidcClientConfig
  * @experimental
  */
-export const makeDelegatedAuthConfig = (
-    issuer = "https://auth.org/",
-    additionalGrantTypes: string[] = [],
-): OidcClientConfig => {
-    const metadata = mockOpenIdConfiguration(issuer, additionalGrantTypes);
-
-    return {
-        ...metadata,
-        signingKeys: null,
-    };
-};
-
-/**
- * Useful for mocking <issuer>/.well-known/openid-configuration
- * @param issuer used as the base for all other urls
- * @param additionalGrantTypes to add to the default grant types
- * @returns ValidatedAuthMetadata
- * @experimental
- */
-export const mockOpenIdConfiguration = (
+export const makeDelegatedAuthMetadata = (
     issuer = "https://auth.org/",
     additionalGrantTypes: string[] = [],
 ): ValidatedAuthMetadata => ({
@@ -224,8 +205,8 @@ export const mockOpenIdConfiguration = (
     authorization_endpoint: issuer + "auth",
     registration_endpoint: issuer + "registration",
     device_authorization_endpoint: issuer + "device",
-    jwks_uri: issuer + "jwks",
     response_types_supported: ["code"],
     grant_types_supported: [OAuthGrantType.AuthorizationCode, OAuthGrantType.RefreshToken, ...additionalGrantTypes],
     code_challenge_methods_supported: ["S256"],
+    response_modes_supported: ["query", "fragment"],
 });

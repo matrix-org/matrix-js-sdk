@@ -713,7 +713,7 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Export secrets bundle for transmitting to another device as part of OIDC QR login
+     * Export secrets bundle for transmitting to another device as part of OAuth2 QR login
      */
     exportSecretsBundle?(): Promise<Awaited<ReturnType<SecretsBundle["to_json"]>>>;
 

@@ -60,11 +60,9 @@
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^2.0.0",
-        "jwt-decode": "^4.0.0",
         "loglevel": "^1.9.2",
         "matrix-events-sdk": "0.0.1",
         "matrix-widget-api": "^1.16.1",
-        "oidc-client-ts": "^3.0.1",
         "p-retry": "8",
         "sdp-transform": "^3.0.0",
         "unhomoglyph": "^1.0.6"

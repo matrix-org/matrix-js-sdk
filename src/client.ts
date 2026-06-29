@@ -241,7 +241,7 @@ import { type RoomMessageEventContent, type StickerEventContent } from "./@types
 import { type ImageInfo } from "./@types/media.ts";
 import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
-import { type ValidatedAuthMetadata, validateAuthMetadataAndKeys } from "./oidc/index.ts";
+import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
@@ -8900,11 +8900,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async getAuthMetadata(): Promise<ValidatedAuthMetadata> {
         const useStable = await this.isVersionSupported("v1.15");
-        const authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
+        const authMetadata = await this.http.request(Method.Get, "/auth_metadata", undefined, undefined, {
             prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
         });
 
-        return validateAuthMetadataAndKeys(authMetadata);
+        if (isValidAuthMetadata(authMetadata)) {
+            return authMetadata;
+        }
+
+        logger.error("Issuer configuration not valid");
+        throw new Error(OAuth2Error.OpSupport);
     }
 }
 

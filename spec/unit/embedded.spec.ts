@@ -1139,8 +1139,8 @@ describe("RoomWidgetClient", () => {
         });
     });
 
-    describe("oidc token", () => {
-        it("requests an oidc token", async () => {
+    describe("oauth2 token", () => {
+        it("requests an oauth2 token", async () => {
             await makeClient({});
             expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });

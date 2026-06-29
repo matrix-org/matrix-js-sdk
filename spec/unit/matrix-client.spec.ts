@@ -84,7 +84,7 @@ import { StubStore } from "../../src/store/stub";
 import { type ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
 import { type RoomMessageEventContent } from "../../src/@types/events";
-import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
+import { makeDelegatedAuthMetadata } from "../test-utils/auth.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
@@ -3882,19 +3882,11 @@ describe("MatrixClient", function () {
 
     describe("getAuthMetadata", () => {
         beforeEach(() => {
-            // This request is made by oidc-client-ts so is not intercepted by httpLookups
-            fetchMock.get("https://auth.org/jwks", {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                keys: [],
-            });
             makeClient();
         });
 
         it("should use stable prefix", async () => {
-            const metadata = mockOpenIdConfiguration();
+            const metadata = makeDelegatedAuthMetadata();
             client.getVersions = vi.fn().mockResolvedValue({
                 versions: ["v1.15"],
             });
@@ -3907,15 +3899,12 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
 
         it("should use unstable prefix", async () => {
-            const metadata = mockOpenIdConfiguration();
+            const metadata = makeDelegatedAuthMetadata();
             httpLookups = [
                 {
                     method: "GET",
@@ -3925,35 +3914,7 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
-            expect(httpLookups.length).toEqual(0);
-        });
-
-        it("should handle no jwks_uri", async () => {
-            const { jwks_uri: _, ...metadata } = mockOpenIdConfiguration();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-                {
-                    method: "GET",
-                    path: `/auth_issuer`,
-                    data: { issuer: metadata.issuer },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
-
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: null,
-            });
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
     });
