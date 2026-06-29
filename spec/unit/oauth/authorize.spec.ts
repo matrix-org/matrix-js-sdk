@@ -117,10 +117,6 @@ describe("authorization", () => {
             return [code, scope];
         };
 
-        beforeEach(() => {
-            sessionStorage.clear();
-        });
-
         it("should make correct request to the token endpoint", async () => {
             const [code] = await setupState();
             const codeVerifier = auth.context.codeVerifier;
