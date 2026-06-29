@@ -70,7 +70,7 @@ export class OAuth2 {
      * @returns Promise<string> resolved with registered clientId
      * @throws when registration is not supported, on failed request or invalid response
      */
-    public static async registerOidcClient(
+    public static async registerClient(
         authMetadata: ValidatedAuthMetadata,
         clientMetadata: OAuthRegistrationRequest,
     ): Promise<string> {

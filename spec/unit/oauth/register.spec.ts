@@ -19,7 +19,7 @@ import fetchMock from "@fetch-mock/vitest";
 import { type OAuthRegistrationRequest, OAuth2, OAuth2Error } from "../../../src/oauth";
 import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
 
-describe("registerOidcClient()", () => {
+describe("registerClient()", () => {
     const issuer = "https://auth.com/";
     const clientName = "Element";
     const baseUrl = "https://just.testing";
@@ -41,7 +41,7 @@ describe("registerOidcClient()", () => {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
-        expect(await OAuth2.registerOidcClient(delegatedAuthConfig, metadata)).toEqual(dynamicClientId);
+        expect(await OAuth2.registerClient(delegatedAuthConfig, metadata)).toEqual(dynamicClientId);
         expect(fetchMock.fetchHandler).toHaveFetched(
             delegatedAuthConfig.registration_endpoint,
             expect.objectContaining({
@@ -72,7 +72,7 @@ describe("registerOidcClient()", () => {
         fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
             status: 500,
         });
-        await expect(() => OAuth2.registerOidcClient(delegatedAuthConfig, metadata)).rejects.toThrow(
+        await expect(() => OAuth2.registerClient(delegatedAuthConfig, metadata)).rejects.toThrow(
             OAuth2Error.DynamicRegistrationFailed,
         );
     });
@@ -83,14 +83,14 @@ describe("registerOidcClient()", () => {
             // no clientId in response
             body: "{}",
         });
-        await expect(() => OAuth2.registerOidcClient(delegatedAuthConfig, metadata)).rejects.toThrow(
+        await expect(() => OAuth2.registerClient(delegatedAuthConfig, metadata)).rejects.toThrow(
             OAuth2Error.DynamicRegistrationInvalid,
         );
     });
 
     it("should throw when required scopes are unavailable", async () => {
         await expect(() =>
-            OAuth2.registerOidcClient(
+            OAuth2.registerClient(
                 {
                     ...delegatedAuthConfig,
                     grant_types_supported: [delegatedAuthConfig.grant_types_supported[0]],
@@ -106,7 +106,7 @@ describe("registerOidcClient()", () => {
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
         expect(
-            await OAuth2.registerOidcClient(delegatedAuthConfig, {
+            await OAuth2.registerClient(delegatedAuthConfig, {
                 ...metadata,
                 tos_uri: "http://just.testing/tos",
                 policy_uri: "https://policy-uri/",
@@ -133,7 +133,7 @@ describe("registerOidcClient()", () => {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
-        expect(await OAuth2.registerOidcClient(config, metadata)).toEqual(dynamicClientId);
+        expect(await OAuth2.registerClient(config, metadata)).toEqual(dynamicClientId);
         expect(fetchMock.fetchHandler).toHaveFetched(
             config.registration_endpoint,
             expect.objectContaining({

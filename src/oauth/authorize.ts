@@ -189,11 +189,11 @@ export function validateDeviceAuthorizationResponse(
 }
 
 /**
- * Begin OIDC device authorization flow.
+ * Begin OAuth2 device authorization flow.
  * @param options - The device authorization parameters.
  * @param options.clientId - the client ID returned from client registration.
  * @param options.scope - the scope to request for authorization.
- * @param options.metadata - the validated OIDC metadata for the Identity Provider.
+ * @param options.metadata - the validated OAuth2 metadata for the Identity Provider.
  * @returns a promise that resolves to a device access token response,
  *   or an error response if the user denies authorization or the device code expires.
  */
@@ -227,10 +227,10 @@ export const startDeviceAuthorization = async ({
 };
 
 /**
- * Polls the OIDC token endpoint until we get a device access token response, or encounter an unrecoverable error.
+ * Polls the OAuth2 token endpoint until we get a device access token response, or encounter an unrecoverable error.
  * @param options - The device authorization parameters.
  * @param options.session - The session returned from a previous call to {@link startDeviceAuthorization}.
- * @param options.metadata - The validated OIDC metadata for the Identity Provider.
+ * @param options.metadata - The validated OAuth2 metadata for the Identity Provider.
  * @param options.clientId - The client ID returned from client registration.
  * @returns a promise that resolves to a device access token response,
  *   or an error response if the user denies authorization or the device code expires.
