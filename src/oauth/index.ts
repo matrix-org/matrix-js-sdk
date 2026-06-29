@@ -208,8 +208,8 @@ export class OAuth2 {
     }
 
     /**
-     * TODO
-     * @param refreshToken
+     * Refresh the access token using the given refresh token and the refresh token grant
+     * @param refreshToken - the token to use to refresh the access token
      */
     public async performRefreshTokenGrant(refreshToken: string): Promise<BearerTokenResponse> {
         const params = new URLSearchParams();
@@ -225,9 +225,9 @@ export class OAuth2 {
     }
 
     /**
-     * TODO
-     * @param token
-     * @param type
+     * Revokes the given token
+     * @param token - the token to remove
+     * @param type - the type of token, acts as a hint to the IdP
      */
     public async revokeToken(token: string, type?: "access_token" | "refresh_token"): Promise<void> {
         const params = new URLSearchParams();

@@ -99,16 +99,13 @@ export const normalizeBearerTokenResponseTokenType = (response: ValidTokenRespon
 
 /**
  * Response from the OAuth2 token endpoint when exchanging a token for grant_type device_code.
- * TODO
  */
 export interface DeviceAccessTokenResponse {
-    id_token?: string;
     access_token: string;
     token_type: string;
     refresh_token?: string;
     scope?: string;
     expires_in?: number;
-    session_state?: string;
 }
 
 /**
@@ -121,17 +118,14 @@ export function isValidDeviceAccessTokenResponse(response: unknown): response is
         isRecord(response) &&
         hasRequiredStringProperty(response, "access_token") &&
         hasRequiredStringProperty(response, "token_type") &&
-        hasOptionalStringProperty(response, "id_token") &&
         hasOptionalStringProperty(response, "refresh_token") &&
         hasOptionalStringProperty(response, "scope") &&
-        hasOptionalStringProperty(response, "session_state") &&
         hasOptionalNumberProperty(response, "expires_in")
     );
 }
 
 /**
  * Error from the OAuth2 token endpoint when exchanging a token for grant_type device_code.
- * TODO
  */
 export interface DeviceAccessTokenError {
     error: string;
