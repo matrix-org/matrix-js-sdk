@@ -15,7 +15,6 @@ limitations under the License.
 */
 
 import {
-    type AuthorizationCodeGrantParams,
     type BearerTokenResponse,
     type DeviceAccessTokenError,
     type DeviceAccessTokenResponse,
@@ -149,12 +148,18 @@ export class OAuth2 {
     /**
      * Generate a URL to attempt authorization with the OP
      * See https://spec.matrix.org/v1.18/client-server-api/#authorization-code-flow
+     * @param state - A unique opaque identifier, like a transaction ID,
+     *     that will allow the client to maintain state between the authorization request and the callback.
+     *     The app should use this to key the storage for where the rest of the auth context is saved.
+     * @param responseMode - The manner in which the IdP should send the secrets back to the app. Defaults to `fragment` for privacy.
+     * @param prompt - Optional prompt parameter to pass to the IdP to signal intent, e.g. `create` for User registration.
+     * @param scope - The OAuth2 scope to request, will be generated based on the device ID if omitted.
      * @returns a Promise with the url as a string
      */
     public async generateAuthorizationCodeGrantUrl(
         state: string,
         responseMode: "fragment" | "query" = "fragment",
-        prompt?: AuthorizationCodeGrantParams["prompt"],
+        prompt?: string,
         scope?: string,
     ): Promise<string> {
         const challenge = encodeUnpaddedBase64Url(await sha256(this.context.codeVerifier));

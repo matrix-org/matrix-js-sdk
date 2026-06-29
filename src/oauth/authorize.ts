@@ -84,53 +84,6 @@ export const generateScope = (deviceId?: string): string => {
 };
 
 /**
- * Parameters for {@link generateAuthorizationCodeGrantUrl}.
- */
-export type AuthorizationCodeGrantParams = {
-    /**
-     * The auth metadata received from {@link MatrixClient.getAuthMetadata}.
-     */
-    metadata: ValidatedAuthMetadata;
-    /**
-     * The client ID returned from client registration.
-     */
-    clientId: string;
-    /**
-     * The redirect URI that MUST match one of the values registered in the client metadata
-     */
-    redirectUri: string;
-    /**
-     * The device ID to use for the new device, will be generated if omitted.
-     */
-    deviceId?: string;
-    /**
-     * A cryptographically random value that will allow to make sure that the client that makes the token request
-     * for a given code is the same one that made the authorization request.
-     *
-     * Needs to be persisted and passed back to the SDK after the user returns from the IdP.
-     *
-     * It is defined in RFC 7636 as a high-entropy cryptographic random string using the characters
-     * [A-Z], [a-z], [0-9], -, ., _ and ~ with a minimum length of 43 characters and a maximum length of 128 characters.
-     */
-    verifier: string;
-    /**
-     * A unique opaque identifier, like a transaction ID,
-     * that will allow the client to maintain state between the authorization request and the callback.
-     *
-     * The app should use this to key the storage for where the rest of the auth context is saved.
-     */
-    state: string;
-    /**
-     * Optional prompt parameter to pass to the IdP to signal intent, e.g. `create` for User registration.
-     */
-    prompt?: string;
-    /**
-     * The manner in which the IdP should send the secrets back to the app. Defaults to `fragment` for privacy.
-     */
-    responseMode?: "query" | "fragment";
-};
-
-/**
  * Normalize token_type to use capital case to make consuming the token response easier
  * token_type is case insensitive, and it is spec-compliant for OPs to return token_type: "bearer"
  * Later, when used in auth headers it is case sensitive and must be Bearer
