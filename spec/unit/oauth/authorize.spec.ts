@@ -19,8 +19,6 @@ limitations under the License.
 */
 
 import fetchMock from "@fetch-mock/vitest";
-import { Crypto } from "@peculiar/webcrypto";
-import { getRandomValues } from "node:crypto";
 
 import { logger } from "../../../src/logger";
 import { OAuth2, generateScope, startDeviceAuthorization, waitForDeviceAuthorization } from "../../../src/oauth";
@@ -34,7 +32,12 @@ describe("authorization", () => {
     const deviceId = "deadbeef";
     const baseUrl = "https://test.com";
 
-    const auth = new OAuth2(delegatedAuthConfig, { clientId, redirectUri: baseUrl, deviceId });
+    const auth = new OAuth2(delegatedAuthConfig, {
+        clientId,
+        redirectUri: baseUrl,
+        deviceId,
+        codeVerifier: "test-code-verifier",
+    });
 
     // 14.03.2022 16:15
     const now = 1647270879403;
@@ -43,15 +46,6 @@ describe("authorization", () => {
         vi.spyOn(logger, "warn");
         vi.useFakeTimers();
         vi.setSystemTime(now);
-
-        const webCrypto = new Crypto();
-        Object.defineProperty(window, "crypto", {
-            value: {
-                getRandomValues,
-                randomUUID: vi.fn().mockReturnValue("not-random-uuid"),
-                subtle: webCrypto.subtle,
-            },
-        });
     });
 
     describe("generateAuthorizationCodeGrantUrl()", () => {
@@ -69,7 +63,7 @@ describe("authorization", () => {
             );
             expect(authUrl.searchParams.get("state")).toBe(state);
 
-            expect(authUrl.searchParams.get("code_challenge")).toBeTruthy();
+            expect(authUrl.searchParams.get("code_challenge")).toEqual("0FLIKahrX7kqxncwhV5WD82lu_wi5GA8FsRSLubaOpU");
         });
 
         it("should generate url with create prompt", async () => {

@@ -82,7 +82,6 @@
         "@babel/preset-typescript": "^8.0.0",
         "@fetch-mock/vitest": "^0.2.18",
         "@matrix-org/olm": "3.2.15",
-        "@peculiar/webcrypto": "^1.4.5",
         "@types/debug": "^4.1.7",
         "@types/node": "22",
         "@types/sdp-transform": "^3.0.0",
