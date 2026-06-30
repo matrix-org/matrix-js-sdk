@@ -223,6 +223,7 @@ import { type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
 import {
     type CrossSigningKeyInfo,
+    type CrossSigningKeys,
     type CryptoApi,
     type CryptoCallbacks,
     CryptoEvent,
@@ -566,14 +567,6 @@ export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
 
-enum CrossSigningKeyType {
-    MasterKey = "master_key",
-    SelfSigningKey = "self_signing_key",
-    UserSigningKey = "user_signing_key",
-}
-
-export type CrossSigningKeys = Record<CrossSigningKeyType, CrossSigningKeyInfo>;
-
 export type SendToDeviceContentMap = Map<string, Map<string, Record<string, any>>>;
 
 export interface ISignedKey {
@@ -583,6 +576,9 @@ export interface ISignedKey {
     algorithms: string[];
     device_id: string;
 }
+
+// re-export for backwards compatibility
+export { type CrossSigningKeys };
 
 export type KeySignatures = Record<string, Record<string, CrossSigningKeyInfo | ISignedKey>>;
 export interface IUploadKeySignaturesResponse {
