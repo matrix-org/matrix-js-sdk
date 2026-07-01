@@ -120,12 +120,29 @@ describe("Device dehydration", () => {
             // The first time will return a single event, and the second
             // time will return no events (which will signal to the
             // rehydration function that it can stop)
-            const nextBatch = new URL(callLog.url).searchParams.get("from") ?? "0";
-            const events = nextBatch === "0" ? [{ sender: "@alice:localhost", type: "m.dummy", content: {} }] : [];
-            return {
-                events,
-                next_batch: nextBatch + "1",
-            };
+            const from = new URL(callLog.url).searchParams.get("from") ?? "0";
+
+            switch (from) {
+                case "0":
+                    return {
+                        events: [{ sender: "@alice:localhost", type: "m.dummy", content: { batch: 0 } }],
+                        next_batch: "1",
+                    };
+                case "1":
+                    return {
+                        events: [{ sender: "@alice:localhost", type: "m.dummy", content: { batch: 1 } }],
+                        next_batch: "2",
+                    };
+                case "2":
+                    return {
+                        events: [{ sender: "@alice:localhost", type: "m.dummy", content: { batch: 2 } }],
+                        // next_batch is missing, meaning there are no more events
+                    };
+                default:
+                    // Because the previous batch did not provide `next_batch`,
+                    // we stopped polling, so we should not get here.
+                    throw new Error(`Unexpected call with from=${from}`);
+            }
         });
         fetchMock.get(
             `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
@@ -135,12 +152,12 @@ describe("Device dehydration", () => {
         expect(dehydrationCount).toEqual(3);
 
         expect(setDehydrationCount).toEqual(2);
-        expect(eventsResponse.mock.calls).toHaveLength(2);
+        expect(eventsResponse.mock.calls).toHaveLength(3);
 
         expect(rehydrationStartedCounter.counter).toEqual(1);
         expect(rehydrationCompletedCounter.counter).toEqual(1);
         expect(creationEventCounter.counter).toEqual(3);
-        expect(rehydrationProgressCounter.counter).toEqual(1);
+        expect(rehydrationProgressCounter.counter).toEqual(3);
         expect(dehydrationKeyCachedEventCounter.counter).toEqual(2);
 
         // test that if we get an error when we try to rotate, it emits an event
