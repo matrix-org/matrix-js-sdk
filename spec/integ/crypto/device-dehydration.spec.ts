@@ -120,7 +120,7 @@ describe("Device dehydration", () => {
             // The first time will return a single event, and the second
             // time will return no events (which will signal to the
             // rehydration function that it can stop)
-            const nextBatch = new URL(callLog.url).searchParams.get("next_batch") ?? "0";
+            const nextBatch = new URL(callLog.url).searchParams.get("from") ?? "0";
             const events = nextBatch === "0" ? [{ sender: "@alice:localhost", type: "m.dummy", content: {} }] : [];
             return {
                 events,

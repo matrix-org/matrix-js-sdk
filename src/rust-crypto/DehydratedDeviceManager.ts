@@ -272,7 +272,7 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
             const eventResp: DehydratedDeviceEventsResp = await this.http.authedRequest<DehydratedDeviceEventsResp>(
                 Method.Get,
                 path,
-                nextBatch ? { next_batch: nextBatch } : undefined,
+                nextBatch ? { "from": nextBatch } : undefined,
                 undefined,
                 {
                     prefix: UnstablePrefix,
