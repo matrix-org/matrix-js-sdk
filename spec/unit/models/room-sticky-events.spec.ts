@@ -2,6 +2,7 @@ import { type Mock } from "vitest";
 
 import { type IStickyEvent, MatrixEvent } from "../../../src";
 import { RoomStickyEventsStore, RoomStickyEventsEvent } from "../../../src/models/room-sticky-events";
+import { EventType } from "../../../src/@types/event";
 
 describe("RoomStickyEvents", () => {
     let stickyEvents: RoomStickyEventsStore;
@@ -32,41 +33,41 @@ describe("RoomStickyEvents", () => {
     });
 
     describe("addStickyEvents", () => {
-        it("should allow adding an event without a msc4354_sticky_key", () => {
-            stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, content: {} })]);
+        it("should allow adding an event without a msc4354_sticky_key", async () => {
+            await stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, content: {} })]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(1);
         });
-        it("should not allow adding an event without a msc4354_sticky property", () => {
-            stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, msc4354_sticky: undefined })]);
+        it("should not allow adding an event without a msc4354_sticky property", async () => {
+            await stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, msc4354_sticky: undefined })]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
-            stickyEvents.addStickyEvents([
+            await stickyEvents.addStickyEvents([
                 new MatrixEvent({ ...stickyEvent, msc4354_sticky: { duration_ms: undefined } as any }),
             ]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
         });
-        it("should not allow adding an event without a sender", () => {
-            stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, sender: undefined })]);
+        it("should not allow adding an event without a sender", async () => {
+            await stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, sender: undefined })]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
         });
-        it("should not allow adding an event with an invalid sender", () => {
-            stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, sender: "not_a_real_sender" })]);
+        it("should not allow adding an event with an invalid sender", async () => {
+            await stickyEvents.addStickyEvents([new MatrixEvent({ ...stickyEvent, sender: "not_a_real_sender" })]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
         });
-        it("should ignore old events", () => {
-            stickyEvents.addStickyEvents([
+        it("should ignore old events", async () => {
+            await stickyEvents.addStickyEvents([
                 new MatrixEvent({ ...stickyEvent, origin_server_ts: 0, msc4354_sticky: { duration_ms: 1 } }),
             ]);
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
         });
-        it("should be able to just add an event", () => {
+        it("should be able to just add an event", async () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
-            stickyEvents.addStickyEvents([originalEv]);
+            await stickyEvents.addStickyEvents([originalEv]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
         });
-        it("should not replace events on ID tie break", () => {
+        it("should not replace events on ID tie break", async () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
-            stickyEvents.addStickyEvents([originalEv]);
-            stickyEvents.addStickyEvents([
+            await stickyEvents.addStickyEvents([originalEv]);
+            await stickyEvents.addStickyEvents([
                 new MatrixEvent({
                     ...stickyEvent,
                     event_id: "$abc:bar",
@@ -74,10 +75,10 @@ describe("RoomStickyEvents", () => {
             ]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
         });
-        it("should not replace a newer event with an older event", () => {
+        it("should not replace a newer event with an older event", async () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
-            stickyEvents.addStickyEvents([originalEv]);
-            stickyEvents.addStickyEvents([
+            await stickyEvents.addStickyEvents([originalEv]);
+            await stickyEvents.addStickyEvents([
                 new MatrixEvent({
                     ...stickyEvent,
                     origin_server_ts: 1,
@@ -85,44 +86,56 @@ describe("RoomStickyEvents", () => {
             ]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv]);
         });
-        it("should replace an older event with a newer event", () => {
+        it("should replace an older event with a newer event", async () => {
             const originalEv = new MatrixEvent({ ...stickyEvent, event_id: "$old" });
             const newerEv = new MatrixEvent({
                 ...stickyEvent,
                 event_id: "$new",
                 origin_server_ts: Date.now() + 2000,
             });
-            stickyEvents.addStickyEvents([originalEv]);
-            stickyEvents.addStickyEvents([newerEv]);
+            await stickyEvents.addStickyEvents([originalEv]);
+            await stickyEvents.addStickyEvents([newerEv]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: newerEv, previous: originalEv }], []);
         });
-        it("should allow multiple events with the same sticky key for different event types", () => {
+        it("should allow multiple events with the same sticky key for different event types", async () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
             const anotherEv = new MatrixEvent({
                 ...stickyEvent,
                 type: "org.example.another_type",
             });
-            stickyEvents.addStickyEvents([originalEv, anotherEv]);
+            await stickyEvents.addStickyEvents([originalEv, anotherEv]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([originalEv, anotherEv]);
         });
 
-        it("should emit when a new sticky event is added", () => {
+        it("should emit when a new sticky event is added", async () => {
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], [], []);
         });
-        it("should emit when a new unkeyed sticky event is added", () => {
+
+        it("should not add an unkeyed event whose type is m.room.encrypted", async () => {
+            await stickyEvents.addStickyEvents([
+                new MatrixEvent({
+                    ...stickyEvent,
+                    type: EventType.RoomMessageEncrypted,
+                    content: {},
+                }),
+            ]);
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+        });
+
+        it("should emit when a new unkeyed sticky event is added", async () => {
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             const ev = new MatrixEvent({
                 ...stickyEvent,
                 content: {},
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
             expect(emitSpy).toHaveBeenCalledWith([ev], [], []);
         });
@@ -132,14 +145,14 @@ describe("RoomStickyEvents", () => {
         it("should have zero sticky events", () => {
             expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
         });
-        it("should contain a sticky event", () => {
+        it("should contain a sticky event", async () => {
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
         });
-        it("should contain two sticky events", () => {
+        it("should contain two sticky events", async () => {
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
@@ -150,7 +163,7 @@ describe("RoomStickyEvents", () => {
                     msc4354_sticky_key: "bibble",
                 },
             });
-            stickyEvents.addStickyEvents([ev, ev2]);
+            await stickyEvents.addStickyEvents([ev, ev2]);
             expect([...stickyEvents.getStickyEvents()]).toEqual([ev, ev2]);
         });
     });
@@ -165,11 +178,11 @@ describe("RoomStickyEvents", () => {
                 ),
             ).toBeUndefined();
         });
-        it("should return a sticky event", () => {
+        it("should return a sticky event", async () => {
             const ev = new MatrixEvent({
                 ...stickyEvent,
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             expect(
                 stickyEvents.getKeyedStickyEvent(
                     stickyEvent.sender,
@@ -184,14 +197,14 @@ describe("RoomStickyEvents", () => {
         it("should have zero sticky events", () => {
             expect(stickyEvents.getUnkeyedStickyEvent(stickyEvent.sender, stickyEvent.type)).toEqual([]);
         });
-        it("should return a sticky event", () => {
+        it("should return a sticky event", async () => {
             const ev = new MatrixEvent({
                 ...stickyEvent,
                 content: {
                     msc4354_sticky_key: undefined,
                 },
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             expect(stickyEvents.getUnkeyedStickyEvent(stickyEvent.sender, stickyEvent.type)).toEqual([ev]);
         });
     });
@@ -204,7 +217,7 @@ describe("RoomStickyEvents", () => {
             vi.useRealTimers();
         });
 
-        it("should emit when a sticky event expires", () => {
+        it("should emit when a sticky event expires", async () => {
             vi.setSystemTime(1000);
             const ev = new MatrixEvent({
                 ...stickyEvent,
@@ -216,7 +229,7 @@ describe("RoomStickyEvents", () => {
                 sender: "@bob:example.org",
                 origin_server_ts: 1000,
             });
-            stickyEvents.addStickyEvents([ev, evLater]);
+            await stickyEvents.addStickyEvents([ev, evLater]);
             const emitSpy = vi.fn();
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             vi.advanceTimersByTime(15000);
@@ -225,7 +238,7 @@ describe("RoomStickyEvents", () => {
             vi.advanceTimersByTime(1000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [evLater]);
         });
-        it("should emit two events when both expire at the same time", () => {
+        it("should emit two events when both expire at the same time", async () => {
             const emitSpy = vi.fn();
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             vi.setSystemTime(0);
@@ -242,12 +255,12 @@ describe("RoomStickyEvents", () => {
                 },
                 origin_server_ts: 0,
             });
-            stickyEvents.addStickyEvents([ev1, ev2]);
+            await stickyEvents.addStickyEvents([ev1, ev2]);
             expect(emitSpy).toHaveBeenCalledWith([ev1, ev2], [], []);
             vi.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev1, ev2]);
         });
-        it("should emit when a unkeyed sticky event expires", () => {
+        it("should emit when a unkeyed sticky event expires", async () => {
             const emitSpy = vi.fn();
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             vi.setSystemTime(0);
@@ -256,7 +269,7 @@ describe("RoomStickyEvents", () => {
                 content: {},
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             vi.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
@@ -269,42 +282,42 @@ describe("RoomStickyEvents", () => {
         afterAll(() => {
             vi.useRealTimers();
         });
-        it("should not emit if the event does not exist in the map", () => {
+        it("should not emit if the event does not exist in the map", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
                 content: {},
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             stickyEvents.handleRedaction("$123456");
             expect(emitSpy).not.toHaveBeenCalled();
         });
-        it("should emit a remove when the event exists in the map without a predecessor", () => {
+        it("should emit a remove when the event exists in the map without a predecessor", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             stickyEvents.handleRedaction(stickyEvent.event_id);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
-        it("should emit a remove when the event has no sticky key", () => {
+        it("should emit a remove when the event has no sticky key", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
                 content: {},
                 origin_server_ts: Date.now(),
             });
-            stickyEvents.addStickyEvents([ev]);
+            await stickyEvents.addStickyEvents([ev]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             stickyEvents.handleRedaction(stickyEvent.event_id);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
-        it("should emit an update when the event exists in the map with a predecessor", () => {
+        it("should emit an update when the event exists in the map with a predecessor", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
@@ -316,12 +329,12 @@ describe("RoomStickyEvents", () => {
                 event_id: "$newer-ev",
                 origin_server_ts: Date.now() + 1000,
             });
-            stickyEvents.addStickyEvents([ev, newerEv]);
+            await stickyEvents.addStickyEvents([ev, newerEv]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             stickyEvents.handleRedaction(newerEv.getId()!);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
         });
-        it("should emit a remove if the previous event has expired", () => {
+        it("should emit a remove if the previous event has expired", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
@@ -333,7 +346,7 @@ describe("RoomStickyEvents", () => {
                 event_id: "$newer-ev",
                 origin_server_ts: Date.now() + 1000,
             });
-            stickyEvents.addStickyEvents([ev, newerEv]);
+            await stickyEvents.addStickyEvents([ev, newerEv]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             // Expire the older event.
             vi.advanceTimersByTime(stickyEvent.msc4354_sticky.duration_ms);
@@ -341,7 +354,7 @@ describe("RoomStickyEvents", () => {
             stickyEvents.handleRedaction(newerEv.getId()!);
             expect(emitSpy).toHaveBeenCalledWith([], [], [newerEv]);
         });
-        it("should recurse the chain of events if the previous event has been redacted", () => {
+        it("should recurse the chain of events if the previous event has been redacted", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
@@ -359,7 +372,7 @@ describe("RoomStickyEvents", () => {
                 event_id: "$newest-ev",
                 origin_server_ts: Date.now() + 2000,
             });
-            stickyEvents.addStickyEvents([ev, middleEv, newestEv]);
+            await stickyEvents.addStickyEvents([ev, middleEv, newestEv]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             // Mark the middle event as redacted.
             middleEv.setUnsigned({
@@ -372,7 +385,7 @@ describe("RoomStickyEvents", () => {
             // expect immediate transition from newestEv -> ev and skipping middleEv
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
         });
-        it("should revert to the most recent valid event regardless of insertion order", () => {
+        it("should revert to the most recent valid event regardless of insertion order", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
@@ -391,7 +404,7 @@ describe("RoomStickyEvents", () => {
                 origin_server_ts: Date.now() + 2000,
             });
             // Invert in reverse order, to make sure we retain the older events.
-            stickyEvents.addStickyEvents([newestEv, middleEv, ev]);
+            await stickyEvents.addStickyEvents([newestEv, middleEv, ev]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             // Mark the middle event as redacted.
             middleEv.setUnsigned({
@@ -403,7 +416,7 @@ describe("RoomStickyEvents", () => {
             stickyEvents.handleRedaction(newestEv.getId()!);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newestEv }], []);
         });
-        it("should handle redaction when using `handleRedaction` with a `MatrixEvent` parameter", () => {
+        it("should handle redaction when using `handleRedaction` with a `MatrixEvent` parameter", async () => {
             const emitSpy = vi.fn();
             const ev = new MatrixEvent({
                 ...stickyEvent,
@@ -415,7 +428,7 @@ describe("RoomStickyEvents", () => {
                 event_id: "$newer-ev",
                 origin_server_ts: Date.now() + 1000,
             });
-            stickyEvents.addStickyEvents([ev, newerEv]);
+            await stickyEvents.addStickyEvents([ev, newerEv]);
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             stickyEvents.handleRedaction(newerEv);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);

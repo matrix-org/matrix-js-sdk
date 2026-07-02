@@ -453,7 +453,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Stores and tracks sticky events
      */
-    private stickyEvents = new RoomStickyEventsStore();
+    private stickyEvents = new RoomStickyEventsStore((event) => this.client.decryptEventIfNeeded(event));
 
     private readonly retention?: RoomRetentionPolicy;
 

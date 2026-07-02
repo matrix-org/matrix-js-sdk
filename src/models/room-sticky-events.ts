@@ -1,4 +1,5 @@
 import { logger as loggerInstance } from "../logger.ts";
+import { EventType } from "../@types/event.ts";
 import { type MatrixEvent } from "./event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 
@@ -36,6 +37,10 @@ function assertIsUserId(value: unknown): asserts value is UserId {
  * whenever a sticky event is updated or replaced.
  */
 export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEvent, RoomStickyEventsMap> {
+    public constructor(private readonly decryptEventIfNeeded?: (event: MatrixEvent) => Promise<void>) {
+        super();
+    }
+
     /**
      * Sticky event map is a nested map of:
      *  eventType -> `content.sticky_key sender` -> StickyMatrixEvent[]
@@ -130,7 +135,26 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @returns An object describing whether the event was added to the map,
      *          and the previous event it may have replaced.
      */
-    private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: StickyMatrixEvent } | { added: false } {
+    private async addStickyEvent(
+        event: MatrixEvent,
+    ): Promise<{ added: true; prevEvent?: StickyMatrixEvent } | { added: false }> {
+        if (this.decryptEventIfNeeded) {
+            try {
+                await this.decryptEventIfNeeded(event);
+            } catch (e) {
+                logger.warn(`Failed to decrypt sticky event ${event.getId()}, skipping`, e);
+                return { added: false };
+            }
+        }
+
+        const type = event.getType();
+        if (type === EventType.RoomMessageEncrypted) {
+            logger.warn(
+                "addStickyEvent called with encrypted event. Events are expected to be decrypted before adding!",
+            );
+            return { added: false };
+        }
+
         const stickyKey = event.getContent().msc4354_sticky_key;
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
             throw new Error(`${event.getId()} is missing msc4354_sticky_key`);
@@ -141,7 +165,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             throw new Error(`${event.getId()} is missing msc4354_sticky.duration_ms`);
         }
         const sender = event.getSender();
-        const type = event.getType();
         assertIsUserId(sender);
         if (event.unstableStickyExpiresAt <= Date.now()) {
             logger.info("ignored sticky event with older expiration time than current time", stickyKey);
@@ -190,29 +213,33 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     }
 
     /**
-     * Add a series of sticky events, emitting `RoomEvent.StickyEvents` if any
+     * Add a series of sticky events, emitting `RoomStickyEventsEvent.Update` if any
      * changes were made.
      * @param events A set of new sticky events.
      */
-    public addStickyEvents(events: MatrixEvent[]): void {
+    public async addStickyEvents(events: MatrixEvent[]): Promise<void> {
         const added: StickyMatrixEvent[] = [];
         const updated: { current: StickyMatrixEvent; previous: StickyMatrixEvent }[] = [];
-        for (const event of events) {
-            try {
-                const result = this.addStickyEvent(event);
-                if (result.added) {
-                    if (result.prevEvent) {
-                        // e is validated as a StickyMatrixEvent by virtue of `addStickyEvent` returning added: true.
-                        updated.push({ current: event as StickyMatrixEvent, previous: result.prevEvent });
-                    } else {
-                        added.push(event as StickyMatrixEvent);
+
+        await Promise.allSettled(
+            events.map(async (event) => {
+                try {
+                    const result = await this.addStickyEvent(event);
+                    if (result.added) {
+                        if (result.prevEvent) {
+                            updated.push({ current: event as StickyMatrixEvent, previous: result.prevEvent });
+                        } else {
+                            added.push(event as StickyMatrixEvent);
+                        }
                     }
+                } catch (ex) {
+                    logger.warn("ignored invalid sticky event", ex);
                 }
-            } catch (ex) {
-                logger.warn("ignored invalid sticky event", ex);
-            }
-        }
+            }),
+        );
+
         if (added.length || updated.length) this.emit(RoomStickyEventsEvent.Update, added, updated, []);
+
         this.scheduleStickyTimer();
     }
 
