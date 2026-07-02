@@ -62,17 +62,18 @@ import {
     ThreadFilterType,
 } from "./thread.ts";
 import {
-    type CachedReceiptStructure,
+    type CachedReceipt,
     MAIN_ROOM_TIMELINE,
     type Receipt,
     type ReceiptContent,
     ReceiptType,
+    type WrappedReceipt,
 } from "../@types/read_receipts.ts";
 import { type IStateEventWithRoomId } from "../@types/search.ts";
 import { RelationsContainer } from "./relations-container.ts";
-import { ReadReceipt, synthesizeReceipt } from "./read-receipt.ts";
 import { isPollEvent, Poll, PollEvent } from "./poll.ts";
-import { RoomReceipts } from "./room-receipts.ts";
+import { computeEventReadUpTo, RoomReceipts, synthesizeReceipt } from "./room-receipts.ts";
+import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { compareEventOrdering } from "./compare-event-ordering.ts";
 import { KnownMembership, type Membership } from "../@types/membership.ts";
 import { type Capabilities, type IRoomVersionsCapability, RoomVersionStability } from "../serverCapabilities.ts";
@@ -335,20 +336,12 @@ export type RoomEventHandlerMap = {
     > &
     Pick<BeaconEventHandlerMap, BeaconEvent.Update | BeaconEvent.Destroy | BeaconEvent.LivenessChange>;
 
-export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
+export class Room extends TypedEventEmitter<RoomEmittedEvents, RoomEventHandlerMap> {
     public readonly reEmitter: TypedReEmitter<RoomEmittedEvents, RoomEventHandlerMap>;
     private txnToEvent: Map<string, MatrixEvent> = new Map(); // Pending in-flight requests { string: MatrixEvent }
     private notificationCounts: NotificationCount = {};
     private bumpStamp: number | undefined = undefined;
     private readonly threadNotifications = new Map<string, NotificationCount>();
-    public readonly cachedThreadReadReceipts = new Map<string, CachedReceiptStructure[]>();
-    // Useful to know at what point the current user has started using threads in this room
-    private oldestThreadedReceiptTs = Infinity;
-    /**
-     * A record of the latest unthread receipts per user
-     * This is useful in determining whether a user has read a thread or not
-     */
-    private unthreadedReceipts = new Map<string, Receipt>();
     private readonly timelineSets: EventTimelineSet[];
     public readonly polls: Map<string, Poll> = new Map<string, Poll>();
 
@@ -2548,7 +2541,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             room: this,
             client: this.client,
             pendingEventOrdering: this.opts.pendingEventOrdering,
-            receipts: this.cachedThreadReadReceipts.get(threadId) ?? [],
         });
 
         // Add the re-emitter before we start adding events to the thread so we don't miss events
@@ -2559,10 +2551,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             RoomEvent.Timeline,
             RoomEvent.TimelineReset,
         ]);
-
-        // All read receipts should now come down from sync, we do not need to keep
-        // a reference to the cached receipts anymore.
-        this.cachedThreadReadReceipts.delete(threadId);
 
         // If we managed to create a thread and figure out its `id` then we can use it
         // This has to happen before thread.addEvents, because that adds events to the eventtimeline, and the
@@ -3232,73 +3220,48 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         this.roomReceipts.add(content, synthetic);
 
-        // TODO: delete the following code when it has been replaced by RoomReceipts
-        Object.keys(content).forEach((eventId: string) => {
-            Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
-                Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
-                    const receipt = content[eventId][receiptType][userId] as Receipt;
-                    const receiptForMainTimeline = !receipt.thread_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
-                    const receiptDestination: Thread | this | undefined = receiptForMainTimeline
-                        ? this
-                        : this.threads.get(receipt.thread_id ?? "");
-
-                    if (receiptDestination) {
-                        receiptDestination.addReceiptToStructure(
-                            eventId,
-                            receiptType as ReceiptType,
-                            userId,
-                            receipt,
-                            synthetic,
-                        );
-
-                        // If the read receipt sent for the logged in user matches
-                        // the last event of the live timeline, then we know for a fact
-                        // that the user has read that message, so we can mark the room
-                        // as read and not wait for the remote echo from synapse.
-                        //
-                        // This needs to be done after the initial sync as we do not want this
-                        // logic to run whilst the room is being initialised
-                        //
-                        // We only do this for non-synthetic receipts, because
-                        // our intention is to do this when the user really did
-                        // just read a message, not when we are e.g. receiving
-                        // an event during the sync. More explanation at:
-                        // https://github.com/matrix-org/matrix-js-sdk/issues/3684
-                        if (!synthetic && this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
-                            const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
-                            if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
-                                receiptDestination.setUnread(NotificationCountType.Total, 0);
-                                receiptDestination.setUnread(NotificationCountType.Highlight, 0);
-                            }
-                        }
-                    } else {
-                        // The thread does not exist locally, keep the read receipt
-                        // in a cache locally, and re-apply  the `addReceipt` logic
-                        // when the thread is created
-                        this.cachedThreadReadReceipts.set(receipt.thread_id!, [
-                            ...(this.cachedThreadReadReceipts.get(receipt.thread_id!) ?? []),
-                            { eventId, receiptType, userId, receipt, synthetic },
-                        ]);
-                    }
-
-                    const me = this.client.getUserId();
-                    // Track the time of the current user's oldest threaded receipt in the room.
-                    if (userId === me && !receiptForMainTimeline && receipt.ts < this.oldestThreadedReceiptTs) {
-                        this.oldestThreadedReceiptTs = receipt.ts;
-                    }
-
-                    // Track each user's unthreaded read receipt.
-                    if (!receipt.thread_id && receipt.ts > (this.unthreadedReceipts.get(userId)?.ts ?? 0)) {
-                        this.unthreadedReceipts.set(userId, receipt);
-                    }
-                });
-            });
-        });
-        // End of code to delete when replaced by RoomReceipts
+        // If the read receipt sent for the logged in user matches the last event
+        // of the live timeline of its target context (room or thread), mark that
+        // context as read immediately instead of waiting for the remote echo from
+        // synapse. We only do this for non-synthetic receipts and after the
+        // initial sync — see https://github.com/matrix-org/matrix-js-sdk/issues/3684.
+        if (!synthetic && this.client.isInitialSyncComplete()) {
+            this.maybeResetUnreadOnReceipt(content);
+        }
 
         // send events after we've regenerated the structure & cache, otherwise things that
         // listened for the event would read stale data.
         this.emit(RoomEvent.Receipt, event, this);
+    }
+
+    /**
+     * For receipts from the logged-in user that point at the last event in
+     * their target context, eagerly clear the unread counts so we don't have to
+     * wait for the remote echo. See {@link addReceipt}.
+     */
+    private maybeResetUnreadOnReceipt(content: ReceiptContent): void {
+        const me = this.client.getUserId();
+        if (!me) return;
+
+        for (const eventId of Object.keys(content)) {
+            const byType = content[eventId];
+            for (const receiptType of Object.keys(byType)) {
+                const receipt = byType[receiptType][me] as Receipt | undefined;
+                if (!receipt) continue;
+
+                const receiptForMainTimeline: boolean = !receipt.thread_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
+                const destination: Thread | this | undefined = receiptForMainTimeline
+                    ? this
+                    : this.threads.get(receipt.thread_id ?? "");
+                if (!destination) continue;
+
+                const lastEvent = destination.timeline[destination.timeline.length - 1];
+                if (lastEvent && eventId === lastEvent.getId() && lastEvent.getSender() === me) {
+                    destination.setUnread(NotificationCountType.Total, 0);
+                    destination.setUnread(NotificationCountType.Highlight, 0);
+                }
+            }
+        }
     }
 
     /**
@@ -3934,12 +3897,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Find when a client has gained thread capabilities by inspecting the oldest
-     * threaded receipt
-     * @returns the timestamp of the oldest threaded receipt
+     * Find when a user gained thread capabilities by inspecting the oldest
+     * non-main threaded receipt we have from them.
+     * @param userId - The user ID whose oldest threaded receipt timestamp to return.
+     * @returns the timestamp of the oldest threaded receipt, or Infinity if none.
      */
-    public getOldestThreadedReceiptTs(): number {
-        return this.oldestThreadedReceiptTs;
+    public getOldestThreadedReceiptTs(userId: string): number {
+        return this.roomReceipts.getOldestThreadedReceiptTs(userId);
     }
 
     /**
@@ -3963,7 +3927,91 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * a receipt from this user yet).
      */
     public getLastUnthreadedReceiptFor(userId: string): Receipt | undefined {
-        return this.unthreadedReceipts.get(userId);
+        return this.roomReceipts.getLastUnthreadedReceiptFor(userId);
+    }
+
+    /**
+     * Get the latest receipt of the given type for a user.
+     * @param userId - The id of the user.
+     * @param ignoreSynthesized - When true, ignores receipts the JS SDK synthesized.
+     * @param receiptType - The type of receipt to look for. Defaults to `m.read`.
+     */
+    public getReadReceiptForUserId(
+        userId: string,
+        ignoreSynthesized = false,
+        receiptType: ReceiptType = ReceiptType.Read,
+    ): WrappedReceipt | null {
+        return this.roomReceipts.getReadReceiptForUserId(userId, ignoreSynthesized, receiptType);
+    }
+
+    /**
+     * Get the ID of the event the given user has read up to, or null if there
+     * is no receipt or the receipt points at an event we can't validate.
+     */
+    public getEventReadUpTo(userId: string, ignoreSynthesized = false): string | null {
+        return computeEventReadUpTo(
+            this,
+            (id) => this.findEventById(id),
+            (receiptType) => this.getReadReceiptForUserId(userId, ignoreSynthesized, receiptType),
+        );
+    }
+
+    /**
+     * Add a temporary local-echo receipt to the room to reflect in the
+     * client the fact that we've sent one.
+     */
+    public addLocalEchoReceipt(userId: string, event: MatrixEvent, receiptType: ReceiptType, unthreaded = false): void {
+        this.addReceipt(synthesizeReceipt(userId, event, receiptType, unthreaded), true);
+    }
+
+    /**
+     * Get a list of receipts pointing at the given event.
+     */
+    public getReceiptsForEvent(event: MatrixEvent): CachedReceipt[] {
+        const id = event.getId();
+        if (!id) return [];
+        return this.roomReceipts.getReceiptsForEvent(id);
+    }
+
+    /**
+     * Get the IDs of users who have read up to the given event (via supported
+     * receipt types).
+     */
+    public getUsersReadUpTo(event: MatrixEvent): string[] {
+        const id = event.getId();
+        if (!id) return [];
+        return this.roomReceipts.getUsersReadUpTo(id);
+    }
+
+    /**
+     * Thread-scoped variant of {@link getReadReceiptForUserId}. Used by
+     * {@link Thread} which needs to query receipts within its own thread only.
+     */
+    public getReadReceiptForUserIdInThread(
+        threadId: string,
+        userId: string,
+        ignoreSynthesized = false,
+        receiptType: ReceiptType = ReceiptType.Read,
+    ): WrappedReceipt | null {
+        return this.roomReceipts.getReadReceiptForUserIdInThread(threadId, userId, ignoreSynthesized, receiptType);
+    }
+
+    /**
+     * Thread-scoped variant of {@link getReceiptsForEvent}.
+     */
+    public getReceiptsForEventInThread(event: MatrixEvent, threadId: string): CachedReceipt[] {
+        const id = event.getId();
+        if (!id) return [];
+        return this.roomReceipts.getReceiptsForEventInThread(id, threadId);
+    }
+
+    /**
+     * Thread-scoped variant of {@link getUsersReadUpTo}.
+     */
+    public getUsersReadUpToInThread(event: MatrixEvent, threadId: string): string[] {
+        const id = event.getId();
+        if (!id) return [];
+        return this.roomReceipts.getUsersReadUpToInThread(id, threadId);
     }
 
     /**
@@ -3978,7 +4026,15 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * contexts
      */
     public fixupNotifications(userId: string): void {
-        super.fixupNotifications(userId);
+        // If the user's own receipt points at the last event in this room and
+        // they sent it, treat the room as read (we never send receipts against
+        // our own events). Inlined from the former ReadReceipt base class.
+        const receipt = this.getReadReceiptForUserId(userId, false);
+        const lastEvent = this.timeline[this.timeline.length - 1];
+        if (lastEvent && receipt?.eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+            this.setUnread(NotificationCountType.Total, 0);
+            this.setUnread(NotificationCountType.Highlight, 0);
+        }
 
         const unreadThreads = this.getThreads().filter(
             (thread) => this.getThreadUnreadNotificationCount(thread.id, NotificationCountType.Total) > 0,
