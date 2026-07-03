@@ -116,10 +116,9 @@ describe("Device dehydration", () => {
             },
         });
         const eventsResponse = vi.fn((callLog: CallLog) => {
-            // rehydrating should make two calls to the /events endpoint.
-            // The first time will return a single event, and the second
-            // time will return no events (which will signal to the
-            // rehydration function that it can stop)
+            // Rehydrating should make three calls to the /events endpoint. Each
+            // time we will received one event. The third time, next_batch will
+            // be missing, so we know we don't need to make a fourth request.
             const from = new URL(callLog.url).searchParams.get("from") ?? "0";
 
             switch (from) {
