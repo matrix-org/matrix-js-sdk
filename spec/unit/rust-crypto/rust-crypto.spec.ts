@@ -2065,7 +2065,6 @@ describe("RustCrypto", () => {
                     status: 200,
                     body: {
                         events: [],
-                        next_batch: "foo",
                     },
                 });
                 getDehydratedDeviceMock.mockClear();
