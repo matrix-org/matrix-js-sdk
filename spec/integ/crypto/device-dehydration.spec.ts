@@ -120,15 +120,14 @@ describe("Device dehydration", () => {
             // The first time will return a single event, and the second
             // time will return no events (which will signal to the
             // rehydration function that it can stop)
-            const body = JSON.parse(callLog.options.body as string);
-            const nextBatch = body.next_batch ?? "0";
+            const nextBatch = new URL(callLog.url).searchParams.get("next_batch") ?? "0";
             const events = nextBatch === "0" ? [{ sender: "@alice:localhost", type: "m.dummy", content: {} }] : [];
             return {
                 events,
                 next_batch: nextBatch + "1",
             };
         });
-        fetchMock.post(
+        fetchMock.get(
             `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
             eventsResponse,
         );

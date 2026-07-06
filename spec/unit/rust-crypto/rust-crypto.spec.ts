@@ -1956,7 +1956,7 @@ describe("RustCrypto", () => {
                 device_id: dehydratedDeviceBody.device_id,
                 device_data: dehydratedDeviceBody.device_data,
             });
-            fetchMock.post(
+            fetchMock.get(
                 `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
                 {
                     events: [],
@@ -2062,7 +2062,7 @@ describe("RustCrypto", () => {
                     "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
                     putDehydratedDeviceMock,
                 );
-                fetchMock.post(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
+                fetchMock.get(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
                     status: 200,
                     body: {
                         events: [],
