@@ -16,9 +16,18 @@ limitations under the License.
 
 import { logger } from "../logger.ts";
 
+/**
+ * Type guard to check the given value is a Record type with string keys.
+ * @param value - the value to check
+ */
 export const isRecord = (value: unknown): value is Record<string, unknown> =>
     !!value && typeof value === "object" && !Array.isArray(value);
 
+/**
+ * Type guard to check the given record has a key and its value is a string
+ * @param metadata - the record to check
+ * @param key - the key to check
+ */
 export const hasRequiredStringProperty = <K extends string>(
     metadata: Record<string, unknown>,
     key: K,
@@ -30,6 +39,11 @@ export const hasRequiredStringProperty = <K extends string>(
     return true;
 };
 
+/**
+ * Type guard to check that if the given record has a key then its value is a string
+ * @param metadata - the record to check
+ * @param key - the key to check
+ */
 export const hasOptionalStringProperty = <K extends string>(
     metadata: Record<string, unknown>,
     key: K,
@@ -41,6 +55,11 @@ export const hasOptionalStringProperty = <K extends string>(
     return true;
 };
 
+/**
+ * Type guard to check the given record has a key and its value is a number
+ * @param metadata - the record to check
+ * @param key - the key to check
+ */
 export const hasRequiredNumberProperty = <K extends string>(
     metadata: Record<string, unknown>,
     key: K,
@@ -52,6 +71,11 @@ export const hasRequiredNumberProperty = <K extends string>(
     return true;
 };
 
+/**
+ * Type guard to check that if the given record has a key then its value is a number
+ * @param metadata - the record to check
+ * @param key - the key to check
+ */
 export const hasOptionalNumberProperty = <K extends string>(
     metadata: Record<string, unknown>,
     key: K,
@@ -63,6 +87,11 @@ export const hasOptionalNumberProperty = <K extends string>(
     return true;
 };
 
+/**
+ * Type guard to check that if the given record has a key then its value is an array containing only strings
+ * @param metadata - the record to check
+ * @param key - the key to check
+ */
 export const optionalStringArrayProperty = <K extends string>(
     metadata: Record<string, unknown>,
     key: K,
@@ -77,6 +106,12 @@ export const optionalStringArrayProperty = <K extends string>(
     return true;
 };
 
+/**
+ * Type guard to check the given record has a key and its value is an array of strings containing at least the given value
+ * @param metadata - the record to check
+ * @param key - the key to check
+ * @param value - the value to require to be present in the array
+ */
 export const requiredArrayValue = <K extends string, V>(
     metadata: Record<string, unknown>,
     key: K,
