@@ -1960,7 +1960,6 @@ describe("RustCrypto", () => {
                 `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
                 {
                     events: [],
-                    next_batch: "token",
                 },
             );
 
@@ -2066,7 +2065,6 @@ describe("RustCrypto", () => {
                     status: 200,
                     body: {
                         events: [],
-                        next_batch: "foo",
                     },
                 });
                 getDehydratedDeviceMock.mockClear();
