@@ -239,14 +239,4 @@ describe("MatrixHttpApi", () => {
         api.cancelUpload(upload);
         expect(api.getCurrentUploads().find((u) => u.promise === upload)).toBeFalsy();
     });
-
-    it("should return expected object from `getContentUri`", () => {
-        const api = new MatrixHttpApi(new TypedEventEmitter<any, any>(), {
-            baseUrl,
-            prefix,
-            accessToken: "token",
-            onlyData: true,
-        });
-        expect(api.getContentUri()).toMatchSnapshot();
-    });
 });

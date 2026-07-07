@@ -349,8 +349,7 @@ export interface ICreateClientOpts {
      * Set to false to send the access token to the server via a query parameter rather
      * than the Authorization HTTP header.
      *
-     * Note that as of v1.11 of the Matrix spec, sending the access token via a query
-     * is deprecated.
+     * @deprecated as of v1.11 in https://spec.matrix.org/v1.17/client-server-api/#using-access-tokens
      *
      * Default true.
      */
