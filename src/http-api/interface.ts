@@ -143,15 +143,6 @@ export interface IRequestOpts extends BaseRequestOpts {
     inhibitLogoutEmit?: boolean;
 }
 
-export interface IContentUri {
-    base: string;
-    path: string;
-    params: {
-        // eslint-disable-next-line camelcase
-        access_token: string;
-    };
-}
-
 export enum HttpApiEvent {
     SessionLoggedOut = "Session.logged_out",
     NoConsent = "no_consent",

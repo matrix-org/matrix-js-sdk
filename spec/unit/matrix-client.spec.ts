@@ -337,9 +337,7 @@ describe("MatrixClient", function () {
             ...opts,
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = (
-            ["authedRequest", "getContentUri", "request", "uploadContent", "idServerRequest"] as const
-        ).reduce((r, k) => {
+        client.http = (["authedRequest", "request", "uploadContent", "idServerRequest"] as const).reduce((r, k) => {
             r[k] = vi.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
