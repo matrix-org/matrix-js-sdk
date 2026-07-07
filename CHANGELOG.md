@@ -1,3 +1,14 @@
+Changes in [41.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.9.0) (2026-07-07)
+==================================================================================================
+## ✨ Features
+
+* Add method `CryptoApi.getUserCrossSigningKeys` ([#5389](https://github.com/matrix-org/matrix-js-sdk/pull/5389)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix restarting delayed events via compatibility path in RoomWidgetClient ([#5380](https://github.com/matrix-org/matrix-js-sdk/pull/5380)). Contributed by @robintown.
+
+
 Changes in [41.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.8.0) (2026-06-23)
 ==================================================================================================
 ## ✨ Features
