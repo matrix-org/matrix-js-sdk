@@ -53,10 +53,7 @@ jobs:
                   git config --global user.name "RiotRobot"
 
             - name: Merge to develop
-              run: |
-                  git checkout develop
-                  git merge -X ours master
-                  pnpm install --lockfile-only --fix-lockfile --frozen-lockfile=false --ignore-scripts
+              run: .action-repo/scripts/release/merge-master-to-develop.sh
 
             - name: Reset dependencies
               if: inputs.dependencies
