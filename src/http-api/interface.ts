@@ -21,7 +21,6 @@ import { type QueryDict } from "../utils.ts";
 export type Body = Record<string, any> | BodyInit;
 
 /**
- * @experimental
  * Unencrypted access and (optional) refresh token
  */
 export type AccessTokens = {
@@ -40,7 +39,6 @@ export type AccessTokens = {
 };
 
 /**
- * @experimental
  * Function that performs token refresh using the given refreshToken.
  * Returns a promise that resolves to the refreshed access and (optional) refresh tokens.
  *

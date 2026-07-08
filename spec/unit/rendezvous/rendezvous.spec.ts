@@ -16,7 +16,7 @@ limitations under the License.
 
 import { isSignInWithQRAvailable } from "../../../src/rendezvous";
 import { ClientPrefix, type IHttpOpts, type MatrixClient, MatrixHttpApi, OAuthGrantType } from "../../../src";
-import { makeDelegatedAuthConfig } from "../../../src/testing.ts";
+import { makeDelegatedAuthMetadata } from "../../../src/testing.ts";
 
 function makeMockClient(): MatrixClient {
     const baseUrl = "https://example.com";
@@ -57,7 +57,7 @@ describe("MSC4108", () => {
         ])(
             "should return %s if device_code support is %s and msc4108 support is %s",
             async (deviceCodeSupport, mscSupport, expected) => {
-                const metadata = makeDelegatedAuthConfig(
+                const metadata = makeDelegatedAuthMetadata(
                     "https://issuer/",
                     deviceCodeSupport ? [OAuthGrantType.DeviceAuthorization] : [],
                 );
