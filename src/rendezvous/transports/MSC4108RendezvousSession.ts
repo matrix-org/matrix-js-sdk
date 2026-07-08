@@ -203,7 +203,10 @@ export class MSC4108RendezvousSession {
             // rely on server expiring the channel rather than checking ourselves
 
             const etag = poll.headers.get("etag") ?? undefined;
-            if (poll.headers.get("content-type") !== "text/plain") {
+            // Strip any parameters from the content type, e.g. a `charset` appended
+            // by an intermediary proxy, as only the media type itself matters.
+            const contentType = poll.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
+            if (contentType !== "text/plain") {
                 this.etag = etag;
             } else if (poll.status === 200) {
                 if (!etag) {
