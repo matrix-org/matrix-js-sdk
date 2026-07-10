@@ -296,6 +296,9 @@ importers:
       '@types/sdp-transform':
         specifier: ^3.0.0
         version: 3.0.0
+      '@typescript/native':
+        specifier: npm:typescript@7.0.2
+        version: typescript@7.0.2
       '@vitest/coverage-v8':
         specifier: ^4.0.17
         version: 4.1.9(vitest@4.1.9)
@@ -340,19 +343,19 @@ importers:
         version: 0.24.0
       typedoc:
         specifier: ^0.28.1
-        version: 0.28.20(typescript@7.0.2)
+        version: 0.28.20(@typescript/typescript6@6.0.2)
       typedoc-plugin-coverage:
         specifier: ^4.0.0
-        version: 4.0.3(typedoc@0.28.20(typescript@7.0.2))
+        version: 4.0.3(typedoc@0.28.20(@typescript/typescript6@6.0.2))
       typedoc-plugin-mdn-links:
         specifier: ^5.0.0
-        version: 5.1.1(typedoc@0.28.20(typescript@7.0.2))
+        version: 5.1.1(typedoc@0.28.20(@typescript/typescript6@6.0.2))
       typedoc-plugin-missing-exports:
         specifier: ^4.0.0
-        version: 4.1.3(typedoc@0.28.20(typescript@7.0.2))
+        version: 4.1.3(typedoc@0.28.20(@typescript/typescript6@6.0.2))
       typescript:
-        specifier: ^7.0.0
-        version: 7.0.2
+        specifier: npm:@typescript/typescript6@6.0.2
+        version: '@typescript/typescript6@6.0.2'
       vitest:
         specifier: ^4.0.17
         version: 4.1.9(@types/node@22.20.0)(@vitest/coverage-v8@4.1.9)(@vitest/ui@4.1.9)(happy-dom@20.10.6)(vite@8.0.16(@types/node@22.20.0)(jiti@2.7.0)(yaml@2.9.0))
@@ -1816,6 +1819,10 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@typescript/typescript6@6.0.2':
+    resolution: {integrity: sha512-mbCddXd+jm7hfx7w2YU64/Av4/NqqeG3GoRZgxPcgoTxYjhrcfJRw9ULch71SS4G+Q3bOXFhRvPqjguN0Hyp5w==}
+    hasBin: true
+
   '@vitest/coverage-v8@4.1.9':
     resolution: {integrity: sha512-G9/lgqibheLVBDRuya45EbsEXTYcWoSG+TLg7i2axuzx0Eq62eXn+aWXyaVdV5vKvFSWd6ywcX8hA7la9Pvu8g==}
     peerDependencies:
@@ -2681,6 +2688,11 @@ packages:
     hasBin: true
     peerDependencies:
       typescript: 5.0.x || 5.1.x || 5.2.x || 5.3.x || 5.4.x || 5.5.x || 5.6.x || 5.7.x || 5.8.x || 5.9.x || 6.0.x
+
+  typescript@6.0.3:
+    resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
 
   typescript@7.0.2:
     resolution: {integrity: sha512-8FYau96o3NKOhbjKi/qNvG/W5jhzxkbdm5sj9AbZ/5T5sWqn3hJgLfGx27sRKZWTvyzCP8dLRBTf5tBTSRVUNA==}
@@ -4087,6 +4099,10 @@ snapshots:
   '@typescript/typescript-win32-x64@7.0.2':
     optional: true
 
+  '@typescript/typescript6@6.0.2':
+    dependencies:
+      '@typescript/old': typescript@6.0.3
+
   '@vitest/coverage-v8@4.1.9(vitest@4.1.9)':
     dependencies:
       '@bcoe/v8-coverage': 1.0.2
@@ -4964,26 +4980,28 @@ snapshots:
 
   tslib@2.8.1: {}
 
-  typedoc-plugin-coverage@4.0.3(typedoc@0.28.20(typescript@7.0.2)):
+  typedoc-plugin-coverage@4.0.3(typedoc@0.28.20(@typescript/typescript6@6.0.2)):
     dependencies:
-      typedoc: 0.28.20(typescript@7.0.2)
+      typedoc: 0.28.20(@typescript/typescript6@6.0.2)
 
-  typedoc-plugin-mdn-links@5.1.1(typedoc@0.28.20(typescript@7.0.2)):
+  typedoc-plugin-mdn-links@5.1.1(typedoc@0.28.20(@typescript/typescript6@6.0.2)):
     dependencies:
-      typedoc: 0.28.20(typescript@7.0.2)
+      typedoc: 0.28.20(@typescript/typescript6@6.0.2)
 
-  typedoc-plugin-missing-exports@4.1.3(typedoc@0.28.20(typescript@7.0.2)):
+  typedoc-plugin-missing-exports@4.1.3(typedoc@0.28.20(@typescript/typescript6@6.0.2)):
     dependencies:
-      typedoc: 0.28.20(typescript@7.0.2)
+      typedoc: 0.28.20(@typescript/typescript6@6.0.2)
 
-  typedoc@0.28.20(typescript@7.0.2):
+  typedoc@0.28.20(@typescript/typescript6@6.0.2):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
       markdown-it: 14.3.0
       minimatch: 10.2.5
-      typescript: 7.0.2
+      typescript: '@typescript/typescript6@6.0.2'
       yaml: 2.9.0
+
+  typescript@6.0.3: {}
 
   typescript@7.0.2:
     optionalDependencies:
