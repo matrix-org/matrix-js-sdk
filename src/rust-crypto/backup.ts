@@ -380,6 +380,12 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         }
     }
 
+    /**
+     * Helper for {@link enableOrSwitchKeyBackup}.
+     * 
+     * Enables key backup upload and download for the given backup version. Also emits
+     * a {@link CryptoEvent.KeyBackupStatus} event.
+     */
     private async enableKeyBackup(backupInfo: KeyBackupInfoWithVersion): Promise<void> {
         // we know for certain it must be a Curve25519 key, because we have verified it and only Curve25519
         // keys can be verified.
@@ -574,6 +580,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a KeyBackupCreationInfo - All information related to the backup.
      */
     public async setupKeyBackup(signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        // Wait for any active call to `checkKeyBackupAndEnable` to complete, to avoid racing with it
         if (this.keyBackupCheckInProgress) {
             await this.keyBackupCheckInProgress;
         }
