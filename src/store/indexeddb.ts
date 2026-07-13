@@ -64,11 +64,7 @@ export class IndexedDBStore extends MemoryStore {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 
-    /**
-     * The backend instance.
-     * Call through to this API if you need to perform specific indexeddb actions like deleting the database.
-     */
-    public readonly backend: IIndexedDBBackend;
+    public _backend: IIndexedDBBackend;
 
     private startedUp = false;
     private syncTs = 0;
@@ -105,7 +101,7 @@ export class IndexedDBStore extends MemoryStore {
      *
      * @param opts - Options object.
      */
-    public constructor(opts: IOpts) {
+    public constructor(private readonly opts: IOpts) {
         super(opts);
 
         if (!opts.indexedDB) {
@@ -113,10 +109,18 @@ export class IndexedDBStore extends MemoryStore {
         }
 
         if (opts.workerFactory) {
-            this.backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
+            this._backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
         } else {
-            this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
+            this._backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
         }
+    }
+
+    /**
+     * The backend instance.
+     * Call through to this API if you need to perform specific indexeddb actions like deleting the database.
+     */
+    public get backend(): IIndexedDBBackend {
+        return this._backend;
     }
 
     /** Re-exports `TypedEventEmitter.on` */
@@ -136,6 +140,14 @@ export class IndexedDBStore extends MemoryStore {
         logger.log(`IndexedDBStore.startup: connecting to backend`);
         return this.backend
             .connect(this.onClose)
+            .catch((e) => {
+                if (this.opts.workerFactory) {
+                    logger.log("Falling back to local indexeddb backend");
+                    this._backend = new LocalIndexedDBStoreBackend(this.opts.indexedDB!, this.opts.dbName);
+                    return this.backend.connect(this.onClose);
+                }
+                throw e;
+            })
             .then(() => {
                 logger.log(`IndexedDBStore.startup: loading presence events`);
                 return this.backend.getUserPresenceEvents();

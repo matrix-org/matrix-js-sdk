@@ -47,13 +47,13 @@ describe("MatrixClient retrying", function () {
         return httpBackend!.stop();
     });
 
-    it.skip("should retry according to MatrixScheduler.retryFn", function () {});
+    it.todo("should retry according to MatrixScheduler.retryFn", function () {});
 
-    it.skip("should queue according to MatrixScheduler.queueFn", function () {});
+    it.todo("should queue according to MatrixScheduler.queueFn", function () {});
 
-    it.skip("should mark events as EventStatus.NOT_SENT when giving up", function () {});
+    it.todo("should mark events as EventStatus.NOT_SENT when giving up", function () {});
 
-    it.skip("should mark events as EventStatus.QUEUED when queued", function () {});
+    it.todo("should mark events as EventStatus.QUEUED when queued", function () {});
 
     it("should mark events as EventStatus.CANCELLED when cancelled", function () {
         // send a couple of events; the second will be queued
@@ -129,7 +129,7 @@ describe("MatrixClient retrying", function () {
     });
 
     describe("resending", function () {
-        it.skip("should be able to resend a NOT_SENT event", function () {});
-        it.skip("should be able to resend a sent event", function () {});
+        it.todo("should be able to resend a NOT_SENT event", function () {});
+        it.todo("should be able to resend a sent event", function () {});
     });
 });

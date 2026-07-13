@@ -274,6 +274,14 @@ export interface IStore {
     getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
 
     /**
+     * Remove all stored events matching the given IDs from the stored accumulated
+     * sync.
+     * @param roomId The target room.
+     * @param eventIds IDs of events to remove.
+     */
+    removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void>;
+
+    /**
      * Stop the store and perform any appropriate cleanup
      */
     destroy(): Promise<void>;

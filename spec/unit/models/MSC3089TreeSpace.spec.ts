@@ -530,7 +530,7 @@ describe("MSC3089TreeSpace", () => {
 
                         if (eventType === EventType.RoomCreate) {
                             expect(stateKey).toEqual("");
-                            return parentState.filter((e) => e.getType() === EventType.RoomCreate)[0];
+                            return parentState.find((e) => e.getType() === EventType.RoomCreate);
                         } else {
                             if (stateKey !== undefined) {
                                 expect(Object.keys(rooms)).toContain(stateKey);

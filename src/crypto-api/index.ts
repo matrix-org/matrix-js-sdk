@@ -74,8 +74,6 @@ export interface StartDehydrationOpts {
 
 /**
  * Public interface to the cryptography parts of the js-sdk
- *
- * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
     /**
@@ -267,9 +265,17 @@ export interface CryptoApi {
      *
      * This is useful if the user was previously verified but is not anymore
      * ({@link UserVerificationStatus.wasCrossSigningVerified}) and it is not possible to verify him again now.
-     *
      */
     withdrawVerificationRequirement(userId: string): Promise<void>;
+
+    /**
+     * Get the given user's public cross-signing keys, if they have published any, and we have fetched them to
+     * our store.
+     *
+     * Normally this is only useful to applications as debug info, since the SDK handles keeping track of a
+     * user's identity, and whether their devices are verified.
+     */
+    getUserCrossSigningKeys(userId: string): Promise<Partial<CrossSigningKeys> | null>;
 
     /**
      * Get the verification status of a given device.
@@ -715,7 +721,7 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Export secrets bundle for transmitting to another device as part of OIDC QR login
+     * Export secrets bundle for transmitting to another device as part of OAuth2 QR login
      */
     exportSecretsBundle?(): Promise<Awaited<ReturnType<SecretsBundle["to_json"]>>>;
 
@@ -1224,10 +1230,15 @@ export interface CreateSecretStorageOpts {
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
-    Master = "master",
-    SelfSigning = "self_signing",
-    UserSigning = "user_signing",
+    Master = "master_key",
+    SelfSigning = "self_signing_key",
+    UserSigning = "user_signing_key",
 }
+
+/** All of a user's cross-signing keys.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
+ */
+export type CrossSigningKeys = Record<CrossSigningKey, CrossSigningKeyInfo>;
 
 /**
  * Information on one of the cross-signing keys.

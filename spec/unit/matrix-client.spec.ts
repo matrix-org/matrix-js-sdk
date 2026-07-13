@@ -84,7 +84,7 @@ import { StubStore } from "../../src/store/stub";
 import { type ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
 import { type RoomMessageEventContent } from "../../src/@types/events";
-import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
+import { makeDelegatedAuthMetadata } from "../test-utils/auth.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
@@ -334,12 +334,10 @@ describe("MatrixClient", function () {
             store: store,
             scheduler: scheduler,
             userId: userId,
-            ...(opts || {}),
+            ...opts,
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = (
-            ["authedRequest", "getContentUri", "request", "uploadContent", "idServerRequest"] as const
-        ).reduce((r, k) => {
+        client.http = (["authedRequest", "request", "uploadContent", "idServerRequest"] as const).reduce((r, k) => {
             r[k] = vi.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
@@ -2021,27 +2019,29 @@ describe("MatrixClient", function () {
 
     describe("redactEvent", () => {
         const roomId = "!room:example.org";
-        const mockRoom = {
-            getMyMembership: () => KnownMembership.Join,
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
-            getThread: vi.fn(),
-            addPendingEvent: vi.fn(),
-            updatePendingEvent: vi.fn(),
-            reEmitter: {
-                reEmit: vi.fn(),
-            },
-        } as unknown as Room;
+        let mockRoom: Room;
 
         beforeEach(() => {
+            mockRoom = {
+                getMyMembership: () => KnownMembership.Join,
+                currentState: {
+                    getStateEvents: (eventType, stateKey) => {
+                        if (eventType === EventType.RoomEncryption) {
+                            expect(stateKey).toEqual("");
+                            return new MatrixEvent({ content: {} });
+                        } else {
+                            throw new Error("Unexpected event type or state key");
+                        }
+                    },
+                } as Room["currentState"],
+                getThread: vi.fn(),
+                addPendingEvent: vi.fn(),
+                updatePendingEvent: vi.fn(),
+                reEmitter: {
+                    reEmit: vi.fn(),
+                },
+            } as unknown as Room;
+
             client.getRoom = (getRoomId) => {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
@@ -2146,7 +2146,7 @@ describe("MatrixClient", function () {
                             `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
                             `/${encodeURIComponent(txnId)}`,
                         expectBody: {
-                            reason: "redaction test",
+                            "reason": "redaction test",
                             ["org.matrix.msc3912.with_relations"]: ["m.reference"],
                         },
                         data: { event_id: eventId },
@@ -2901,7 +2901,7 @@ describe("MatrixClient", function () {
             const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID) as WrappedRoom;
 
             // Fetch the list of sources and check that we do not have the new room yet.
-            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
+            const policies = client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies).toBeTruthy();
             const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites).toBeTruthy();
@@ -2915,7 +2915,7 @@ describe("MatrixClient", function () {
             expect(added2).toBe(false);
 
             // Fetch the list of sources and check that we have added the new room.
-            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
+            const policies2 = client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies2).toBeTruthy();
             const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites2).toBeTruthy();
@@ -3880,19 +3880,11 @@ describe("MatrixClient", function () {
 
     describe("getAuthMetadata", () => {
         beforeEach(() => {
-            // This request is made by oidc-client-ts so is not intercepted by httpLookups
-            fetchMock.get("https://auth.org/jwks", {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                keys: [],
-            });
             makeClient();
         });
 
         it("should use stable prefix", async () => {
-            const metadata = mockOpenIdConfiguration();
+            const metadata = makeDelegatedAuthMetadata();
             client.getVersions = vi.fn().mockResolvedValue({
                 versions: ["v1.15"],
             });
@@ -3905,15 +3897,12 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
 
         it("should use unstable prefix", async () => {
-            const metadata = mockOpenIdConfiguration();
+            const metadata = makeDelegatedAuthMetadata();
             httpLookups = [
                 {
                     method: "GET",
@@ -3923,60 +3912,7 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
-            expect(httpLookups.length).toEqual(0);
-        });
-
-        it("should fall back to auth_issuer + openid-configuration", async () => {
-            const metadata = mockOpenIdConfiguration();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-                {
-                    method: "GET",
-                    path: `/auth_issuer`,
-                    data: { issuer: metadata.issuer },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
-
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
-            expect(httpLookups.length).toEqual(0);
-        });
-
-        it("should handle no jwks_uri", async () => {
-            const { jwks_uri: _, ...metadata } = mockOpenIdConfiguration();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-                {
-                    method: "GET",
-                    path: `/auth_issuer`,
-                    data: { issuer: metadata.issuer },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
-
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: null,
-            });
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
     });

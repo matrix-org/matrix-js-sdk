@@ -24,7 +24,6 @@ import {
     WidgetApiToWidgetAction,
     MatrixCapabilities,
     type ITurnServer,
-    type IOpenIDCredentials,
     type ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
     UnstableApiVersion,
@@ -97,9 +96,6 @@ class MockWidgetApi extends EventEmitter {
     public sendToDevice = vi.fn().mockResolvedValue(undefined);
     public requestOpenIDConnectToken = vi.fn(async () => {
         return testOIDCToken;
-        return new Promise<IOpenIDCredentials>(() => {
-            return testOIDCToken;
-        });
     });
     public readStateEvents = vi.fn(async () => []);
     public getTurnServers = vi.fn(async () => []);
@@ -186,7 +182,7 @@ describe("RoomWidgetClient", () => {
             await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
             widgetApi.sendRoomEvent.mockResolvedValueOnce({
                 room_id: "!1:example.org",
-                delay_id: `id-${Math.random}`,
+                delay_id: `id-${Math.random()}`,
             });
             await expect(
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
@@ -269,7 +265,7 @@ describe("RoomWidgetClient", () => {
             });
             it("get response then local echo", async () => {
                 await sleep(600);
-                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+                const { injectSpy, resolveWidgetSend } = setupRemoteEcho();
 
                 // Begin by sending an event:
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
@@ -293,10 +289,15 @@ describe("RoomWidgetClient", () => {
 
             it("get local echo then response", async () => {
                 await sleep(600);
-                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+                const { injectSpy, resolveWidgetSend } = setupRemoteEcho();
 
                 // Begin by sending an event:
-                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+                void client.sendEvent(
+                    "!1:example.org",
+                    "org.matrix.rageshake_request",
+                    { request_id: 12 },
+                    "widgetTxId",
+                );
                 // we do not expect it to be send -- until we call `resolveWidgetSend`
                 expect(injectSpy).not.toHaveBeenCalled();
 
@@ -318,7 +319,7 @@ describe("RoomWidgetClient", () => {
             });
             it("__ local echo then response", async () => {
                 await sleep(600);
-                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+                const { injectSpy, resolveWidgetSend } = setupRemoteEcho();
 
                 // Begin by sending an event:
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
@@ -557,7 +558,7 @@ describe("RoomWidgetClient", () => {
                             updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
                             break;
                         case UpdateDelayedEventAction.Restart:
-                            updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
+                            updateDelayedEvent = widgetApi.restartScheduledDelayedEvent;
                             break;
                         case UpdateDelayedEventAction.Send:
                             updateDelayedEvent = widgetApi.sendScheduledDelayedEvent;
@@ -703,7 +704,7 @@ describe("RoomWidgetClient", () => {
             await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
             widgetApi.sendStateEvent.mockResolvedValueOnce({
                 room_id: "!1:example.org",
-                delay_id: `id-${Math.random}`,
+                delay_id: `id-${Math.random()}`,
             });
             await expect(
                 client.sendStateEvent("!1:example.org", "org.example.foo", { hello: "world" }, "bar"),
@@ -1138,8 +1139,8 @@ describe("RoomWidgetClient", () => {
         });
     });
 
-    describe("oidc token", () => {
-        it("requests an oidc token", async () => {
+    describe("oauth2 token", () => {
+        it("requests an oauth2 token", async () => {
             await makeClient({});
             expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });

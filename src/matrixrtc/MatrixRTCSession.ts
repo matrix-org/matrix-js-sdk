@@ -755,9 +755,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         this.membershipNeedsRecalculation = true;
         // Chain the recalculation.
-        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise
-            .finally()
-            .then(() => this.recalculateSessionMembers());
+        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise.then(
+            () => this.recalculateSessionMembers(),
+            () => this.recalculateSessionMembers(),
+        );
         return this.recalculateSessionMembersPromise;
     }
 
@@ -815,7 +816,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        this.encryptionManager?.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
     };

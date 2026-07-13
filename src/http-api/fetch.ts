@@ -208,7 +208,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
      * @returns The parsed response.
      * @throws Error if a problem occurred. This includes network problems and Matrix-specific error JSON.
      */
-    public request<T>(
+    public request<T = unknown>(
         method: Method,
         path: string,
         queryParams?: QueryDict,

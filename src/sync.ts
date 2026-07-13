@@ -917,7 +917,7 @@ export class SyncApi {
             // tell the crypto module to do its processing. It may block (to do a
             // /keys/changes request).
             if (this.syncOpts.cryptoCallbacks) {
-                await this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
+                this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
             }
 
             // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
@@ -1167,7 +1167,6 @@ export class SyncApi {
             for (const [userId, userData] of Object.entries(userUpdate)) {
                 logger.info(`Storing user profile ${userId}`, userData);
                 if (userData.profile_updates) {
-                    client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates);
                     const existingProfile = await client.store.getUserProfile(userId);
                     profilesToAmend.set(userId, { ...existingProfile, ...userData.profile_updates });
                 } else if (userData.profile_updates === null) {
@@ -1180,6 +1179,11 @@ export class SyncApi {
             if (profilesToAmend.size) {
                 await client.store.storeUserProfiles(profilesToAmend);
             }
+
+            // emit after we've update the store so that clients can get the updated profile if they want to
+            for (const [userId, userData] of Object.entries(userUpdate)) {
+                client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates ?? null);
+            }
         }
 
         // handle to-device events
@@ -1191,13 +1195,11 @@ export class SyncApi {
                 receivedToDeviceMessages =
                     await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
             } else {
-                receivedToDeviceMessages = toDeviceMessages.map((rawEvent) =>
-                    // Crypto is not enabled, so we just return the events.
-                    ({
-                        message: rawEvent,
-                        encryptionInfo: null,
-                    }),
-                );
+                // Crypto is not enabled, so we just return the events.
+                receivedToDeviceMessages = toDeviceMessages.map((rawEvent) => ({
+                    message: rawEvent,
+                    encryptionInfo: null,
+                }));
             }
 
             processToDeviceMessages(receivedToDeviceMessages, client);

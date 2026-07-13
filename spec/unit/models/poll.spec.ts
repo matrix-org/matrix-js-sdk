@@ -61,7 +61,7 @@ describe("Poll", () => {
         const event = new MatrixEvent({
             ...eventProps,
             content: {
-                ...(eventProps.content || {}),
+                ...eventProps.content,
                 "m.relates_to": {
                     rel_type: REFERENCE_RELATION.name,
                     event_id: basePollStartEvent.getId(),
@@ -227,7 +227,7 @@ describe("Poll", () => {
                 await poll.getResponses();
                 expect(poll.undecryptableRelationsCount).toBe(1);
 
-                await poll.onNewRelation(undecryptableEvent2);
+                poll.onNewRelation(undecryptableEvent2);
 
                 expect(poll.undecryptableRelationsCount).toBe(2);
 

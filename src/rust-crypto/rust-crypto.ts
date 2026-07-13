@@ -42,6 +42,7 @@ import {
     type BackupTrustInfo,
     type BootstrapCrossSigningOpts,
     type CreateSecretStorageOpts,
+    type CrossSigningKeys,
     CrossSigningKey,
     type CrossSigningKeyInfo,
     type CrossSigningStatus,
@@ -772,6 +773,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Implementation of {@link CryptoApi#getUserCrossSigningKeys}.
+     */
+    public async getUserCrossSigningKeys(userId: string): Promise<Partial<CrossSigningKeys> | null> {
+        const userIdentity = await this.getOlmMachineOrThrow().getIdentity(new RustSdkCryptoJs.UserId(userId));
+
+        if (!userIdentity) {
+            return null;
+        }
+
+        const result: Partial<CrossSigningKeys> = {
+            master_key: JSON.parse(userIdentity.masterKey),
+            self_signing_key: JSON.parse(userIdentity.selfSigningKey),
+        };
+
+        // The USK is only visible for our own identity
+        if ("userSigningKey" in userIdentity) {
+            result.user_signing_key = JSON.parse(userIdentity.userSigningKey);
+        }
+
+        return result;
+    }
+
+    /**
      * Implementation of {@link CryptoApi#isCrossSigningReady}
      */
     public async isCrossSigningReady(): Promise<boolean> {
@@ -1147,7 +1171,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 verificationMethodIdentifierToMethod(method),
             );
             // Get the request content to send to the DM room
-            const verCont: string = await userIdentity.verificationRequestContent(methods);
+            const verCont: string = userIdentity.verificationRequestContent(methods);
 
             // TODO: due to https://github.com/matrix-org/matrix-rust-sdk/issues/5643, we need to fix up the verification request content to include `msgtype`.
             const verContObj = JSON.parse(verCont);
@@ -1158,7 +1182,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             const eventId = await this.sendVerificationRequestContent(roomId, verificationEventContent);
 
             // Get a verification request
-            const request: RustSdkCryptoJs.VerificationRequest = await userIdentity.requestVerification(
+            const request: RustSdkCryptoJs.VerificationRequest = userIdentity.requestVerification(
                 new RustSdkCryptoJs.RoomId(roomId),
                 new RustSdkCryptoJs.EventId(eventId),
                 methods,
@@ -1569,7 +1593,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         // Delete the dehydrated device, since any existing one will be signed
         // by the wrong cross-signing key
-        this.dehydratedDeviceManager.delete();
+        void this.dehydratedDeviceManager.delete();
 
         // Disable backup, and delete all the backups from the server
         await this.backupManager.deleteAllKeyBackupVersions();
@@ -1989,7 +2013,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             event.getContent().membership !== KnownMembership.Join
         ) {
             this.logger.info(`Rotating session for room ${event.getRoomId()} due to member leaving the room`);
-            this.forceDiscardSession(event.getRoomId()!);
+            void this.forceDiscardSession(event.getRoomId()!);
         }
     }
 
@@ -2005,7 +2029,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         for (const key of keys) {
             this.onRoomKeyUpdated(key);
         }
-        this.backupManager.maybeUploadKey();
+        void this.backupManager.maybeUploadKey();
     }
 
     private onRoomKeyUpdated(key: RustSdkCryptoJs.RoomKeyInfo): void {
@@ -2176,7 +2200,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
                 clearTimeout(timeoutId);
                 event.off(MatrixEventEvent.Decrypted, onDecrypted);
-                processEvent(decryptedEvent);
+                void processEvent(decryptedEvent);
             };
 
             event.on(MatrixEventEvent.Decrypted, onDecrypted);

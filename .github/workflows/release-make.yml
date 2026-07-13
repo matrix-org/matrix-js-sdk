@@ -73,14 +73,14 @@ jobs:
 
             - name: Get draft release
               id: draft-release
-              uses: cardinalby/git-get-release-action@5172c3a026600b1d459b117738c605fabc9e4e44 # 1.2.5
+              uses: cardinalby/git-get-release-action@2ab178299eecb253f820dcf2cce11f62be1178f7 # 1.2.6
               env:
                   GITHUB_TOKEN: ${{ github.token }}
               with:
                   draft: true
                   latest: true
 
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   ref: staging
                   # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
@@ -89,7 +89,7 @@ jobs:
                   persist-credentials: true
 
             - name: Get actions scripts
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
@@ -134,7 +134,7 @@ jobs:
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
 
-            - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
             - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
               with:
                   cache: "pnpm"
@@ -161,7 +161,7 @@ jobs:
             - name: Bump package.json versions
               run: |
                   for DIR in $DIRS; do
-                      pnpm version -C "$DIR" --no-git-tag-version "${VERSION#v}"
+                      pnpm version -C "$DIR" --no-git-checks --no-git-tag-version "${VERSION#v}"
                       git add "$DIR"/package.json
                   done
               env:

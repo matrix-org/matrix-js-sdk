@@ -17,8 +17,8 @@ limitations under the License.
 import fetchMock from "@fetch-mock/vitest";
 
 import { linkNewDeviceByGeneratingQR, MSC4108FailureReason, signInByGeneratingQR } from "../../../src/rendezvous";
-import { ClientPrefix, DEVICE_CODE_SCOPE, type IHttpOpts, type MatrixClient, MatrixHttpApi } from "../../../src";
-import { makeDelegatedAuthConfig } from "../../../src/testing.ts";
+import { ClientPrefix, type IHttpOpts, type MatrixClient, MatrixHttpApi, OAuthGrantType } from "../../../src";
+import { makeDelegatedAuthMetadata } from "../../../src/testing.ts";
 
 function makeMockClient(): MatrixClient {
     const baseUrl = "https://example.com";
@@ -39,7 +39,9 @@ function makeMockClient(): MatrixClient {
         getDomain: () => "example.com",
         getDevice: vi.fn(),
         getCrypto: vi.fn(() => crypto),
-        getAuthMetadata: vi.fn().mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_CODE_SCOPE])),
+        getAuthMetadata: vi
+            .fn()
+            .mockResolvedValue(makeDelegatedAuthMetadata("https://issuer/", [OAuthGrantType.DeviceAuthorization])),
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { parse as parseContentType, type ParsedMediaType } from "content-type";
+import { parse as parseContentType, type ContentType } from "content-type";
 
 import { logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
@@ -39,7 +39,7 @@ export function timeoutSignal(ms: number): AbortSignal {
 
 export function anySignal(signals: AbortSignal[]): {
     signal: AbortSignal;
-    cleanup(): void;
+    cleanup(this: void): void;
 } {
     const controller = new AbortController();
 
@@ -92,7 +92,7 @@ export function parseErrorResponse(response: XMLHttpRequest | Response, body?: s
           )
         : response.headers;
 
-    let contentType: ParsedMediaType | null;
+    let contentType: ContentType | null;
     try {
         contentType = getResponseContentType(httpHeaders);
     } catch (e) {
@@ -136,15 +136,10 @@ function isXhr(response: XMLHttpRequest | Response): response is XMLHttpRequest 
  * @param response - response object
  * @returns parsed content-type header, or null if not found
  */
-function getResponseContentType(headers: Headers): ParsedMediaType | null {
+function getResponseContentType(headers: Headers): ContentType | null {
     const contentType = headers.get("Content-Type");
     if (contentType === null) return null;
-
-    try {
-        return parseContentType(contentType);
-    } catch (e) {
-        throw new Error(`Error parsing Content-Type '${contentType}': ${e}`);
-    }
+    return parseContentType(contentType);
 }
 
 /**

@@ -88,13 +88,17 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /** whether {@link backupKeysLoop} is currently running */
     private backupKeysLoopRunning = false;
 
+    /** The logger to use */
+    private readonly logger: Logger;
+
     public constructor(
-        private readonly logger: Logger,
+        logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
         private readonly outgoingRequestProcessor: OutgoingRequestProcessor,
     ) {
         super();
+        this.logger = logger.getChild("[RustBackupManager]");
     }
 
     /**
@@ -150,7 +154,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Re-check the key backup and enable/disable it as appropriate.
      *
-     * @param force - whether we should force a re-check even if one has already happened.
+     * @param force - whether we should force a re-check even if one has already happened. If this is
+     *   `false`, and we have already done a check, `null` is returned rather than the actual info on the key backup.
      */
     public checkKeyBackupAndEnable(force: boolean): Promise<KeyBackupCheck | null> {
         if (!force && this.checkedForBackup) {
@@ -168,6 +173,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Handles a backup secret received event and store it if it matches the current backup version.
+     *
+     * Also enables key backup upload if it was not previously enabled, and the encryption key matches the received
+     * decryption key.
      *
      * @param secret - The secret as received from a `m.secret.send` or `io.element.msc4385.secret.push` event for secret `m.megolm_backup.v1`.
      * @returns true if the secret is valid and has been stored, false otherwise.
@@ -214,11 +222,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 `handleBackupSecretReceived: Valid decryption key for the current server-side backup version (${latestBackupInfo.version}) received`,
             );
             await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
-            // Check if the backup should be enabled (e.g. if it's properly
-            // signed), and enable it if it should
+
+            // Check if backup upload should be enabled (e.g. the encryption key matches the decryption key),
+            // and enable it if so.
             if (this.keyBackupCheckInProgress) {
+                this.logger.debug("handleBackupSecretReceived: waiting for ongoing keybackup check to complete");
                 await this.keyBackupCheckInProgress;
             }
+            this.logger.debug("handleBackupSecretReceived: checking if we can enable keybackup upload");
             this.keyBackupCheckInProgress = this.doCheckKeyBackup(latestBackupInfo).finally(() => {
                 this.keyBackupCheckInProgress = null;
             });

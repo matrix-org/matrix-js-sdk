@@ -22,11 +22,11 @@ jobs:
                 node: ["lts/*", 22]
         steps:
             - name: Checkout code
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
             - name: Setup Node
               id: setupNode
               uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
@@ -66,21 +66,14 @@ jobs:
                       coverage
                       !coverage/lcov-report
 
-    # Dummy completion job to simplify branch protections
-    complete:
-        name: Tests
-        needs: test
-        if: always()
-        runs-on: ubuntu-24.04
-        steps:
-            - if: needs.test.result != 'skipped' && needs.test.result != 'success'
-              run: exit 1
-
     element-web:
         name: Downstream test element-web
         if: github.event_name == 'merge_group'
         uses: element-hq/element-web/.github/workflows/tests.yml@develop # zizmor: ignore[unpinned-uses]
         permissions:
+            contents: read
+            pull-requests: read
+            checks: write
             statuses: write
         with:
             disable_coverage: true
@@ -94,30 +87,22 @@ jobs:
         with:
             use_js_sdk: "."
 
-    # we need this so the job is reported properly when run in a merge queue
-    downstream-complement-crypto:
-        name: Downstream Complement Crypto tests
-        runs-on: ubuntu-24.04
-        if: always()
+    complete:
+        name: Tests
         needs:
-            - complement-crypto
-        steps:
-            - if: needs.complement-crypto.result != 'skipped' && needs.complement-crypto.result != 'success'
-              run: exit 1
-
-    # Hook for branch protection to skip downstream testing outside of merge queues
-    # and skip sonarcloud coverage within merge queues
-    downstream:
-        name: Downstream tests
-        runs-on: ubuntu-24.04
-        if: always()
-        needs:
+            - test
             - element-web
+            - complement-crypto
+        if: always()
+        runs-on: ubuntu-24.04
         permissions:
+            contents: read
+            pull-requests: read
+            checks: write
             statuses: write
         steps:
-            - name: Skip SonarCloud on merge queues
-              if: env.ENABLE_COVERAGE == 'false'
+            - name: Skip SonarCloud in merge queue
+              if: github.event_name == 'merge_group' || inputs.disable_coverage == 'true'
               uses: guibranco/github-status-action-v2@9bfa8773cdbdc6c185747fd43cd7faa9d7c32f09
               with:
                   authToken: ${{ secrets.GITHUB_TOKEN }}
@@ -127,5 +112,36 @@ jobs:
                   sha: ${{ github.sha }}
                   target_url: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
-            - if: needs.element-web.result != 'skipped' && needs.element-web.result != 'success'
+            - name: Checkout code
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+              if: needs.test.result == 'success' && env.ENABLE_COVERAGE == 'true'
+              with:
+                  persist-credentials: false
+                  fetch-depth: 0 # Full history, fastest for diff-cover
+
+            - name: Download coverage artifacts
+              uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+              if: needs.test.result == 'success' && env.ENABLE_COVERAGE == 'true'
+              with:
+                  pattern: coverage-*
+                  path: coverage
+
+            - name: Diff Coverage
+              id: coverage
+              if: needs.test.result == 'success' && env.ENABLE_COVERAGE == 'true'
+              uses: Affanmir/diff-cover-action@a35ea05c1c458490473f6fc2233737e809678273 # v2.1.1
+              with:
+                  compare-branch: origin/${{ github.base_ref || 'develop' }}
+                  mode: coverage
+                  coverage-files: coverage/*/*lcov.info
+                  ignore-whitespace: true
+                  show-uncovered: true
+                  post-comment: false
+                  create-annotations: true
+                  annotation-type: warning
+                  fail-on-threshold: ${{ contains(github.event.pull_request.labels.*.name, 'Z-Skip-Coverage') && 'false' || 'true' }}
+                  fail-under: 80
+
+            - name: Check status of tests
+              if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
               run: exit 1
