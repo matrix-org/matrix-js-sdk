@@ -66,8 +66,6 @@ describe("Upload keys to backup", () => {
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
         rustBackupManager = new RustBackupManager(logger, mockOlmMachine, httpAPi, outgoingRequestProcessor);
-
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
     });
 
     afterEach(() => {
@@ -76,6 +74,8 @@ describe("Upload keys to backup", () => {
     });
 
     it("Should call expensive roomKeyCounts only once per loop", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
         const remainingEmitted: number[] = [];
 
         const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
@@ -122,6 +122,8 @@ describe("Upload keys to backup", () => {
     });
 
     it("Should not call expensive roomKeyCounts when only one iteration is needed", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
         const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
             rustBackupManager.on(CryptoEvent.KeyBackupSessionsRemaining, (count) => {
                 if (count == 0) {
@@ -143,8 +145,6 @@ describe("Upload keys to backup", () => {
     });
 
     it("Should emit key cached after enabling a newly-created backup", async () => {
-        fetchMock.hardReset();
-        fetchMock.mockGlobal();
         fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
             status: 404,
             body: {
