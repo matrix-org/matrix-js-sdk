@@ -588,10 +588,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Creates a new key backup by generating a new random private key.
+     * Creates a new key backup by generating a new random private key, and then enable key backup upload and download
+     * using the new backup version.
      *
      * If there is an existing backup server side it will be deleted and replaced
      * by the new one.
+     *
+     * Saves the decryption key in the Rust SDK's CryptoStore.
      *
      * @param signObject - Method that should sign the backup with existing device and
      * existing identity.
@@ -631,6 +634,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             auth_data: authData,
             version: res.version,
         };
+
         // saveBackupDecryptionKey emits KeyBackupDecryptionKeyCached. Cache and
         // enable the created backup first so listeners observe the new version.
         // This backup was just created and signed locally, so use the creation
