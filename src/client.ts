@@ -1310,6 +1310,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // A manager for determining which invites should be ignored.
     public readonly ignoredInvites: IgnoredInvites;
 
+    /** Map from room ID to the user who invited us, for rooms with a pending invite.
+     * Used to do the key-bundle bookkeeping if the server joins us to the room itself
+     * (e.g. auto-accepting a knock, synapse#16307) rather than via `joinRoom`. */
+    private readonly pendingKeyBundleInviters = new Map<string, string>();
+
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
@@ -1429,6 +1434,43 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.ignoredInvites = new IgnoredInvites(this);
         this._secretStorage = new ServerSideSecretStorageImpl(this, opts.cryptoCallbacks ?? {});
+
+        // If the server joins us to a room we were invited to — e.g. automatically accepting a
+        // knock we made (https://github.com/element-hq/synapse/issues/16307) — `joinRoom` never
+        // runs, so nothing does the shared-history key bundle bookkeeping it would otherwise
+        // have done. Watch our own membership: remember who invited us, and on an
+        // invite -> join transition run the same mark-pending/maybe-accept dance as `joinRoom`
+        // (idempotent when the join did come from `joinRoom`).
+        this.on(RoomMemberEvent.Membership, (event, member, oldMembership) => {
+            if (member.userId !== this.getUserId()) return;
+            if (member.membership === KnownMembership.Invite) {
+                const inviter = event.getSender();
+                if (inviter) this.pendingKeyBundleInviters.set(member.roomId, inviter);
+            } else if (
+                member.membership === KnownMembership.Join &&
+                oldMembership === KnownMembership.Invite &&
+                this.cryptoBackend
+            ) {
+                const inviter = this.pendingKeyBundleInviters.get(member.roomId);
+                this.pendingKeyBundleInviters.delete(member.roomId);
+                if (inviter && inviter !== this.getUserId()) {
+                    const cryptoBackend = this.cryptoBackend;
+                    (async () => {
+                        // Flag that we are waiting for a key bundle, then try to accept one we
+                        // may already have received. Mirrors `joinRoom`.
+                        await cryptoBackend.markRoomAsPendingKeyBundle(member.roomId, inviter);
+                        await cryptoBackend.maybeAcceptKeyBundle(member.roomId, inviter);
+                    })().catch((e) => {
+                        this.logger.error(
+                            `Error accepting key bundle for auto-joined room ${member.roomId}:`,
+                            e,
+                        );
+                    });
+                }
+            } else if (member.membership === KnownMembership.Leave) {
+                this.pendingKeyBundleInviters.delete(member.roomId);
+            }
+        });
 
         // having lots of event listeners is not unusual. 0 means "unlimited".
         this.setMaxListeners(0);
