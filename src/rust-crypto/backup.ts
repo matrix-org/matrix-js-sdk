@@ -369,6 +369,16 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         return { backupInfo, trustInfo };
     }
 
+    /**
+     * Enable key backup upload for the given backup version, if it is not already.
+     *
+     * If backup is currently enabled for a different version, disables it first.
+     *
+     * Also emits one or more {@link CryptoEvent.KeyBackupStatus} events if the backup status changes.
+     *
+     * @param backupInfo - the desired backup version (and the encryption key).
+     * @param activeVersion - the current active backup version (or `null`, if none).
+     */
     private async enableOrSwitchKeyBackup(
         backupInfo: KeyBackupInfoWithVersion,
         activeVersion: string | null,
@@ -378,7 +388,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             await this.enableKeyBackup(backupInfo);
         } else if (activeVersion !== backupInfo.version) {
             this.logger.debug(`On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`);
-            // This will remove any pending backup request, remove the backup key and reset the backup state of each room key we have.
+            // This will remove any pending backup request, remove the backup upload key from the OlmMachine and reset
+            // the backup state of each room key we have.
             await this.disableKeyBackup();
             // Enabling will now trigger re-upload of all the keys
             await this.enableKeyBackup(backupInfo);
@@ -390,7 +401,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     /**
      * Helper for {@link enableOrSwitchKeyBackup}.
      *
-     * Enables key backup upload and download for the given backup version. Also emits
+     * Enables key backup upload for the given backup version. Also emits
      * a {@link CryptoEvent.KeyBackupStatus} event.
      */
     private async enableKeyBackup(backupInfo: KeyBackupInfoWithVersion): Promise<void> {
