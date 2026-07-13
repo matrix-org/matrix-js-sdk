@@ -9,7 +9,7 @@ overrides:
     expect: 30.4.1
     # https://github.com/advisories/GHSA-fx2h-pf6j-xcff
     # https://github.com/advisories/GHSA-v6wh-96g9-6wx3
-    vite: 8.0.16
+    vite: 8.1.4
 
 allowBuilds:
     unrs-resolver: false
