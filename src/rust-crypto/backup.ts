@@ -371,12 +371,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     private async enableOrSwitchKeyBackup(
         backupInfo: KeyBackupInfoWithVersion,
-        activeVersion?: string | null,
+        activeVersion: string | null,
     ): Promise<void> {
-        if (activeVersion === undefined) {
-            activeVersion = await this.getActiveBackupVersion();
-        }
-
         if (activeVersion === null) {
             this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
             await this.enableKeyBackup(backupInfo);
@@ -393,7 +389,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     /**
      * Helper for {@link enableOrSwitchKeyBackup}.
-     * 
+     *
      * Enables key backup upload and download for the given backup version. Also emits
      * a {@link CryptoEvent.KeyBackupStatus} event.
      */
@@ -630,7 +626,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // response instead of doing another discovery/trust check before the event.
         this.serverBackupInfo = backupInfo;
         this.checkedForBackup = true;
-        await this.enableOrSwitchKeyBackup(backupInfo);
+        await this.enableOrSwitchKeyBackup(backupInfo, await this.getActiveBackupVersion());
         await this.saveBackupDecryptionKey(randomKey, res.version);
 
         return {
