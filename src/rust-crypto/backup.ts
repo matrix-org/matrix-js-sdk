@@ -382,9 +382,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // we also checked it has a valid `version`.
         await this.olmMachine.enableBackupV1(
             (backupInfo.auth_data as Curve25519AuthData).public_key,
-            backupInfo.version!,
+            backupInfo.version,
         );
-        this.activeBackupVersion = backupInfo.version!;
+        this.activeBackupVersion = backupInfo.version;
 
         this.emit(CryptoEvent.KeyBackupStatus, true);
 

@@ -467,7 +467,7 @@ describe("crypto", () => {
                     .getCrypto()!
                     .storeSessionBackupPrivateKey(
                         Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                        testData.SIGNED_BACKUP_DATA.version!,
+                        testData.SIGNED_BACKUP_DATA.version,
                     );
 
                 // Tell Alice to trust the dummy device that signed the backup

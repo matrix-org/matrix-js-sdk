@@ -1531,7 +1531,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             await rustCrypto.storeSessionBackupPrivateKey(
                 new TextEncoder().encode(key),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
@@ -1756,7 +1756,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -1799,7 +1799,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
