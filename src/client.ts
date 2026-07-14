@@ -4452,7 +4452,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = utils.encodeUri("/presence/$userId/status", {
             $userId: this.credentials.userId!,
         });
-        if (opts.status_msg == undefined) {  }
+        if (opts.status_msg == undefined) {
+        }
         const validStates = ["offline", "online", "unavailable"];
         if (validStates.indexOf(opts.presence) === -1) {
             throw new Error("Bad presence value: " + opts.presence);
@@ -7429,7 +7430,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         // NOTE: We only read individual keys from a cached profile as we don't have the full profile
         // cached, only the keys that the user has configured via their sync filter.
-        let storedProfile = await this.store.getUserProfile(userId);
+        const storedProfile = await this.store.getUserProfile(userId);
         if (storedProfile?.[key] !== undefined) {
             return storedProfile[key];
         }

@@ -612,9 +612,9 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             return selectQuery(store, [userId], (cursor) => cursor.value).then((results) => {
                 const record = results[0];
                 if (!record || Date.now() > record.ttlEnd) {
-                    return undefined;           //leads to restore if cached profile is stale
-                } return record.profile;
-
+                    return undefined; //leads to restore if cached profile is stale
+                }
+                return record.profile;
             });
         });
     }
@@ -623,9 +623,8 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const txn = this.db!.transaction(["user_profile"], "readwrite");
         const store = txn.objectStore("user_profile");
         for (const [userId, profile] of userProfiles.entries()) {
-            const ttlEnd = Date.now() + 24 * 3600 * 1000;           //expires after 1 day
+            const ttlEnd = Date.now() + 24 * 3600 * 1000; //expires after 1 day
             store.put({ profile, userId, ttlEnd });
-
         }
         await txnAsPromise(txn);
     }
