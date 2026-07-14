@@ -1,0 +1,92 @@
+{
+  "Version": 1,
+  "WorkspaceRootPath": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\",
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\spec\\test-utils\\client.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:spec\\test-utils\\client.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\src\\models\\user.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\models\\user.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\src\\store\\indexeddb-local-backend.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:src\\store\\indexeddb-local-backend.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\spec\\test-utils\\test-data\\index.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}",
+      "RelativeMoniker": "D:0:0:{A2FE74E1-B743-11D0-AE1A-00A0C90FFFC3}|\u003CMiscFiles\u003E|solutionrelative:spec\\test-utils\\test-data\\index.ts||{0F2454B1-A556-402D-A7D0-1FDE7F99DEE0}"
+    }
+  ],
+  "DocumentGroupContainers": [
+    {
+      "Orientation": 0,
+      "VerticalTabListWidth": 256,
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 4,
+          "Children": [
+            {
+              "$type": "Bookmark",
+              "Name": "ST:128:0:{75188d03-9892-4ae2-abf1-207126247ce5}"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "user.ts",
+              "DocumentMoniker": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\src\\models\\user.ts",
+              "RelativeDocumentMoniker": "src\\models\\user.ts",
+              "ToolTip": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\src\\models\\user.ts",
+              "RelativeToolTip": "src\\models\\user.ts",
+              "ViewState": "AgIAAMoAAAAAAAAAAAAwwOcAAAAIAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2026-07-14T10:05:07.721Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "indexeddb-local-backend.ts",
+              "DocumentMoniker": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\src\\store\\indexeddb-local-backend.ts",
+              "RelativeDocumentMoniker": "src\\store\\indexeddb-local-backend.ts",
+              "ToolTip": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\src\\store\\indexeddb-local-backend.ts",
+              "RelativeToolTip": "src\\store\\indexeddb-local-backend.ts",
+              "ViewState": "AgIAAFYCAAAAAAAAAAAgwGYCAAAZAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2026-07-14T10:03:37.172Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "index.ts",
+              "DocumentMoniker": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\spec\\test-utils\\test-data\\index.ts",
+              "RelativeDocumentMoniker": "spec\\test-utils\\test-data\\index.ts",
+              "ToolTip": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\spec\\test-utils\\test-data\\index.ts",
+              "RelativeToolTip": "spec\\test-utils\\test-data\\index.ts",
+              "ViewState": "AgIAANMAAAAAAAAAAAAwwPAAAAAAAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2026-07-14T10:02:31.489Z",
+              "EditorCaption": ""
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "client.ts",
+              "DocumentMoniker": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\spec\\test-utils\\client.ts",
+              "RelativeDocumentMoniker": "spec\\test-utils\\client.ts",
+              "ToolTip": "C:\\Users\\david\\source\\repos\\crime-think\\matrix-js-sdk\\spec\\test-utils\\client.ts",
+              "RelativeToolTip": "spec\\test-utils\\client.ts",
+              "ViewState": "AgIAADMAAAAAAAAAAIAwwDoAAAADAAAAAAAAAA==",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.003213|",
+              "WhenOpened": "2026-07-14T09:58:33.025Z",
+              "EditorCaption": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
