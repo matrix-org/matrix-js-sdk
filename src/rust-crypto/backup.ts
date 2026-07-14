@@ -27,6 +27,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type KeyBackupRoomSessions,
+    type NewKeyBackupInfo,
 } from "../crypto-api/keybackup.ts";
 import { type Logger } from "../logger.ts";
 import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -580,14 +581,16 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         await signObject(authData);
 
+        const backupData: NewKeyBackupInfo = {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+        };
+
         const res = await this.http.authedRequest<{ version: string }>(
             Method.Post,
             "/room_keys/version",
             undefined,
-            {
-                algorithm: pubKey.algorithm,
-                auth_data: authData,
-            },
+            backupData,
             {
                 prefix: ClientPrefix.V3,
             },
