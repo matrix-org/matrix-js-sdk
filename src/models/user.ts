@@ -224,29 +224,19 @@ export class User extends TypedEventEmitter<UserEvent, UserEventHandlerMap> {
 
         this.presence = event.getContent().presence;
         eventsToFire.push(UserEvent.LastPresenceTs);
-        const content = event.getContent();
 
-        if ("status_msg" in content) {          //checks for existence rather than truth to allow undefined presence
-            this.presenceStatusMsg = content.status_msg;
+        if (event.getContent().status_msg) {
+            this.presenceStatusMsg = event.getContent().status_msg;
         }
-        else {
-            this.presenceStatusMsg = undefined
+        if (event.getContent().displayname) {
+            this.displayName = event.getContent().displayname;
         }
-        if ("displayname" in content) {
-            this.displayName = content.displayname;
+        if (event.getContent().avatar_url) {
+            this.avatarUrl = event.getContent().avatar_url;
         }
-            else {
-                this.displayName = undefined;
-        }
-        if ("avatar_url" in content) {
-            this.avatarUrl = content.avatar_url;
-        }
-        else {
-            this.avatarUrl = undefined
-        }
-        this.lastActiveAgo = content.last_active_ago;
+        this.lastActiveAgo = event.getContent().last_active_ago;
         this.lastPresenceTs = Date.now();
-        this.currentlyActive = content.currently_active;
+        this.currentlyActive = event.getContent().currently_active;
 
         this.updateModifiedTime();
 

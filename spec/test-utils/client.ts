@@ -73,7 +73,6 @@ export const mockClientMethodsUser = (userId = "@alice:domain") => ({
     credentials: { userId },
     getThreePids: vi.fn().mockResolvedValue({ threepids: [] }) as Mock,
     getAccessToken: vi.fn() as Mock,
-    getUserProfile: vi.fn().mockReturnValue(userId) as Mock
 });
 
 /**
