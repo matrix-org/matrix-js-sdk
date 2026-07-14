@@ -65,7 +65,7 @@ export enum ConditionKind {
     RoomMemberCount = "room_member_count",
     SenderNotificationPermission = "sender_notification_permission",
     RecipientPermission = "recipient_permission",
-    RecipientPermissionPrefix = "org.matrix.mscxxxx.recipient_permission",
+    RecipientPermissionPrefix = "org.matrix.msc4506.recipient_permission",
     CallStarted = "call_started",
     CallStartedPrefix = "org.matrix.msc3914.call_started",
 }
@@ -153,7 +153,7 @@ export enum RuleId {
     EncryptedMessage = ".m.rule.encrypted",
     InviteToSelf = ".m.rule.invite_for_me",
     Knock = ".m.rule.knock",
-    KnockUnstable = ".org.matrix.mscxxxx.rule.knock",
+    KnockUnstable = ".org.matrix.msc4506.rule.knock",
     MemberEvent = ".m.rule.member_event",
     IncomingCall = ".m.rule.call",
     SuppressNotices = ".m.rule.suppress_notices",

@@ -1050,13 +1050,13 @@ describe("getPushRuleGlobRegex", () => {
     });
 });
 
-describe("recipient_permission condition (MSCxxxx knock push rule)", () => {
+describe("recipient_permission condition (MSC4506 knock push rule)", () => {
     const roomId = "!knockroom:server";
     const adminId = "@admin:server";
     const knockerId = "@knocker:server";
 
     const knockRule: IPushRule = {
-        rule_id: ".org.matrix.mscxxxx.rule.knock",
+        rule_id: ".org.matrix.msc4506.rule.knock",
         default: true,
         enabled: true,
         conditions: [

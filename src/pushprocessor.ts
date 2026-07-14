@@ -515,7 +515,7 @@ export class PushProcessor {
     }
 
     /**
-     * MSCxxxx `recipient_permission` condition: matches if the user these push
+     * MSC4506 `recipient_permission` condition: matches if the user these push
      * rules are being evaluated for (i.e. us) has a power level at least that
      * required to perform the `m.room.power_levels` action named by `key`
      * (e.g. "invite"), in the room the event is in.
