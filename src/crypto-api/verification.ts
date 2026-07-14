@@ -119,7 +119,15 @@ export interface VerificationRequest extends TypedEventEmitter<
     /**
      * Send an `m.key.verification.start` event to start verification via a particular method.
      *
-     * This is normally used when starting a verification via emojis (ie, `method` is set to `m.sas.v1`).
+     * This is used for SAS (emoji) verification: `method` should be set to `m.sas.v1`. It does not start
+     * QR-code verification, and passing a QR-code method (such as `m.reciprocate.v1`, `m.qr_code.scan.v1`,
+     * or `m.qr_code.show.v1`) will be rejected with an "Unsupported verification method" error.
+     *
+     * For QR-code verification, use {@link VerificationRequest#generateQRCode} to display a QR code to the
+     * other device, or {@link VerificationRequest#scanQRCode} to consume a QR code scanned from it. This is
+     * only possible once the `phase` is {@link VerificationPhase.Ready}; when it is, a client can typically
+     * offer the user any of three options: show a QR code, scan the other party's QR code, or fall back to
+     * emoji (SAS) verification via this method.
      *
      * @param method - the name of the verification method to use.
      *
@@ -130,8 +138,10 @@ export interface VerificationRequest extends TypedEventEmitter<
     /**
      * Start a QR code verification by providing a scanned QR code for this verification flow.
      *
-     * Validates the QR code, and if it is ok, sends an `m.key.verification.start` event with `method` set to
-     * `m.reciprocate.v1`, to tell the other side the scan was successful.
+     * Call this once the user has scanned the QR code displayed by the other device (for example, the bytes
+     * produced by that device's {@link VerificationRequest#generateQRCode}). Validates the QR code, and if it
+     * is ok, sends an `m.key.verification.start` event with `method` set to `m.reciprocate.v1`, to tell the
+     * other side the scan was successful.
      *
      * See also {@link VerificationRequest#startVerification} which can be used to start other verification methods.
      *
@@ -149,8 +159,16 @@ export interface VerificationRequest extends TypedEventEmitter<
     /**
      * Generate the data for a QR code allowing the other device to verify this one, if it supports it.
      *
-     * Only returns data once `phase` is {@link VerificationPhase.Ready} and the other party can scan a QR code;
-     * otherwise returns `undefined`.
+     * Returns the QR code data only when all of the following hold; otherwise it returns `undefined`:
+     *  - `phase` is {@link VerificationPhase.Ready};
+     *  - the other party advertises support for scanning a QR code (ie, `otherPartySupportsMethod("m.qr_code.scan.v1")`
+     *    is true); and
+     *  - this device has its cross-signing keys available locally. A frequent cause of an unexpected `undefined`
+     *    is that cross-signing has not been set up or the keys have not yet been fetched, so the QR code cannot be
+     *    constructed even though the phase and method checks pass.
+     *
+     * On success, display the returned bytes as a QR code for the other device to scan; if the other side scans it
+     * and confirms, there is nothing further to do on this side.
      */
     generateQRCode(): Promise<Uint8ClampedArray | undefined>;
 
