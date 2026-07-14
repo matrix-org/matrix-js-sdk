@@ -48,6 +48,7 @@ import {
     MatrixHttpApi,
     MemoryCryptoStore,
     TypedEventEmitter,
+    MatrixError,
 } from "../../../src";
 import { emitPromise, mkEvent, waitFor } from "../../test-utils/test-utils";
 import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
@@ -841,6 +842,8 @@ describe("RustCrypto", () => {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
                     } else if (method === "GET" && backupAuthData) {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    } else {
+                        throw new MatrixError({ errcode: "M_NOT_FOUND" }, 404);
                     }
                 }
                 return Promise.resolve({});
@@ -2367,7 +2370,12 @@ describe("RustCrypto", () => {
             });
             // If the backup is deleted, we will return an empty object
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
-                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+                return backupIsDeleted
+                    ? {
+                          status: 404,
+                          body: { errcode: "M_NOT_FOUND" },
+                      }
+                    : testData.SIGNED_BACKUP_DATA;
             });
 
             let dehydratedDeviceIsDeleted = false;

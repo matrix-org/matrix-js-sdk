@@ -445,7 +445,14 @@ describe("crypto", () => {
             });
 
             it("fails with HISTORICAL_MESSAGE_BACKUP_UNCONFIGURED when the backup is broken", async () => {
-                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {});
+                // A backup with an unknown algorithm
+                fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+                    algorithm: "boo",
+                    auth_data: {},
+                    version: "1",
+                    etag: "",
+                    count: 0,
+                });
                 expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
                 await startClientAndAwaitFirstSync();
 
