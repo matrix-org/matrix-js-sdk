@@ -1439,8 +1439,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // knock we made (https://github.com/element-hq/synapse/issues/16307) — `joinRoom` never
         // runs, so nothing does the shared-history key bundle bookkeeping it would otherwise
         // have done. Watch our own membership: remember who invited us, and on an
-        // invite -> join transition run the same mark-pending/maybe-accept dance as `joinRoom`
-        // (idempotent when the join did come from `joinRoom`).
+        // invite -> join (or knock -> join: an accepted knock can be auto-joined straight past
+        // the invited state, the invite coalesced away) transition run the same
+        // mark-pending/maybe-accept dance as `joinRoom` (idempotent when the join did come from
+        // `joinRoom`).
         this.on(RoomMemberEvent.Membership, (event, member, oldMembership) => {
             if (member.userId !== this.getUserId()) return;
             if (member.membership === KnownMembership.Invite) {
@@ -1448,11 +1450,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 if (inviter) this.pendingKeyBundleInviters.set(member.roomId, inviter);
             } else if (
                 member.membership === KnownMembership.Join &&
-                oldMembership === KnownMembership.Invite &&
+                (oldMembership === KnownMembership.Invite || oldMembership === KnownMembership.Knock) &&
                 this.cryptoBackend
             ) {
-                const inviter = this.pendingKeyBundleInviters.get(member.roomId);
+                let inviter = this.pendingKeyBundleInviters.get(member.roomId);
                 this.pendingKeyBundleInviters.delete(member.roomId);
+                if (!inviter && event.getPrevContent().membership === KnownMembership.Invite) {
+                    // We never saw the invite itself (coalesced away, or we restarted between
+                    // invite and join): recover the inviter from the join event's
+                    // `unsigned.prev_sender` — a Synapse extension, but the same source
+                    // `RoomMember.getDMInviter` already relies on for accepted DM invites.
+                    inviter = event.getUnsigned().prev_sender;
+                }
                 if (inviter && inviter !== this.getUserId()) {
                     const cryptoBackend = this.cryptoBackend;
                     (async () => {
