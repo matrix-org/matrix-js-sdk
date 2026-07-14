@@ -326,11 +326,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             return null;
         }
         this.checkedForBackup = true;
-
-        if (backupInfo && !backupInfo.version) {
-            this.logger.warn("active backup lacks a useful 'version'; ignoring it");
-            backupInfo = undefined;
-        }
         this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
