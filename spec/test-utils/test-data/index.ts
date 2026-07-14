@@ -232,7 +232,9 @@ export const SIGNED_BACKUP_DATA: KeyBackupInfo = {
                 "ed25519:test_device": "KDSNeumirTsd8piI0oVfv/wzg4J4HlEc7rs5XhODFcJ/YAcUdg65ajsZG+rLI0TQOSSGjorJqcrSiSB1HRSCAA"
             }
         }
-    }
+    },
+    "etag": "",
+    "count": 0
 };
 
 /**
@@ -463,7 +465,9 @@ export const BOB_SIGNED_BACKUP_DATA: KeyBackupInfo = {
                 "ed25519:bob_device": "lDIMj3VC0WazE2FamGHpmbiqKf9Z4pO4qapZ5TL5BnD3c+dvb+2waOEd6pgay/pmrQ6MW4Eu2KDEpe1fnHc3BA"
             }
         }
-    }
+    },
+    "etag": "",
+    "count": 0
 };
 
 /**

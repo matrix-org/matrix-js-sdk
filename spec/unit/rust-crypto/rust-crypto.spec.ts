@@ -67,7 +67,7 @@ import {
     EventShieldReason,
     type ImportRoomKeysOpts,
     type KeyBackupCheck,
-    type KeyBackupInfo,
+    type NewKeyBackupInfo,
     type VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
@@ -2377,7 +2377,7 @@ describe("RustCrypto", () => {
             });
 
             // A new key backup should be created after the reset
-            let newKeyBackupInfo!: KeyBackupInfo;
+            let newKeyBackupInfo!: NewKeyBackupInfo;
             fetchMock.post("path:/_matrix/client/v3/room_keys/version", (callLog) => {
                 newKeyBackupInfo = JSON.parse(callLog.options.body as string);
                 return { version: "2" };

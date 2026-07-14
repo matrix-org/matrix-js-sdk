@@ -20,7 +20,7 @@ This file is a Python script to generate test data for crypto tests.
 To run it:
 
 python -m venv env
-./env/bin/pip install cryptography canonicaljson
+./env/bin/pip install cryptography canonicaljson base58
 ./env/bin/python generate-test-data.py > index.ts
 """
 
@@ -172,6 +172,8 @@ def build_test_data(user_data, prefix = "") -> str:
         "auth_data": {
             "public_key": b64_backup_public_key,
         },
+        "etag": "",
+        "count": 0,
     }
     # sign with our device key
     sig = sign_json(backup_data["auth_data"], private_key)
