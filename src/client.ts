@@ -252,6 +252,11 @@ export type Store = IStore;
 
 export type ResetTimelineCallback = (roomId: string) => boolean;
 
+/** MSC4509: to-device message type by which the server designates one of our user's
+ * devices as the eager downloader of an MSC4268 room key bundle after a server-initiated
+ * join. */
+const UNSTABLE_KEY_BUNDLE_CLAIM_TYPE = "org.matrix.msc4509.key_bundle_claim";
+
 const SCROLLBACK_DELAY_MS = 3000;
 
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
@@ -458,6 +463,16 @@ export interface ICreateClientOpts {
      * Locally remove events past the server global or per room retention setting.
      */
     unstableMSC1763Retention?: boolean;
+
+    /**
+     * Enable unstable MSC4509 support: on a server-initiated room join, defer downloading
+     * the room's MSC4268 key bundle until the server designates this device via an
+     * `org.matrix.msc4509.key_bundle_claim` to-device message (or until the first
+     * undecryptable event in the room). When disabled, `key_bundle_claim` messages are
+     * ignored and every device downloads the bundle eagerly, as `joinRoom` would.
+     * Default: false.
+     */
+    unstableMSC4509KeyBundleClaim?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -1315,6 +1330,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * (e.g. auto-accepting a knock, synapse#16307) rather than via `joinRoom`. */
     private readonly pendingKeyBundleInviters = new Map<string, string>();
 
+    /** Map from room ID to inviter, for rooms the server joined us to whose key bundle
+     * we are deferring (MSC4509): the bundle is only downloaded if the server designates
+     * us as the claimer, or lazily on the first undecryptable event in the room. */
+    private readonly lazyKeyBundleRooms = new Map<string, string>();
+
+    /** Room IDs for which an `org.matrix.msc4509.key_bundle_claim` designation arrived
+     * before we processed the corresponding join. */
+    private readonly earlyKeyBundleClaims = new Set<string>();
+
+    /** Whether unstable MSC4509 key-bundle-claim handling is enabled
+     * ({@link ICreateClientOpts.unstableMSC4509KeyBundleClaim}). */
+    private readonly msc4509KeyBundleClaimEnabled: boolean;
+
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
@@ -1400,6 +1428,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
         this.retentionPolicyService = new RetentionPolicyService(this.logger, this.http);
         this._unstable_shouldApplyMessageRetention = opts.unstableMSC1763Retention ?? false;
+        this.msc4509KeyBundleClaimEnabled = opts.unstableMSC4509KeyBundleClaim ?? false;
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1464,25 +1493,79 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 }
                 if (inviter && inviter !== this.getUserId()) {
                     const cryptoBackend = this.cryptoBackend;
-                    (async () => {
-                        // Flag that we are waiting for a key bundle, then try to accept one we
-                        // may already have received. Mirrors `joinRoom`.
-                        await cryptoBackend.markRoomAsPendingKeyBundle(member.roomId, inviter);
-                        await cryptoBackend.maybeAcceptKeyBundle(member.roomId, inviter);
+                    const finalInviter = inviter;
+                    (async (): Promise<void> => {
+                        // Flag that we are waiting for a key bundle, as `joinRoom` would have.
+                        await cryptoBackend.markRoomAsPendingKeyBundle(member.roomId, finalInviter);
+                        // Unlike a client-initiated join, this join happened on all of our
+                        // user's devices at once, so don't eagerly download the bundle from
+                        // every one of them (MSC4509): only claim it now if the server has
+                        // designated us as the claimer; otherwise wait to be designated, or
+                        // for the first undecryptable event in the room.
+                        if (!this.msc4509KeyBundleClaimEnabled) {
+                            // MSC4509 disabled: download eagerly, as `joinRoom` would.
+                            await cryptoBackend.maybeAcceptKeyBundle(member.roomId, finalInviter);
+                        } else if (this.earlyKeyBundleClaims.delete(member.roomId)) {
+                            await cryptoBackend.maybeAcceptKeyBundle(member.roomId, finalInviter);
+                        } else {
+                            this.lazyKeyBundleRooms.set(member.roomId, finalInviter);
+                        }
                     })().catch((e) => {
-                        this.logger.error(
-                            `Error accepting key bundle for auto-joined room ${member.roomId}:`,
-                            e,
-                        );
+                        this.logger.error(`Error accepting key bundle for auto-joined room ${member.roomId}:`, e);
                     });
                 }
             } else if (member.membership === KnownMembership.Leave) {
                 this.pendingKeyBundleInviters.delete(member.roomId);
+                this.lazyKeyBundleRooms.delete(member.roomId);
+                this.earlyKeyBundleClaims.delete(member.roomId);
+            }
+        });
+
+        // MSC4509: the server may designate this device as the one which should eagerly
+        // download a room key bundle after a server-initiated join (see above). Only our
+        // own homeserver can deliver a to-device message with our own user as sender.
+        this.on(ClientEvent.ToDeviceEvent, (event) => {
+            if (!this.msc4509KeyBundleClaimEnabled) return;
+            if (event.getType() !== UNSTABLE_KEY_BUNDLE_CLAIM_TYPE) return;
+            if (event.getSender() !== this.getUserId()) return;
+            const roomId = event.getContent().room_id;
+            if (typeof roomId !== "string") return;
+            this.claimLazyKeyBundle(roomId, "designated by the server");
+        });
+
+        // MSC4509: lazy fallback — if we deferred a room's key bundle and then hit an
+        // event we cannot decrypt in that room, fetch the bundle after all.
+        this.on(MatrixEventEvent.Decrypted, (event) => {
+            const roomId = event.getRoomId();
+            if (event.isDecryptionFailure() && roomId && this.lazyKeyBundleRooms.has(roomId)) {
+                this.claimLazyKeyBundle(roomId, "undecryptable event");
             }
         });
 
         // having lots of event listeners is not unusual. 0 means "unlimited".
         this.setMaxListeners(0);
+    }
+
+    /**
+     * Download and import a deferred room key bundle (MSC4509) for a room the server
+     * joined us to, if we haven't already.
+     *
+     * If the room's join hasn't been processed yet (a designation racing ahead of the
+     * join in the same sync), remember the designation for the join handler instead.
+     */
+    private claimLazyKeyBundle(roomId: string, reason: string): void {
+        const inviter = this.lazyKeyBundleRooms.get(roomId);
+        if (!inviter) {
+            this.earlyKeyBundleClaims.add(roomId);
+            return;
+        }
+        this.lazyKeyBundleRooms.delete(roomId);
+        const cryptoBackend = this.cryptoBackend;
+        if (!cryptoBackend) return;
+        this.logger.info(`Claiming deferred key bundle for ${roomId}: ${reason}`);
+        cryptoBackend.maybeAcceptKeyBundle(roomId, inviter).catch((e) => {
+            this.logger.error(`Error accepting deferred key bundle for room ${roomId}:`, e);
+        });
     }
 
     public set store(newStore: Store) {
