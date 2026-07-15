@@ -271,8 +271,11 @@ export const {prefix}CLEAR_EVENT: Partial<IEvent> = {json.dumps(clear_event, ind
 /** The encrypted CLEAR_EVENT by MEGOLM_SESSION_DATA */
 export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_event, indent=4)};
 
-/** base64-encoded backup decryption (private) key */
+/** base64-encoded backup decryption (private) key that matches the public key in {prefix}CURVE25519_KEY_BACKUP_DATA */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
+
+/** base64-encoded backup decryption (private) key that does not match the public key in {prefix}CURVE25519_KEY_BACKUP_DATA */
+export const {prefix}BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";

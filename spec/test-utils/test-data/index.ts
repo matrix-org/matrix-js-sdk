@@ -446,8 +446,11 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
     "origin_server_ts": 1507753886000
 };
 
-/** base64-encoded backup decryption (private) key */
+/** base64-encoded backup decryption (private) key that matches the public key in BOB_CURVE25519_KEY_BACKUP_DATA */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** base64-encoded backup decryption (private) key that does not match the public key in BOB_CURVE25519_KEY_BACKUP_DATA */
+export const BOB_BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE58 = "EsT5 Sd5m mEXs NQYE ibRe 3q9E 4aXW rHih 5f9J 6rU6 AfwY mASR";
