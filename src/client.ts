@@ -54,7 +54,7 @@ import { deepCompare, noUnsafeEventProps, type QueryDict, replaceParam, safeSet,
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
 import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
-import { encodeUnpaddedBase64Url } from "./base64.ts";
+import { decodeBase64, encodeBase64, encodeUnpaddedBase64Url } from "./base64.ts";
 import { TypedReEmitter } from "./ReEmitter.ts";
 import { logger, type Logger } from "./logger.ts";
 import { SERVICE_TYPES } from "./service-types.ts";
@@ -147,6 +147,7 @@ import {
     UNSTABLE_MSC3088_PURPOSE,
     UNSTABLE_MSC3089_TREE_SUBTYPE,
     type WritableAccountDataEvents,
+    type EncryptableAccountDataEvents,
 } from "./@types/event.ts";
 import {
     GuestAccess,
@@ -247,6 +248,10 @@ import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { randomBytes } from "node:crypto";
+import decryptAESSecretStorageItem from "./utils/decryptAESSecretStorageItem.ts";
+import { AESEncryptedSecretStoragePayload } from "./types.ts";
+import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
 
 export type Store = IStore;
 
@@ -2364,6 +2369,57 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 ? { prefix: "/_matrix/client/unstable/org.matrix.msc3391" }
                 : undefined;
         return await this.http.authedRequest(Method.Delete, path, undefined, undefined, options);
+    }
+
+    public async getAccountDataKey(): Promise<Uint8Array<ArrayBuffer>> {
+        const ADK_ID = "dev.zirco.msc4483.account_data.key";
+
+        let key = await this.secretStorage.get(ADK_ID);
+
+        if (!key) {
+            throw new Error("Account data key not found in secret storage");
+        }
+
+        return decodeBase64(key);
+    }
+
+    public async getOrCreateAccountDataKey(): Promise<Uint8Array<ArrayBuffer>> {
+        // get the ADK secret from secret storage, or create it if it doesn't exist
+        const ADK_ID = "dev.zirco.msc4483.account_data.key";
+
+        let key = await this.secretStorage.get(ADK_ID);
+
+        if (!key) {
+            // generate a new 256 byte secret, base64 encode it, and store it in 4S
+            key = encodeBase64(randomBytes(32));
+
+            await this.secretStorage.store(ADK_ID, key);
+        }
+
+        return decodeBase64(key);
+    }
+
+    public async getEncryptedAccountData<K extends keyof EncryptableAccountDataEvents>(
+        eventType: K,
+    ): Promise<EncryptableAccountDataEvents[K] | null> {
+        const key = await this.getAccountDataKey();
+
+        const event = await this.getAccountDataFromServer(eventType) as never as AESEncryptedSecretStoragePayload;
+        if (!event) {
+            return null;
+        }
+
+        const decrypted = await decryptAESSecretStorageItem(event, key, eventType);
+        return decrypted as EncryptableAccountDataEvents[K];
+    }
+
+    public async setEncryptedAccountData<K extends keyof EncryptableAccountDataEvents>(
+        eventType: K,
+        content: EncryptableAccountDataEvents[K],
+    ): Promise<void> {
+        const key = await this.getOrCreateAccountDataKey();
+        const encrypted = await encryptAESSecretStorageItem(content, key, eventType);
+        await this.setAccountData(eventType, encrypted as never);
     }
 
     /**
