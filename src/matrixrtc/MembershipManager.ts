@@ -1116,6 +1116,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             rtc_transports: livekitTransport
                 ? [{ type: livekitTransport.type, livekit_service_url: livekitTransport.livekit_service_url }]
                 : [],
+            transports: { can_subscribe: ["livekit"] },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],
             ...relationObject,

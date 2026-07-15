@@ -39,6 +39,9 @@ export interface RtcMembershipData {
     };
     "application": RtcSlotEventContent["application"];
     "rtc_transports": Transport[];
+    "transports": {
+        can_subscribe: string[];
+    };
     "versions": string[];
     "msc4354_sticky_key"?: string;
     "sticky_key"?: string;
@@ -107,6 +110,14 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
                 break;
             }
         }
+    }
+    if (
+        data.transports !== undefined && // Allow this to be missing for now as older clients won't send it
+        (typeof data.transports !== "object" ||
+            !Array.isArray(data.transports.can_subscribe) ||
+            !data.transports.can_subscribe.every((t: unknown) => typeof t === "string"))
+    ) {
+        errors.push(prefix + "transports must be missing or contain the can_subscribe array");
     }
     if (data.versions === undefined || !Array.isArray(data.versions)) {
         errors.push(prefix + "versions must be an array");

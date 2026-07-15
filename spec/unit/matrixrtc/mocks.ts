@@ -64,6 +64,7 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
     },
     slot_id: "m.call#ROOM",
     versions: [],
+    transports: { can_subscribe: ["livekit"] },
     rtc_transports: [
         {
             type: "livekit",

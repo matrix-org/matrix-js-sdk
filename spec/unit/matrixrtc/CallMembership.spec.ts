@@ -247,6 +247,7 @@ describe("CallMembership", () => {
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             rtc_transports: [{ type: "livekit" }],
+            transports: { can_subscribe: ["livekit"] },
             versions: [],
             msc4354_sticky_key: "abc123",
         };
@@ -322,6 +323,25 @@ describe("CallMembership", () => {
                 });
             }).toThrow();
         });
+
+        it("accepts membership with no transports for backwards compatibility", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: undefined });
+            }).not.toThrow();
+        });
+
+        it("rejects membership with incorrect transports", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { can_subscribe: [1] } });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { wrong_key: [] } });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: "not an object" });
+            }).toThrow();
+        });
+
         it("rejects membership with incorrect sticky_key", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), membershipTemplate);
