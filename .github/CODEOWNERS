@@ -15,4 +15,4 @@
 /spec/unit/crypto.spec.ts  @matrix-org/element-crypto-web-reviewers
 /spec/unit/crypto          @matrix-org/element-crypto-web-reviewers
 /spec/unit/rust-crypto     @matrix-org/element-crypto-web-reviewers
-/spec/test-utils/test-data @matrix-org/element-crypto-web-reviewers
+/spec/test-utils/crypto-test-data @matrix-org/element-crypto-web-reviewers

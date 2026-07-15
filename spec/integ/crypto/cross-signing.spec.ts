@@ -34,8 +34,8 @@ import {
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
     USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
-} from "../../test-utils/test-data";
-import * as testData from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { CryptoEvent } from "../../../src/crypto-api";
