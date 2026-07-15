@@ -43,6 +43,7 @@ export default defineConfig({
         coverage: {
             provider: "v8",
             include: ["src/**/*.ts"],
+            exclude: ["**/crypto-test-data/**"],
             reporter: "lcov",
         },
         environment: "node",
