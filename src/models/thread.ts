@@ -914,8 +914,8 @@ export const FILTER_RELATED_BY_REL_TYPES = new ServerControlledNamespacedValue(
 export const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue("m.thread", "io.element.thread");
 
 export enum ThreadFilterType {
-    "My",
-    "All",
+    My,
+    All,
 }
 
 export function threadFilterTypeToFilter(type: ThreadFilterType | null): "all" | "participated" {
