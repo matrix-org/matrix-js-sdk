@@ -19,8 +19,9 @@ This file is a Python script to generate test data for crypto tests.
 
 To run it:
 
+cd spec/test-utils/test-data
 python -m venv env
-./env/bin/pip install cryptography canonicaljson
+./env/bin/pip install cryptography canonicaljson base58
 ./env/bin/python generate-test-data.py > index.ts
 """
 
