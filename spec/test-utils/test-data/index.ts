@@ -215,7 +215,7 @@ export const ENCRYPTED_EVENT: Partial<IEvent> = {
 /** base64-encoded backup decryption (private) key that matches the public key in CURVE25519_KEY_BACKUP_DATA */
 export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
 
-/** base64-encoded backup decryption (private) key that does not match the public key in CURVE25519_KEY_BACKUP_DATA */
+/** base64-encoded backup decryption (private) key that does not match the public key in CURVE25519_KEY_BACKUP_DATA. (This is just a random string of the right length for a private key.) */
 export const BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
@@ -449,7 +449,7 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
 /** base64-encoded backup decryption (private) key that matches the public key in BOB_CURVE25519_KEY_BACKUP_DATA */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
 
-/** base64-encoded backup decryption (private) key that does not match the public key in BOB_CURVE25519_KEY_BACKUP_DATA */
+/** base64-encoded backup decryption (private) key that does not match the public key in BOB_CURVE25519_KEY_BACKUP_DATA. (This is just a random string of the right length for a private key.) */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */

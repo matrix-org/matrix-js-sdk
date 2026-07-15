@@ -274,7 +274,7 @@ export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_ev
 /** base64-encoded backup decryption (private) key that matches the public key in {prefix}CURVE25519_KEY_BACKUP_DATA */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
 
-/** base64-encoded backup decryption (private) key that does not match the public key in {prefix}CURVE25519_KEY_BACKUP_DATA */
+/** base64-encoded backup decryption (private) key that does not match the public key in {prefix}CURVE25519_KEY_BACKUP_DATA. (This is just a random string of the right length for a private key.) */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
