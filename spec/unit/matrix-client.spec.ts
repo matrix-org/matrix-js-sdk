@@ -1337,6 +1337,29 @@ describe("MatrixClient", function () {
             await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
         });
 
+        it("preserves previously cached keys when writing through the profile cache", async () => {
+            const storedProfile = { other_key: "bar" };
+            const testProfile = { test_key: "foo" };
+            (client.store as MockedObject<IStore>).getUserProfile.mockImplementation(async (requestedUserId) => {
+                expect(requestedUserId).toEqual(userId);
+                return storedProfile;
+            });
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: testProfile,
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
+
+            expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
+                new Map([[userId, { ...storedProfile, ...testProfile }]]),
+            );
+        });
+
         it("can set a property in our extended profile", async () => {
             httpLookups = [
                 {
