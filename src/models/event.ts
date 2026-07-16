@@ -75,6 +75,7 @@ export interface IUnsigned {
     "invite_room_state"?: StrippedState[];
     "m.relations"?: Record<RelationType | string, any>; // No common pattern for aggregated relations
     "msc4354_sticky_duration_ttl_ms"?: number;
+    "msc4354_sticky_ttl_start_ms"?: number;
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
     "membership"?: Membership;
     "io.element.msc4115.membership"?: Membership;
@@ -460,10 +461,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const age = this.getAge();
         const now = Date.now();
         this.localTimestamp = age !== undefined ? now - age : (this.getTs() ?? now);
+        const established = this.unstableStickyInfo?.ttl_start_ms ?? now;
         this.reEmitter = new TypedReEmitter(this);
         if (this.unstableStickyInfo) {
             if (this.unstableStickyInfo.duration_ttl_ms) {
-                this.unstableStickyExpiresAt = now + this.unstableStickyInfo.duration_ttl_ms;
+                const elapsed = now - established
+                const remainingTtl = this.unstableStickyInfo.duration_ttl_ms - elapsed;
+                this.unstableStickyExpiresAt = now + remainingTtl;
             } else {
                 // Bound the timestamp so it doesn't come from the future.
                 this.unstableStickyExpiresAt = Math.min(now, this.getTs()) + this.unstableStickyInfo.duration_ms;
@@ -1768,7 +1772,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * `duration_ms` is safely bounded to a hour.
      */
-    public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
+    public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number; ttl_start_ms?: number } | undefined {
         if (!this.event.msc4354_sticky?.duration_ms) {
             return undefined;
         }
@@ -1776,6 +1780,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             duration_ms: Math.min(MAX_STICKY_DURATION_MS, this.event.msc4354_sticky.duration_ms),
             // This is assumed to be bounded server-side.
             duration_ttl_ms: this.event.unsigned?.msc4354_sticky_duration_ttl_ms,
+            ttl_start_ms: this.event.unsigned?.msc4354_sticky_ttl_start_ms,
         };
     }
 }
