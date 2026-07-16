@@ -179,7 +179,7 @@ export const CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     "forwarded_count": 0,
     "is_verified": false,
     "session_data": {
-        "ciphertext": "r6HRk2/Im2yJe5cLP8R81aVjFWjYWPHpw7TVxphiSK1cdIDZTTK57r6MfU+0i/mTPn+/PosT74OvYwCnehy2d/r0NTff1SQt+1GopZkT0nq6jF5Wh/oX+8iwtYjHvTxMpN1UQoXAvRF40O+EVg+Q3efJXh1t45cMco8EWU64VerOir+k7cQ3C9FtcgQw3kmz3s3HeVY10o13X/w6+rc8n6vXqxuIxYHnFxanxX8B6TgTMZNajNfVsmJV0aC1aezim7E2gsftc+6+zW5G+rCFaEsWV/IuSOUz0+Hh0U+7hzSrz9/4qXPEVmPy1f6Ll4hhquPAlXPVDwddqlJDYj7kmvzr1g3bKVpk+TtKDbWlVQDPaJx2DEI2jGkPYjhYb7okpTFKpUny94dZmFIQqCeSGPIniaq8Y+/CanugQ1ZRVQcThuXrTewqWhXcpVvkVHT9i4ImcpBl95HzCBXuiwSUv6FKvO25fp++w555rbn2piFtilrUwnkrZPW32jFuaQcKZF4mZwcLeH7POL5UCuS4TWyaKyArp7bRzXwWuIq1wPET2nAMUmUVL7ge2+tAevk1WOIsjLgSaz/g55wO3Yma7yhXRFKcnzTjS0hUQOZ3GfTNwCM4pjzAtIPzvVd4Fp0b1emWZS5WyOYdXsceEDi3c6WtkoHWOKhPU0zBzn8hA9TdlFFqKzf2QFbN5Zgg0gprDLnLWgpc3/ieI4C7ndEQ7ZeTNMXbT/Y10APFk3qO+IGkLXJ97/qTF41EXFDhlsL0",
+        "ciphertext": "r6HRk2/Im2yJe5cLP8R81aVjFWjYWPHpw7TVxphiSK1cdIDZTTK57r6MfU+0i/mTPn+/PosT74OvYwCnehy2dyqqks+Ev+uBKw3TAo0HCv7W3Rmq9XtqxikG9ts7XtcjFEkx37+qRaXtikcu0+CmUf+I5X6KStwNXb+CPnN2CGgwpn8g5+xEgSjE904QFrte4s9ygfqymgszgF7kzNICYF5g2GTlss8pdu/GLnh52AKvtT6FcqE5LC74N07BDWUycMHMMMw43F7z5GhzEnoWOXlbz+M4eTGrCYuhvcmQGNbdgzYqEXPm1z4xFhVgs84kFCtNeUc+AHZWfC2zynZ++4tpmfCYYpYEfYwQNo9Ks7o+Mh2PtAo9/GIU4xAK/uG0vizEiNYt/1QAxwgrmDxjdRe5TH4pPUtLMktRDyZKeUHJmYZA7pcLtpVatXhXmVEQLFLDc/uusxaBxFXYkx7BQnNRoa1BE1yXRxud94s6vMsI/auhn95TG58Z0Rz9psRT4HzgDKeHf/uVbdfKR9O3gqxlB4mzZAyTCqHhUQERmGiISC2FeuKkAwVk/ZxXiFqSTUCizwXcczGbzEbC+pBJTi6jX5Pa2yI9cT5C8xaGGUzEaKdNWukcs73uvXoFl/5y0Y29PkfE8UlPWpN4kZn7hrcOllcqqV9ZMH+rBbGViIw0yZ6yQUciEJzO8Gk3yz36lIT30VhCgKXMu+kELEPTRSVXqEQkCXBcfNOhgl3LIso",
         "ephemeral": "q+P1WdRtEiPIEtNuuGrRcueZxUbLnSKdsuTAkxewXgU",
         "mac": "OibmACbORhI"
     }
@@ -215,7 +215,7 @@ export const ENCRYPTED_EVENT: Partial<IEvent> = {
 /** base64-encoded backup decryption (private) key that matches the public key in CURVE25519_KEY_BACKUP_DATA */
 export const BACKUP_DECRYPTION_KEY_BASE64 = "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
 
-/** base64-encoded backup decryption (private) key that does not match the public key in CURVE25519_KEY_BACKUP_DATA */
+/** base64-encoded backup decryption (private) key that does not match the public key in CURVE25519_KEY_BACKUP_DATA. (This is just a random string of the right length for a private key.) */
 export const BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
@@ -413,7 +413,7 @@ export const BOB_CURVE25519_KEY_BACKUP_DATA: KeyBackupSession = {
     "forwarded_count": 0,
     "is_verified": false,
     "session_data": {
-        "ciphertext": "d7UVOK17WEVky/8hK0h3HsTQrFMEbKbfqMcl2KtyTWcI9S5gGFWK9Git5BzVRxRggvxQ0c8PDfqL+dr3zHytAA7TEpHlx8Ks23hCqXmVW710VjqK2K9xnWCyJvkHfE8x0w6AYvffDj+tRVP8C8M7t4849rD2itn0uma+YMkvjG/nANUTxG1dBf3oUOZ673vflCPoaz7s7x9ZNhYDVSVH5JTdMgNwwN42R5dqqxnGTu516tJzJh/9BWvyD9oIPWJ8X0rt1sbzEJ3PZeBXcSy8GTlZ1SgSFjeiXlwYxOZCaX2sxprk4N1oI1db6g+wCDBhbCGGucJIlTDJna/h9/C5J4drGd/fkisG3SidUmJXXCyInhs/BhwjGAtTGeQS8j7R8UnJxhMulYBHSckzj0Kas71LElPp8W8M4Jq81APA03n5UfYB+U6jbxjDgf8OJnxGQyrteq9F2+SEvS/TwHe1pE3t6EM2mDYRoYDTpU5pTNYSJkGIQMfWJKRxxuWUGs29o1twewJ6dhHgm+SlCII0M7ESoVdV54vxZCvHZnPcR0NXDzal7ils7zBKJmamHfPQBuaqNPU3KmSo+5R8ngFPaWU5LbWqYp/WxSBfNCoLZ7Jf8Io5uitjXTATR2qy2r6l/RJmk3RlfP51kliQqI2TWqRF96oaB96IGgUGSFCX/2pv0psOBGc1SjfmMB3d7gYis+2iBYVbG3xmnpeXbqvlD0Lw9TiTIPkjhJkTW1+lXyhy1xVH9ZmcFamcL7bX15Jx",
+        "ciphertext": "d7UVOK17WEVky/8hK0h3HsTQrFMEbKbfqMcl2KtyTWcI9S5gGFWK9Git5BzVRxRggvxQ0c8PDfqL+dr3zHytAA++ax1ey0Jp13HF6U35/DT5lPwB1ah4+uUwVKhq21xsdg/IFtiqYxYfNhzgJnkIeMVjZIX79+/B2VZ001SVzDWIkPorNu5DSyuCGCOrcvB/vXMRSsIYQr/Ns7apdpWbTpGm2KbNhJOZR9KBdlwY6mG++eWlsuv6wvlfjMRu+s2TJEXk60whigWluC0e/JuaAH+T2tKkz/RizPCbC/0EhDWpzCJHrZepDtDridQ/8+jbwGqQQoC6VS8PuqWGeXbc8q6a9swyG2OhyT95vRJfIj/BH2YoLn+5jbH4b19F8DRDY210tBRkYApVGuLzR2aWJrD4Q9Re699kWaY2NFW7G5NpWU3I4okWNx5jh5/g4q1EIo93m7XlxZYpwqgAwniQ7UqHEsweE/lRGlg4HxUOsY1wIpkPnrPnCwcdzjvuGZUraFTUJW3JvbBHbxD22keRkNEhsKNEx66vngCrtUNxsSoQ2DoJ+FIJRvxx+SGdPZrvqs6qUw5aCv9sXzxsPYl+QFsQIJ4GPJkIPzRv3gu3uCgpBC7IYNeVz3fCfXeedoyX45FONCosDdere5Z23n1y+caKlSP/Ahmw4ckg0YCxpt0NI64lfUE61KLvA1ptxYBo4VXul3gR/uP9RWE8ZFzYNPVBcft/YS2FwHeVeHCTdhQ",
         "ephemeral": "oO0VX84OUIzm2i/12zAhTWOZT5IFRH5mXaKZ8fXkCgU",
         "mac": "lEfHlqfJQwU"
     }
@@ -446,8 +446,11 @@ export const BOB_ENCRYPTED_EVENT: Partial<IEvent> = {
     "origin_server_ts": 1507753886000
 };
 
-/** base64-encoded backup decryption (private) key */
+/** base64-encoded backup decryption (private) key that matches the public key in BOB_CURVE25519_KEY_BACKUP_DATA */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE64 = "DwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=";
+
+/** base64-encoded backup decryption (private) key that does not match the public key in BOB_CURVE25519_KEY_BACKUP_DATA. (This is just a random string of the right length for a private key.) */
+export const BOB_BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
 export const BOB_BACKUP_DECRYPTION_KEY_BASE58 = "EsT5 Sd5m mEXs NQYE ibRe 3q9E 4aXW rHih 5f9J 6rU6 AfwY mASR";
