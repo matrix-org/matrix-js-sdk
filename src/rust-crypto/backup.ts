@@ -27,6 +27,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type KeyBackupRoomSessions,
+    type NewKeyBackupInfo,
 } from "../crypto-api/keybackup.ts";
 import { type Logger } from "../logger.ts";
 import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -325,11 +326,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             return null;
         }
         this.checkedForBackup = true;
-
-        if (backupInfo && !backupInfo.version) {
-            this.logger.warn("active backup lacks a useful 'version'; ignoring it");
-            backupInfo = undefined;
-        }
         this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
@@ -381,9 +377,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // we also checked it has a valid `version`.
         await this.olmMachine.enableBackupV1(
             (backupInfo.auth_data as Curve25519AuthData).public_key,
-            backupInfo.version!,
+            backupInfo.version,
         );
-        this.activeBackupVersion = backupInfo.version!;
+        this.activeBackupVersion = backupInfo.version;
 
         this.emit(CryptoEvent.KeyBackupStatus, true);
 
@@ -580,14 +576,16 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         await signObject(authData);
 
+        const backupData: NewKeyBackupInfo = {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+        };
+
         const res = await this.http.authedRequest<{ version: string }>(
             Method.Post,
             "/room_keys/version",
             undefined,
-            {
-                algorithm: pubKey.algorithm,
-                auth_data: authData,
-            },
+            backupData,
             {
                 prefix: ClientPrefix.V3,
             },

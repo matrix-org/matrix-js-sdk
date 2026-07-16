@@ -173,6 +173,8 @@ def build_test_data(user_data, prefix = "") -> str:
         "auth_data": {
             "public_key": b64_backup_public_key,
         },
+        "etag": "",
+        "count": 0,
     }
     # sign with our device key
     sig = sign_json(backup_data["auth_data"], private_key)
