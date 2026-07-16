@@ -519,7 +519,7 @@ describe("History Sharing", () => {
             .getCrypto()!
             .storeSessionBackupPrivateKey(
                 Buffer.from(BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                SIGNED_BACKUP_DATA.version!,
+                SIGNED_BACKUP_DATA.version,
             );
 
         await aliceClient.getCrypto()!.checkKeyBackupAndEnable();

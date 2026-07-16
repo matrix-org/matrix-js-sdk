@@ -48,7 +48,7 @@ describe("Upload keys to backup", () => {
 
         mockOlmMachine = {
             getBackupKeys: vi.fn().mockResolvedValue({
-                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
+                backupVersion: TestData.SIGNED_BACKUP_DATA.version,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys),
             backupRoomKeys: vi.fn(),

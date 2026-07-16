@@ -131,9 +131,9 @@ describe("PerSessionKeyBackupDownloader", () => {
 
     describe("Given valid backup available", () => {
         beforeEach(async () => {
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version);
             mockOlmMachine.getBackupKeys.mockResolvedValue({
-                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
+                backupVersion: TestData.SIGNED_BACKUP_DATA.version,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
 
@@ -345,7 +345,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             // there is a backup
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
             // it is trusted
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version);
             // but the key is not cached
             mockOlmMachine.getBackupKeys.mockResolvedValue({} as RustSdkCryptoJs.BackupKeys);
 
@@ -364,7 +364,7 @@ describe("PerSessionKeyBackupDownloader", () => {
             // there is a backup
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
             // it is trusted
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version);
             // but the cached key has the wrong version
             mockOlmMachine.getBackupKeys.mockResolvedValue({
                 backupVersion: "0",
@@ -433,10 +433,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
 
             // Now the backup becomes trusted
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version);
             // And we have the key in cache
             mockOlmMachine.getBackupKeys.mockResolvedValue({
-                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
+                backupVersion: TestData.SIGNED_BACKUP_DATA.version,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
 
@@ -458,10 +458,10 @@ describe("PerSessionKeyBackupDownloader", () => {
             // there is a backup
             mockRustBackupManager.getServerBackupInfo.mockResolvedValue(TestData.SIGNED_BACKUP_DATA);
             // It's trusted
-            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version!);
+            mockRustBackupManager.getActiveBackupVersion.mockResolvedValue(TestData.SIGNED_BACKUP_DATA.version);
             // And we have the key in cache
             mockOlmMachine.getBackupKeys.mockResolvedValue({
-                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
+                backupVersion: TestData.SIGNED_BACKUP_DATA.version,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
             } as unknown as RustSdkCryptoJs.BackupKeys);
         });

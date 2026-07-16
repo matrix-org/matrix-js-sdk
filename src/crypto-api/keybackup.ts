@@ -33,16 +33,24 @@ export interface Aes256AuthData {
 }
 
 /**
- * Information about a server-side key backup.
+ * Information about a new server-side key backup.
+ *
+ * The type of the request body for [`POST /_matrix/client/v3/room_keys/version`](https://spec.matrix.org/v1.19/client-server-api/#post_matrixclientv3room_keysversion).
+ */
+export interface NewKeyBackupInfo {
+    algorithm: string;
+    auth_data: ISigned & (Curve25519AuthData | Aes256AuthData);
+}
+
+/**
+ * Information about an existing server-side key backup.
  *
  * Returned by [`GET /_matrix/client/v3/room_keys/version`](https://spec.matrix.org/v1.7/client-server-api/#get_matrixclientv3room_keysversion).
  */
-export interface KeyBackupInfo {
-    algorithm: string;
-    auth_data: ISigned & (Curve25519AuthData | Aes256AuthData);
-    count?: number;
-    etag?: string;
-    version?: string; // number contained within
+export interface KeyBackupInfo extends NewKeyBackupInfo {
+    count: number;
+    etag: string;
+    version: string; // number contained within
 }
 
 /**

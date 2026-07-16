@@ -1243,6 +1243,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
             },
+            etag: "",
+            count: 0,
         };
 
         /** {@link unsignedMatchingBackupInfo}, with the addition of a signature */
@@ -1254,6 +1256,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
 
         /** {@link unsignedNonMatchingBackupInfo}, with the addition of a signature */
@@ -1265,6 +1269,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
 
         beforeEach(async () => {

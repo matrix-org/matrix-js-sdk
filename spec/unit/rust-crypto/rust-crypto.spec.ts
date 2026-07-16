@@ -48,6 +48,7 @@ import {
     MatrixHttpApi,
     MemoryCryptoStore,
     TypedEventEmitter,
+    MatrixError,
 } from "../../../src";
 import { emitPromise, mkEvent, waitFor } from "../../test-utils/test-utils";
 import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
@@ -67,7 +68,7 @@ import {
     EventShieldReason,
     type ImportRoomKeysOpts,
     type KeyBackupCheck,
-    type KeyBackupInfo,
+    type NewKeyBackupInfo,
     type VerificationRequest,
 } from "../../../src/crypto-api";
 import * as testData from "../../test-utils/test-data";
@@ -841,6 +842,8 @@ describe("RustCrypto", () => {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
                     } else if (method === "GET" && backupAuthData) {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    } else {
+                        throw new MatrixError({ errcode: "M_NOT_FOUND" }, 404);
                     }
                 }
                 return Promise.resolve({});
@@ -1532,7 +1535,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             await rustCrypto.storeSessionBackupPrivateKey(
                 new TextEncoder().encode(key),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
@@ -1757,7 +1760,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -1800,7 +1803,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -2368,7 +2371,12 @@ describe("RustCrypto", () => {
             });
             // If the backup is deleted, we will return an empty object
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
-                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+                return backupIsDeleted
+                    ? {
+                          status: 404,
+                          body: { errcode: "M_NOT_FOUND" },
+                      }
+                    : testData.SIGNED_BACKUP_DATA;
             });
 
             let dehydratedDeviceIsDeleted = false;
@@ -2378,7 +2386,7 @@ describe("RustCrypto", () => {
             });
 
             // A new key backup should be created after the reset
-            let newKeyBackupInfo!: KeyBackupInfo;
+            let newKeyBackupInfo!: NewKeyBackupInfo;
             fetchMock.post("path:/_matrix/client/v3/room_keys/version", (callLog) => {
                 newKeyBackupInfo = JSON.parse(callLog.options.body as string);
                 return { version: "2" };

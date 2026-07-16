@@ -27,6 +27,7 @@ import {
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type KeyBackupRoomSessions,
+    type NewKeyBackupInfo,
 } from "../crypto-api/keybackup.ts";
 import { type Logger } from "../logger.ts";
 import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -46,14 +47,6 @@ import { type IMegolmSessionData } from "../@types/crypto.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
-
-// Server backup info is public API data and may be malformed; enabling a backup
-// requires the version to have been checked or supplied by backup creation.
-type KeyBackupInfoWithVersion = KeyBackupInfo & { version: string };
-
-function hasBackupVersion(backupInfo: KeyBackupInfo): backupInfo is KeyBackupInfoWithVersion {
-    return !!backupInfo.version;
-}
 
 /**
  * Holds information of a created keybackup.
@@ -333,11 +326,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             return null;
         }
         this.checkedForBackup = true;
-
-        if (backupInfo && !hasBackupVersion(backupInfo)) {
-            this.logger.warn("active backup lacks a useful 'version'; ignoring it");
-            backupInfo = undefined;
-        }
         this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
@@ -379,10 +367,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param backupInfo - the desired backup version (and the encryption key).
      * @param activeVersion - the current active backup version (or `null`, if none).
      */
-    private async enableOrSwitchKeyBackup(
-        backupInfo: KeyBackupInfoWithVersion,
-        activeVersion: string | null,
-    ): Promise<void> {
+    private async enableOrSwitchKeyBackup(backupInfo: KeyBackupInfo, activeVersion: string | null): Promise<void> {
         if (activeVersion === null) {
             this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
             await this.enableKeyBackup(backupInfo);
@@ -404,7 +389,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Enables key backup upload for the given backup version. Also emits
      * a {@link CryptoEvent.KeyBackupStatus} event.
      */
-    private async enableKeyBackup(backupInfo: KeyBackupInfoWithVersion): Promise<void> {
+    private async enableKeyBackup(backupInfo: KeyBackupInfo): Promise<void> {
         // we know for certain it must be a Curve25519 key, because we have verified it and only Curve25519
         // keys can be verified.
         await this.olmMachine.enableBackupV1(
@@ -616,29 +601,33 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         await signObject(authData);
 
+        const backupData: NewKeyBackupInfo = {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+        };
+
         const res = await this.http.authedRequest<{ version: string }>(
             Method.Post,
             "/room_keys/version",
             undefined,
-            {
-                algorithm: pubKey.algorithm,
-                auth_data: authData,
-            },
+            backupData,
             {
                 prefix: ClientPrefix.V3,
             },
         );
 
-        const backupInfo: KeyBackupInfoWithVersion = {
+        // This backup was just created and signed locally, so use the creation response to make up a full
+        // `KeyBackupInfo` struct representing the new backup, instead of doing another discovery/trust check.
+        const backupInfo: KeyBackupInfo = {
             algorithm: pubKey.algorithm,
             auth_data: authData,
             version: res.version,
+            count: 0,
+            etag: "", // we never actually use the etag, so we can just make up a value
         };
 
         // saveBackupDecryptionKey emits KeyBackupDecryptionKeyCached. Cache and
         // enable the created backup first so listeners observe the new version.
-        // This backup was just created and signed locally, so use the creation
-        // response instead of doing another discovery/trust check before the event.
         this.serverBackupInfo = backupInfo;
         this.checkedForBackup = true;
         await this.enableOrSwitchKeyBackup(backupInfo, await this.getActiveBackupVersion());
