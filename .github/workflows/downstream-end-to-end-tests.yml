@@ -32,3 +32,5 @@ jobs:
             # We only want to run the playwright tests on merge queue to prevent regressions
             # from creeping in. They take a long time to run and consume multiple concurrent runners.
             skip: ${{ github.event_name != 'merge_group' }}
+            # Element Desktop build/test does not exercise the js-sdk whatsoever at present
+            desktop: false
