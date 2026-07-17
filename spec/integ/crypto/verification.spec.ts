@@ -86,8 +86,7 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
