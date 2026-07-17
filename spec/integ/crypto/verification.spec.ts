@@ -21,7 +21,7 @@ import debug from "debug";
 import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 import { IDBFactory } from "fake-indexeddb";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import Olm from "@matrix-org/olm";
 
 import {

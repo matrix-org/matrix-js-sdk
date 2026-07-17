@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
+const fs = require("node:fs");
 
 async function listReleases(github, owner, repo) {
     const response = await github.rest.repos.listReleases({

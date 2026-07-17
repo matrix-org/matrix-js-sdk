@@ -1,7 +1,6 @@
 import mkdebug from "debug";
 
-// eslint-disable-next-line no-restricted-imports
-import type EventEmitter from "events";
+import type EventEmitter from "node:events";
 import {
     type IContent,
     type IEvent,
