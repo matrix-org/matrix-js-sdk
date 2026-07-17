@@ -47,7 +47,7 @@ import {
     TEST_ROOM_ID,
     TEST_USER_ID,
     PER_ROOM_CURVE25519_KEY_BACKUP_DATA,
-} from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
 
 const debug = mkDebug("matrix-js-sdk:history-sharing");
 

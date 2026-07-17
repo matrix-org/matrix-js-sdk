@@ -5,8 +5,8 @@ import { type Mocked } from "vitest";
 import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
 import { CryptoEvent, type KeyBackupSession } from "../../../src/crypto-api/index.ts";
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import * as testData from "../../test-utils/test-data";
-import * as TestData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
+import * as TestData from "../../test-utils/crypto-test-data";
 import { RustBackupManager, type KeyBackup } from "../../../src/rust-crypto/backup";
 import { logger } from "../../../src/logger.ts";
 

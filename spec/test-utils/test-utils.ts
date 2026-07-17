@@ -23,7 +23,7 @@ import {
 } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
-import { TEST_ROOM_ID } from "./test-data";
+import { TEST_ROOM_ID } from "./crypto-test-data";
 import { KnownMembership, type Membership } from "../../src/@types/membership";
 
 const debug = mkdebug("test-utils");

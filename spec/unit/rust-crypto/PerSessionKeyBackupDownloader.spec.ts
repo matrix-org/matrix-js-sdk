@@ -26,7 +26,7 @@ import {
     type RustBackupCryptoEvents,
     type RustBackupManager,
 } from "../../../src/rust-crypto/backup";
-import * as TestData from "../../test-utils/test-data";
+import * as TestData from "../../test-utils/crypto-test-data";
 import {
     ConnectionError,
     type HttpApiEvent,
@@ -36,7 +36,7 @@ import {
     MatrixHttpApi,
     TypedEventEmitter,
 } from "../../../src";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { type BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
 import { type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
