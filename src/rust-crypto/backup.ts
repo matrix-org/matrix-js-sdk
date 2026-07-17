@@ -41,7 +41,6 @@ import {
     CryptoEvent,
     ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
-import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { type IMegolmSessionData } from "../@types/crypto.ts";
 
 /** Authentification of the backup info, depends on algorithm */

@@ -17,7 +17,6 @@ limitations under the License.
 import { type IMinimalEvent } from "./sync-accumulator.ts";
 import { EventType } from "./@types/event.ts";
 import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils.ts";
-import { type IContent } from "./models/event.ts";
 import { type ReceiptContent, type ReceiptType } from "./@types/read_receipts.ts";
 
 interface AccumulatedReceipt {
