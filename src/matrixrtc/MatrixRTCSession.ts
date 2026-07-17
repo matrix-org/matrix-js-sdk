@@ -735,7 +735,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
      */
     // We allow this name schema since this function should only be used for testing purposes.
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public _onRTCSessionMemberUpdate = async (): Promise<void> => {
         await this.recalculateSessionMembers();
     };

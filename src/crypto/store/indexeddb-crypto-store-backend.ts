@@ -607,7 +607,7 @@ function createDatabase(db: IDBDatabase): void {
 }
 
 interface IWrappedIDBTransaction extends IDBTransaction {
-    _mx_abortexception: Error; // eslint-disable-line camelcase
+    _mx_abortexception: Error;
 }
 
 /*

@@ -275,7 +275,6 @@ describe("ServerSideSecretStorageImpl", function () {
             expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith("mysecret", { encrypted: {} });
 
             // ... and emitted a warning.
-            // eslint-disable-next-line no-console
             expect(console.warn).toHaveBeenCalledWith(expect.stringContaining("unknown algorithm"));
         });
 

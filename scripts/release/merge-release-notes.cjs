@@ -151,13 +151,11 @@ if (require.main === module) {
     const { Octokit } = require("@octokit/rest");
     const github = new Octokit({ auth: process.env.GITHUB_TOKEN });
     if (process.argv.length < 4) {
-        // eslint-disable-next-line no-console
         console.error("Usage: node merge-release-notes.js owner/repo:release_id npm-package-name ...");
         process.exit(1);
     }
     const [releaseId, ...dependencies] = process.argv.slice(2);
     void main({ github, releaseId, dependencies }).then((output) => {
-        // eslint-disable-next-line no-console
         console.log(output);
     });
 }

@@ -146,7 +146,6 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
         return "mock" + (name ? " of " + name : "");
     };
     for (const key of Object.getOwnPropertyNames(constr.prototype)) {
-        // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = vi.fn();

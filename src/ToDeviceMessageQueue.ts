@@ -105,8 +105,6 @@ export class ToDeviceMessageQueue {
             this.logger.debug("All queued to-device messages sent");
         } catch (e) {
             ++this.retryAttempts;
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            // eslint-disable-next-line new-cap
             const retryDelay = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(null, this.retryAttempts, <MatrixError>e);
             if (retryDelay === -1) {
                 // the scheduler function doesn't differentiate between fatal errors and just getting

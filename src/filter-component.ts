@@ -34,7 +34,6 @@ function matchesWildcard(actualValue: string, filterValue: string): boolean {
     }
 }
 
-/* eslint-disable camelcase */
 export interface IFilterComponent {
     "types"?: string[];
     "not_types"?: string[];
@@ -51,7 +50,6 @@ export interface IFilterComponent {
     "io.element.relation_senders"?: Array<RelationType | string>;
     "io.element.relation_types"?: string[];
 }
-/* eslint-enable camelcase */
 
 /**
  * FilterComponent is a section of a Filter definition which defines the

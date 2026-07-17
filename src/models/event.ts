@@ -50,7 +50,6 @@ import { type EmptyObject } from "../@types/common.ts";
 
 export { EventStatus } from "./event-status.ts";
 
-/* eslint-disable camelcase */
 export interface IContent {
     [key: string]: any;
     "msgtype"?: MsgType | string;
@@ -165,7 +164,6 @@ export interface IClearEvent {
     content: Omit<IContent, "membership" | "avatar_url" | "displayname" | "m.relates_to">;
     unsigned?: IUnsigned;
 }
-/* eslint-enable camelcase */
 
 interface IKeyRequestRecipient {
     userId: string;
@@ -938,7 +936,6 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // `decryptionPromise`).
         await Promise.resolve();
 
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             this.retryDecryption = false;
 

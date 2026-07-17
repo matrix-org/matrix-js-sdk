@@ -16,7 +16,6 @@
 
 import { deriveRecoveryKeyFromPassphrase } from "../crypto-api/index.ts";
 
-/* eslint-disable camelcase */
 interface IAuthData {
     private_key_salt?: string;
     private_key_iterations?: number;

@@ -102,7 +102,6 @@ import { CryptoEvent } from "../../../src/crypto-api";
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 
     vi.useRealTimers();
@@ -1669,7 +1668,6 @@ describe("crypto", () => {
          * https://spec.matrix.org/v1.6/client-server-api/#put_matrixclientv3useruseridaccount_datatype
          */
         async function awaitSecretStorageKeyStoredInAccountData(): Promise<string> {
-            // eslint-disable-next-line no-constant-condition
             while (true) {
                 const content = await accountDataAccumulator.waitForAccountData("m.secret_storage.*");
                 if (content.key) {

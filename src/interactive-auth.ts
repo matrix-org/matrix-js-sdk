@@ -145,7 +145,6 @@ export class NoAuthFlowFoundError extends Error {
 
     public constructor(
         m: string,
-        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         public readonly required_stages: string[],
         public readonly flows: UIAFlow[],
     ) {

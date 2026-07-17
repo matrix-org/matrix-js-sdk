@@ -139,10 +139,8 @@ describe("MatrixRTCSession", () => {
                 await sess.initialMembershipCalculated;
 
                 if (testConfig.listenForMemberStateEvents) {
-                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(stateWarningWasLogged()).toBeTruthy();
                 } else {
-                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(stateWarningWasLogged()).toBeFalsy();
                 }
             });

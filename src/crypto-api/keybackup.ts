@@ -84,7 +84,6 @@ export interface Curve25519SessionData {
     mac: string;
 }
 
-/* eslint-disable camelcase */
 export interface KeyBackupSession<T = Curve25519SessionData | AESEncryptedSecretStoragePayload> {
     first_message_index: number;
     forwarded_count: number;

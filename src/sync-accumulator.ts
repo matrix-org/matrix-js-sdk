@@ -54,7 +54,6 @@ export interface IEphemeral {
     events: IMinimalEvent[];
 }
 
-/* eslint-disable camelcase */
 interface UnreadNotificationCounts {
     highlight_count?: number;
     notification_count?: number;
@@ -210,7 +209,6 @@ export interface ISyncResponse {
     "device_unused_fallback_key_types"?: string[];
     "org.matrix.msc2732.device_unused_fallback_key_types"?: string[];
 }
-/* eslint-enable camelcase */
 
 export enum Category {
     Invite = "invite",

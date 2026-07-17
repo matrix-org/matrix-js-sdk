@@ -3444,7 +3444,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Get an iterator of currently active sticky events.
      */
-    // eslint-disable-next-line
     public _unstable_getStickyEvents(): ReturnType<RoomStickyEventsStore["getStickyEvents"]> {
         return this.stickyEvents.getStickyEvents();
     }
@@ -3456,7 +3455,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param stickyKey The sticky key used by the event.
      * @returns A matching active sticky event, or undefined.
      */
-    // eslint-disable-next-line
     public _unstable_getKeyedStickyEvent(
         sender: string,
         type: string,
@@ -3471,7 +3469,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param sender The sender of the sticky event.
      * @returns An array of matching sticky events.
      */
-    // eslint-disable-next-line
     public _unstable_getUnkeyedStickyEvent(
         sender: string,
         type: string,
