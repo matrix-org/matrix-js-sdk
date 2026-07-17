@@ -886,26 +886,26 @@ describe("MatrixRTCSession", () => {
         it("returns the correct probablyLeft status", () => {
             const mockRoom = makeMockRoom([sessionMembershipTemplate]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            expect(sess!.probablyLeft).toBe(undefined);
+            expect(sess.probablyLeft).toBe(undefined);
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-            expect(sess!.probablyLeft).toBe(false);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess.probablyLeft).toBe(false);
 
             // Simulate the membership manager believing the user has left
             const accessPrivateFieldsSession = sess as unknown as {
                 membershipManager: { state: { probablyLeft: boolean } };
             };
             accessPrivateFieldsSession.membershipManager.state.probablyLeft = true;
-            expect(sess!.probablyLeft).toBe(true);
+            expect(sess.probablyLeft).toBe(true);
         });
 
         it("returns membershipStatus once joinRTCSession got called", () => {
             const mockRoom = makeMockRoom([rtcMembershipTemplate]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            expect(sess!.membershipStatus).toBe(undefined);
+            expect(sess.membershipStatus).toBe(undefined);
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-            expect(sess!.membershipStatus).toBe(Status.Connecting);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess.membershipStatus).toBe(Status.Connecting);
         });
     });
     it("ensureRecalculateSessionMembers still runs after a rejected promise (React Native / Hermes regression)", async () => {
@@ -942,7 +942,7 @@ describe("MatrixRTCSession", () => {
         const probablyLeftChanged = vi.fn();
         sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
 
-        sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
+        sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
 
         const membershipManager = sess["membershipManager"]!;
         membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");

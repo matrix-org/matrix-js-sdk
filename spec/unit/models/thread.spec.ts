@@ -887,7 +887,7 @@ describe("Thread", () => {
                 expect(originalMessage.getContent().body).toBe("Final edit");
 
                 // Relations for replaces should now exist and include all edits in order
-                const replaceRels = thread.timelineSet.relations!.getChildEventsForEvent(
+                const replaceRels = thread.timelineSet.relations.getChildEventsForEvent(
                     originalMessage.getId()!,
                     RelationType.Replace,
                     EventType.RoomMessage,
@@ -949,7 +949,7 @@ describe("Thread", () => {
                     thread.addEvent(reaction2, false);
 
                     // Relations should already include the reactions pre-init
-                    const relsBefore = thread.timelineSet.relations!.getChildEventsForEvent(
+                    const relsBefore = thread.timelineSet.relations.getChildEventsForEvent(
                         originalMessage.getId()!,
                         RelationType.Annotation,
                         EventType.Reaction,
@@ -971,7 +971,7 @@ describe("Thread", () => {
                     for (const ev of replay) thread.addEvent(ev, false);
 
                     // Ensure no duplicates after replay (idempotent aggregation)
-                    const relsAfter = thread.timelineSet.relations!.getChildEventsForEvent(
+                    const relsAfter = thread.timelineSet.relations.getChildEventsForEvent(
                         originalMessage.getId()!,
                         RelationType.Annotation,
                         EventType.Reaction,

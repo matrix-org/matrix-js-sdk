@@ -129,7 +129,7 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storePassphrase: "storePassphrase",
         });
@@ -153,7 +153,7 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storeKey: storeKey,
         });
@@ -176,7 +176,7 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: null,
             storeKey: new Uint8Array(),
             storePassphrase: "storePassphrase",
@@ -199,7 +199,7 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storePassphrase: "storePassphrase",
         });
@@ -269,7 +269,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -379,7 +379,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -419,7 +419,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -905,7 +905,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 secretStorage,
-                {} as CryptoCallbacks,
+                {},
                 false,
             );
             vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
@@ -1014,7 +1014,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
             rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
@@ -1132,7 +1132,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1350,7 +1350,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1592,7 +1592,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1673,7 +1673,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
             return { olmMachine, rustCrypto };
         }
@@ -1745,7 +1745,7 @@ describe("RustCrypto", () => {
                 testData.TEST_USER_ID,
                 testData.TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
 
             // Wait for the key backup to be available
@@ -2484,7 +2484,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -2624,7 +2624,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
 
             // @ts-ignore mocking outgoingRequestProcessor
@@ -2681,7 +2681,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
-    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
+    cryptoCallbacks: CryptoCallbacks = {},
 ): Promise<RustCrypto> {
     return await initRustCrypto({
         logger: new DebugLogger(debug("matrix-js-sdk:test:rust-crypto.spec")),

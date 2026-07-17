@@ -213,7 +213,7 @@ describe("EventTimelineSet", () => {
             });
             expect(liveTimeline.getEvents()).toHaveLength(1);
             const [event] = liveTimeline.getEvents();
-            const reactions = eventTimelineSet.relations!.getChildEventsForEvent(
+            const reactions = eventTimelineSet.relations.getChildEventsForEvent(
                 event.getId()!,
                 "m.annotation",
                 "m.reaction",
@@ -435,7 +435,7 @@ describe("EventTimelineSet", () => {
 
     describe("handleRemoteEcho", () => {
         it("should add to liveTimeline only if the event matches the filter", () => {
-            const filter = new Filter(client.getUserId()!, "test_filter");
+            const filter = new Filter(client.getUserId(), "test_filter");
             filter.setDefinition({
                 room: {
                     timeline: {

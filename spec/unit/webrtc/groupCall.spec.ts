@@ -759,7 +759,7 @@ describe("Group Call", function () {
 
                 // @ts-ignore
                 const oldCall = groupCall1.calls.get(client2.userId)!.get(client2.deviceId)!;
-                oldCall.emit(CallEvent.Hangup, oldCall!);
+                oldCall.emit(CallEvent.Hangup, oldCall);
 
                 client1.sendToDevice.mockClear();
 
@@ -1153,9 +1153,7 @@ describe("Group Call", function () {
         };
 
         const aliceLeaves = () => {
-            room.currentState.getStateEvents = vi
-                .fn()
-                .mockImplementation(mockGetStateEvents([] as unknown as MatrixEvent[]));
+            room.currentState.getStateEvents = vi.fn().mockImplementation(mockGetStateEvents([]));
             room.currentState.emit(RoomStateEvent.Update, room.currentState);
         };
 
@@ -1367,7 +1365,7 @@ describe("Group Call", function () {
 
             groupCall.terminate();
 
-            expect(mockClient.getMediaHandler()!.stopScreensharingStream).toHaveBeenCalledWith(
+            expect(mockClient.getMediaHandler().stopScreensharingStream).toHaveBeenCalledWith(
                 screensharingFeed!.stream,
             );
             // @ts-ignore Mock

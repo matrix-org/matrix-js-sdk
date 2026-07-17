@@ -2469,7 +2469,7 @@ describe("MatrixClient", function () {
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
             expect(queryParams).toBeFalsy();
-            expect(result!.aliases).toEqual(response.aliases);
+            expect(result.aliases).toEqual(response.aliases);
         });
     });
 
@@ -2738,7 +2738,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
+            expect(ruleMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2767,7 +2767,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch!.getContent<IContent>()).toMatchObject({
+            expect(ruleSenderMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2777,7 +2777,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:example.org",
             });
             expect(ruleRoomMatch).toBeTruthy();
-            expect(ruleRoomMatch!.getContent<IContent>()).toMatchObject({
+            expect(ruleRoomMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2802,7 +2802,7 @@ describe("MatrixClient", function () {
                 roomId: BAD_ROOM_ID,
             });
             expect(ruleSenderMatch).toBeTruthy();
-            expect(ruleSenderMatch!.getContent<IContent>()).toMatchObject({
+            expect(ruleSenderMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: REASON,
             });
@@ -2836,7 +2836,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
+            expect(ruleMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });
@@ -2864,7 +2864,7 @@ describe("MatrixClient", function () {
                 roomId: "!snafu:somewhere.org",
             });
             expect(ruleMatch).toBeTruthy();
-            expect(ruleMatch!.getContent<IContent>()).toMatchObject({
+            expect(ruleMatch!.getContent()).toMatchObject({
                 recommendation: "m.ban",
                 reason: "just a test",
             });

@@ -5,6 +5,7 @@
         "correctness": "error",
         "perf": "error",
         "restriction": "error",
+        "suspicious": "error",
     },
     "options": {
         "typeAware": true,
@@ -104,6 +105,13 @@
         "no-void": "off",
         "no-bitwise": "off",
         "no-eq-null": "off",
+        "unicorn/no-array-sort": "off",
+        "unicorn/no-array-reverse": "off",
+        "typescript/no-unnecessary-type-parameters": "off",
+        "typescript/no-unnecessary-boolean-literal-compare": "off",
+        "typescript/no-extraneous-class": "off",
+        "promise/always-return": "off",
+        "unicorn/prefer-add-event-listener": "off",
 
         // Disable some rules by default for them to be enabled for `src` via overrides
         "no-console": "off",
@@ -133,6 +141,8 @@
         "typescript/no-import-type-side-effects": "off",
         "typescript/use-unknown-in-catch-callback-variable": "off",
         "typescript/no-invalid-void-type": "off", // https://github.com/oxc-project/oxc/issues/20280
+        "typescript/no-unsafe-enum-comparison": "off",
+        "typescript/no-unnecessary-type-conversion": "off",
         "no-param-reassign": "off",
         "typescript/no-explicit-any": "off",
         "import/no-cycle": "off",
@@ -142,6 +152,11 @@
         "guard-for-in": "error",
         "complexity": "off",
         "no-empty-function": "off",
+        "no-underscore-dangle": "off",
+        "no-shadow": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/consistent-return": "off",
     },
     "overrides": [
         {
@@ -164,6 +179,7 @@
                 "typescript/unbound-method": "off",
                 "typescript/no-floating-promises": "off",
                 "typescript/no-misused-spread": "off",
+                "typescript/consistent-return": "off",
                 "vitest/require-mock-type-parameters": "off",
                 "vitest/no-disabled-tests": "off",
                 "vitest/no-conditional-expect": "off",
@@ -191,7 +207,18 @@
                         ],
                     },
                 ],
+                "unicorn/consistent-function-scoping": "off",
                 "jsdoc/check-tag-names": "off",
+                "no-shadow": "off",
+                "import/no-unassigned-import": [
+                    "error",
+                    {
+                        "allow": ["fake-indexeddb/auto"],
+                    },
+                ],
+                "promise/no-promise-in-callback": "off",
+                "no-new": "off",
+                "unicorn/prefer-add-event-listener": "off",
             },
         },
         {
@@ -221,5 +248,6 @@
                 "typescript/no-require-imports": "off",
             },
         },
+        { "files": ["**/*.d.ts"], "rules": { "unicorn/require-module-specifiers": "off" } },
     ],
 }

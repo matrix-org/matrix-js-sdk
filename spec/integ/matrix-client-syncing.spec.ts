@@ -71,9 +71,9 @@ describe("MatrixClient syncing", () => {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         const httpBackend = testClient.httpBackend;
         const client = testClient.client;
-        httpBackend!.when("GET", "/versions").respond(200, {});
-        httpBackend!.when("GET", "/pushrules").respond(200, {});
-        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+        httpBackend.when("GET", "/versions").respond(200, {});
+        httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
         return [client, httpBackend];
     };
 
@@ -1325,27 +1325,27 @@ describe("MatrixClient syncing", () => {
 
             // Make sure it re-registers the state listeners after the
             // `room.currentState` reference changes
-            it("should be able to listen to state events even after " + "refreshing the timeline", async () => {
+            it("should be able to listen to state events even after refreshing the timeline", async () => {
                 const testClientWithTimelineSupport = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
                     timelineSupport: true,
                 });
                 httpBackend = testClientWithTimelineSupport.httpBackend;
-                httpBackend!.when("GET", "/versions").respond(200, {});
-                httpBackend!.when("GET", "/pushrules").respond(200, {});
-                httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+                httpBackend.when("GET", "/versions").respond(200, {});
+                httpBackend.when("GET", "/pushrules").respond(200, {});
+                httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
                 client = testClientWithTimelineSupport.client;
 
                 // Create a room from the sync
-                httpBackend!.when("GET", "/sync").respond(200, syncData);
-                client!.startClient();
-                await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+                httpBackend.when("GET", "/sync").respond(200, syncData);
+                client.startClient();
+                await Promise.all([httpBackend.flushAllExpected(), awaitSyncEvent()]);
 
                 // Get the room after the first sync so the room is created
-                const room = client!.getRoom(roomOne)!;
+                const room = client.getRoom(roomOne)!;
                 expect(room).toBeTruthy();
 
                 let stateEventEmitCount = 0;
-                client!.on(RoomStateEvent.Update, () => {
+                client.on(RoomStateEvent.Update, () => {
                     stateEventEmitCount += 1;
                 });
 
@@ -1355,10 +1355,8 @@ describe("MatrixClient syncing", () => {
                 expect(stateEventEmitCount).toEqual(1);
 
                 const eventsInRoom = syncData.rooms.join[roomOne].timeline.events;
-                const contextUrl =
-                    `/rooms/${encodeURIComponent(roomOne)}/context/` +
-                    `${encodeURIComponent(eventsInRoom[0].event_id!)}`;
-                httpBackend!.when("GET", contextUrl).respond(200, () => {
+                const contextUrl = `/rooms/${encodeURIComponent(roomOne)}/context/${encodeURIComponent(eventsInRoom[0].event_id!)}`;
+                httpBackend.when("GET", contextUrl).respond(200, () => {
                     return {
                         start: "start_token",
                         events_before: [EVENTS[1], EVENTS[0]],
@@ -1371,7 +1369,7 @@ describe("MatrixClient syncing", () => {
 
                 // Refresh the timeline. This will cause the `room.currentState`
                 // reference to change
-                await Promise.all([room.refreshLiveTimeline(), httpBackend!.flushAllExpected()]);
+                await Promise.all([room.refreshLiveTimeline(), httpBackend.flushAllExpected()]);
 
                 // Cause `RoomStateEvent.Update` to be fired
                 room.currentState.setStateEvents([SOME_STATE_EVENT]);

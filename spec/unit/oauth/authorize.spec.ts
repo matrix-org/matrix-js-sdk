@@ -253,7 +253,7 @@ describe("authorization", () => {
                 verification_uri: "https://url",
                 expires_in: 9999,
             });
-            expect(fetchMock).toHavePosted(metadata.device_authorization_endpoint!, {
+            expect(fetchMock).toHavePosted(metadata.device_authorization_endpoint, {
                 matcherFunction: (callLog) => {
                     expect(callLog.options.body).toBe(
                         "client_id=xyz789&scope=urn%3Amatrix%3Aclient%3Aapi%3A*+urn%3Amatrix%3Aclient%3Adevice%3Adeadbeef",

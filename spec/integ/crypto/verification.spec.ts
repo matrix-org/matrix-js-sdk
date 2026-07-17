@@ -1282,7 +1282,7 @@ describe("verification", () => {
                 signedNonMatchingBackupInfo,
             ]);
 
-            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID]![olmDeviceId]);
+            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID][olmDeviceId]);
             e2eKeyResponder.addCrossSigningData(bootstrapped);
 
             usermasterPubKey = Object.values(bootstrapped.master_keys![TEST_USER_ID].keys)[0];
@@ -1523,7 +1523,7 @@ describe("verification", () => {
                 recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
                 p2pSession: p2pSession,
                 olmAccount: testOlmAccount,
-                requestId: requestId!,
+                requestId: requestId,
                 secret: secret,
             });
 

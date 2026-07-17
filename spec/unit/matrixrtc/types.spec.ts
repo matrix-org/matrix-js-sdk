@@ -120,7 +120,7 @@ describe("IRTCNotificationContent", () => {
         const res = parseCallNotificationContent({
             ...validBase,
             relation: { rel_type: "m.reference", event_id: "$ev" },
-        } as any);
+        });
         expect(res).toBeTruthy();
     });
 

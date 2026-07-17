@@ -23,7 +23,6 @@ import {
     type KeyBackupCheck,
     type KeyBackupInfo,
     type KeyBackupSession,
-    type Curve25519SessionData,
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type KeyBackupRoomSessions,
@@ -901,9 +900,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
     /**
      * Implements {@link BackupDecryptor#decryptSessions}
      */
-    public async decryptSessions(
-        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | AESEncryptedSecretStoragePayload>>,
-    ): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(ciphertexts: Record<string, KeyBackupSession>): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {
             try {

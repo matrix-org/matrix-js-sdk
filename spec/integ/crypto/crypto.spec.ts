@@ -1160,7 +1160,7 @@ describe("crypto", () => {
         // it probably won't be decrypted yet, because it takes a while to process the olm keys
         const decryptedEvent = await testUtils.awaitDecryption(event, { waitOnDecryptionFailure: true });
         expect(decryptedEvent.getRoomId()).toEqual(ROOM_ID);
-        expect(decryptedEvent.getContent<IContent>()).toEqual({});
+        expect(decryptedEvent.getContent()).toEqual({});
         expect(decryptedEvent.getClearContent()).toBeUndefined();
     });
 
@@ -1198,7 +1198,7 @@ describe("crypto", () => {
             // and wait for the outgoing requests
             const inboundGroupSession = await inboundGroupSessionPromise;
             const encryptedMessageContent = await reqProm;
-            const msg: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+            const msg: any = inboundGroupSession.decrypt(encryptedMessageContent.ciphertext);
             logger.log("Decrypted received megolm message", msg);
 
             // at this point, the request to send the room message has been made, but not completed.
@@ -1231,7 +1231,7 @@ describe("crypto", () => {
             });
             await syncPromise(aliceClient);
 
-            const timelineEvents = aliceClient.getRoom(testData.TEST_ROOM_ID)!.getLiveTimeline()!.getEvents();
+            const timelineEvents = aliceClient.getRoom(testData.TEST_ROOM_ID)!.getLiveTimeline().getEvents();
             const lastEvent = timelineEvents[timelineEvents.length - 1];
             expect(lastEvent.getId()).toEqual("$event_id");
 
@@ -1891,11 +1891,11 @@ describe("crypto", () => {
                 expect(activeBackup).toStrictEqual(backupVersion);
 
                 // check that there is a MSK signature
-                const signatures = (await aliceClient.getCrypto()!.checkKeyBackupAndEnable())!.backupInfo.auth_data!
+                const signatures = (await aliceClient.getCrypto()!.checkKeyBackupAndEnable())!.backupInfo.auth_data
                     .signatures;
                 expect(signatures).toBeDefined();
                 expect(signatures![aliceClient.getUserId()!]).toBeDefined();
-                const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master)!;
+                const mskId = await aliceClient.getCrypto()!.getCrossSigningKeyId(CrossSigningKey.Master);
                 expect(signatures![aliceClient.getUserId()!][`ed25519:${mskId}`]).toBeDefined();
             });
 
@@ -1938,7 +1938,7 @@ describe("crypto", () => {
                 const check = await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
                 fetchMock.get(
                     `path:/_matrix/client/v3/room_keys/version/${check!.backupInfo.version}`,
-                    check!.backupInfo!,
+                    check!.backupInfo,
                 );
 
                 // Import a new key that should be uploaded

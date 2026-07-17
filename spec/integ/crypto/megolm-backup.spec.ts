@@ -237,7 +237,7 @@ describe("megolm-keys backup", () => {
 
             // Eventually, decryption succeeds.
             await awaitDecryption(event, { waitOnDecryptionFailure: true });
-            expect(event.getContent<IContent>()).toEqual(testData.CLEAR_EVENT.content);
+            expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
         });
 
         it("handles error on backup query gracefully", async () => {
@@ -326,7 +326,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version,
+                check!.backupInfo.version,
             );
 
             const result = await advanceTimersUntil(aliceCrypto.restoreKeyBackup());
@@ -376,7 +376,7 @@ describe("megolm-keys backup", () => {
 
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version,
+                check!.backupInfo.version,
             );
 
             const progressCallback = vi.fn();
@@ -435,7 +435,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version,
+                check!.backupInfo.version,
             );
 
             const progressCallback = vi.fn();
@@ -470,7 +470,7 @@ describe("megolm-keys backup", () => {
                 // DecryptSessions does not reject on decryption failure, but just skip the key
                 decryptSessions: vi.fn().mockImplementation((sessions) => {
                     // simulate fail to decrypt 2 keys out of all
-                    const decrypted = [];
+                    const decrypted: Mocked<IMegolmSessionData>[] = [];
                     const keys = Object.keys(sessions);
                     for (let i = 0; i < keys.length - decryptionFailureCount; i++) {
                         decrypted.push({
@@ -492,7 +492,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version,
+                check!.backupInfo.version,
             );
 
             const result = await aliceCrypto.restoreKeyBackup();
@@ -1129,7 +1129,7 @@ describe("megolm-keys backup", () => {
             const event = room.getLiveTimeline().getEvents()[0];
             await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
 
-            expect(event.getContent<IContent>()).toEqual(testData.CLEAR_EVENT.content);
+            expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
 
             // =====
             // Second suppose now that the backup has changed to version 2

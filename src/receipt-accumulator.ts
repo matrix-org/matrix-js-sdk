@@ -162,7 +162,7 @@ export class ReceiptAccumulator {
             room_id: roomId,
             content: {
                 // $event_id: { "m.read": { $user_id: $json } }
-            } as IContent,
+            },
         };
 
         const receiptEventContent: MapWithDefault<

@@ -284,7 +284,7 @@ export class MembershipManager
             this.logger.warn("Missing own membership: force re-join");
             this.state.hasMemberStateEvent = false;
 
-            if (this.scheduler.actions.some((a) => sendingMembershipActions.includes(a.type as MembershipActionType))) {
+            if (this.scheduler.actions.some((a) => sendingMembershipActions.includes(a.type))) {
                 this.logger.error(
                     "tried adding another `SendDelayedEvent` actions even though we already have one in the Queue\nActionQueueOnMemberUpdate:",
                     this.scheduler.actions,

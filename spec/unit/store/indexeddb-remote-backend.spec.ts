@@ -98,7 +98,7 @@ describe("RemoteIndexedDBStoreBackend", () => {
                 set onmessage(fn: ((ev: MessageEvent) => void) | null) {
                     workerMessageHandler = fn ?? undefined;
                 },
-            } as unknown as Worker);
+            } satisfies Worker);
             backend = new RemoteIndexedDBStoreBackend(factory, "test-db");
 
             await backend.connect();
