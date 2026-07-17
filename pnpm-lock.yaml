@@ -312,8 +312,8 @@ importers:
         specifier: ^4.3.4
         version: 4.4.3
       fake-indexeddb:
-        specifier: ^5.0.2
-        version: 5.0.2
+        specifier: ^6.0.0
+        version: 6.2.5
       fetch-mock:
         specifier: ^12.6.0
         version: 12.6.0
@@ -2069,8 +2069,8 @@ packages:
     resolution: {integrity: sha512-PMARsyh/JtqC20HoGqlFcIlQAyqUtW4PlI1rup1uhYJtKuwAjbvWi3GQMAn+STdHum/dk8xrKfUM1+5SAwpolA==}
     engines: {node: ^18.14.0 || ^20.0.0 || ^22.0.0 || >=24.0.0}
 
-  fake-indexeddb@5.0.2:
-    resolution: {integrity: sha512-cB507r5T3D55DfclY01GLkninZLfU7HXV/mhVRTnTRm5k2u+fY7Fof2dBkr80p5t7G7dlA/G5dI87QiMdPpMCQ==}
+  fake-indexeddb@6.2.5:
+    resolution: {integrity: sha512-CGnyrvbhPlWYMngksqrSSUT1BAVP49dZocrHuK0SvtR0D5TMs5wP0o3j7jexDJW01KSadjBp1M/71o/KR3nD1w==}
     engines: {node: '>=18'}
 
   fd-package-json@2.0.0:
@@ -4276,7 +4276,7 @@ snapshots:
       jest-mock: 30.4.1
       jest-util: 30.4.1
 
-  fake-indexeddb@5.0.2: {}
+  fake-indexeddb@6.2.5: {}
 
   fd-package-json@2.0.0:
     dependencies:

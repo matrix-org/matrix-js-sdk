@@ -296,7 +296,7 @@ describe("History Sharing", () => {
     });
 
     test("Room keys are not imported if the bundle arrives more than 24H after the invite is accepted", async () => {
-        vitest.useFakeTimers();
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
 
         const [alice, bob] = await setupClients(2);
         const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
@@ -359,7 +359,7 @@ describe("History Sharing", () => {
         expect(event.isDecryptionFailure()).toBeTruthy();
 
         // 24 hours elapse before the room key bundle message arrives.
-        vitest.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+        vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
 
         fetchMock.getOnce(`begin:${bobHomeserverUrl}/_matrix/client/v1/media/download/alice-server/here`, {
             body: uploadedBlob,
@@ -379,7 +379,7 @@ describe("History Sharing", () => {
 
         // Wait a bit to ensure the event is not decrypted.
         for (let i = 0; i < 10; i++) {
-            await vitest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
         }
 
         expect(event.isDecryptionFailure()).toBeTruthy();
@@ -1074,7 +1074,7 @@ describe("History Sharing", () => {
     );
 
     afterEach(async () => {
-        vitest.useRealTimers();
+        vi.useRealTimers();
     });
 });
 

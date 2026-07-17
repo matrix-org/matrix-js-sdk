@@ -29,7 +29,7 @@ import { emitPromise, EventCounter } from "../../test-utils/test-utils";
 
 describe("Device dehydration", () => {
     it("should rehydrate and dehydrate a device", async () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
 
         const matrixClient = createClient({
             baseUrl: "http://test.server",
