@@ -325,7 +325,7 @@ importers:
         version: 9.1.7
       knip:
         specifier: ^6.0.0
-        version: 6.26.0
+        version: 6.27.0
       lint-staged:
         specifier: ^17.0.0
         version: 17.0.8
@@ -2213,8 +2213,8 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
-  knip@6.26.0:
-    resolution: {integrity: sha512-e9eELEEpBpGTd4H4HB7818/DYj9dMzMyUqAddfYwUN/EbSkgIjOuWEF96W/xHsmV0SDrsdXjIM+oZ2xpPzPsBA==}
+  knip@6.27.0:
+    resolution: {integrity: sha512-CngYEYrD0n20N06FXA8n3u/0Wnnugoa+B9k14OP+iKIgkCHuzvIdsP3nfwjhByoc1WfogpxfiriMboAXFETDUw==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
 
@@ -2662,8 +2662,8 @@ packages:
   uc.micro@2.1.0:
     resolution: {integrity: sha512-ARDJmphmdvUk6Glw7y9DQ2bFkKBHwQHLi2lsaH6PPmz/Ka9sFOBsBluozhDltWmnv9u/cF6Rt87znRTPV+yp/A==}
 
-  unbash@4.0.2:
-    resolution: {integrity: sha512-8gwNZ29+0/3zmXw7ToIHZtg6wK37xnniRUdBt7B27xZxaxfgR5tGMaGHT0t0dLtBV9fXE7zurh0s6Z1DHVjfWg==}
+  unbash@4.0.3:
+    resolution: {integrity: sha512-3cudTErfToSc4Ggv8XGXVNVli/xHKUtUZvaY5UVwhOcUPbQGz7PeaEnT/SAVgNziZtX67KEN9swMUYkLghxA1w==}
     engines: {node: '>=14'}
 
   undici-types@6.21.0:
@@ -4418,7 +4418,7 @@ snapshots:
 
   json5@2.2.3: {}
 
-  knip@6.26.0:
+  knip@6.27.0:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.5)
       formatly: 0.3.0
@@ -4430,7 +4430,7 @@ snapshots:
       smol-toml: 1.7.0
       strip-json-comments: 5.0.3
       tinyglobby: 0.2.17
-      unbash: 4.0.2
+      unbash: 4.0.3
       yaml: 2.9.0
       zod: 4.4.3
 
@@ -4912,7 +4912,7 @@ snapshots:
 
   uc.micro@2.1.0: {}
 
-  unbash@4.0.2: {}
+  unbash@4.0.3: {}
 
   undici-types@6.21.0: {}
 
