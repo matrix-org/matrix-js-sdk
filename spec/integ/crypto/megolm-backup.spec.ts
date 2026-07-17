@@ -22,7 +22,6 @@ import { type Mocked } from "vitest";
 import {
     createClient,
     encodeBase64,
-    type IContent,
     type ICreateClientOpts,
     type IEvent,
     type IMegolmSessionData,

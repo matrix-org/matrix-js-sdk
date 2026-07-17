@@ -20,7 +20,7 @@ import {
     mkEncryptedMatrixEvent,
     mkMatrixEvent,
 } from "../../src/testing";
-import { EventType, type IContent } from "../../src";
+import { EventType } from "../../src";
 import { DecryptionFailureCode } from "../../src/crypto-api";
 
 describe("testing", () => {
