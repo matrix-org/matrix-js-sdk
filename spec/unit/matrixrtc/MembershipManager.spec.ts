@@ -941,7 +941,9 @@ describe("MembershipManager", () => {
         it("should fail if the user has not joined the call", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             // After joining we want our own focus to be the one we select.
-            await expect(manager.updateCallIntent("video")).rejects.toThrowErrorMatchingInlineSnapshot(`[Error: You cannot update your intent before joining the call]`);
+            await expect(manager.updateCallIntent("video")).rejects.toThrowErrorMatchingInlineSnapshot(
+                `[Error: You cannot update your intent before joining the call]`,
+            );
         });
 
         it("can adjust the intent", async () => {

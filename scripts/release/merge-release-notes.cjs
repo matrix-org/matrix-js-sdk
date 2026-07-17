@@ -134,6 +134,7 @@ const main = async ({ github, releaseId, dependencies }) => {
         output = intro + "\n\n";
     }
 
+    // oxlint-disable-next-line guard-for-in
     for (const section in sections) {
         const lines = sections[section];
         if (!lines.length) continue;

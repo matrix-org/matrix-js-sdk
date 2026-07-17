@@ -142,6 +142,7 @@ export class FilterComponent {
             },
         } as const;
 
+        // oxlint-disable-next-line guard-for-in
         for (const name in literalKeys) {
             const matchFunc = literalKeys[<keyof typeof literalKeys>name];
             const notName = "not_" + name;
