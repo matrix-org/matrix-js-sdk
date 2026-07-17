@@ -640,7 +640,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         let capabilities: Capabilities = {};
         try {
             capabilities = await this.client.getCapabilities();
-        } catch {}
+        } catch {
+            // Ignore errors - we'll just use the default safe room version
+        }
         let versionCap = capabilities["m.room_versions"];
         if (!versionCap) {
             versionCap = {
@@ -2276,7 +2278,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 event.once(MatrixEventEvent.BeforeRedaction, (redactedEvent: MatrixEvent) => {
                     this.polls.delete(redactedEvent.getId()!);
                 });
-            } catch {}
+            } catch {
+                // Do nothing
+            }
             // poll creation can fail for malformed poll start events
             return;
         }
@@ -3482,7 +3486,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @param events A set of new sticky events.
      * @internal
      */
-    // eslint-disable-next-line
     public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEventsStore["addStickyEvents"]> {
         // ALWAYS filter out any events that are past retention
         events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);

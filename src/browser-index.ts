@@ -31,7 +31,9 @@ globalThis.__js_sdk_entrypoint = true;
 let indexedDB: IDBFactory | undefined;
 try {
     indexedDB = globalThis.indexedDB;
-} catch {}
+} catch {
+    // Do nothing
+}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {

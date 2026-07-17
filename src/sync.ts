@@ -1762,7 +1762,7 @@ export class SyncApi {
                     // fire listeners
                     member.setMembershipEvent(inviteEvent, room.currentState);
                 },
-                function (err) {
+                function () {
                     // OH WELL.
                 },
             );
