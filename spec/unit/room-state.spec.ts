@@ -21,7 +21,7 @@ import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { RoomMemberEvent } from "../../src/models/room-member";
-import { type Beacon, BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
+import { BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
 import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
 import { type IContent, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
@@ -179,8 +179,8 @@ describe("RoomState", function () {
             const events = state.getStateEvents("m.room.member");
             expect(events.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(events[0].getStateKey() as string)).not.toEqual(-1);
-            expect([userA, userB].indexOf(events[1].getStateKey() as string)).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[0].getStateKey()!)).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[1].getStateKey()!)).not.toEqual(-1);
         });
 
         it("should return a single MatrixEvent if a state_key was specified", function () {
@@ -577,7 +577,7 @@ describe("RoomState", function () {
 
             state.setStateEvents([beaconEvent]);
             const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
-            const destroySpy = vi.spyOn(beaconInstance as Beacon, "destroy");
+            const destroySpy = vi.spyOn(beaconInstance!, "destroy");
             expect(beaconInstance?.isLive).toEqual(true);
 
             state.setStateEvents([redactedBeaconEvent]);
@@ -1120,7 +1120,7 @@ describe("RoomState", function () {
 
                 expect(state.beacons.size).toEqual(2);
 
-                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beaconInstance, "addLocations");
 
                 await state.processBeaconEvents([location1, location2, location3], mockClient);
@@ -1187,7 +1187,7 @@ describe("RoomState", function () {
                 });
                 state.setStateEvents([beacon1, beacon2]);
 
-                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beacon, "addLocations").mockClear();
                 state.processBeaconEvents([location, otherRelatedEvent], mockClient);
                 expect(addLocationsSpy).not.toHaveBeenCalled();
@@ -1248,7 +1248,7 @@ describe("RoomState", function () {
                 });
                 vi.spyOn(decryptingRelatedEvent, "isBeingDecrypted").mockReturnValue(true);
                 state.setStateEvents([beacon1, beacon2]);
-                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beacon, "addLocations").mockClear();
                 await state.processBeaconEvents([decryptingRelatedEvent], mockClient);
 
@@ -1274,7 +1274,7 @@ describe("RoomState", function () {
                 mockClient.decryptEventIfNeeded.mockReturnValue(decryptEventResolvers.promise);
 
                 state.setStateEvents([beacon1, beacon2]);
-                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beacon, "addLocations").mockClear();
                 const prom = state.processBeaconEvents([decryptingRelatedEvent], mockClient);
 

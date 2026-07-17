@@ -605,7 +605,7 @@ export class SyncAccumulator {
             for (let i = startIndex; i < currentData._timeline.length; i++) {
                 if (currentData._timeline[i].token) {
                     // keep all events after this, including this one
-                    currentData._timeline = currentData._timeline.slice(i, currentData._timeline.length);
+                    currentData._timeline = currentData._timeline.slice(i);
                     break;
                 }
             }
