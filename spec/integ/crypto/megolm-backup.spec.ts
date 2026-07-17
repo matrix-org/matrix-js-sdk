@@ -123,7 +123,9 @@ describe("megolm-keys backup", () => {
     let e2eKeyResponder: E2EKeyResponder;
 
     beforeEach(async () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({
+            toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+        });
 
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -203,6 +205,7 @@ describe("megolm-keys backup", () => {
                 await waitForDeviceList();
                 await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
                 await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+                await vi.runOnlyPendingTimersAsync();
             } /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */,
             10000,
         );

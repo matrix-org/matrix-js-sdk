@@ -4305,14 +4305,14 @@ describe("Room", function () {
     describe("should handle retention", () => {
         let room: Room;
         beforeEach(async () => {
-            vitest.useFakeTimers();
-            const client = vitest.mockObject(
+            vi.useFakeTimers();
+            const client = vi.mockObject(
                 new MatrixClient({
                     baseUrl: "http://example.org",
                     unstableMSC1763Retention: true,
                 }),
             );
-            client.retentionPolicyService.getCached = vitest.fn().mockReturnValue({
+            client.retentionPolicyService.getCached = vi.fn().mockReturnValue({
                 policies: {
                     "*": {
                         max_lifetime: 1000,

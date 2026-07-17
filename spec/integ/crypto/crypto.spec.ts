@@ -1004,7 +1004,9 @@ describe("crypto", () => {
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            vi.useFakeTimers();
+            vi.useFakeTimers({
+                toFake: ["Date"],
+            });
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -1927,12 +1929,9 @@ describe("crypto", () => {
                     });
                 });
 
-                vi.useFakeTimers({ toFake: ["setTimeout"] });
                 const importRoomKeysPromise = aliceClient.getCrypto()!.importRoomKeys([newKey]);
 
                 // The backup loop waits a random amount of time to avoid different clients firing at the same time.
-                vi.runAllTicks();
-                vi.runAllTimers();
                 await importRoomKeysPromise;
 
                 const keyBackupData = await awaitKeyUploaded;
