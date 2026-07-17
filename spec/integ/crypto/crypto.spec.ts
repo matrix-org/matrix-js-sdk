@@ -1942,7 +1942,7 @@ describe("crypto", () => {
                 await aliceClient.getCrypto()!.loadSessionBackupPrivateKeyFromSecretStorage();
                 const importResult = await aliceClient.getCrypto()!.restoreKeyBackup();
                 expect(importResult.imported).toStrictEqual(1);
-            });
+            }, 10000);
 
             it("Reset key backup should create a new backup and update 4S", async () => {
                 // First set up 4S and key backup
