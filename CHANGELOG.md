@@ -1,3 +1,90 @@
+Changes in [41.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.9.0) (2026-07-07)
+==================================================================================================
+## ✨ Features
+
+* Add method `CryptoApi.getUserCrossSigningKeys` ([#5389](https://github.com/matrix-org/matrix-js-sdk/pull/5389)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix restarting delayed events via compatibility path in RoomWidgetClient ([#5380](https://github.com/matrix-org/matrix-js-sdk/pull/5380)). Contributed by @robintown.
+
+
+Changes in [41.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.8.0) (2026-06-23)
+==================================================================================================
+## ✨ Features
+
+* MatrixRTC: Preserve original error as `cause` when wrapping in scheduler ([#5363](https://github.com/matrix-org/matrix-js-sdk/pull/5363)). Contributed by @fkwp.
+* Add mechanism to locally enforce MSC1763 retention rules ([#5353](https://github.com/matrix-org/matrix-js-sdk/pull/5353)). Contributed by @Half-Shot.
+
+## 🐛 Bug Fixes
+
+* Fall back to local indexeddb backend when worker fails to start ([#5361](https://github.com/matrix-org/matrix-js-sdk/pull/5361)). Contributed by @t3chguy.
+
+
+Changes in [41.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.7.0) (2026-06-09)
+==================================================================================================
+## ✨ Features
+
+* MSC4140: use auth for delayed event management ([#5340](https://github.com/matrix-org/matrix-js-sdk/pull/5340)). Contributed by @AndrewFerr.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] SECURITY: Update matrix-sdk-crypto-wasm to v18.3.1 ([#5356](https://github.com/matrix-org/matrix-js-sdk/pull/5356)). Contributed by @RiotRobot.
+* fix(MatrixRTCSession): replace no-arg .finally() with .then(fn, fn) to fix crash on React Native / Hermes ([#5307](https://github.com/matrix-org/matrix-js-sdk/pull/5307)). Contributed by @JeanLuX.
+
+
+Changes in [41.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.6.0) (2026-05-26)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Throw sane error on completeLoginOnNewDevice IdP rejection ([#5321](https://github.com/matrix-org/matrix-js-sdk/pull/5321)). Contributed by @t3chguy.
+
+
+Changes in [41.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.5.0) (2026-05-12)
+==================================================================================================
+## ✨ Features
+
+* MSC4108v2024 iteration and support for sign in on new device ([#5283](https://github.com/matrix-org/matrix-js-sdk/pull/5283)). Contributed by @t3chguy.
+* Enable encrypted history sharing by default ([#5300](https://github.com/matrix-org/matrix-js-sdk/pull/5300)). Contributed by @richvdh.
+* Restore functional `start` command ([#5298](https://github.com/matrix-org/matrix-js-sdk/pull/5298)). Contributed by @t3chguy.
+* Support stable identifiers for MSC4268 and MSC4287 ([#5299](https://github.com/matrix-org/matrix-js-sdk/pull/5299)). Contributed by @andybalaam.
+* Implement MSC4429: Profile Updates for Legacy Sync ([#5246](https://github.com/matrix-org/matrix-js-sdk/pull/5246)). Contributed by @Half-Shot.
+* Support stable identifiers for MSC4268 ([#5290](https://github.com/matrix-org/matrix-js-sdk/pull/5290)). Contributed by @andybalaam.
+
+
+Changes in [41.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.4.0) (2026-04-28)
+==================================================================================================
+## ✨ Features
+
+* Handle secret pushing for key backups ([#5189](https://github.com/matrix-org/matrix-js-sdk/pull/5189)). Contributed by @uhoreg.
+* Add support for `m.recent_emoji` account data event ([#5280](https://github.com/matrix-org/matrix-js-sdk/pull/5280)). Contributed by @t3chguy.
+* Adapt LiveKit Identity hash calculation to latest MSC4195 update ([#5268](https://github.com/matrix-org/matrix-js-sdk/pull/5268)). Contributed by @fkwp.
+* Support the stable prefix for MSC4287 (key backup preference) ([#5258](https://github.com/matrix-org/matrix-js-sdk/pull/5258)). Contributed by @andybalaam.
+* Handle response\_mode=fragment in completeAuthorizationCodeGrant ([#5266](https://github.com/matrix-org/matrix-js-sdk/pull/5266)). Contributed by @t3chguy.
+* Allow generating OIDC URIs with response\_mode=fragment ([#5265](https://github.com/matrix-org/matrix-js-sdk/pull/5265)). Contributed by @t3chguy.
+* Expose `UserVerificationStatus.known` flag ([#5255](https://github.com/matrix-org/matrix-js-sdk/pull/5255)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Allow oidc jwks\_uri to be omitted ([#5271](https://github.com/matrix-org/matrix-js-sdk/pull/5271)). Contributed by @t3chguy.
+
+
+Changes in [41.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.3.0) (2026-04-07)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Rotate the current room key when we see a member leave ([#5231](https://github.com/matrix-org/matrix-js-sdk/pull/5231)). Contributed by @kaylendog.
+
+
+Changes in [41.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.2.0) (2026-03-24)
+==================================================================================================
+## ✨ Features
+
+* Only share history if room history visibility is shared ([#5216](https://github.com/matrix-org/matrix-js-sdk/pull/5216)). Contributed by @kaylendog.
+* History sharing: resume key-bundle import on restart ([#5214](https://github.com/matrix-org/matrix-js-sdk/pull/5214)). Contributed by @richvdh.
+* Move `CryptoApi.shareRoomHistoryWithUser` to `CryptoBackend` ([#5218](https://github.com/matrix-org/matrix-js-sdk/pull/5218)). Contributed by @richvdh.
+
+
 Changes in [41.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.1.0) (2026-03-10)
 ==================================================================================================
 ## ✨ Features

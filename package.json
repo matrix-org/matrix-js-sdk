@@ -1,26 +1,34 @@
 {
     "name": "matrix-js-sdk",
-    "version": "41.1.0",
+    "version": "41.9.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
     },
+    "devEngines": {
+        "packageManager": {
+            "name": "pnpm",
+            "version": "11.9.0",
+            "onFail": "download"
+        }
+    },
     "scripts": {
         "prepare": "pnpm build",
-        "start": "echo THIS IS FOR LEGACY PURPOSES ONLY. && babel --delete-dir-on-start src -w -s -d lib --verbose --extensions \".ts,.js\"",
+        "start": "concurrently 'pnpm run build:compile --watch' 'pnpm run build:types --watch'",
         "build": "pnpm build:compile && pnpm build:types",
         "build:types": "tsc -p tsconfig-build.json --emitDeclarationOnly",
         "build:compile": "babel --delete-dir-on-start -d lib --verbose --extensions \".ts,.js\" src",
         "gendoc": "typedoc",
         "lint": "pnpm lint:types && pnpm lint:js && pnpm lint:workflows",
-        "lint:js": "eslint --max-warnings 0 src spec && prettier --check .",
-        "lint:js-fix": "prettier --log-level=warn --write . && eslint --fix src spec",
+        "lint:js": "oxlint && oxfmt --check",
+        "lint:js-fix": "oxfmt --write . && oxlint --fix src spec",
         "lint:types": "tsc --noEmit",
         "lint:workflows": "find .github/workflows -type f \\( -iname '*.yaml' -o -iname '*.yml' \\) | xargs -I {} sh -c 'echo \"Linting {}\"; action-validator \"{}\"'",
-        "lint:knip": "knip",
-        "test": "vitest",
-        "test:watch": "vitest --watch",
-        "coverage": "pnpm test --coverage"
+        "lint:knip": "knip && knip --strict --exclude unlisted,dependencies,binaries",
+        "test": "vitest run",
+        "test:watch": "vitest watch",
+        "coverage": "pnpm test --coverage",
+        "coverage:diff": "diff-cover --config-file diff-cover.toml coverage/lcov.info"
     },
     "repository": {
         "type": "git",
@@ -47,89 +55,56 @@
         "release.sh"
     ],
     "dependencies": {
-        "@babel/runtime": "^7.12.5",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^18.0.0",
+        "@babel/runtime": "^8.0.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^18.3.1",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
-        "content-type": "^1.0.4",
-        "jwt-decode": "^4.0.0",
+        "content-type": "^2.0.0",
         "loglevel": "^1.9.2",
         "matrix-events-sdk": "0.0.1",
         "matrix-widget-api": "^1.16.1",
-        "oidc-client-ts": "^3.0.1",
-        "p-retry": "7",
+        "p-retry": "8",
         "sdp-transform": "^3.0.0",
-        "unhomoglyph": "^1.0.6",
-        "uuid": "13"
+        "unhomoglyph": "^1.0.6"
     },
     "devDependencies": {
         "@action-validator/cli": "^0.6.0",
         "@action-validator/core": "^0.6.0",
-        "@babel/cli": "^7.12.10",
-        "@babel/core": "^7.12.10",
-        "@babel/eslint-parser": "^7.12.10",
-        "@babel/eslint-plugin": "^7.12.10",
-        "@babel/plugin-proposal-decorators": "^7.25.9",
-        "@babel/plugin-syntax-dynamic-import": "^7.8.3",
-        "@babel/plugin-transform-class-properties": "^7.12.1",
-        "@babel/plugin-transform-numeric-separator": "^7.12.7",
-        "@babel/plugin-transform-object-rest-spread": "^7.12.1",
-        "@babel/plugin-transform-runtime": "^7.12.10",
-        "@babel/preset-env": "^7.12.11",
-        "@babel/preset-typescript": "^7.12.7",
+        "@babel/cli": "^8.0.0",
+        "@babel/core": "^8.0.0",
+        "@babel/plugin-proposal-decorators": "^8.0.0",
+        "@babel/plugin-transform-class-properties": "^8.0.0",
+        "@babel/plugin-transform-numeric-separator": "^8.0.0",
+        "@babel/plugin-transform-object-rest-spread": "^8.0.0",
+        "@babel/plugin-transform-runtime": "^8.0.0",
+        "@babel/plugin-transform-typescript": "^8.0.0",
+        "@babel/preset-env": "^8.0.0",
+        "@babel/preset-typescript": "^8.0.0",
         "@fetch-mock/vitest": "^0.2.18",
         "@matrix-org/olm": "3.2.15",
-        "@peculiar/webcrypto": "^1.4.5",
-        "@stylistic/eslint-plugin": "^5.0.0",
-        "@types/content-type": "^1.1.5",
         "@types/debug": "^4.1.7",
         "@types/node": "22",
-        "@types/sdp-transform": "^2.4.5",
-        "@typescript-eslint/eslint-plugin": "^8.0.0",
-        "@typescript-eslint/parser": "^8.0.0",
+        "@types/sdp-transform": "^3.0.0",
+        "@typescript/native": "npm:typescript@7.0.2",
         "@vitest/coverage-v8": "^4.0.17",
-        "@vitest/eslint-plugin": "^1.6.6",
         "@vitest/ui": "^4.0.17",
-        "babel-plugin-search-and-replace": "^1.1.1",
+        "concurrently": "^10.0.0",
         "debug": "^4.3.4",
-        "eslint": "8.57.1",
-        "eslint-config-google": "^0.14.0",
-        "eslint-config-prettier": "^10.0.0",
-        "eslint-import-resolver-typescript": "^4.0.0",
-        "eslint-plugin-import": "^2.26.0",
-        "eslint-plugin-jsdoc": "^62.0.0",
-        "eslint-plugin-matrix-org": "^3.0.0",
-        "eslint-plugin-n": "^14.0.0",
-        "eslint-plugin-tsdoc": "^0.5.0",
-        "eslint-plugin-unicorn": "^56.0.0",
         "fake-indexeddb": "^6.0.0",
         "fetch-mock": "^12.6.0",
         "happy-dom": "^20.1.0",
         "husky": "^9.0.0",
-        "knip": "^5.0.0",
-        "lint-staged": "^16.0.0",
+        "knip": "^6.0.0",
+        "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
-        "prettier": "3.8.1",
+        "oxfmt": "^0.59.0",
+        "oxlint": "^1.70.0",
+        "oxlint-tsgolint": "^0.24.0",
         "typedoc": "^0.28.1",
         "typedoc-plugin-coverage": "^4.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
-        "typescript": "^5.4.2",
-        "vitest": "^4.0.17",
-        "vitest-sonar-reporter": "^3.0.0"
-    },
-    "resolutions": {
-        "expect": "30.3.0"
-    },
-    "pnpm": {
-        "peerDependencyRules": {
-            "allowedVersions": {
-                "eslint": "8"
-            }
-        },
-        "allowedDeprecatedVersions": {
-            "eslint": "8"
-        }
-    },
-    "packageManager": "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
+        "typescript": "npm:@typescript/typescript6@6.0.2",
+        "vitest": "^4.0.17"
+    }
 }

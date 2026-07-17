@@ -21,7 +21,6 @@ import { type QueryDict } from "../utils.ts";
 export type Body = Record<string, any> | BodyInit;
 
 /**
- * @experimental
  * Unencrypted access and (optional) refresh token
  */
 export type AccessTokens = {
@@ -40,7 +39,6 @@ export type AccessTokens = {
 };
 
 /**
- * @experimental
  * Function that performs token refresh using the given refreshToken.
  * Returns a promise that resolves to the refreshed access and (optional) refresh tokens.
  *
@@ -141,15 +139,6 @@ export interface IRequestOpts extends BaseRequestOpts {
     // This is intended for use on endpoints where M_UNKNOWN_TOKEN is a valid/notable error response,
     // such as with token refreshes.
     inhibitLogoutEmit?: boolean;
-}
-
-export interface IContentUri {
-    base: string;
-    path: string;
-    params: {
-        // eslint-disable-next-line camelcase
-        access_token: string;
-    };
 }
 
 export enum HttpApiEvent {

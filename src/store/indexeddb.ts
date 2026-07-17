@@ -28,6 +28,7 @@ import { type EventEmitterEvents, TypedEventEmitter } from "../models/typed-even
 import { type IStateEventWithRoomId } from "../@types/search.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 import { type IStoredClientOpts } from "../client.ts";
+import { type SyncUserProfile } from "../models/user.ts";
 
 /**
  * This is an internal module. See {@link IndexedDBStore} for the public class.
@@ -63,11 +64,7 @@ export class IndexedDBStore extends MemoryStore {
         return LocalIndexedDBStoreBackend.exists(indexedDB, dbName);
     }
 
-    /**
-     * The backend instance.
-     * Call through to this API if you need to perform specific indexeddb actions like deleting the database.
-     */
-    public readonly backend: IIndexedDBBackend;
+    public _backend: IIndexedDBBackend;
 
     private startedUp = false;
     private syncTs = 0;
@@ -104,7 +101,7 @@ export class IndexedDBStore extends MemoryStore {
      *
      * @param opts - Options object.
      */
-    public constructor(opts: IOpts) {
+    public constructor(private readonly opts: IOpts) {
         super(opts);
 
         if (!opts.indexedDB) {
@@ -112,10 +109,18 @@ export class IndexedDBStore extends MemoryStore {
         }
 
         if (opts.workerFactory) {
-            this.backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
+            this._backend = new RemoteIndexedDBStoreBackend(opts.workerFactory, opts.dbName);
         } else {
-            this.backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
+            this._backend = new LocalIndexedDBStoreBackend(opts.indexedDB, opts.dbName);
         }
+    }
+
+    /**
+     * The backend instance.
+     * Call through to this API if you need to perform specific indexeddb actions like deleting the database.
+     */
+    public get backend(): IIndexedDBBackend {
+        return this._backend;
     }
 
     /** Re-exports `TypedEventEmitter.on` */
@@ -135,6 +140,14 @@ export class IndexedDBStore extends MemoryStore {
         logger.log(`IndexedDBStore.startup: connecting to backend`);
         return this.backend
             .connect(this.onClose)
+            .catch((e) => {
+                if (this.opts.workerFactory) {
+                    logger.log("Falling back to local indexeddb backend");
+                    this._backend = new LocalIndexedDBStoreBackend(this.opts.indexedDB!, this.opts.dbName);
+                    return this.backend.connect(this.onClose);
+                }
+                throw e;
+            })
             .then(() => {
                 logger.log(`IndexedDBStore.startup: loading presence events`);
                 return this.backend.getUserPresenceEvents();
@@ -383,6 +396,18 @@ export class IndexedDBStore extends MemoryStore {
 
     public removeToDeviceBatch(id: number): Promise<void> {
         return this.backend.removeToDeviceBatch(id);
+    }
+
+    public async getUserProfile(userId: string): Promise<SyncUserProfile | undefined> {
+        return this.backend.getUserProfile(userId);
+    }
+
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        return this.backend.storeUserProfiles(userProfiles);
+    }
+
+    public async removeUserProfiles(userIds: string[]): Promise<void> {
+        return this.backend.removeUserProfiles(userIds);
     }
 }
 

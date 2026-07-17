@@ -192,7 +192,7 @@ describe("megolm-keys backup", () => {
                 const aliceCrypto = aliceClient.getCrypto()!;
                 await aliceCrypto.storeSessionBackupPrivateKey(
                     Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                    testData.SIGNED_BACKUP_DATA.version!,
+                    testData.SIGNED_BACKUP_DATA.version,
                 );
 
                 // start after saving the private key
@@ -328,7 +328,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo!.version,
             );
 
             const result = await advanceTimersUntil(aliceCrypto.restoreKeyBackup());
@@ -378,7 +378,7 @@ describe("megolm-keys backup", () => {
 
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo!.version,
             );
 
             const progressCallback = vi.fn();
@@ -437,7 +437,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo!.version,
             );
 
             const progressCallback = vi.fn();
@@ -494,7 +494,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo!.version,
             );
 
             const result = await aliceCrypto.restoreKeyBackup();
@@ -580,21 +580,22 @@ describe("megolm-keys backup", () => {
 
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
 
-            const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+            const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version);
 
-            const uploadPromises = someRoomKeys.map((data) => {
-                new Promise<void>((resolve) => {
-                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
-                        if (
-                            data.room_id == roomId &&
-                            data.session_id == sessionId &&
-                            version == testData.SIGNED_BACKUP_DATA.version
-                        ) {
-                            resolve();
-                        }
-                    });
-                });
-            });
+            const uploadPromises = someRoomKeys.map(
+                (data) =>
+                    new Promise<void>((resolve) => {
+                        uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                            if (
+                                data.room_id == roomId &&
+                                data.session_id == sessionId &&
+                                version == testData.SIGNED_BACKUP_DATA.version
+                            ) {
+                                resolve();
+                            }
+                        });
+                    }),
+            );
 
             fetchMock.modifyRoute("room-keys-version", {
                 response: { status: 200, body: testData.SIGNED_BACKUP_DATA },
@@ -661,7 +662,7 @@ describe("megolm-keys backup", () => {
             const result = await aliceCrypto.checkKeyBackupAndEnable();
             expect(result).toBeTruthy();
 
-            mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+            mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version);
             await aliceCrypto.importRoomKeys(someRoomKeys);
 
             // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
@@ -680,15 +681,16 @@ describe("megolm-keys backup", () => {
 
             // If we import a new key the loop will try to upload to old version, it will
             // fail then check the current version and switch if trusted
-            const uploadPromises = someRoomKeys.map((data) => {
-                new Promise<void>((resolve) => {
-                    uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
-                        if (data.room_id == roomId && data.session_id == sessionId && version == newBackupVersion) {
-                            resolve();
-                        }
-                    });
-                });
-            });
+            const uploadPromises = someRoomKeys.map(
+                (data) =>
+                    new Promise<void>((resolve) => {
+                        uploadMockEmitter.on(MockKeyUploadEvent.KeyUploaded, (roomId, sessionId, version) => {
+                            if (data.room_id == roomId && data.session_id == sessionId && version == newBackupVersion) {
+                                resolve();
+                            }
+                        });
+                    }),
+            );
 
             const disableOldBackup = new Promise<void>((resolve) => {
                 aliceClient.on(CryptoEvent.KeyBackupFailed, (errCode) => {
@@ -864,7 +866,7 @@ describe("megolm-keys backup", () => {
         // Delete the backup and we are expecting the key backup to be disabled
         const keyBackupStatus = Promise.withResolvers<boolean>();
         aliceClient.once(CryptoEvent.KeyBackupStatus, (enabled) => keyBackupStatus.resolve(enabled));
-        await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version!);
+        await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version);
         expect(await keyBackupStatus.promise).toBe(false);
 
         // The backup info should not be available anymore
@@ -904,7 +906,7 @@ describe("megolm-keys backup", () => {
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
@@ -918,7 +920,7 @@ describe("megolm-keys backup", () => {
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             const backup: KeyBackupInfo = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
@@ -959,7 +961,7 @@ describe("megolm-keys backup", () => {
             // Alice does *not* trust the device that signed the backup, but *does* have the decryption key.
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
@@ -1075,7 +1077,7 @@ describe("megolm-keys backup", () => {
             const aliceCrypto = aliceClient.getCrypto()!;
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             // start after saving the private key

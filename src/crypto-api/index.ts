@@ -74,8 +74,6 @@ export interface StartDehydrationOpts {
 
 /**
  * Public interface to the cryptography parts of the js-sdk
- *
- * @remarks Currently, this is a work-in-progress. In time, more methods will be added here.
  */
 export interface CryptoApi {
     /**
@@ -188,7 +186,9 @@ export interface CryptoApi {
     /**
      * Check if the given user has published cross-signing keys.
      *
-     * - If the user is tracked, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is this user, a `/keys/query` request is made to update locally the cross signing keys.
+     * - If the user is tracked, any current `/keys/query` requests are awaited (with a timeout) and then
+     *   the locally cached information is used.
      * - If the user is not tracked locally and downloadUncached is set to true,
      *   a `/keys/query` request is made to the server to retrieve the cross signing keys.
      * - Otherwise, return false
@@ -205,7 +205,10 @@ export interface CryptoApi {
      * Get the device information for the given list of users.
      *
      * For any users whose device lists are cached (due to sharing an encrypted room with the user), the
-     * cached device data is returned.
+     * cached device data is returned, unless it is stale.
+     *
+     * If there are users with stale cached entries, wait (with some timeout) for any in-progress
+     * `/keys/query` request to complete.
      *
      * If there are uncached users, and the `downloadUncached` parameter is set to `true`,
      * a `/keys/query` request is made to the server to retrieve these devices.
@@ -262,9 +265,17 @@ export interface CryptoApi {
      *
      * This is useful if the user was previously verified but is not anymore
      * ({@link UserVerificationStatus.wasCrossSigningVerified}) and it is not possible to verify him again now.
-     *
      */
     withdrawVerificationRequirement(userId: string): Promise<void>;
+
+    /**
+     * Get the given user's public cross-signing keys, if they have published any, and we have fetched them to
+     * our store.
+     *
+     * Normally this is only useful to applications as debug info, since the SDK handles keeping track of a
+     * user's identity, and whether their devices are verified.
+     */
+    getUserCrossSigningKeys(userId: string): Promise<Partial<CrossSigningKeys> | null>;
 
     /**
      * Get the verification status of a given device.
@@ -626,7 +637,6 @@ export interface CryptoApi {
      *  * Disables 4S, deleting the info for the default key, the default key pointer itself and any
      *    known 4S data (cross-signing keys and the megolm key backup key).
      *  * Deletes any dehydrated devices.
-     *  * Sets the "m.org.matrix.custom.backup_disabled" account data flag to indicate that the user has disabled backups.
      */
     disableKeyStorage(): Promise<void>;
 
@@ -711,7 +721,7 @@ export interface CryptoApi {
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Export secrets bundle for transmitting to another device as part of OIDC QR login
+     * Export secrets bundle for transmitting to another device as part of OAuth2 QR login
      */
     exportSecretsBundle?(): Promise<Awaited<ReturnType<SecretsBundle["to_json"]>>>;
 
@@ -794,6 +804,9 @@ export enum DeviceIsolationModeKind {
  *
  * Events from all senders are always decrypted (and should be decorated with message shields in case
  * of authenticity warnings, see {@link EventEncryptionInfo}).
+ *
+ * `AllDevicesIsolationMode` is used in the legacy, non-'exclude insecure devices' mode in Element Web. It is not
+ * recommended (see {@link https://github.com/matrix-org/matrix-spec-proposals/pull/4153 | MSC4153}).
  */
 export class AllDevicesIsolationMode {
     public readonly kind = DeviceIsolationModeKind.AllDevicesIsolationMode;
@@ -820,6 +833,9 @@ export class AllDevicesIsolationMode {
  *
  * Events are decrypted only if they come from a cross-signed device. Other events will result in a decryption
  * failure. (To access the failure reason, see {@link MatrixEvent.decryptionFailureReason}.)
+ *
+ * `OnlySignedDevicesIsolationMode` corresponds to the 'Exclude insecure devices' mode in Element Web, which is
+ * recommended by {@link https://github.com/matrix-org/matrix-spec-proposals/pull/4153 | MSC4153}.
  */
 export class OnlySignedDevicesIsolationMode {
     public readonly kind = DeviceIsolationModeKind.OnlySignedDevicesIsolationMode;
@@ -852,6 +868,25 @@ export interface BootstrapCrossSigningOpts {
  */
 export class UserVerificationStatus {
     /**
+     * Indicates if we have saved a known identity for this user. Typically, this means that we share a
+     * room with them (or have done in the past).
+     *
+     * If this is `false`, then the other flags ({@link isCrossSigningVerified}, {@link wasCrossSigningVerified},
+     * {@link needsUserApproval}) will also be `false`. This means that we haven't seen this user before.
+     *
+     * If this is `true`, then there are further possibilities:
+     *
+     *  - If {@link isCrossSigningVerified} returns `true`, then we have cryptographically verified the current
+     *    identity of this user: that is the highest form of trust we have.
+     *
+     *  - If {@link needsUserApproval} is `true`, that means that the user has changed their identity.
+     *
+     *  - Otherwise, the user is "TOFU trusted": we have a record of their identity, and, typically, will share
+     *    encrypted content with them as long as they retain that identity.
+     */
+    public readonly known: boolean;
+
+    /**
      * Indicates if the identity has changed in a way that needs user approval.
      *
      * This happens if the identity has changed since we first saw it, *unless* the new identity has also been verified
@@ -866,12 +901,14 @@ export class UserVerificationStatus {
      */
     public readonly needsUserApproval: boolean;
 
+    /** @internal */
     public constructor(
         private readonly crossSigningVerified: boolean,
         private readonly crossSigningVerifiedBefore: boolean,
-        private readonly tofu: boolean,
+        known: boolean,
         needsUserApproval: boolean = false,
     ) {
+        this.known = known;
         this.needsUserApproval = needsUserApproval;
     }
 
@@ -903,7 +940,7 @@ export class UserVerificationStatus {
      * @deprecated No longer supported, with the Rust crypto stack.
      */
     public isTofu(): boolean {
-        return this.tofu;
+        return false;
     }
 }
 
@@ -1193,10 +1230,15 @@ export interface CreateSecretStorageOpts {
 
 /** Types of cross-signing key */
 export enum CrossSigningKey {
-    Master = "master",
-    SelfSigning = "self_signing",
-    UserSigning = "user_signing",
+    Master = "master_key",
+    SelfSigning = "self_signing_key",
+    UserSigning = "user_signing_key",
 }
+
+/** All of a user's cross-signing keys.
+ * @see https://spec.matrix.org/v1.7/client-server-api/#post_matrixclientv3keysdevice_signingupload
+ */
+export type CrossSigningKeys = Record<CrossSigningKey, CrossSigningKeyInfo>;
 
 /**
  * Information on one of the cross-signing keys.

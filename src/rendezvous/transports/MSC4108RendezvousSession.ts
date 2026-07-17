@@ -30,7 +30,7 @@ export class MSC4108RendezvousSession {
     private readonly client?: MatrixClient;
     private readonly fallbackRzServer?: string;
     private readonly fetchFn?: typeof globalThis.fetch;
-    private readonly onFailure?: RendezvousFailureListener;
+    public onFailure?: RendezvousFailureListener;
     private etag?: string;
     private expiresAt?: Date;
     private expiresTimer?: ReturnType<typeof setTimeout>;
@@ -160,7 +160,7 @@ export class MSC4108RendezvousSession {
                 this.expiresAt = new Date(expires);
                 this.expiresTimer = setTimeout(() => {
                     this.expiresTimer = undefined;
-                    this.cancel(ClientRendezvousFailureReason.Expired);
+                    void this.cancel(ClientRendezvousFailureReason.Expired);
                 }, this.expiresAt.getTime() - Date.now());
             }
             // MSC4108: we expect a JSON response with a rendezvous URL
@@ -175,7 +175,7 @@ export class MSC4108RendezvousSession {
 
     /**
      * Receives data from the rendezvous channel.
-     * @return the returned promise won't resolve until new data is acquired or the channel is closed either by the server or the other party.
+     * @returns the returned promise won't resolve until new data is acquired or the channel is closed either by the server or the other party.
      */
     public async receive(): Promise<string | undefined> {
         if (!this.url) {

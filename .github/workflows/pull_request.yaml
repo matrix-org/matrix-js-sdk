@@ -16,7 +16,7 @@ permissions: {} # We use ELEMENT_BOT_TOKEN instead
 jobs:
     changelog:
         name: Preview Changelog
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         steps:
             - uses: mheap/github-action-required-labels@0ac283b4e65c1fb28ce6079dea5546ceca98ccbe # v5
               if: github.event_name != 'merge_group'
@@ -33,12 +33,12 @@ jobs:
 
     prevent-blocked:
         name: Prevent Blocked
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         permissions:
             pull-requests: read
         steps:
             - name: Add notice
-              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
               if: contains(github.event.pull_request.labels.*.name, 'X-Blocked')
               with:
                   script: |
@@ -46,14 +46,14 @@ jobs:
 
     community-prs:
         name: Label Community PRs
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         if: github.event.action == 'opened'
         permissions:
             pull-requests: write
         steps:
             - name: Check membership
               if: github.event.pull_request.user.login != 'renovate[bot]' && github.event.pull_request.user.login != 'dependabot[bot]'
-              uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3
+              uses: tspascoal/get-user-teams-membership@b2546c5affc730fd8e3d8483ae9ad3621938c2f9 # v4
               id: teams
               with:
                   username: ${{ github.event.pull_request.user.login }}
@@ -63,7 +63,7 @@ jobs:
 
             - name: Add label
               if: steps.teams.outputs.isTeamMember == 'false'
-              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
               with:
                   script: |
                       github.rest.issues.addLabels({
@@ -75,7 +75,7 @@ jobs:
 
     close-if-fork-develop:
         name: Forbid develop branch fork contributions
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-slim
         permissions:
             pull-requests: write
         if: >
@@ -84,7 +84,7 @@ jobs:
             github.event.pull_request.head.repo.full_name != github.repository
         steps:
             - name: Close pull request
-              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
               with:
                   script: |
                       github.rest.issues.createComment({

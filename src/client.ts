@@ -78,7 +78,7 @@ import {
     type UploadOpts,
     type UploadResponse,
 } from "./http-api/index.ts";
-import { User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
+import { type SyncUserProfile, User, UserEvent, type UserEventHandlerMap } from "./models/user.ts";
 import { getHttpUriForMxc } from "./content-repo.ts";
 import { SearchResult } from "./models/search-result.ts";
 import { type IIdentityServerProvider } from "./@types/IIdentityServerProvider.ts";
@@ -101,7 +101,7 @@ import {
     type RoomNameState,
 } from "./models/room.ts";
 import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
-import { type IPowerLevelsContent, type RoomStateEvent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
+import { RoomStateEvent, type IPowerLevelsContent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
     isSendDelayedEventRequestOpts,
     UpdateDelayedEventAction,
@@ -223,6 +223,7 @@ import { type CryptoBackend } from "./common-crypto/CryptoBackend.ts";
 import { RUST_SDK_STORE_PREFIX } from "./rust-crypto/constants.ts";
 import {
     type CrossSigningKeyInfo,
+    type CrossSigningKeys,
     type CryptoApi,
     type CryptoCallbacks,
     CryptoEvent,
@@ -241,14 +242,11 @@ import { type RoomMessageEventContent, type StickerEventContent } from "./@types
 import { type ImageInfo } from "./@types/media.ts";
 import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
-import {
-    discoverAndValidateOIDCIssuerWellKnown,
-    type OidcClientConfig,
-    validateAuthMetadataAndKeys,
-} from "./oidc/index.ts";
+import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
+import { RetentionPolicyService } from "./retentionPolicy.ts";
 
 export type Store = IStore;
 
@@ -347,8 +345,7 @@ export interface ICreateClientOpts {
      * Set to false to send the access token to the server via a query parameter rather
      * than the Authorization HTTP header.
      *
-     * Note that as of v1.11 of the Matrix spec, sending the access token via a query
-     * is deprecated.
+     * @deprecated as of v1.11 in https://spec.matrix.org/v1.17/client-server-api/#using-access-tokens
      *
      * Default true.
      */
@@ -462,6 +459,11 @@ export interface ICreateClientOpts {
      * Defaults to the built-in global logger; see {@link DebugLogger} for an alternative.
      */
     logger?: Logger;
+
+    /**
+     * Locally remove events past the server global or per room retention setting.
+     */
+    unstableMSC1763Retention?: boolean;
 }
 
 export interface IMatrixClientCreateOpts extends ICreateClientOpts {
@@ -539,6 +541,12 @@ export interface IStartClientOpts {
      * @experimental
      */
     slidingSync?: SlidingSync;
+
+    /**
+     * Include user profiles in sync responses.
+     * Will only work if the server supports MSC4429.
+     */
+    unstableMSC4429SyncUserProfileFields?: string[];
 }
 
 export interface IStoredClientOpts extends IStartClientOpts {}
@@ -558,14 +566,6 @@ export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
 
-enum CrossSigningKeyType {
-    MasterKey = "master_key",
-    SelfSigningKey = "self_signing_key",
-    UserSigningKey = "user_signing_key",
-}
-
-export type CrossSigningKeys = Record<CrossSigningKeyType, CrossSigningKeyInfo>;
-
 export type SendToDeviceContentMap = Map<string, Map<string, Record<string, any>>>;
 
 export interface ISignedKey {
@@ -575,6 +575,9 @@ export interface ISignedKey {
     algorithms: string[];
     device_id: string;
 }
+
+// re-export for backwards compatibility
+export { type CrossSigningKeys };
 
 export type KeySignatures = Record<string, Record<string, CrossSigningKeyInfo | ISignedKey>>;
 export interface IUploadKeySignaturesResponse {
@@ -1102,6 +1105,7 @@ export enum ClientEvent {
     ReceivedVoipEvent = "received_voip_event",
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
+    UserProfileUpdate = "userProfileUpdate",
 }
 
 type RoomEvents =
@@ -1172,6 +1176,12 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
+    /**
+     *
+     * @param userId - the user ID of the profile which was updated
+     * @param profile - the updated profile information
+     */
+    [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown> | null) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
@@ -1314,6 +1324,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly matrixRTC: MatrixRTCSessionManager;
 
     private serverCapabilitiesService: ServerCapabilities;
+    public readonly retentionPolicyService: RetentionPolicyService;
+    // eslint-disable-next-line
+    public readonly _unstable_shouldApplyMessageRetention: boolean;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1392,6 +1405,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC = new MatrixRTCSessionManager(this.logger, this);
 
         this.serverCapabilitiesService = new ServerCapabilities(this.logger, this.http);
+        this.retentionPolicyService = new RetentionPolicyService(this.logger, this.http);
+        this._unstable_shouldApplyMessageRetention = opts.unstableMSC1763Retention ?? false;
 
         this.on(ClientEvent.Sync, this.fixupRoomNotifications);
 
@@ -1466,10 +1481,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // periodically poll for turn servers if we support voip
         if (this.supportsVoip()) {
             this.checkTurnServersIntervalID = setInterval(() => {
-                this.checkTurnServers();
+                void this.checkTurnServers();
             }, TURN_CHECK_INTERVAL);
-            // noinspection ES6MissingAwait
-            this.checkTurnServers();
+            void this.checkTurnServers();
         }
 
         if (this.syncApi) {
@@ -1510,13 +1524,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
             this.clientWellKnownIntervalID = setInterval(() => {
-                this.fetchClientWellKnown();
+                void this.fetchClientWellKnown();
             }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            this.fetchClientWellKnown();
+            void this.fetchClientWellKnown();
         }
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
+        if (this._unstable_shouldApplyMessageRetention) {
+            this.retentionPolicyService?.start();
+        }
     }
 
     /**
@@ -1895,7 +1912,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public retryImmediately(): boolean {
         // don't await for this promise: we just want to kick it off
-        this.toDeviceMessageQueue.sendQueue();
+        void this.toDeviceMessageQueue.sendQueue();
         return this.syncApi?.retryImmediately() ?? false;
     }
 
@@ -1923,9 +1940,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise resolving with The capabilities of the homeserver
      */
     public async getCapabilities(): Promise<Capabilities> {
-        const caps = this.serverCapabilitiesService.getCachedCapabilities();
+        const caps = this.serverCapabilitiesService.getCached();
         if (caps) return caps;
-        return this.serverCapabilitiesService.fetchCapabilities();
+        return this.serverCapabilitiesService.fetch();
     }
 
     /**
@@ -1935,7 +1952,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns The capabilities of the homeserver
      */
     public getCachedCapabilities(): Capabilities | undefined {
-        return this.serverCapabilitiesService.getCachedCapabilities();
+        return this.serverCapabilitiesService.getCached();
     }
 
     /**
@@ -1945,7 +1962,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns A promise which resolves to the capabilities of the homeserver
      */
     public fetchCapabilities(): Promise<Capabilities> {
-        return this.serverCapabilitiesService.fetchCapabilities();
+        return this.serverCapabilitiesService.fetch();
     }
 
     /**
@@ -2027,8 +2044,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // attach the event listeners needed by RustCrypto
         this.on(RoomMemberEvent.Membership, rustCrypto.onRoomMembership.bind(rustCrypto));
+        this.on(RoomStateEvent.Events, rustCrypto.onRoomStateEvent.bind(rustCrypto));
         this.on(ClientEvent.Event, (event) => {
-            rustCrypto.onLiveEventFromSync(event);
+            void rustCrypto.onLiveEventFromSync(event);
         });
 
         // re-emit the events emitted by the crypto impl
@@ -2427,7 +2445,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const res = await this.http.authedRequest<{ room_id: string }>(Method.Post, path, queryParams, data);
 
         const roomId = res.room_id;
-        if (opts.acceptSharedHistory && inviter && this.cryptoBackend) {
+        if (inviter && this.cryptoBackend) {
             // Flag upfront that we are waiting for a key bundle, so that if we crash mid-import, we can try again.
             await this.cryptoBackend.markRoomAsPendingKeyBundle(roomId, inviter);
             // Try to accept the room key bundle specified in a `m.room_key_bundle` to-device message we (might have) already received.
@@ -2486,7 +2504,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public resendEvent(event: MatrixEvent, room: Room): Promise<ISendEventResponse> {
         // also kick the to-device queue to retry
-        this.toDeviceMessageQueue.sendQueue();
+        void this.toDeviceMessageQueue.sendQueue();
 
         this.updatePendingEventStatus(room, event, EventStatus.SENDING);
         return this.encryptAndSendEvent(room, event);
@@ -3728,7 +3746,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $delayId: delayId,
                 $action: action,
             });
-            return await this.http.request(Method.Post, path, undefined, undefined, {
+            // Although this endpoint supports being used without authentication,
+            // do authenticate here to make ratelimiting apply per user instead of per source IP address,
+            // if the server supports that
+            return await this.http.authedRequest(Method.Post, path, undefined, undefined, {
                 ...requestOptions,
                 prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
             });
@@ -4085,14 +4106,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             opts = { reason: opts };
         }
 
-        if (opts.shareEncryptedHistory) {
-            const historyVisibility = this.getRoom(roomId)?.getHistoryVisibility() ?? HistoryVisibility.Shared;
-            // We should only share room history if the *current* visibility allows it.
-            if ([HistoryVisibility.Invited, HistoryVisibility.Joined].includes(historyVisibility)) {
-                this.logger.debug("Not sharing message history as the room history visibility is currently unshared");
-            } else {
-                await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
-            }
+        const historyVisibility = this.getRoom(roomId)?.getHistoryVisibility() ?? HistoryVisibility.Shared;
+        // We should only share room history if the *current* visibility allows it.
+        if ([HistoryVisibility.Invited, HistoryVisibility.Joined].includes(historyVisibility)) {
+            this.logger.debug("Not sharing message history as the room history visibility is currently unshared");
+        } else {
+            await this.cryptoBackend?.shareRoomHistoryWithUser(roomId, userId);
         }
 
         return await this.membershipChange(roomId, userId, KnownMembership.Invite, opts.reason);
@@ -5889,7 +5908,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.isInitialSyncComplete()) {
             if (supportsMatrixCall()) {
                 this.callEventHandler!.start();
-                this.groupCallEventHandler!.start();
+                void this.groupCallEventHandler!.start();
             }
 
             this.off(ClientEvent.Sync, this.startCallEventHandler);
@@ -6403,7 +6422,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         if (event.shouldAttemptDecryption() && this.getCrypto()) {
-            event.attemptDecryption(this.cryptoBackend!, options);
+            void event.attemptDecryption(this.cryptoBackend!, options);
         }
 
         if (event.isBeingDecrypted()) {
@@ -7363,6 +7382,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Fetch a user's *extended* profile, which may include additional keys.
+     * Always returns all available profile fields, irrespective of what profile fields are set
+     * in the sync filter.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
@@ -7375,6 +7396,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
+
+        // Note that this does not look at the profile cache as this will only contain keys
+        // that we included in the sync filter and this function's purpose is to return the whole profile.
+
         return this.http.authedRequest(
             Method.Get,
             utils.encodeUri("/profile/$userId", { $userId: userId }),
@@ -7387,7 +7412,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetch a specific key from the user's *extended* profile.
+     * Fetch a specific key from the user's *extended* profile by checking local cache (which is updated from
+     * the sync) and querying the server if no data is cached locally.
      *
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
@@ -7401,6 +7427,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
+        // NOTE: We only read individual keys from a cached profile as we don't have the full profile
+        // cached, only the keys that the user has configured via their sync filter.
+        const storedProfile = await this.store.getUserProfile(userId);
+        if (storedProfile?.[key] !== undefined) {
+            return storedProfile[key];
+        }
         const profile = (await this.http.authedRequest(
             Method.Get,
             utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
@@ -7409,7 +7441,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             {
                 prefix: await this.getExtendedProfileRequestPrefix(),
             },
-        )) as Record<string, unknown>;
+        )) as SyncUserProfile;
+
+        // write through to the cache
+        await this.store.storeUserProfiles(new Map([[userId, profile]]));
+
         return profile[key];
     }
 
@@ -8790,8 +8826,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!events?.length) return;
         if (!room) return;
 
-        room.currentState.processBeaconEvents(events, this);
-        room.processPollEvents(events);
+        void room.currentState.processBeaconEvents(events, this);
+        void room.processPollEvents(events);
     }
 
     /**
@@ -8852,34 +8888,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Discover and validate the auth metadata for the OAuth 2.0 API.
      *
-     * Fetches /auth_metadata falling back to legacy implementation using /auth_issuer followed by
-     * https://oidc-issuer.example.com/.well-known/openid-configuration and other files linked therein.
      * When successful, validated metadata is returned.
      *
-     * @returns validated authentication metadata and optionally signing keys
+     * @returns validated authentication metadata
      * @throws when delegated auth config is invalid or unreachable
      */
-    public async getAuthMetadata(): Promise<OidcClientConfig> {
-        let authMetadata: unknown | undefined;
-        try {
-            const useStable = await this.isVersionSupported("v1.15");
-            authMetadata = await this.http.request<unknown>(Method.Get, "/auth_metadata", undefined, undefined, {
-                prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
-            });
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                // Fall back to older variant of MSC2965
-                const { issuer } = await this.http.request<{
-                    issuer: string;
-                }>(Method.Get, "/auth_issuer", undefined, undefined, {
-                    prefix: ClientPrefix.Unstable + "/org.matrix.msc2965",
-                });
-                return discoverAndValidateOIDCIssuerWellKnown(issuer);
-            }
-            throw e;
+    public async getAuthMetadata(): Promise<ValidatedAuthMetadata> {
+        const useStable = await this.isVersionSupported("v1.15");
+        const authMetadata = await this.http.request(Method.Get, "/auth_metadata", undefined, undefined, {
+            prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
+        });
+
+        if (isValidAuthMetadata(authMetadata)) {
+            return authMetadata;
         }
 
-        return validateAuthMetadataAndKeys(authMetadata);
+        logger.error("Issuer configuration not valid");
+        throw new Error(OAuth2Error.OpSupport);
     }
 }
 

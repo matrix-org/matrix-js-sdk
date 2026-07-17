@@ -22,22 +22,18 @@ jobs:
             id: ${{ steps.npm-publish.outputs.id }}
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   ref: staging
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
             - name: 🔧 pnpm cache
-              uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
               with:
                   cache: "pnpm"
                   registry-url: "https://registry.npmjs.org"
                   node-version-file: ${{ inputs.dir }}/package.json
-
-            # Ensure npm 11.5.1 or later is installed
-            - name: Update npm
-              run: npm install -g npm@latest
 
             - name: 🔨 Install dependencies
               run: "pnpm install --frozen-lockfile"
@@ -46,7 +42,7 @@ jobs:
               id: npm-publish
               working-directory: ${{ inputs.dir }}
               run: |
-                  npm publish --provenance --access public --tag "$TAG"
+                  pnpm publish --provenance --access public --publish-branch staging --tag "$TAG"
                   release=$(jq -r '"\(.name)@\(.version)"' package.json)
                   echo "id=$release" >> $GITHUB_OUTPUT
               env:

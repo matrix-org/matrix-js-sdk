@@ -22,7 +22,7 @@ jobs:
     merge:
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
@@ -30,7 +30,7 @@ jobs:
                   persist-credentials: true
 
             - name: Get actions scripts
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
@@ -38,14 +38,14 @@ jobs:
                   sparse-checkout: |
                       scripts/release
 
-            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4
-            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
               with:
                   cache: "pnpm"
                   node-version-file: package.json
 
             - name: Install Deps
-              run: "pnpm install --frozen-lockfile"
+              run: "pnpm install --frozen-lockfile --ignore-scripts"
 
             - name: Set up git
               run: |
@@ -53,9 +53,7 @@ jobs:
                   git config --global user.name "RiotRobot"
 
             - name: Merge to develop
-              run: |
-                  git checkout develop
-                  git merge -X ours master
+              run: .action-repo/scripts/release/merge-master-to-develop.sh
 
             - name: Reset dependencies
               if: inputs.dependencies

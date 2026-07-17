@@ -527,19 +527,17 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        let updateDelayedEvent: (delayId: string) => Promise<unknown>;
         switch (action) {
             case UpdateDelayedEventAction.Cancel:
-                updateDelayedEvent = this.widgetApi.cancelScheduledDelayedEvent;
+                await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
             case UpdateDelayedEventAction.Restart:
-                updateDelayedEvent = this.widgetApi.cancelScheduledDelayedEvent;
+                await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
             case UpdateDelayedEventAction.Send:
-                updateDelayedEvent = this.widgetApi.sendScheduledDelayedEvent;
+                await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
         }
-        await updateDelayedEvent.call(this.widgetApi, delayId).catch(timeoutToConnectionError);
         return {};
     }
 
@@ -682,7 +680,7 @@ export class RoomWidgetClient extends MatrixClient {
     }
 
     private async ack(ev: CustomEvent<IWidgetApiRequest>): Promise<void> {
-        await this.widgetApi.transport.reply<IWidgetApiAcknowledgeResponseData>(ev.detail, {});
+        this.widgetApi.transport.reply<IWidgetApiAcknowledgeResponseData>(ev.detail, {});
     }
 
     private updateTxId = async (event: MatrixEvent): Promise<void> => {
@@ -806,7 +804,7 @@ export class RoomWidgetClient extends MatrixClient {
                     // Sliding Sync
                     await this.syncApi!.injectRoomEvents(this.room!, [event]);
                 }
-                logger.info(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
+                logger.debug(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
             } else {
                 const { event_id: eventId, room_id: roomId } = ev.detail.data;
                 logger.info(`Received state entry ${eventId} for a different room ${roomId}; discarding`);

@@ -1,4 +1,7 @@
-import { KnipConfig } from "knip";
+import { type KnipConfig } from "knip";
+
+// Specify this as knip loads config files which may conditionally load plugins
+process.env.GITHUB_ACTIONS = "1";
 
 export default {
     entry: [
@@ -7,6 +10,7 @@ export default {
         "src/browser-index.ts",
         "src/indexeddb-worker.ts",
         "src/crypto-api/index.ts",
+        "src/rendezvous/index.ts",
         "src/testing.ts",
         "src/matrix.ts",
         "src/utils.ts", // not really an entrypoint but we have deprecated `defer` there
@@ -17,7 +21,6 @@ export default {
         "src/sliding-sync.ts",
         "src/webrtc/groupCall.ts",
         "src/webrtc/stats/media/mediaTrackStats.ts",
-        "src/rendezvous/RendezvousChannel.ts",
     ],
     project: ["**/*.{js,ts}"],
     ignore: ["examples/**"],
@@ -28,16 +31,15 @@ export default {
         "husky",
         // Used in script which only runs in environment with `@octokit/rest` installed
         "@octokit/rest",
-        // Used by `vitest`
-        "vitest-sonar-reporter",
-        // Used by `@babel/plugin-transform-runtime`
-        "@babel/runtime",
     ],
     ignoreBinaries: [
         // Used when available by reusable workflow `.github/workflows/release-make.yml`
         "dist",
+        // Optional for coverage:diff development script
+        "diff-cover",
     ],
     ignoreExportsUsedInFile: true,
     includeEntryExports: false,
     exclude: ["enumMembers"],
+    treatConfigHintsAsErrors: true,
 } satisfies KnipConfig;

@@ -23,7 +23,8 @@ import { IDBFactory } from "fake-indexeddb";
 
 import { IndexedDBStore, type IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { RemoteIndexedDBStoreBackend } from "../../../src/store/indexeddb-remote-backend";
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
@@ -77,6 +78,62 @@ describe("IndexedDBStore", () => {
             store.setOutOfBandMembers(roomId, [member1, member2]),
         ]);
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(2);
+    });
+
+    it("should degrade to local IDB backend if remote worker fails to start", async () => {
+        const store = new IndexedDBStore({
+            workerFactory: () => {
+                const w = {
+                    postMessage: vi.fn(),
+                } as unknown as Worker;
+                setTimeout(() => {
+                    w.onerror!({ error: "IndexedDB worker failed to connect" } as ErrorEvent);
+                }, 100);
+                return w;
+            },
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+
+        expect(store.backend).toBeInstanceOf(RemoteIndexedDBStoreBackend);
+        await store.startup();
+        expect(store.backend).toBeInstanceOf(LocalIndexedDBStoreBackend);
+    });
+
+    it("should handle failed queries", async () => {
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+        await store.startup();
+
+        // Simulate a failed query
+        let txn: IDBRequest;
+        (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
+            return {
+                objectStore: (name: string) =>
+                    ({
+                        name,
+                        openCursor: (query: unknown) => {
+                            return (txn = {
+                                error: new DOMException("Expected error"),
+                            } as IDBRequest);
+                        },
+                    }) as IDBObjectStore,
+            } as IDBTransaction;
+        };
+
+        // Call backend directly as otherwise the error is masked.
+        const promise = store.backend.getClientOptions();
+        // The function uses a Promise.then(() => trick to delay execution
+        // so we need to wait before we can call the txn onerror handler.
+        process.nextTick(() => {
+            txn!.onerror!(new Event("we-ignore-this"));
+        });
+
+        await expect(() => promise).rejects.toThrow("selectQuery failed for client_options");
     });
 
     it("Should load presence events on startup", async () => {

@@ -207,6 +207,8 @@ export class MembershipManager
      * transport selection will be used instead.
      * @param onError This will be called once the membership manager encounters an unrecoverable error.
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
+     * The original underlying error is preserved as `error.cause`, so consumers can `instanceof`-check the typed
+     * cause.
      */
     public join(fociPreferred: Transport[], multiSfuFocus?: Transport, onError?: (error: unknown) => void): void {
         if (this.scheduler.running) {

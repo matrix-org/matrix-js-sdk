@@ -20,7 +20,7 @@ limitations under the License.
 
 import { type EventType } from "../@types/event.ts";
 import { type Room } from "../models/room.ts";
-import { type User } from "../models/user.ts";
+import { type SyncUserProfile, type User } from "../models/user.ts";
 import { type IEvent, type MatrixEvent } from "../models/event.ts";
 import { type RoomState, RoomStateEvent } from "../models/room-state.ts";
 import { type RoomMember } from "../models/room-member.ts";
@@ -65,6 +65,7 @@ export class MemoryStore implements IStore {
     private pendingToDeviceBatches: IndexedToDeviceBatch[] = [];
     private nextToDeviceBatchId = 0;
     protected createUser?: UserCreator;
+    public readonly userProfiles = new Map<string, SyncUserProfile>();
 
     /**
      * Construct a new in-memory data store for the Matrix Client.
@@ -440,6 +441,22 @@ export class MemoryStore implements IStore {
     public removeToDeviceBatch(id: number): Promise<void> {
         this.pendingToDeviceBatches = this.pendingToDeviceBatches.filter((batch) => batch.id !== id);
         return Promise.resolve();
+    }
+
+    public async getUserProfile(userId: string): Promise<SyncUserProfile | undefined> {
+        return this.userProfiles.get(userId);
+    }
+
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        userProfiles.forEach((profile, userId) => this.userProfiles.set(userId, profile));
+    }
+
+    public async removeUserProfiles(userIds: string[]): Promise<void> {
+        userIds.forEach((userId) => this.userProfiles.delete(userId));
+    }
+
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        // Can ignore as there is no backing store.
     }
 
     public async destroy(): Promise<void> {

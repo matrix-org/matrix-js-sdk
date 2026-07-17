@@ -755,9 +755,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         this.membershipNeedsRecalculation = true;
         // Chain the recalculation.
-        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise
-            .finally()
-            .then(() => this.recalculateSessionMembers());
+        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise.then(
+            () => this.recalculateSessionMembers(),
+            () => this.recalculateSessionMembers(),
+        );
         return this.recalculateSessionMembersPromise;
     }
 
@@ -815,7 +816,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        this.encryptionManager?.onMembershipsUpdate(oldMemberships);
 
         this.setExpiryTimer();
     };
@@ -863,7 +864,8 @@ function quickFilterNonRelevantContents(content: IContent, logger: Logger): bool
         // We have a MSC4143 event membership event with a proper joined content
         return true;
     } else if (eventKeysCount === 1 && "memberships" in content) {
-        logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
+        // Events used to have this format in the past, but are now deprecated.
+        // Given that state events ~cannot be deleted, there can be some remaining events in the room, just ignore them.
         return false;
     } else {
         // Invalid or left content

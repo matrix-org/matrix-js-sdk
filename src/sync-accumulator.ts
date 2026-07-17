@@ -26,6 +26,7 @@ import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
+import { type SyncUserProfile } from "./matrix.ts";
 
 interface IOpts {
     /**
@@ -36,6 +37,10 @@ interface IOpts {
      * Default: 50.
      */
     maxTimelineEntries?: number;
+    /**
+     * Whether to use the stable or unstable fields for user profiles.
+     */
+    profileFieldsStable?: boolean;
 }
 
 export interface IMinimalEvent {
@@ -183,6 +188,15 @@ export interface IDeviceLists {
     left?: string[];
 }
 
+/**
+ * The "users" section of the sync update which contains extended profile updates.
+ */
+export interface UsersUpdate {
+    [userId: string]: {
+        profile_updates?: SyncUserProfile | null;
+    };
+}
+
 export interface ISyncResponse {
     "next_batch": string;
     "rooms": IRooms;
@@ -191,7 +205,8 @@ export interface ISyncResponse {
     "to_device"?: IToDevice;
     "device_lists"?: IDeviceLists;
     "device_one_time_keys_count"?: Record<string, number>;
-
+    "users"?: UsersUpdate;
+    "org.matrix.msc4429.users"?: UsersUpdate;
     "device_unused_fallback_key_types"?: string[];
     "org.matrix.msc2732.device_unused_fallback_key_types"?: string[];
 }
@@ -765,6 +780,15 @@ export class SyncAccumulator {
 
     public getNextBatchToken(): string {
         return this.nextBatch!;
+    }
+
+    public removeEventsFromRoom(roomId: string, eventIds: string[]): void {
+        this.joinRooms[roomId]._timeline = this.joinRooms[roomId]._timeline.filter(
+            (ev) => !eventIds.includes(ev.event.event_id),
+        );
+        this.joinRooms[roomId]._stickyEvents = this.joinRooms[roomId]._stickyEvents.filter(
+            (ev) => !eventIds.includes(ev.event.event_id),
+        );
     }
 }
 

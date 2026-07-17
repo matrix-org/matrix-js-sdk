@@ -19,8 +19,9 @@ This file is a Python script to generate test data for crypto tests.
 
 To run it:
 
+cd spec/test-utils/test-data
 python -m venv env
-./env/bin/pip install cryptography canonicaljson
+./env/bin/pip install cryptography canonicaljson base58
 ./env/bin/python generate-test-data.py > index.ts
 """
 
@@ -172,6 +173,8 @@ def build_test_data(user_data, prefix = "") -> str:
         "auth_data": {
             "public_key": b64_backup_public_key,
         },
+        "etag": "",
+        "count": 0,
     }
     # sign with our device key
     sig = sign_json(backup_data["auth_data"], private_key)
@@ -270,8 +273,11 @@ export const {prefix}CLEAR_EVENT: Partial<IEvent> = {json.dumps(clear_event, ind
 /** The encrypted CLEAR_EVENT by MEGOLM_SESSION_DATA */
 export const {prefix}ENCRYPTED_EVENT: Partial<IEvent> = {json.dumps(encrypted_event, indent=4)};
 
-/** base64-encoded backup decryption (private) key */
+/** base64-encoded backup decryption (private) key that matches the public key in {prefix}CURVE25519_KEY_BACKUP_DATA */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE64 = "{ user_data['B64_BACKUP_DECRYPTION_KEY'] }";
+
+/** base64-encoded backup decryption (private) key that does not match the public key in {prefix}CURVE25519_KEY_BACKUP_DATA. (This is just a random string of the right length for a private key.) */
+export const {prefix}BACKUP_DECRYPTION_KEY_BASE64_ALT = "dh4fP2LITyJusgnb0dEq/SQK253WGObvLxXF5FEX6qc";
 
 /** Backup decryption key in export format */
 export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
@@ -279,7 +285,7 @@ export const {prefix}BACKUP_DECRYPTION_KEY_BASE58 = "{ backup_recovery_key }";
 /** Signed backup data, suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}/{{sessionId}}` */
 export const {prefix}SIGNED_BACKUP_DATA: KeyBackupInfo = { json.dumps(backup_data, indent=4) };
 
-/** 
+/**
  * Per-room backup data, (supposedly) suitable for return from `GET /_matrix/client/v3/room_keys/keys/{{roomId}}`.
  * Contains the key from {prefix}MEGOLM_SESSION_DATA.
  */
@@ -422,7 +428,7 @@ def build_exported_megolm_key(device_curve_key: x25519.X25519PrivateKey) -> tupl
             "ed25519": encode_base64(ed25519.Ed25519PrivateKey.from_private_bytes(randbytes(32)).public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)),
         },
         "forwarding_curve25519_key_chain": [],
-        "org.matrix.msc3061.shared_history": True,
+        "m.shared_history": True,
     }
 
     return megolm_export, private_key

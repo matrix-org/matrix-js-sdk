@@ -16,14 +16,14 @@ jobs:
             contents: write
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   ref: staging
                   fetch-depth: 0
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4
-            - uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
               with:
                   node-version-file: package.json
                   cache: "pnpm"
@@ -39,7 +39,7 @@ jobs:
                   disable-autolabeler: true
 
             - name: Get actions scripts
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
@@ -50,7 +50,7 @@ jobs:
 
             - name: Ingest upstream changes
               if: inputs.include-changes
-              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   RELEASE_ID: ${{ steps.draft-release.outputs.id }}

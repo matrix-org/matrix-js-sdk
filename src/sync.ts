@@ -24,12 +24,12 @@ limitations under the License.
  */
 
 import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
-import { User } from "./models/user.ts";
+import { type SyncUserProfile, User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
 import { deepCopy, noUnsafeEventProps, unsafeProp } from "./utils.ts";
 import { Filter } from "./filter.ts";
 import { EventTimeline } from "./models/event-timeline.ts";
-import { type Logger } from "./logger.ts";
+import { logger, type Logger } from "./logger.ts";
 import {
     ClientEvent,
     type IStoredClientOpts,
@@ -622,7 +622,11 @@ export class SyncApi {
         return filter;
     };
 
-    private prepareLazyLoadingForSync = async (): Promise<void> => {
+    /**
+     * Sets up the sync filter options for lazy loading if enabled,
+     * (or force-disables lazy loading entirely if we're a guest).
+     */
+    private prepareSyncFilterLazyLoading = (): void => {
         this.syncOpts.logger.debug("Prepare lazy loading for sync...");
         if (this.client.isGuest()) {
             this.opts.lazyLoadMembers = false;
@@ -633,6 +637,22 @@ export class SyncApi {
                 this.opts.filter = this.buildDefaultFilter();
             }
             this.opts.filter.setLazyLoadMembers(true);
+        }
+    };
+
+    /**
+     * Preare sync filter options for the unstable MSC4429 user profile fields if enabled.
+     */
+    private prepareSyncFilterUserProfiles = async (): Promise<void> => {
+        if (this.opts.unstableMSC4429SyncUserProfileFields?.length) {
+            this.syncOpts.logger.debug("Enabling EXPERIMENTAL user profiles on sync filter...");
+            if (!this.opts.filter) {
+                this.opts.filter = this.buildDefaultFilter();
+            }
+            this.opts.filter.setUnstableMSC4429SyncUserProfiles(
+                this.opts.unstableMSC4429SyncUserProfileFields,
+                await this.client.doesServerSupportUnstableFeature("org.matrix.msc4429.stable"),
+            );
         }
     };
 
@@ -723,7 +743,8 @@ export class SyncApi {
         // take a while so if we set it going now, we can wait for it
         // to finish while we process our saved sync data.
         await this.getPushRules();
-        await this.prepareLazyLoadingForSync();
+        this.prepareSyncFilterLazyLoading();
+        await this.prepareSyncFilterUserProfiles();
         await this.storeClientOptions();
 
         const { filterId, filter } = await this.getFilter();
@@ -896,7 +917,7 @@ export class SyncApi {
             // tell the crypto module to do its processing. It may block (to do a
             // /keys/changes request).
             if (this.syncOpts.cryptoCallbacks) {
-                await this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
+                this.syncOpts.cryptoCallbacks.onSyncCompleted(syncEventData);
             }
 
             // keep emitting SYNCING -> SYNCING for clients who want to do bulk updates
@@ -1138,6 +1159,33 @@ export class SyncApi {
             });
         }
 
+        // handle user profile updates (MSC4429)
+        const userUpdate = data["users"] ?? data["org.matrix.msc4429.users"];
+        if (typeof userUpdate === "object" && userUpdate !== null) {
+            const usersToRemove: string[] = [];
+            const profilesToAmend: Map<string, SyncUserProfile> = new Map();
+            for (const [userId, userData] of Object.entries(userUpdate)) {
+                logger.info(`Storing user profile ${userId}`, userData);
+                if (userData.profile_updates) {
+                    const existingProfile = await client.store.getUserProfile(userId);
+                    profilesToAmend.set(userId, { ...existingProfile, ...userData.profile_updates });
+                } else if (userData.profile_updates === null) {
+                    usersToRemove.push(userId);
+                }
+            }
+            if (usersToRemove.length) {
+                await client.store.removeUserProfiles(usersToRemove);
+            }
+            if (profilesToAmend.size) {
+                await client.store.storeUserProfiles(profilesToAmend);
+            }
+
+            // emit after we've update the store so that clients can get the updated profile if they want to
+            for (const [userId, userData] of Object.entries(userUpdate)) {
+                client.emit(ClientEvent.UserProfileUpdate, userId, userData.profile_updates ?? null);
+            }
+        }
+
         // handle to-device events
         if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
             const toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
@@ -1147,13 +1195,11 @@ export class SyncApi {
                 receivedToDeviceMessages =
                     await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
             } else {
-                receivedToDeviceMessages = toDeviceMessages.map((rawEvent) =>
-                    // Crypto is not enabled, so we just return the events.
-                    ({
-                        message: rawEvent,
-                        encryptionInfo: null,
-                    }),
-                );
+                // Crypto is not enabled, so we just return the events.
+                receivedToDeviceMessages = toDeviceMessages.map((rawEvent) => ({
+                    message: rawEvent,
+                    encryptionInfo: null,
+                }));
             }
 
             processToDeviceMessages(receivedToDeviceMessages, client);

@@ -18,7 +18,7 @@ import { type IMinimalEvent, type ISyncData, type ISyncResponse, SyncAccumulator
 import { deepCopy, promiseTry } from "../utils.ts";
 import { exists as idbExists } from "../indexeddb-helpers.ts";
 import { logger } from "../logger.ts";
-import { type IStateEventWithRoomId, type IStoredClientOpts } from "../matrix.ts";
+import type { SyncUserProfile, IStateEventWithRoomId, IStoredClientOpts } from "../matrix.ts";
 import { type ISavedSync } from "./index.ts";
 import { type IIndexedDBBackend, type UserTuple } from "./indexeddb-backend.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
@@ -48,6 +48,9 @@ const DB_MIGRATIONS: DbMigration[] = [
     (db): void => {
         db.createObjectStore("to_device_queue", { autoIncrement: true });
     },
+    (db): void => {
+        db.createObjectStore("user_profile", { keyPath: ["userId"] });
+    },
     // Expand as needed.
 ];
 const VERSION = DB_MIGRATIONS.length;
@@ -61,6 +64,7 @@ const VERSION = DB_MIGRATIONS.length;
  * Return the data you want to keep.
  * @returns Promise which resolves to an array of whatever you returned from
  * resultMapper.
+ * @throws If there was an error completing the query.
  */
 function selectQuery<T>(
     store: IDBObjectStore,
@@ -71,7 +75,7 @@ function selectQuery<T>(
     return new Promise((resolve, reject) => {
         const results: T[] = [];
         query.onerror = (): void => {
-            reject(new Error("Query failed: " + query.error?.name));
+            reject(new Error(`selectQuery failed for ${store.name}`, { cause: query.error }));
         };
         // collect results
         query.onsuccess = (): void => {
@@ -319,10 +323,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const roomRange = IDBKeyRange.only(roomId);
 
         const minStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "next")).then(
-            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1],
+            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)?.[1],
         );
         const maxStateKeyProm = reqAsCursorPromise(roomIndex.openKeyCursor(roomRange, "prev")).then(
-            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)[1],
+            (cursor) => (<IDBValidKey[]>cursor?.primaryKey)?.[1],
         );
         const [minStateKey, maxStateKey] = await Promise.all([minStateKeyProm, maxStateKeyProm]);
 
@@ -599,6 +603,44 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const store = txn.objectStore("to_device_queue");
         store.delete(id);
         await txnAsPromise(txn);
+    }
+
+    public async getUserProfile(userId: string): Promise<SyncUserProfile | undefined> {
+        return Promise.resolve().then(() => {
+            const txn = this.db!.transaction(["user_profile"], "readonly");
+            const store = txn.objectStore("user_profile");
+            return selectQuery(store, [userId], (cursor) => {
+                return cursor.value?.profile;
+            }).then((results) => results[0]);
+        });
+    }
+
+    public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
+        const txn = this.db!.transaction(["user_profile"], "readwrite");
+        const store = txn.objectStore("user_profile");
+        for (const [userId, profile] of userProfiles.entries()) {
+            store.put({ profile, userId });
+        }
+        await txnAsPromise(txn);
+    }
+
+    public async removeUserProfiles(userIds: string[]): Promise<void> {
+        const txn = this.db!.transaction(["user_profile"], "readwrite");
+        const store = txn.objectStore("user_profile");
+        for (const userId of userIds) {
+            store.delete([userId]);
+        }
+        await txnAsPromise(txn);
+    }
+
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
+        try {
+            this.syncAccumulator.removeEventsFromRoom(roomId, eventIds);
+            const syncData = this.syncAccumulator.getJSON(true);
+            await this.persistSyncData(syncData.nextBatch, syncData.roomsData);
+        } finally {
+            this.syncToDatabasePromise = undefined;
+        }
     }
 
     /*

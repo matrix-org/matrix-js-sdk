@@ -130,7 +130,7 @@ export class PerSessionKeyBackupDownloader {
     /**
      * Check if key download is successfully configured and active.
      *
-     * @return `true` if key download is correctly configured and active; otherwise `false`.
+     * @returns `true` if key download is correctly configured and active; otherwise `false`.
      */
     public isKeyBackupDownloadConfigured(): boolean {
         return this.configuration !== null;

@@ -205,7 +205,7 @@ interface IOpts<T> {
      * The busyChanged callback should be used instead of the background flag.
      * Should return a promise which resolves to the successful response or rejects with a MatrixError.
      */
-    doRequest(auth: AuthDict | null, background: boolean): Promise<T>;
+    doRequest(this: void, auth: AuthDict | null, background: boolean): Promise<T>;
     /**
      * Called when the status of the UI auth changes,
      * ie. when the state of an auth stage changes of when the auth flow moves to a new stage.
@@ -219,7 +219,7 @@ interface IOpts<T> {
      *     m.login.email.identity:
      *         * emailSid: string, the sid of the active email auth session
      */
-    stateUpdated(nextStage: AuthType | string, status: IStageStatus): void;
+    stateUpdated(this: void, nextStage: AuthType | string, status: IStageStatus): void;
 
     /**
      * A function that takes the email address (string), clientSecret (string), attempt number (int) and
@@ -227,14 +227,20 @@ interface IOpts<T> {
      * function.
      * If the resulting promise rejects, the rejection will propagate through to the attemptAuth promise.
      */
-    requestEmailToken(email: string, secret: string, attempt: number, session: string): Promise<{ sid: string }>;
+    requestEmailToken(
+        this: void,
+        email: string,
+        secret: string,
+        attempt: number,
+        session: string,
+    ): Promise<{ sid: string }>;
     /**
      * Called whenever the interactive auth logic becomes busy submitting information provided by the user or finishes.
      * After this has been called with true the UI should indicate that a request is in progress
      * until it is called again with false.
      */
-    busyChanged?(busy: boolean): void;
-    startAuthStage?(nextStage: string): Promise<void>; // LEGACY
+    busyChanged?(this: void, busy: boolean): void;
+    startAuthStage?(this: void, nextStage: string): Promise<void>; // LEGACY
 }
 
 /**

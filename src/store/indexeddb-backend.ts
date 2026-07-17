@@ -17,6 +17,7 @@ limitations under the License.
 import { type ISavedSync } from "./index.ts";
 import { type IEvent, type IStateEventWithRoomId, type IStoredClientOpts, type ISyncResponse } from "../matrix.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
+import { type SyncUserProfile } from "../models/user.ts";
 
 export interface IIndexedDBBackend {
     connect(onClose?: () => void): Promise<void>;
@@ -35,6 +36,9 @@ export interface IIndexedDBBackend {
     saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void>;
     getOldestToDeviceBatch(): Promise<IndexedToDeviceBatch | null>;
     removeToDeviceBatch(id: number): Promise<void>;
+    getUserProfile(userId: string): Promise<SyncUserProfile | undefined>;
+    storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void>;
+    removeUserProfiles(userIds: string[]): Promise<void>;
     destroy(): Promise<void>;
 }
 

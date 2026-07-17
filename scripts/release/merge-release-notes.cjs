@@ -59,7 +59,7 @@ async function getRelease(github, dependency) {
                     const baseVersion = tag.split("-rc.")[0];
                     const release = releases.find((release) => release.tag_name.startsWith(baseVersion));
                     if (release) return release;
-                } catch (e) {
+                } catch {
                     // Fall back to getReleaseByTag
                 }
             }
@@ -156,7 +156,7 @@ if (require.main === module) {
         process.exit(1);
     }
     const [releaseId, ...dependencies] = process.argv.slice(2);
-    main({ github, releaseId, dependencies }).then((output) => {
+    void main({ github, releaseId, dependencies }).then((output) => {
         // eslint-disable-next-line no-console
         console.log(output);
     });

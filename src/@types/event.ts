@@ -65,6 +65,7 @@ import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import type { ROOM_RETENTION_TYPE, RoomRetentionContent } from "./retention.ts";
 
 export enum EventType {
     // Room state events
@@ -162,6 +163,10 @@ export enum EventType {
 
     // Policy servers
     RoomPolicy = "org.matrix.msc4284.policy",
+
+    // Retention
+    RetentionPolicy = "m.room.retention",
+    RetentionPolicyUnstable = "org.matrix.msc1763.retention",
 }
 
 export enum RelationType {
@@ -396,6 +401,10 @@ export interface StateEvents {
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+
+    // MSC1763
+    [ROOM_RETENTION_TYPE.name]: RoomRetentionContent | EmptyObject;
+    [ROOM_RETENTION_TYPE.altName]: RoomRetentionContent | EmptyObject;
 }
 
 /**
@@ -416,9 +425,12 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [EventType.Direct]: { [userId: string]: string[] };
     [EventType.IgnoredUserList]: { ignored_users: { [userId: string]: EmptyObject } };
     "m.secret_storage.default_key": { key: string };
-    // Flag set by the rust SDK (Element X) and also used by us to mark that the user opted out of backup
-    // (I don't know why it's m.org.matrix...)
+
+    // MSC4287: Sharing key backup preference between clients - used to mark that the user opted out of key storage
+    "m.key_backup": { enabled: boolean };
+    // MSC4287 unstable prefix (note the boolean property has the opposite sense)
     "m.org.matrix.custom.backup_disabled": { disabled: boolean };
+
     "m.identity_server": { base_url: string | null };
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
     [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
@@ -428,6 +440,15 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
 
     [EventType.InvitePermissionConfig]: { default_action?: string };
+
+    // List of recently used reaction emojis
+    // https://spec.matrix.org/v1.18/client-server-api/#mrecent_emoji
+    "m.recent_emoji": {
+        recent_emoji: Array<{
+            emoji: string;
+            total: number;
+        }>;
+    };
 }
 
 /**
