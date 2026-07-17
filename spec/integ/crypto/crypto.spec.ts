@@ -30,7 +30,7 @@ import {
     mkMembershipCustom,
     syncPromise,
 } from "../../test-utils/test-utils";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import {
     BOB_SIGNED_CROSS_SIGNING_KEYS_DATA,
     BOB_SIGNED_TEST_DEVICE_DATA,
@@ -40,7 +40,7 @@ import {
     TEST_ROOM_ID,
     TEST_ROOM_ID as ROOM_ID,
     TEST_USER_ID,
-} from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
 import { logger } from "../../../src/logger";
 import {
     Category,
@@ -2014,7 +2014,7 @@ describe("crypto", () => {
                         // update get call with new version
                         fetchMock.modifyRoute("room-keys-version", { response: backupData });
                         return {
-                            version: backupVersion,
+                            version: newVersion,
                         };
                     },
                 });
@@ -2028,11 +2028,33 @@ describe("crypto", () => {
                 });
 
                 const newBackupUploadPromise = awaitMegolmBackupKeyUpload();
+                const keyBackupCachedState = new Promise<{
+                    activeVersion: string | null;
+                    eventVersion: string;
+                    serverVersion: string | undefined;
+                }>((resolve) => {
+                    aliceClient.on(CryptoEvent.KeyBackupDecryptionKeyCached, async (eventVersion) => {
+                        const [activeVersion, serverInfo] = await Promise.all([
+                            aliceClient.getCrypto()!.getActiveSessionBackupVersion(),
+                            aliceClient.getCrypto()!.getKeyBackupInfo(),
+                        ]);
+                        resolve({
+                            activeVersion,
+                            eventVersion,
+                            serverVersion: serverInfo?.version,
+                        });
+                    });
+                });
 
                 await aliceClient.getCrypto()!.resetKeyBackup();
                 await awaitDeleteCalled;
                 await newBackupStatusUpdate;
                 await newBackupUploadPromise;
+                await expect(keyBackupCachedState).resolves.toEqual({
+                    activeVersion: newVersion,
+                    eventVersion: newVersion,
+                    serverVersion: newVersion,
+                });
 
                 const nextVersion = await aliceClient.getCrypto()!.getActiveSessionBackupVersion();
                 const nextKey = await aliceClient.getCrypto()!.getSessionBackupPrivateKey();

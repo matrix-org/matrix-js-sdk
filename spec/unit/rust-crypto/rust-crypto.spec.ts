@@ -71,7 +71,7 @@ import {
     type NewKeyBackupInfo,
     type VerificationRequest,
 } from "../../../src/crypto-api";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -888,6 +888,7 @@ describe("RustCrypto", () => {
                     asJSON: vi.fn().mockReturnValue("{}"),
                 }),
                 saveBackupDecryptionKey: vi.fn(),
+                enableBackupV1: vi.fn(),
                 exportCrossSigningKeys: vi.fn().mockResolvedValue({
                     masterKey: "sosecret",
                     userSigningKey: "secrets",
