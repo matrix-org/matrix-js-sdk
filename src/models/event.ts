@@ -1772,7 +1772,9 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * `duration_ms` is safely bounded to a hour.
      */
-    public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number; ttl_start_ms?: number } | undefined {
+    public get unstableStickyInfo():
+        | { duration_ms: number; duration_ttl_ms?: number; ttl_start_ms?: number }
+        | undefined {
         if (!this.event.msc4354_sticky?.duration_ms) {
             return undefined;
         }
