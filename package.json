@@ -99,7 +99,7 @@
         "matrix-mock-request": "^2.5.0",
         "oxfmt": "^0.59.0",
         "oxlint": "^1.70.0",
-        "oxlint-tsgolint": "^0.24.0",
+        "oxlint-tsgolint": "^0.25.0",
         "typedoc": "^0.28.1",
         "typedoc-plugin-coverage": "^4.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",
