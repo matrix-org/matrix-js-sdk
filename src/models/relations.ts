@@ -336,7 +336,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      * @param targetEvent - the event the relations are related to.
      */
     public async setTargetEvent(event: MatrixEvent): Promise<void> {
-        if (this.targetEvent) {
+        if (this.targetEvent === event) {
             return;
         }
         this.targetEvent = event;

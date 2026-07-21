@@ -20,6 +20,7 @@ import { EventStatus, type MatrixEvent, MatrixEventEvent } from "./event.ts";
 import { type EventTimelineSet } from "./event-timeline-set.ts";
 import { type MatrixClient } from "../client.ts";
 import { type Room } from "./room.ts";
+import { logger } from "../logger.ts";
 
 export class RelationsContainer {
     // A tree of objects to access a set of related children for an event, as in:
@@ -88,30 +89,53 @@ export class RelationsContainer {
      *
      * @param event - The new child event to be aggregated.
      * @param timelineSet - The event timeline set within which to search for the related event if any.
+     * @param targetEvent - A known relation target to use when it is not in the timeline yet.
+     * @returns A promise which resolves after aggregation when `targetEvent` is supplied.
      */
-    public aggregateChildEvent(event: MatrixEvent, timelineSet?: EventTimelineSet): void {
+    public aggregateChildEvent(event: MatrixEvent, timelineSet?: EventTimelineSet): void;
+    public aggregateChildEvent(
+        event: MatrixEvent,
+        timelineSet: EventTimelineSet,
+        targetEvent: MatrixEvent,
+    ): Promise<void>;
+    public aggregateChildEvent(
+        event: MatrixEvent,
+        timelineSet?: EventTimelineSet,
+        targetEvent?: MatrixEvent,
+    ): void | Promise<void> {
+        const aggregation = this.aggregateChildEventInternal(event, timelineSet, targetEvent);
+        if (targetEvent) return aggregation;
+
+        void aggregation.catch((error) => logger.error("Failed to aggregate child event: ", error));
+    }
+
+    private aggregateChildEventInternal(
+        event: MatrixEvent,
+        timelineSet?: EventTimelineSet,
+        targetEvent?: MatrixEvent,
+    ): Promise<void> {
         if (event.isRedacted() || event.status === EventStatus.CANCELLED) {
-            return;
+            return Promise.resolve();
         }
 
         const relation = event.getRelation();
-        if (!relation) return;
-
-        const onEventDecrypted = (): void => {
-            if (event.isDecryptionFailure()) {
-                // This could for example happen if the encryption keys are not yet available.
-                // The event may still be decrypted later. Register the listener again.
-                event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
-                return;
-            }
-
-            this.aggregateChildEvent(event, timelineSet);
-        };
+        if (!relation) return Promise.resolve();
 
         // If the event is currently encrypted, wait until it has been decrypted.
         if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
-            event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
-            return;
+            return new Promise<void>((resolve, reject) => {
+                const onEventDecrypted = (): void => {
+                    if (event.isDecryptionFailure()) {
+                        // This could for example happen if the encryption keys are not yet available.
+                        // The event may still be decrypted later. Register the listener again.
+                        event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
+                        return;
+                    }
+
+                    void this.aggregateChildEventInternal(event, timelineSet, targetEvent).then(resolve, reject);
+                };
+                event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
+            });
         }
 
         const { event_id: relatesToEventId, rel_type: relationType } = relation;
@@ -130,20 +154,26 @@ export class RelationsContainer {
         }
 
         let relationsWithEventType = relationsWithRelType.get(eventType);
+        const isNewRelationCollection = !relationsWithEventType;
+        let targetEventUpdate = Promise.resolve();
         if (!relationsWithEventType) {
             relationsWithEventType = new Relations(relationType!, eventType, this.client);
             relationsWithRelType.set(eventType, relationsWithEventType);
+        }
 
+        if (isNewRelationCollection || targetEvent) {
             const room = this.room ?? timelineSet?.room;
             const relatesToEvent =
                 timelineSet?.findEventById(relatesToEventId!) ??
                 room?.findEventById(relatesToEventId!) ??
-                room?.getPendingEvent(relatesToEventId!);
+                room?.getPendingEvent(relatesToEventId!) ??
+                targetEvent;
             if (relatesToEvent) {
-                relationsWithEventType.setTargetEvent(relatesToEvent);
+                targetEventUpdate = relationsWithEventType.setTargetEvent(relatesToEvent);
             }
         }
 
-        relationsWithEventType.addEvent(event);
+        const addEventUpdate = relationsWithEventType.addEvent(event);
+        return Promise.all([targetEventUpdate, addEventUpdate]).then(() => undefined);
     }
 }
