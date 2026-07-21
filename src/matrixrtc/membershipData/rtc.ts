@@ -17,7 +17,7 @@ limitations under the License.
 import { MXID_PATTERN } from "../../models/room-member.ts";
 import type { IContent } from "../../models/event.ts";
 import type { RelationType } from "../../types.ts";
-import { type RtcSlotEventContent, type Transport } from "../types.ts";
+import { type RtcSlotApplicationContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 import { sha256 } from "../../digest.ts";
 import { encodeUnpaddedBase64 } from "../../base64.ts";
@@ -37,7 +37,7 @@ export interface RtcMembershipData {
         event_id: string;
         rel_type: RelationType.Reference;
     };
-    "application": RtcSlotEventContent["application"];
+    "application": RtcSlotApplicationContent;
     "rtc_transports": Transport[];
     "versions": string[];
     "msc4354_sticky_key"?: string;
