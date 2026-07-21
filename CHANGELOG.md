@@ -1,3 +1,11 @@
+Changes in [42.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.0.0) (2026-07-21)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Properly support Matrix v1.18 OAuth2 APIs ([#5390](https://github.com/matrix-org/matrix-js-sdk/pull/5390)). Contributed by @t3chguy.
+* Remove unused getContentUri ([#5400](https://github.com/matrix-org/matrix-js-sdk/pull/5400)). Contributed by @t3chguy.
+
+
 Changes in [41.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.9.0) (2026-07-07)
 ==================================================================================================
 ## ✨ Features
