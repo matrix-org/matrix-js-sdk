@@ -53,7 +53,7 @@ jobs:
                   git config --global user.name "RiotRobot"
 
             - name: Merge to develop
-              run: .action-repo/scripts/release/merge-master-to-develop.sh
+              run: .action-repo/scripts/release/merge-master-develop.sh
 
             - name: Reset dependencies
               if: inputs.dependencies
