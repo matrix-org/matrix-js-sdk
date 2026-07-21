@@ -17,20 +17,28 @@ import { AbortError } from "p-retry";
 
 import { EventType, RelationType } from "../@types/event.ts";
 import { type ISendEventResponse, type SendDelayedEventResponse } from "../@types/requests.ts";
-import { type EmptyObject } from "../@types/common.ts";
 import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
+import {
+    isMyMembership,
+    LEAVE_REASON_DELAYED,
+    type LeaveMembershipEventContent,
+    type LeaveReason,
+    type RTCCallIntent,
+    type SlotDescription,
+    Status,
+    type Transport,
+} from "./types.ts";
 import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { UnsupportedDelayedEventsEndpointError } from "../errors.ts";
 import {
-    MembershipManagerEvent,
     type IMembershipManager,
+    MembershipManagerEvent,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
@@ -58,10 +66,10 @@ On Join:  ───────────────┐   ┌─────�
 
 On Leave: ─────────  STOP ALL ABOVE
                            ▼
-            ┌────────────────────────────────┐
-            │ SendScheduledDelayedLeaveEvent │
-            └────────────────────────────────┘
-                           │(5)
+            ┌─────────────────────────────────────┐
+            │ CancelledScheduledDelayedLeaveEvent │
+            └─────────────────────────────────────┘
+                           │
                            ▼
                     ┌──────────────┐
                     │SendLeaveEvent│
@@ -107,13 +115,22 @@ export enum MembershipActionType {
     UpdateExpiry = "UpdateExpiry",
     //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
 
-    SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent",
-    //  -> MembershipActionType.SendLeaveEvent on failure (not found) we need to send the leave manually and cannot use the scheduled delayed event
-    //  -> DelayedLeaveActionType.SendScheduledDelayedLeaveEvent on error we try again.
+    CancelledScheduledDelayedLeaveEvent = "CancelledScheduledDelayedLeaveEvent",
+    //  -> MembershipActionType.SendLeaveEvent
+    //  -> DelayedLeaveActionType.CancelledScheduledDelayedLeaveEvent on error we try again
 
     SendLeaveEvent = "SendLeaveEvent",
     // -> MembershipActionType.SendLeaveEvent
 }
+
+export type MembershipActionData = {
+    SendDelayedEvent: undefined;
+    SendJoinEvent: undefined;
+    RestartDelayedEvent: undefined;
+    UpdateExpiry: undefined;
+    CancelledScheduledDelayedLeaveEvent: undefined;
+    SendLeaveEvent: { leaveReason?: LeaveReason };
+};
 
 /**
  * @internal
@@ -144,9 +161,13 @@ export interface MembershipManagerState {
     probablyLeft: boolean;
 }
 
-function createInsertActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
+function createInsertActionUpdate(
+    type: MembershipActionType,
+    offset?: number,
+    data?: MembershipActionData[MembershipActionType],
+): ActionUpdate {
     return {
-        insert: [{ ts: Date.now() + (offset ?? 0), type }],
+        insert: [{ ts: Date.now() + (offset ?? 0), type, data }],
     };
 }
 
@@ -186,12 +207,13 @@ export class MembershipManager
     implements IMembershipManager
 {
     private activated = false;
-    private readonly logger: Logger;
+    protected readonly logger: Logger;
     protected callIntent: RTCCallIntent | undefined;
 
     public isActivated(): boolean {
         return this.activated;
     }
+
     // DEPRECATED use isActivated
     public isJoined(): boolean {
         return this.isActivated();
@@ -243,23 +265,23 @@ export class MembershipManager
     }
 
     /**
-     * Leave from the call (Send an rtc session event with content: `{}`)
+     * Leave from the call (Send an rtc session event with content: `{ leave_reason: xxx }`)
      * @param timeout the maximum duration this promise will take to resolve
+     * @param leaveReason the reason for the leave.
      * @returns true if it managed to leave and false if the timeout condition happened.
      */
-    public leave(timeout?: number): Promise<boolean> {
+    public leave(timeout?: number, leaveReason?: LeaveReason): Promise<boolean> {
         if (!this.scheduler.running) {
             this.logger.warn("Called MembershipManager.leave() even though the MembershipManager is not running");
             return Promise.resolve(true);
         }
-
         // We use the promise to track if we already scheduled a leave event
         // So we do not check scheduler.actions/scheduler.insertions
         if (!this.leavePromiseResolvers) {
             // reset scheduled actions so we will not do any new actions.
             this.leavePromiseResolvers = Promise.withResolvers<boolean>();
             this.activated = false;
-            this.scheduler.initiateLeave();
+            this.scheduler.initiateLeave(leaveReason);
             if (timeout) setTimeout(() => this.leavePromiseResolvers?.resolve(false), timeout);
         }
         return this.leavePromiseResolvers.promise;
@@ -334,7 +356,7 @@ export class MembershipManager
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
-        this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
+        this.scheduler = new ActionScheduler((type, data): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
                 // is equivalent to running it at the end of the loop. (just after applying the status/action list changes)
@@ -348,7 +370,7 @@ export class MembershipManager
             }
             this.oldStatus = this.status;
             this.logger.debug(`MembershipManager before processing action. status=${this.oldStatus}`);
-            return this.membershipLoopHandler(type);
+            return this.membershipLoopHandler(type, data);
         }, this.logger);
     }
 
@@ -363,6 +385,7 @@ export class MembershipManager
 
     // MembershipManager mutable state.
     private state: MembershipManagerState;
+
     private static get defaultState(): MembershipManagerState {
         return {
             hasMemberStateEvent: false,
@@ -375,6 +398,7 @@ export class MembershipManager
             probablyLeft: false,
         };
     }
+
     // Membership Event static parameters:
     protected deviceId: string;
     protected userId: string;
@@ -419,7 +443,10 @@ export class MembershipManager
     }
 
     // LOOP HANDLER:
-    private async membershipLoopHandler(type: MembershipActionType): Promise<ActionUpdate> {
+    private async membershipLoopHandler(
+        type: MembershipActionType,
+        data?: MembershipActionData[MembershipActionType],
+    ): Promise<ActionUpdate> {
         switch (type) {
             case MembershipActionType.SendDelayedEvent: {
                 // Before we start we check if we come from a state where we have a delay id.
@@ -443,16 +470,22 @@ export class MembershipManager
                 }
                 return this.restartDelayedEvent(this.state.delayId);
             }
-            case MembershipActionType.SendScheduledDelayedLeaveEvent: {
+            case MembershipActionType.CancelledScheduledDelayedLeaveEvent: {
                 // We are already good
                 if (!this.state.hasMemberStateEvent) {
-                    return { replace: [] };
+                    this.logger.debug(
+                        "MembershipManager: CancelledScheduledDelayedLeaveEvent but we are already not joined. No action needed.",
+                    );
+                    return {};
                 }
-                if (this.state.delayId) {
-                    return this.sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(this.state.delayId);
-                } else {
-                    return createInsertActionUpdate(MembershipActionType.SendLeaveEvent);
+                if (!this.state.delayId) {
+                    this.logger.debug(
+                        "MembershipManager: CancelledScheduledDelayedLeaveEvent but we do not have a delayId. Ignoring action.",
+                    );
+                    return {};
                 }
+
+                return this.sendCancelDelayedLeaveEvent(this.state.delayId);
             }
             case MembershipActionType.SendJoinEvent: {
                 return this.sendJoinEvent();
@@ -467,7 +500,7 @@ export class MembershipManager
                 }
                 // This is only a fallback in case we do not have working delayed events support.
                 // first we should try to just send the scheduled leave event
-                return this.sendFallbackLeaveEvent();
+                return this.sendLeaveEvent(data?.leaveReason);
             }
         }
     }
@@ -478,7 +511,9 @@ export class MembershipManager
             this.room.roomId,
             { delay: this.delayedLeaveEventDelayMs },
             EventType.GroupCallMemberPrefix,
-            {},
+            {
+                leave_reason: LEAVE_REASON_DELAYED,
+            },
             this.stateKey,
         );
 
@@ -644,42 +679,37 @@ export class MembershipManager
             });
     }
 
-    private async sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(delayId: string): Promise<ActionUpdate> {
+    private async sendCancelDelayedLeaveEvent(delayId: string): Promise<ActionUpdate> {
         return await this.client
-            ._unstable_sendScheduledDelayedEvent(delayId)
+            ._unstable_cancelScheduledDelayedEvent(delayId)
             .then(() => {
-                this.state.hasMemberStateEvent = false;
                 this.setAndEmitDelayId(undefined);
-                this.resetRateLimitCounter(MembershipActionType.SendScheduledDelayedLeaveEvent);
-
-                return { replace: [] };
+                this.resetRateLimitCounter(MembershipActionType.CancelledScheduledDelayedLeaveEvent);
+                return {};
             })
             .catch((e) => {
-                const repeatActionType = MembershipActionType.SendLeaveEvent;
+                const repeatActionType = MembershipActionType.CancelledScheduledDelayedLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
                 if (this.isNotFoundError(e)) {
                     this.setAndEmitDelayId(undefined);
-                    return createInsertActionUpdate(repeatActionType);
+                    return {};
                 }
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "sendScheduledDelayedEvent");
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "CancelledScheduledDelayedLeaveEvent");
                 if (update) return update;
 
                 // On any other error we fall back to SendLeaveEvent (this includes hard errors from rate limiting)
-                this.logger.warn(
-                    "Encountered unexpected error during SendScheduledDelayedLeaveEvent. Falling back to SendLeaveEvent",
-                    e,
-                );
-                return createInsertActionUpdate(repeatActionType);
+                this.logger.warn("Encountered unexpected error during CancelledScheduledDelayedLeaveEvent.", e);
+                return {};
             });
     }
 
     protected clientSendMembership: (
-        myMembership: RtcMembershipData | SessionMembershipData | EmptyObject,
+        myMembership: RtcMembershipData | SessionMembershipData | LeaveMembershipEventContent,
     ) => Promise<ISendEventResponse> = (myMembership) => {
         return this.client.sendStateEvent(
             this.room.roomId,
             EventType.GroupCallMemberPrefix,
-            myMembership as EmptyObject | SessionMembershipData,
+            myMembership as LeaveMembershipEventContent | SessionMembershipData,
             this.stateKey,
         );
     };
@@ -748,8 +778,11 @@ export class MembershipManager
                 throw e;
             });
     }
-    private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
-        return await this.clientSendMembership({})
+
+    private async sendLeaveEvent(leave_reason?: LeaveReason): Promise<ActionUpdate> {
+        return await this.clientSendMembership({
+            leave_reason,
+        })
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
@@ -860,6 +893,7 @@ export class MembershipManager
         const updateNetwork = this.actionUpdateFromNetworkErrorRetry(error, type);
         if (updateNetwork) return updateNetwork;
     }
+
     /**
      * Check if we have a rate limit error and schedule the same action again if we dont exceed the rate limit retry count yet.
      * @param error the error causing this handler check/execution
@@ -1001,7 +1035,7 @@ export class MembershipManager
                     return Status.Connecting;
                 case MembershipActionType.UpdateExpiry: // where no delayed events
                     return Status.Connected;
-                case MembershipActionType.SendScheduledDelayedLeaveEvent:
+                case MembershipActionType.CancelledScheduledDelayedLeaveEvent:
                 case MembershipActionType.SendLeaveEvent:
                     return Status.Disconnecting;
                 default:
@@ -1016,6 +1050,10 @@ export class MembershipManager
                 types.includes(MembershipActionType.UpdateExpiry)
             ) {
                 return Status.Connected;
+            }
+
+            if (types.includes(MembershipActionType.CancelledScheduledDelayedLeaveEvent)) {
+                return Status.Disconnecting;
             }
         } else if (actions.length === 3) {
             const types = actions.map((a) => a.type);
@@ -1040,6 +1078,7 @@ export class MembershipManager
     public get probablyLeft(): boolean {
         return this.state.probablyLeft;
     }
+
     public get delayId(): string | undefined {
         return this.state.delayId;
     }
@@ -1064,18 +1103,25 @@ export class StickyEventMembershipManager extends MembershipManager {
         super(joinConfig, room, clientWithSticky, sessionDescription, parentLogger);
     }
 
-    protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
-        this.clientWithSticky._unstable_sendStickyDelayedEvent(
+    protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () => {
+        this.logger.debug(
+            `StickyMembershipManager send delayed disconnect membership event memberId: ${this.memberId}`,
+        );
+        return this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
             { delay: this.delayedLeaveEventDelayMs },
             null,
             EventType.RTCMembership,
-            { msc4354_sticky_key: this.memberId },
+            {
+                leave_reason: LEAVE_REASON_DELAYED,
+                msc4354_sticky_key: this.memberId,
+            },
         );
+    };
 
     protected clientSendMembership: (
-        myMembership: RtcMembershipData | SessionMembershipData | EmptyObject,
+        myMembership: RtcMembershipData | SessionMembershipData | LeaveMembershipEventContent,
     ) => Promise<ISendEventResponse> = (myMembership) => {
         return this.clientWithSticky._unstable_sendStickyEvent(
             this.room.roomId,
