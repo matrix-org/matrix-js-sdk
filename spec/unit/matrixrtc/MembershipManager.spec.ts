@@ -1016,8 +1016,10 @@ describe("MembershipManager", () => {
                                 device_id: "AAAAAAA",
                             },
                             slot_id: "m.call#ROOM",
-                            rtc_transports: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
-                            transports: { can_subscribe: ["livekit"] },
+                            transports: {
+                                published: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
+                                can_subscribe: ["livekit"],
+                            },
                             versions: [],
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },

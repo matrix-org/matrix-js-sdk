@@ -385,7 +385,7 @@ export class CallMembership {
      * ## RTC Membership
      * Gets the primary transport to use for this RTC membership (m.rtc.member).
      * This will return the primary transport that is used by this call membership to publish their media.
-     * Directly relates to the `rtc_transports` field.
+     * Directly relates to the `transports.published` field.
      *
      * ## Legacy session membership
      * In case of a legacy session membership (m.call.member) this will return the selected transport where
@@ -393,7 +393,7 @@ export class CallMembership {
      * If the `focus_selection` is `oldest_membership` this will return the transport of the oldest membership
      * in the room (based on the `created_ts` field of the session membership).
      * If the `focus_selection` is `multi_sfu` it will return the first transport of the `foci_preferred` list.
-     * (`multi_sfu` is equivalent to how `m.rtc.member` `rtc_transports` work).
+     * (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
      * @param oldestMembership For backwards compatibility with session membership (legacy). Unused in case of RTC membership.
      * Always required to make the consumer not care if it deals with RTC or session memberships.
      * @returns The transport this membership uses to publish media or undefined if no transport is available.
@@ -402,7 +402,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return data.rtc_transports[0];
+                return data.transports.published[0];
             case MembershipKind.Session:
                 switch (data.focus_active.focus_selection) {
                     case "oldest_membership":
@@ -422,14 +422,14 @@ export class CallMembership {
     }
 
     /**
-     * The value of the `rtc_transports` field for RTC memberships (m.rtc.member).
+     * The value of the `transports.published` field for RTC memberships (m.rtc.member).
      * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).
      */
     public get transports(): Transport[] {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                return data.rtc_transports;
+                return data.transports.published;
             case MembershipKind.Session:
             default:
                 return data.foci_preferred;
