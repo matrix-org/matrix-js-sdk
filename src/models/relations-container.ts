@@ -89,10 +89,16 @@ export class RelationsContainer {
      *
      * @param event - The new child event to be aggregated.
      * @param timelineSet - The event timeline set within which to search for the related event if any.
-     * @param targetEvent - A known relation target to use when it is not in the timeline yet.
-     * @returns A promise which resolves after aggregation when `targetEvent` is supplied.
      */
     public aggregateChildEvent(event: MatrixEvent, timelineSet?: EventTimelineSet): void;
+    /**
+     * Add a relation event using a known target that is not in the timeline yet.
+     *
+     * @param event - The new child event to be aggregated.
+     * @param timelineSet - The event timeline set within which to search for the related event.
+     * @param targetEvent - The known relation target.
+     * @returns A promise which resolves after aggregation.
+     */
     public aggregateChildEvent(
         event: MatrixEvent,
         timelineSet: EventTimelineSet,
