@@ -938,14 +938,12 @@ describe("MembershipManager", () => {
     });
 
     describe("updateCallIntent()", () => {
-        // eslint-disable-next-line @vitest/expect-expect
         it("should fail if the user has not joined the call", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             // After joining we want our own focus to be the one we select.
-            try {
-                await manager.updateCallIntent("video");
-                throw Error("Should have thrown");
-            } catch {}
+            await expect(manager.updateCallIntent("video")).rejects.toThrowErrorMatchingInlineSnapshot(
+                `[Error: You cannot update your intent before joining the call]`,
+            );
         });
 
         it("can adjust the intent", async () => {

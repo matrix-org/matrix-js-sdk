@@ -54,7 +54,6 @@ export interface IEphemeral {
     events: IMinimalEvent[];
 }
 
-/* eslint-disable camelcase */
 interface UnreadNotificationCounts {
     highlight_count?: number;
     notification_count?: number;
@@ -210,7 +209,6 @@ export interface ISyncResponse {
     "device_unused_fallback_key_types"?: string[];
     "org.matrix.msc2732.device_unused_fallback_key_types"?: string[];
 }
-/* eslint-enable camelcase */
 
 export enum Category {
     Invite = "invite",
@@ -607,7 +605,7 @@ export class SyncAccumulator {
             for (let i = startIndex; i < currentData._timeline.length; i++) {
                 if (currentData._timeline[i].token) {
                     // keep all events after this, including this one
-                    currentData._timeline = currentData._timeline.slice(i, currentData._timeline.length);
+                    currentData._timeline = currentData._timeline.slice(i);
                     break;
                 }
             }

@@ -23,7 +23,7 @@ export enum ThreepidMedium {
 export interface IThreepid {
     medium: ThreepidMedium;
     address: string;
-    validated_at: number; // eslint-disable-line camelcase
-    added_at: number; // eslint-disable-line camelcase
+    validated_at: number;
+    added_at: number;
     bound?: boolean;
 }

@@ -126,7 +126,6 @@ export class LocalStorageCryptoStore extends MemoryCryptoStore implements Crypto
         func(count);
     }
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     private _getEndToEndSessions(deviceKey: string): Record<string, ISessionInfo> {
         const sessions = getJsonItem(this.store, keyEndToEndSessions(deviceKey));
         const fixedSessions: Record<string, ISessionInfo> = {};

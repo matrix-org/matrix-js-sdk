@@ -394,7 +394,6 @@ export class TimelineWindow {
         // iterate through each timeline between this.start and this.end
         // (inclusive).
         let timeline: EventTimeline | null = this.start.timeline;
-        // eslint-disable-next-line no-constant-condition
         while (timeline) {
             const events = timeline.getEvents();
 

@@ -48,7 +48,6 @@ export class DummyTransport<D extends RendezvousTransportDetails, T> implements 
                 data,
             )} where etag matches ${this.etag}`,
         );
-        // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {
             if (!this.etag || (this.otherParty?.etag && this.otherParty?.etag === this.etag)) {
                 this.data = data;
@@ -66,7 +65,6 @@ export class DummyTransport<D extends RendezvousTransportDetails, T> implements 
 
     async receive(): Promise<T | undefined> {
         logger.info(`[${this.name}] Attempting to receive where etag is after ${this.lastEtagReceived}`);
-        // eslint-disable-next-line no-constant-condition
         while (!this.cancelled) {
             if (!this.lastEtagReceived || this.lastEtagReceived !== this.etag) {
                 this.lastEtagReceived = this.etag;

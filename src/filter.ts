@@ -36,7 +36,6 @@ function setProp(obj: Record<string, any>, keyNesting: string, val: any): void {
     currentObj[nestedKeys[nestedKeys.length - 1]] = val;
 }
 
-/* eslint-disable camelcase */
 export interface IFilterDefinition {
     "event_fields"?: string[];
     "event_format"?: "client" | "federation";
@@ -79,8 +78,6 @@ interface IRoomFilter {
 interface ProfileFieldsFilter {
     ids: string[];
 }
-
-/* eslint-enable camelcase */
 
 export class Filter {
     public static LAZY_LOADING_MESSAGES_FILTER = {

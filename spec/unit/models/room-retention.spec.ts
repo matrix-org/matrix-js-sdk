@@ -30,7 +30,6 @@ describe("RoomRetentionPolicy", () => {
     let getCachedMock: ReturnType<typeof vi.fn>;
     let removeEventsFromRoom: ReturnType<typeof vi.fn>;
     let retentionPolicyUpdateHandler: (() => void) | undefined;
-    // oxlint-disable-next-line no-unused-vars - false positive
     let eventCounter = 0;
 
     function getPolicy(): RoomRetentionPolicy {

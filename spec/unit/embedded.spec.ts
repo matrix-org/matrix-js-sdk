@@ -16,8 +16,7 @@ limitations under the License.
 
 // We have to use EventEmitter here to mock part of the matrix-widget-api
 // project, which doesn't know about our TypeEventEmitter implementation at all
-// eslint-disable-next-line no-restricted-imports
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import { type MockedObject } from "vitest";
 import {
     type WidgetApi,

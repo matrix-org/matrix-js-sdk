@@ -26,8 +26,6 @@ interface Extensible {
     [key: string]: any;
 }
 
-/* eslint-disable camelcase */
-
 /** The result of a call to {@link crypto-api!CryptoApi.exportRoomKeys} */
 export interface IMegolmSessionData extends Extensible {
     /** Sender's Curve25519 device key */
@@ -46,16 +44,14 @@ export interface IMegolmSessionData extends Extensible {
     untrusted?: boolean;
 }
 
-/* eslint-enable camelcase */
-
 /** the type of the `device_keys` parameter on `/_matrix/client/v3/keys/upload`
  *
  * @see https://spec.matrix.org/v1.5/client-server-api/#post_matrixclientv3keysupload
  */
 export interface IDeviceKeys {
     algorithms: Array<string>;
-    device_id: string; // eslint-disable-line camelcase
-    user_id: string; // eslint-disable-line camelcase
+    device_id: string;
+    user_id: string;
     keys: Record<string, string>;
     signatures?: ISignatures;
 }

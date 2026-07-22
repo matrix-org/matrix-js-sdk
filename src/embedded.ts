@@ -476,7 +476,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
         delayOpts: SendDelayedEventRequestOpts,
@@ -518,7 +517,6 @@ export class RoomWidgetClient extends MatrixClient {
      * - {@link _unstable_restartScheduledDelayedEvent}
      * - {@link _unstable_sendScheduledDelayedEvent}
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -544,7 +542,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -560,7 +557,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_restartScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -576,7 +572,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_sendScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(

@@ -21,7 +21,7 @@ import debug from "debug";
 import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 import { IDBFactory } from "fake-indexeddb";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import Olm from "@matrix-org/olm";
 
 import {
@@ -86,8 +86,7 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
@@ -100,7 +99,6 @@ beforeEach(() => {
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -208,7 +206,6 @@ describe("verification", () => {
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             if (methods !== undefined) {
-                // eslint-disable-next-line @vitest/no-conditional-expect
                 expect(new Set(toDeviceMessage.methods)).toEqual(new Set(methods));
             }
 
@@ -512,7 +509,6 @@ describe("verification", () => {
             // Rust crypto waits for the 'done' to arrive from the other side.
             if (request.phase === VerificationPhase.Done) {
                 const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
-                // eslint-disable-next-line @vitest/no-conditional-expect
                 expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
                 await verificationPromise;
             }

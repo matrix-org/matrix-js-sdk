@@ -145,7 +145,6 @@ export class NoAuthFlowFoundError extends Error {
 
     public constructor(
         m: string,
-        // eslint-disable-next-line @typescript-eslint/naming-convention, camelcase
         public readonly required_stages: string[],
         public readonly flows: UIAFlow[],
     ) {
@@ -420,12 +419,13 @@ export class InteractiveAuth<T> {
         // if we're currently trying a request, wait for it to finish
         // as otherwise we can get multiple 200 responses which can mean
         // things like multiple logins for register requests.
-        // (but discard any exceptions as we only care when its done,
-        // not whether it worked or not)
         while (this.submitPromise) {
             try {
                 await this.submitPromise;
-            } catch {}
+            } catch {
+                // discard any exceptions as we only care when its done,
+                // not whether it worked or not
+            }
         }
 
         // use the sessionid from the last request, if one is present.

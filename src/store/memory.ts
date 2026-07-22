@@ -259,7 +259,9 @@ export class MemoryStore implements IStore {
             if (isValidFilterId(value)) {
                 return value;
             }
-        } catch {}
+        } catch {
+            // Do nothing
+        }
         return null;
     }
 
@@ -277,7 +279,9 @@ export class MemoryStore implements IStore {
             } else {
                 this.localStorage.removeItem(key);
             }
-        } catch {}
+        } catch {
+            // Do nothing
+        }
     }
 
     /**

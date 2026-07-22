@@ -181,7 +181,6 @@ export class MSC4108RendezvousSession {
         if (!this.url) {
             throw new Error("Rendezvous not set up");
         }
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             if (this._cancelled) {
                 return undefined;

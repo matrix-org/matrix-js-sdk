@@ -1,7 +1,6 @@
 import mkdebug from "debug";
 
-// eslint-disable-next-line no-restricted-imports
-import type EventEmitter from "events";
+import type EventEmitter from "node:events";
 import {
     type IContent,
     type IEvent,
@@ -147,7 +146,6 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
         return "mock" + (name ? " of " + name : "");
     };
     for (const key of Object.getOwnPropertyNames(constr.prototype)) {
-        // eslint-disable-line guard-for-in
         try {
             if (constr.prototype[key] instanceof Function) {
                 result[key] = vi.fn();

@@ -292,7 +292,6 @@ describe("MatrixClient", function () {
             }
 
             if (next.error) {
-                // eslint-disable-next-line
                 return Promise.reject(
                     new MatrixError(
                         {
@@ -1481,7 +1480,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable @vitest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1500,7 +1498,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable @vitest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1543,7 +1540,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable @vitest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1562,7 +1558,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable @vitest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1580,7 +1575,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable @vitest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1598,7 +1592,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable @vitest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1620,7 +1613,6 @@ describe("MatrixClient", function () {
         const syncPromise = new Promise<void>((resolve, reject) => {
             client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "SYNCING") {
-                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(httpLookups.length).toEqual(0);
                     client.removeListener(ClientEvent.Sync, syncListener);
                     resolve();
@@ -1709,7 +1701,6 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
-                    /* eslint-disable @vitest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(2);
                         expect(client.retryImmediately()).toBe(true);
@@ -1721,7 +1712,6 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
-                    /* eslint-enable @vitest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -1743,10 +1733,8 @@ describe("MatrixClient", function () {
             const isSyncingPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
                     if (state === "ERROR" && httpLookups.length > 0) {
-                        /* eslint-disable @vitest/no-conditional-expect */
                         expect(httpLookups.length).toEqual(1);
                         expect(client.retryImmediately()).toBe(true);
-                        /* eslint-enable @vitest/no-conditional-expect */
                         vi.advanceTimersByTime(1);
                     } else if (state === "RECONNECTING" && httpLookups.length > 0) {
                         vi.advanceTimersByTime(10000);
@@ -1773,7 +1761,6 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
-                    /* eslint-disable @vitest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(3);
                         expect(client.retryImmediately()).toBe(true);
@@ -1785,7 +1772,6 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
-                    /* eslint-enable @vitest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -3034,7 +3020,6 @@ describe("MatrixClient", function () {
             expect(lastCall?.options?.body).toEqual(JSON.stringify(content));
 
             // and a warning should have been logged
-            // eslint-disable-next-line no-console
             expect(console.warn).toHaveBeenCalledWith(
                 expect.stringContaining("Calling `setAccountData` before the client is started"),
             );

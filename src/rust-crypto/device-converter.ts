@@ -111,6 +111,7 @@ export function downloadDeviceToJsDevice(device: QueryDevice): Device {
 
     const signatures = new Map<string, Map<string, string>>();
     if (device.signatures) {
+        // oxlint-disable-next-line guard-for-in
         for (const userId in device.signatures) {
             signatures.set(userId, new Map(Object.entries(device.signatures[userId])));
         }
