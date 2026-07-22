@@ -32,6 +32,8 @@ import {
     UnstableApiVersion,
 } from "matrix-widget-api";
 
+import { type Transport } from "./matrixrtc/index.ts";
+
 import { MatrixEvent, type IEvent, type IContent, EventStatus } from "./models/event.ts";
 import {
     type ISendEventResponse,
@@ -137,6 +139,13 @@ export interface ICapabilities {
      * @defaultValue false
      */
     receiveSticky?: boolean;
+
+    /**
+     * Whether this client needs to be able to discover the RTC transports the host can reach.
+     * @experimental Part of MSC4515
+     * @defaultValue false
+     */
+    rtcTransports?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -284,6 +293,9 @@ export class RoomWidgetClient extends MatrixClient {
         }
         if (capabilities.turnServers) {
             this.widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
+        }
+        if (capabilities.rtcTransports) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4515RtcTransports);
         }
     }
 
@@ -620,6 +632,23 @@ export class RoomWidgetClient extends MatrixClient {
             matrix_server_name: token.matrix_server_name,
             token_type: token.token_type,
         };
+    }
+
+    /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_getRTCTransports} (MSC4143):
+     * a widget cannot make authenticated homeserver calls itself, so we ask the host over the
+     * widget API instead (MSC4515). Requires the `rtcTransports` capability and a host that
+     * advertises the `org.matrix.msc4515` API version (otherwise the request throws).
+     */
+    public override async _unstable_getRTCTransports(): Promise<Transport[]> {
+        const { rtc_transports: rtcTransports } = await this.widgetApi
+            .getRtcTransports()
+            .catch(timeoutToConnectionError);
+        // The widget-api IRtcTransport and the js-sdk Transport types are structurally compatible.
+        // We recreate the objects so the linter catches any future divergence in the shapes.
+        return rtcTransports.map((transport) => ({ ...transport }));
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
