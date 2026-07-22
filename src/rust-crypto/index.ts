@@ -96,6 +96,14 @@ export async function initRustCrypto(args: {
      * Whether to enable support for encrypting state events.
      */
     enableEncryptedStateEvents?: boolean;
+
+    /**
+     * Optional PEM-formatted string that provides CA certificates. These will
+     * be used to check X.509 signatures on user identities. Any user identity
+     * that has a valid signature according to the supplied CAs will be
+     * considered verified, without any manual verification taking place.
+     */
+    caCertsPem?: string;
 }): Promise<RustCrypto> {
     const { logger } = args;
 
@@ -134,6 +142,7 @@ export async function initRustCrypto(args: {
         storeHandle,
         args.legacyCryptoStore,
         args.enableEncryptedStateEvents,
+        args.caCertsPem,
     );
 
     storeHandle.free();
@@ -152,6 +161,7 @@ async function initOlmMachine(
     storeHandle: StoreHandle,
     legacyCryptoStore?: CryptoStore,
     enableEncryptedStateEvents?: boolean,
+    caCertsPem?: string,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
@@ -160,6 +170,7 @@ async function initOlmMachine(
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
         logger,
+        caCertsPem,
     );
 
     // A final migration step, now that we have an OlmMachine.
