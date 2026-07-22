@@ -14,7 +14,7 @@ jobs:
         name: "Typescript Syntax Check"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
@@ -34,7 +34,7 @@ jobs:
         name: "Oxc"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
@@ -54,7 +54,7 @@ jobs:
         name: "Node.js example"
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
@@ -88,7 +88,7 @@ jobs:
         permissions:
             security-events: write
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
@@ -105,13 +105,13 @@ jobs:
               run: "pnpm lint:workflows"
 
             - name: Run zizmor
-              uses: zizmorcore/zizmor-action@192e21d79ab29983730a13d1382995c2307fbcaa # v0.5.7
+              uses: zizmorcore/zizmor-action@6599ee8b7a49aef6a770f63d261d214911a7ce02 # v0.6.0
 
     docs:
         name: "JSDoc Checker"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
@@ -139,7 +139,7 @@ jobs:
         name: "Analyse Dead Code"
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
@@ -160,7 +160,7 @@ jobs:
         if: github.event_name == 'merge_group'
         runs-on: ubuntu-24.04
         steps:
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   repository: element-hq/element-web
                   persist-credentials: false

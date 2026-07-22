@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "41.9.0",
+    "version": "42.0.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -90,7 +90,7 @@
         "@vitest/ui": "^4.0.17",
         "concurrently": "^10.0.0",
         "debug": "^4.3.4",
-        "fake-indexeddb": "^5.0.2",
+        "fake-indexeddb": "^6.0.0",
         "fetch-mock": "^12.6.0",
         "happy-dom": "^20.1.0",
         "husky": "^9.0.0",
@@ -99,7 +99,7 @@
         "matrix-mock-request": "^2.5.0",
         "oxfmt": "^0.59.0",
         "oxlint": "^1.70.0",
-        "oxlint-tsgolint": "^0.24.0",
+        "oxlint-tsgolint": "^0.25.0",
         "typedoc": "^0.28.1",
         "typedoc-plugin-coverage": "^4.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",

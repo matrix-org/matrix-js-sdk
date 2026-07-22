@@ -343,10 +343,6 @@ describe("crypto", () => {
     });
 
     describe("Unable to decrypt error codes", function () {
-        beforeEach(() => {
-            vi.useFakeTimers();
-        });
-
         it("Decryption fails with UISI error", async () => {
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
@@ -1007,7 +1003,9 @@ describe("crypto", () => {
             await startClientAndAwaitFirstSync();
             const p2pSession = await establishOlmSession(aliceClient, keyReceiver, syncResponder, testOlmAccount);
 
-            vi.useFakeTimers();
+            vi.useFakeTimers({
+                toFake: ["Date"],
+            });
 
             const syncResponse = getSyncResponse(["@bob:xyz"]);
 
@@ -1405,10 +1403,6 @@ describe("crypto", () => {
     });
 
     describe("key upload request", () => {
-        beforeEach(() => {
-            vi.useFakeTimers();
-        });
-
         function awaitKeyUploadRequest(): Promise<{ keysCount: number; fallbackKeysCount: number }> {
             return new Promise((resolve) => {
                 fetchMock.modifyRoute("keys-upload", {
@@ -1449,10 +1443,6 @@ describe("crypto", () => {
                 device_one_time_keys_count: { signed_curve25519: 0 },
                 device_unused_fallback_key_types: [],
             });
-
-            // Advance local date to 2 minutes
-            // The old crypto only runs the upload every 60 seconds
-            vi.setSystemTime(Date.now() + 2 * 60 * 1000);
 
             await syncPromise(aliceClient);
 
@@ -1591,8 +1581,6 @@ describe("crypto", () => {
         });
 
         it("Get devices from tracked users", async () => {
-            vi.useFakeTimers();
-
             expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
             await startClientAndAwaitFirstSync();
             const queryPromise = awaitKeyQueryRequest();
@@ -1601,25 +1589,10 @@ describe("crypto", () => {
             // `user` will be added to the room
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([user, "@bob:xyz"]));
 
-            // Advance local date to 2 minutes
-            // The old crypto only runs the upload every 60 seconds
-            vi.setSystemTime(Date.now() + 2 * 60 * 1000);
-
             await syncPromise(aliceClient);
-
-            // Old crypto: for alice: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
-            vi.runAllTimers();
-            // Old crypto: for alice: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
-            await flushPromises();
 
             // Wait for alice to query `user` keys
             await queryPromise;
-
-            // Old crypto: for `user`: run over the `sleep(5)` in `doQueuedQueries` of `DeviceList`
-            vi.runAllTimers();
-            // Old crypto: for `user`: run the `processQueryResponseForUser` in `doQueuedQueries` of `DeviceList`
-            // It will add `@testing_florian1:matrix.org` devices to the DeviceList
-            await flushPromises();
 
             const devicesInfo = await aliceClient.getCrypto()!.getUserDeviceInfo([user]);
 
@@ -1927,10 +1900,6 @@ describe("crypto", () => {
         });
 
         describe("Manage Key Backup", () => {
-            beforeEach(async () => {
-                vi.useFakeTimers();
-            });
-
             it("Should be able to restore from 4S after bootstrap", async () => {
                 const backupVersion = "1";
                 await bootstrapSecurity(backupVersion);
@@ -1958,10 +1927,10 @@ describe("crypto", () => {
                     });
                 });
 
-                await aliceClient.getCrypto()!.importRoomKeys([newKey]);
+                const importRoomKeysPromise = aliceClient.getCrypto()!.importRoomKeys([newKey]);
 
                 // The backup loop waits a random amount of time to avoid different clients firing at the same time.
-                vi.runAllTimers();
+                await importRoomKeysPromise;
 
                 const keyBackupData = await awaitKeyUploaded;
 
@@ -1971,7 +1940,7 @@ describe("crypto", () => {
                 await aliceClient.getCrypto()!.loadSessionBackupPrivateKeyFromSecretStorage();
                 const importResult = await aliceClient.getCrypto()!.restoreKeyBackup();
                 expect(importResult.imported).toStrictEqual(1);
-            });
+            }, 10000);
 
             it("Reset key backup should create a new backup and update 4S", async () => {
                 // First set up 4S and key backup

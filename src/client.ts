@@ -7418,7 +7418,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         )) as SyncUserProfile;
 
         // write through to the cache
-        await this.store.storeUserProfiles(new Map([[userId, profile]]));
+        await this.store.storeUserProfiles(
+            new Map([
+                [
+                    userId,
+                    {
+                        ...storedProfile,
+                        ...profile,
+                    },
+                ],
+            ]),
+        );
 
         return profile[key];
     }

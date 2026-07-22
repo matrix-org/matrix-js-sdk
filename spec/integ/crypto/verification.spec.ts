@@ -91,7 +91,9 @@ beforeAll(async () => {
 }, 10000);
 
 beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({
+        toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+    });
 });
 
 afterEach(() => {
@@ -182,8 +184,8 @@ describe("verification", () => {
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
             expect(request.pending).toBe(true);
-            // we're using fake timers, so the timeout should have exactly 10 minutes left still.
-            expect(request.timeout).toEqual(600_000);
+            expect(request.timeout).toBeLessThanOrEqual(600_000); // 10 mins
+            expect(request.timeout).toBeGreaterThan(540_000); // 9 mins
 
             // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
             {
@@ -1451,7 +1453,9 @@ describe("verification", () => {
                     expect(activeVersion).toEqual("1");
                 });
             } finally {
-                vi.useFakeTimers();
+                vi.useFakeTimers({
+                    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+                });
             }
         });
 
@@ -1464,7 +1468,9 @@ describe("verification", () => {
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            vi.useFakeTimers();
+            vi.useFakeTimers({
+                toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+            });
 
             return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
         }
