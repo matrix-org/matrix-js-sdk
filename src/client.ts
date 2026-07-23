@@ -841,13 +841,13 @@ export interface IProtocol {
     instances: IInstance[];
 }
 
-interface IThirdPartyLocation {
+export interface IThirdPartyLocation {
     alias: string;
     protocol: string;
     fields: object;
 }
 
-interface IThirdPartyUser {
+export interface IThirdPartyUser {
     userid: string;
     protocol: string;
     fields: object;
