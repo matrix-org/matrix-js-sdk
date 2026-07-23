@@ -256,11 +256,6 @@ const SCROLLBACK_DELAY_MS = 3000;
 
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
-export const UNSTABLE_MSC3852_LAST_SEEN_UA = new UnstableValue(
-    "last_seen_user_agent",
-    "org.matrix.msc3852.last_seen_user_agent",
-);
-
 export interface IKeysUploadResponse {
     one_time_key_counts: {
         [algorithm: string]: number;
@@ -777,13 +772,10 @@ interface IUserDirectoryResponse {
 }
 
 export interface IMyDevice {
-    "device_id": string;
-    "display_name"?: string;
-    "last_seen_ip"?: string;
-    "last_seen_ts"?: number;
-    // UNSTABLE_MSC3852_LAST_SEEN_UA
-    "last_seen_user_agent"?: string;
-    "org.matrix.msc3852.last_seen_user_agent"?: string;
+    device_id: string;
+    display_name?: string;
+    last_seen_ip?: string;
+    last_seen_ts?: number;
 }
 
 export interface Keys {
@@ -2345,21 +2337,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public async deleteAccountData(eventType: keyof WritableAccountDataEvents): Promise<void> {
-        const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
-        // if deletion is not supported overwrite with empty content
-        if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
-            await this.setAccountData(eventType, {});
-            return;
-        }
-        const path = utils.encodeUri("/user/$userId/account_data/$type", {
-            $userId: this.getSafeUserId(),
-            $type: eventType,
-        });
-        const options =
-            msc3391DeleteAccountDataServerSupport === ServerSupport.Unstable
-                ? { prefix: "/_matrix/client/unstable/org.matrix.msc3391" }
-                : undefined;
-        return await this.http.authedRequest(Method.Delete, path, undefined, undefined, options);
+        await this.setAccountData(eventType, {});
     }
 
     /**
