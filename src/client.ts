@@ -7242,15 +7242,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param options
      * @param options.term - the term with which to search.
      * @param options.limit - the maximum number of results to return. The server will apply a limit if unspecified.
+     * @param options.server - the remote server whose directory to search (MSC4258-adjacent
+     *     targeted federated search). Ignored by servers without support.
+     * @param options.searchScope - MSC4258 search scope: "local", "restricted" or "remote".
      * @returns Promise which resolves: an array of results.
      */
-    public searchUserDirectory({ term, limit }: { term: string; limit?: number }): Promise<IUserDirectoryResponse> {
+    public searchUserDirectory({
+        term,
+        limit,
+        server,
+        searchScope,
+    }: {
+        term: string;
+        limit?: number;
+        server?: string;
+        searchScope?: "local" | "restricted" | "remote";
+    }): Promise<IUserDirectoryResponse> {
         const body: Body = {
             search_term: term,
         };
 
         if (limit !== undefined) {
             body.limit = limit;
+        }
+        if (server !== undefined) {
+            body.server = server;
+        }
+        if (searchScope !== undefined) {
+            body.search_scope = searchScope;
         }
 
         return this.http.authedRequest(Method.Post, "/user_directory/search", undefined, body);
