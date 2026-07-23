@@ -1,18 +1,17 @@
-peerDependencyRules:
-    allowedVersions:
-        eslint: "8"
+allowBuilds:
+    esbuild: false
+    unrs-resolver: false
 
 allowedDeprecatedVersions:
     eslint: "8"
 
-overrides:
-    expect: 30.4.1
-    # https://github.com/advisories/GHSA-fx2h-pf6j-xcff
-    # https://github.com/advisories/GHSA-v6wh-96g9-6wx3
-    vite: 8.1.5
-
-allowBuilds:
-    unrs-resolver: false
-
 minimumReleaseAgeExclude:
     - "@matrix-org/*"
+
+overrides:
+    expect: 30.4.1
+    vite: 8.1.5
+
+peerDependencyRules:
+    allowedVersions:
+        eslint: "8"
