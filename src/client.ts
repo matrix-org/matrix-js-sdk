@@ -8500,10 +8500,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                        response to getThirdpartyProtocols()
      * @returns Promise which resolves to the result object
      */
-    public getThirdpartyLocation(
-        protocol: string,
-        params: { searchFields?: string[] },
-    ): Promise<IThirdPartyLocation[]> {
+    public getThirdpartyLocation(protocol: string, params?: QueryDict): Promise<IThirdPartyLocation[]> {
         const path = utils.encodeUri("/thirdparty/location/$protocol", {
             $protocol: protocol,
         });
