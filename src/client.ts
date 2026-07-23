@@ -8476,9 +8476,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * this HS
      * @returns Promise which resolves to the result object
      */
-    public getThirdpartyProtocols(): Promise<{ [protocol: string]: IProtocol }> {
+    public getThirdpartyProtocols(server?: string): Promise<{ [protocol: string]: IProtocol }> {
         return this.http
-            .authedRequest<Record<string, IProtocol>>(Method.Get, "/thirdparty/protocols")
+            .authedRequest<Record<string, IProtocol>>(
+                Method.Get,
+                "/thirdparty/protocols",
+                server !== undefined ? { server } : undefined,
+            )
             .then((response) => {
                 // sanity check
                 if (!response || typeof response !== "object") {
