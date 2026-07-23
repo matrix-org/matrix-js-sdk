@@ -2351,7 +2351,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Sets the users thamsc3391t the current user should ignore.
+     * Sets the users that the current user should ignore.
      * @param userIds - the user IDs to ignore
      * @returns Promise which resolves: an empty object
      * @returns Rejects: with an error response.
