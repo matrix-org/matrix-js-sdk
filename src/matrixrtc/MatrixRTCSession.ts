@@ -99,17 +99,6 @@ export interface SessionConfig {
     /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
      * answer before the sender gives up and the call notification is considered timed out.
-     *
-     * This is sent as the `lifetime` field of the `m.rtc.notification` (MSC4075) event, and is
-     * also used locally to time out the ring attempt on the sender's side (see
-     * `MatrixRTCSessionEvent.DidSendCallNotification`).
-     *
-     * Note: the receiving homeserver / client caps this value at 90000ms (1.5 minutes), see
-     * {@link parseCallNotificationContent}.
-     *
-     * @default 60000 (60 seconds)
-     */
-    notificationLifetimeMs?: number;
     }
 
 // The names follow these principles:
