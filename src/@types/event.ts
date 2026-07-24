@@ -428,8 +428,6 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
 
     // MSC4287: Sharing key backup preference between clients - used to mark that the user opted out of key storage
     "m.key_backup": { enabled: boolean };
-    // MSC4287 unstable prefix (note the boolean property has the opposite sense)
-    "m.org.matrix.custom.backup_disabled": { disabled: boolean };
 
     "m.identity_server": { base_url: string | null };
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
