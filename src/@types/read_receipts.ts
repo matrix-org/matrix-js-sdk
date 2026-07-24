@@ -47,15 +47,3 @@ export interface ReceiptContent {
         };
     };
 }
-
-// We will only hold a synthetic receipt if we do not have a real receipt or the synthetic is newer.
-// map: receipt type → user Id → receipt
-export type Receipts = Map<string, Map<string, [real: WrappedReceipt | null, synthetic: WrappedReceipt | null]>>;
-
-export type CachedReceiptStructure = {
-    eventId: string;
-    receiptType: string | ReceiptType;
-    userId: string;
-    receipt: Receipt;
-    synthetic: boolean;
-};
