@@ -457,6 +457,13 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
 export type WritableAccountDataEvents = Exclude<AccountDataEvents, "m.fully_read" | "m.push_rules">;
 
 /**
+ * Subset of AccountDataEvents, only including events encryptable via MSC4483.
+ *
+ * Currently, this is none.
+ */
+export type EncryptableAccountDataEvents = {};
+
+/**
  * Mapped type from event type to content type for all specified global events encrypted by secret storage.
  *
  * See https://spec.matrix.org/v1.13/client-server-api/#msecret_storagev1aes-hmac-sha2-1
@@ -466,5 +473,6 @@ export interface SecretStorageAccountDataEvents {
     "m.cross_signing.master": SecretInfo;
     "m.cross_signing.self_signing": SecretInfo;
     "m.cross_signing.user_signing": SecretInfo;
+    "dev.zirco.msc4483.account_data.key": SecretInfo;
     "org.matrix.msc3814": SecretInfo;
 }
