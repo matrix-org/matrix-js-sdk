@@ -99,7 +99,9 @@ export interface SessionConfig {
     /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
      * answer before the sender gives up and the call notification is considered timed out.
-    }
+     */
+    notificationLifetimeMs?: number;
+}
 
 // The names follow these principles:
 // - we use the technical term delay if the option is related to delayed events.
