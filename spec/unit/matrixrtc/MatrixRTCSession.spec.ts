@@ -685,7 +685,7 @@ describe("MatrixRTCSession", () => {
                     event_id: ownMembershipId,
                     rel_type: "m.reference",
                 },
-                "lifetime": 30000,
+                "lifetime": 60000,
                 "sender_ts": expect.any(Number),
             });
 
@@ -693,7 +693,7 @@ describe("MatrixRTCSession", () => {
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
-                "lifetime": 30000,
+                "lifetime": 60000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
                     event_id: expect.any(String),
@@ -742,7 +742,7 @@ describe("MatrixRTCSession", () => {
                     event_id: ownMembershipEventId,
                     rel_type: "m.reference",
                 },
-                "lifetime": 30000,
+                "lifetime": 60000,
                 "sender_ts": expect.any(Number),
             });
 
@@ -750,7 +750,7 @@ describe("MatrixRTCSession", () => {
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
-                "lifetime": 30000,
+                "lifetime": 60000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
                     event_id: expect.any(String),

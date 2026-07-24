@@ -95,6 +95,12 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
+
+    /**
+     * How long (in milliseconds) the callee's client should keep ringing/waiting for an
+     * answer before the sender gives up and the call notification is considered timed out.
+     */
+    notificationLifetimeMs?: number;
 }
 
 // The names follow these principles:
@@ -675,6 +681,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
+        const lifetime = this.joinConfig?.notificationLifetimeMs ?? 60_000;
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
@@ -687,7 +694,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     rel_type: RelationType.Reference,
                 },
                 "sender_ts": Date.now(),
-                "lifetime": 30_000, // 30 seconds
+                "lifetime": lifetime,
             };
             if (callIntent) {
                 content["m.call.intent"] = callIntent;
