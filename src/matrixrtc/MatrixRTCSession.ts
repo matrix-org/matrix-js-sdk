@@ -242,12 +242,6 @@ interface SessionMembershipsForSlotOpts {
      */
     listenForMemberStateEvents: boolean;
 }
-/**
-* Default lifetime (in milliseconds) advertised in the `lifetime` field of an outgoing
-* `m.rtc.notification` (MSC4075) "ring" event. See {@link SessionConfig.notificationLifetimeMs}.
-*/
-const DEFAULT_NOTIFICATION_LIFETIME_MS = 60_000;
-
 
 const DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS: SessionMembershipsForSlotOpts = {
     listenForStickyEvents: true,
@@ -696,8 +690,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
-       // Use the configured lifetime for this session, falling back to the default.
-        const lifetime = this.joinConfig?.notificationLifetimeMs ?? DEFAULT_NOTIFICATION_LIFETIME_MS;
+        const lifetime = this.joinConfig?.notificationLifetimeMs ?? 60_000;
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
