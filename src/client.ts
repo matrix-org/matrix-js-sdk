@@ -4414,7 +4414,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const path = utils.encodeUri("/presence/$userId/status", {
             $userId: this.credentials.userId!,
         });
-
+        if (opts.status_msg == undefined) {
+        }
         const validStates = ["offline", "online", "unavailable"];
         if (validStates.indexOf(opts.presence) === -1) {
             throw new Error("Bad presence value: " + opts.presence);
