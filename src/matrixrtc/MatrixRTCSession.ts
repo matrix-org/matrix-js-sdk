@@ -696,6 +696,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
+       // Use the configured lifetime for this session, falling back to the default.
+        const lifetime = this.joinConfig?.notificationLifetimeMs ?? DEFAULT_NOTIFICATION_LIFETIME_MS;
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
