@@ -147,6 +147,7 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
     };
     for (const key of Object.getOwnPropertyNames(constr.prototype)) {
         try {
+            // oxlint-disable-next-line unicorn/no-instanceof-builtins
             if (constr.prototype[key] instanceof Function) {
                 result[key] = vi.fn();
             }
@@ -192,7 +193,7 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
     const event: Partial<IEvent> = {
-        type: opts.type as string,
+        type: opts.type,
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
@@ -603,6 +604,7 @@ export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
         resolved = true;
     });
 
+    // oxlint-disable-next-line no-unmodified-loop-condition
     while (!resolved) {
         await vi.advanceTimersByTimeAsync(1);
     }
@@ -652,6 +654,7 @@ export function waitFor<T>(
         if (usingJestFakeTimers) {
             checkCallback();
 
+            // oxlint-disable-next-line no-unmodified-loop-condition
             while (!finished) {
                 vi.advanceTimersByTime(interval);
 

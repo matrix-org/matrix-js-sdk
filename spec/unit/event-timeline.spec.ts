@@ -284,83 +284,77 @@ describe("EventTimeline", function () {
             expect(oldEv.target).toEqual(oldSentinel);
         });
 
-        it(
-            "should call setStateEvents on the right RoomState with the right " + "forwardLooking value for new events",
-            function () {
-                const events = [
-                    utils.mkMembership({
-                        room: roomId,
-                        mship: KnownMembership.Invite,
-                        user: userB,
-                        skey: userA,
-                        event: true,
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.name",
-                        room: roomId,
-                        user: userB,
-                        event: true,
-                        content: {
-                            name: "New room",
-                        },
-                    }),
-                ];
+        it("should call setStateEvents on the right RoomState with the right forwardLooking value for new events", function () {
+            const events = [
+                utils.mkMembership({
+                    room: roomId,
+                    mship: KnownMembership.Invite,
+                    user: userB,
+                    skey: userA,
+                    event: true,
+                }),
+                utils.mkEvent({
+                    type: "m.room.name",
+                    room: roomId,
+                    user: userB,
+                    event: true,
+                    content: {
+                        name: "New room",
+                    },
+                }),
+            ];
 
-                timeline.addEvent(events[0], { toStartOfTimeline: false, addToState: true });
-                timeline.addEvent(events[1], { toStartOfTimeline: false, addToState: true });
+            timeline.addEvent(events[0], { toStartOfTimeline: false, addToState: true });
+            timeline.addEvent(events[1], { toStartOfTimeline: false, addToState: true });
 
-                expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
-                    timelineWasEmpty: undefined,
-                });
-                expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[1]], {
-                    timelineWasEmpty: undefined,
-                });
+            expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
+                timelineWasEmpty: undefined,
+            });
+            expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).toHaveBeenCalledWith([events[1]], {
+                timelineWasEmpty: undefined,
+            });
 
-                expect(events[0].forwardLooking).toBe(true);
-                expect(events[1].forwardLooking).toBe(true);
+            expect(events[0].forwardLooking).toBe(true);
+            expect(events[1].forwardLooking).toBe(true);
 
-                expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).not.toHaveBeenCalled();
-            },
-        );
+            expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).not.toHaveBeenCalled();
+        });
 
-        it(
-            "should call setStateEvents on the right RoomState with the right " + "forwardLooking value for old events",
-            function () {
-                const events = [
-                    utils.mkMembership({
-                        room: roomId,
-                        mship: KnownMembership.Invite,
-                        user: userB,
-                        skey: userA,
-                        event: true,
-                    }),
-                    utils.mkEvent({
-                        type: "m.room.name",
-                        room: roomId,
-                        user: userB,
-                        event: true,
-                        content: {
-                            name: "New room",
-                        },
-                    }),
-                ];
+        it("should call setStateEvents on the right RoomState with the right forwardLooking value for old events", function () {
+            const events = [
+                utils.mkMembership({
+                    room: roomId,
+                    mship: KnownMembership.Invite,
+                    user: userB,
+                    skey: userA,
+                    event: true,
+                }),
+                utils.mkEvent({
+                    type: "m.room.name",
+                    room: roomId,
+                    user: userB,
+                    event: true,
+                    content: {
+                        name: "New room",
+                    },
+                }),
+            ];
 
-                timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: true });
-                timeline.addEvent(events[1], { toStartOfTimeline: true, addToState: true });
+            timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: true });
+            timeline.addEvent(events[1], { toStartOfTimeline: true, addToState: true });
 
-                expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
-                    timelineWasEmpty: undefined,
-                });
-                expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[1]], {
-                    timelineWasEmpty: undefined,
-                });
+            expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[0]], {
+                timelineWasEmpty: undefined,
+            });
+            expect(timeline.getState(EventTimeline.BACKWARDS)!.setStateEvents).toHaveBeenCalledWith([events[1]], {
+                timelineWasEmpty: undefined,
+            });
 
-                expect(events[0].forwardLooking).toBe(false);
-                expect(events[1].forwardLooking).toBe(false);
+            expect(events[0].forwardLooking).toBe(false);
+            expect(events[1].forwardLooking).toBe(false);
 
-                expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).not.toHaveBeenCalled();
-            },
-        );
+            expect(timeline.getState(EventTimeline.FORWARDS)!.setStateEvents).not.toHaveBeenCalled();
+        });
 
         it("Make sure legacy overload passing options directly as parameters still works", () => {
             expect(() => timeline.addEvent(events[0], { toStartOfTimeline: true, addToState: false })).not.toThrow();

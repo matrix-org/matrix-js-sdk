@@ -32,7 +32,7 @@ import {
     UnstableApiVersion,
 } from "matrix-widget-api";
 
-import { MatrixEvent, type IEvent, type IContent, EventStatus } from "./models/event.ts";
+import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
 import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
@@ -408,7 +408,7 @@ export class RoomWidgetClient extends MatrixClient {
         // We need the additional as assertion for the EW linter to be happy.
         // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
         // above
-        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs as number | undefined;
+        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs;
 
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts
@@ -726,7 +726,7 @@ export class RoomWidgetClient extends MatrixClient {
         // Verify the room ID matches, since it's possible for the client to
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
-            const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
+            const event = new MatrixEvent(ev.detail.data);
 
             // Only inject once we have update the txId
             await this.updateTxId(event);
@@ -768,7 +768,7 @@ export class RoomWidgetClient extends MatrixClient {
         const event = new MatrixEvent({
             type: ev.detail.data.type,
             sender: ev.detail.data.sender,
-            content: ev.detail.data.content as IContent,
+            content: ev.detail.data.content,
         });
         // Mark the event as encrypted if it was, using fake contents and keys since those are unknown to us
         if (ev.detail.data.encrypted) event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
@@ -791,7 +791,7 @@ export class RoomWidgetClient extends MatrixClient {
             // send us state updates from other rooms if this widget is always
             // on screen
             if (rawEvent.room_id === this.roomId) {
-                const event = new MatrixEvent(rawEvent as Partial<IEvent>);
+                const event = new MatrixEvent(rawEvent);
 
                 if (this.syncApi instanceof SyncApi) {
                     await this.syncApi.injectRoomEvents(this.room!, undefined, [event]);

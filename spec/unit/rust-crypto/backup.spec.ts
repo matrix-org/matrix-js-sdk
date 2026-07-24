@@ -50,14 +50,14 @@ describe("Upload keys to backup", () => {
             getBackupKeys: vi.fn().mockResolvedValue({
                 backupVersion: TestData.SIGNED_BACKUP_DATA.version,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
-            } as unknown as RustSdkCryptoJs.BackupKeys),
+            } satisfies Partial<RustSdkCryptoJs.BackupKeys>),
             backupRoomKeys: vi.fn(),
             isBackupEnabled: vi.fn().mockResolvedValue(true),
             enableBackupV1: vi.fn(),
             saveBackupDecryptionKey: vi.fn(),
             verifyBackup: vi.fn().mockResolvedValue({
                 trusted: vi.fn().mockResolvedValue(true),
-            } as unknown as RustSdkCryptoJs.SignatureVerification),
+            } satisfies Partial<RustSdkCryptoJs.SignatureVerification>),
             roomKeyCounts: vi.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 

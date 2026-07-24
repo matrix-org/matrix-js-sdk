@@ -494,7 +494,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                   )
                 : new MembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
 
-            this.reEmitter.reEmit(this.membershipManager!, [
+            this.reEmitter.reEmit(this.membershipManager, [
                 MembershipManagerEvent.ProbablyLeft,
                 MembershipManagerEvent.StatusChanged,
                 MembershipManagerEvent.DelayIdChanged,
@@ -528,12 +528,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager!.join(fociPreferred, multiSfuFocus, (e) => {
+        this.membershipManager.join(fociPreferred, multiSfuFocus, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
-        this.encryptionManager!.join(joinConfig);
+        this.encryptionManager.join(joinConfig);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }

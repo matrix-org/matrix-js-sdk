@@ -56,7 +56,7 @@ const CALL_LIFETIME = 60000;
 
 const startVoiceCall = async (client: TestClient, call: MatrixCall, userId?: string): Promise<void> => {
     const callPromise = call.placeVoiceCall();
-    await client.httpBackend!.flush("");
+    await client.httpBackend.flush("");
     await callPromise;
 
     call.getOpponentMember = vi.fn().mockReturnValue({ userId: userId ?? "@bob:bar.uk" });
@@ -357,7 +357,7 @@ describe("Call", function () {
     });
 
     it("should fallback to answering with no video", async () => {
-        await client.httpBackend!.flush("");
+        await client.httpBackend.flush("");
 
         (call as any).shouldAnswerWithMediaType = (wantedValue: boolean) => wantedValue;
         client.client.getMediaHandler().getUserMediaStream = vi.fn().mockRejectedValue("reject");
@@ -522,7 +522,7 @@ describe("Call", function () {
 
     it("should choose opponent member", async () => {
         const callPromise = call.placeVoiceCall();
-        await client.httpBackend!.flush("");
+        await client.httpBackend.flush("");
         await callPromise;
 
         const opponentMember = {
@@ -627,14 +627,12 @@ describe("Call", function () {
                 videoMuted: false,
             }),
         ]);
-        await client.httpBackend!.flush("");
+        await client.httpBackend.flush("");
         await callPromise;
         call.getOpponentMember = vi.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 
         (call as any).pushNewLocalFeed(
-            new MockMediaStream("local_stream2", [
-                new MockMediaStreamTrack("track_id", "video"),
-            ]) as unknown as MediaStream,
+            new MockMediaStream("local_stream2", [new MockMediaStreamTrack("track_id", "video")]),
             SDPStreamMetadataPurpose.Screenshare,
         );
         await call.setMicrophoneMuted(true);
@@ -679,7 +677,7 @@ describe("Call", function () {
                 videoMuted: false,
             }),
         ]);
-        await client.httpBackend!.flush("");
+        await client.httpBackend.flush("");
         await callPromise;
         call.getOpponentMember = vi.fn().mockReturnValue({ userId: "@bob:bar.uk" });
 

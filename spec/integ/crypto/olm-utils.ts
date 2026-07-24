@@ -518,7 +518,7 @@ export async function expectSendMegolmMessageEvent(
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
     const inboundGroupSession = await inboundGroupSessionPromise;
 
-    const r: any = inboundGroupSession.decrypt(encryptedMessageContent!.ciphertext);
+    const r: any = inboundGroupSession.decrypt(encryptedMessageContent.ciphertext);
     logger.log("Decrypted received megolm message", r);
     return JSON.parse(r.plaintext);
 }
@@ -541,7 +541,7 @@ export async function expectSendMegolmStateEvent(
     // In some of the tests, the room key is sent *after* the actual event, so we may need to wait for it now.
     const inboundGroupSession = await inboundGroupSessionPromise;
 
-    const r: any = inboundGroupSession.decrypt(encryptedStateContent!.ciphertext);
+    const r: any = inboundGroupSession.decrypt(encryptedStateContent.ciphertext);
     logger.log("Decrypted received megolm state event", r);
     return JSON.parse(r.plaintext);
 }

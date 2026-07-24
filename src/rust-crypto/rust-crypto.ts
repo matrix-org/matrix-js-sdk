@@ -2329,11 +2329,11 @@ class EventDecryptor {
         }
 
         try {
-            const res = (await this.olmMachine.decryptRoomEvent(
+            const res = await this.olmMachine.decryptRoomEvent(
                 stringifyEvent(event),
                 new RustSdkCryptoJs.RoomId(event.getRoomId()!),
                 new RustSdkCryptoJs.DecryptionSettings(trustRequirement),
-            )) as RustSdkCryptoJs.DecryptedRoomEvent;
+            );
 
             // Success. We can remove the event from the pending list, if
             // that hasn't already happened.
@@ -2377,7 +2377,7 @@ class EventDecryptor {
             err.code === RustSdkCryptoJs.DecryptionErrorCode.MissingRoomKey ||
             err.code === RustSdkCryptoJs.DecryptionErrorCode.UnknownMessageIndex
         ) {
-            this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id!);
+            this.perSessionBackupDownloader.onDecryptionKeyMissingError(event.getRoomId()!, content.session_id);
 
             // If the server is telling us our membership at the time the event
             // was sent, and it isn't "join", we use a different error code.
