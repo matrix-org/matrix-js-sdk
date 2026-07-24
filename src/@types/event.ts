@@ -58,6 +58,8 @@ import {
     type IRTCDeclineContent,
     type EncryptionKeysEventContent,
     type ICallNotifyContent,
+    type LeaveMembershipEventContent,
+    type LeaveReason,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membershipData/index.ts";
@@ -359,7 +361,7 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
-    [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string }; // An object containing just the sticky key is empty.
+    [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string; leave_reason?: LeaveReason }; // An object containing just the sticky key is empty.
 }
 
 /**
@@ -394,7 +396,11 @@ export interface StateEvents {
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
-    [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
+    [EventType.GroupCallMemberPrefix]:
+        | IGroupCallRoomMemberState
+        | SessionMembershipData
+        | LeaveMembershipEventContent
+        | EmptyObject;
     [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;

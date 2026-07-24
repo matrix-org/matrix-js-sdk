@@ -1,7 +1,8 @@
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type EmptyObject } from "../matrix.ts";
 import { sleep } from "../utils.ts";
-import { MembershipActionType } from "./MembershipManager.ts";
+import { type MembershipActionData, MembershipActionType } from "./MembershipManager.ts";
+import { type LeaveReason } from "./types.ts";
 
 /** @internal */
 export interface Action {
@@ -14,6 +15,11 @@ export interface Action {
      * can also be thought of as the type of the action
      */
     type: MembershipActionType;
+
+    /**
+     * Additional parameters of the action
+     */
+    data?: MembershipActionData[MembershipActionType];
 }
 
 /** @internal */
@@ -47,7 +53,10 @@ export class ActionScheduler {
 
     public constructor(
         /** This is the callback called for each scheduled action (`this.addAction()`) */
-        private membershipLoopHandler: (type: MembershipActionType) => Promise<ActionUpdate>,
+        private membershipLoopHandler: (
+            type: MembershipActionType,
+            data: MembershipActionData[MembershipActionType],
+        ) => Promise<ActionUpdate>,
         parentLogger?: Logger,
     ) {
         this.logger = (parentLogger ?? rootLogger).getChild(`[NewMembershipActionScheduler]`);
@@ -101,7 +110,10 @@ export class ActionScheduler {
                     );
                     try {
                         // `this.wakeup` can also be called and sets the `wakeupUpdate` object while we are in the handler.
-                        handlerResult = await this.membershipLoopHandler(nextAction.type as MembershipActionType);
+                        handlerResult = await this.membershipLoopHandler(
+                            nextAction.type as MembershipActionType,
+                            nextAction.data,
+                        );
                     } catch (e) {
                         // Preserve the original error as `cause`.
                         throw new Error(`The MembershipManager shut down because of the end condition: ${e}`, {
@@ -132,7 +144,19 @@ export class ActionScheduler {
     public initiateJoin(): void {
         this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
     }
-    public initiateLeave(): void {
-        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
+    public initiateLeave(leaveReason?: LeaveReason): void {
+        this.wakeup?.({
+            replace: [
+                {
+                    ts: Date.now(),
+                    type: MembershipActionType.CancelledScheduledDelayedLeaveEvent,
+                },
+                {
+                    ts: Date.now(),
+                    type: MembershipActionType.SendLeaveEvent,
+                    data: leaveReason ? { leaveReason } : undefined,
+                },
+            ],
+        });
     }
 }

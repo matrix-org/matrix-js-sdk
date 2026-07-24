@@ -225,3 +225,31 @@ export interface SlotDescription {
      */
     id: string;
 }
+
+export type LeaveMembershipEventContent = {
+    leave_reason?: LeaveReason;
+};
+
+export type LeaveCode = "delayed_leaved" | "user_action" | string;
+
+/**
+ * Provides context on why the client left.
+ */
+export type LeaveReason = {
+    /** Identifier for the specific leave cause. Machine-readable.*/
+    code: LeaveCode;
+    /** Optional human-readable explanation of the leave reason */
+    reason?: string;
+};
+
+/** The member left through a scheduled delayed leave event */
+export const LEAVE_REASON_DELAYED: LeaveReason = {
+    code: "delayed_leaved",
+    reason: "The user was removed due to inactivity (no heartbeat received).",
+};
+
+/** The member left intentionally (e.g. by hanging up a call) */
+export const LEAVE_REASON_HANGUP: LeaveReason = {
+    code: "user_leave",
+    reason: "The user intentionally left the rtc session.",
+};
