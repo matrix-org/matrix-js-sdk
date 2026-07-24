@@ -35,6 +35,7 @@ import type {
     RTCCallIntent,
     Transport,
     SlotDescription,
+    RtcSlotEventContent,
 } from "./types.ts";
 import {
     MembershipManagerEvent,
@@ -310,6 +311,25 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Reads the current slot state event's content for this session.
+     *
+     * @returns The slot event's content, or `undefined` if no slot event exists for this session.
+     */
+    public getRtcSlot(): RtcSlotEventContent | undefined {
+        return getSlotEventContent(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Whether this session's slot is closed.
+     *
+     * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
+     * if no slot exists.
+     */
+    public isSlotClosed(): boolean | undefined {
+        return isSlotClosed(this.roomSubset, this.slotDescription);
+    }
+
+    /**
      * Returns all the call memberships for a room that match the provided `sessionDescription`,
      * oldest first.
      *
@@ -325,7 +345,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         const logger = rootLogger.getChild(
             `[MatrixRTCSession ${room.roomId} ${slotDescription.application}#${slotDescription.id}]`,
         );
-        const callMemberEvents = collectMembersEvents(room, options, logger);
+        const callMemberEvents = collectMembersEvents(room, slotDescription, options, logger);
 
         const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
             room,
@@ -424,6 +444,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         );
 
         this.roomSubset.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        this.roomSubset.on(RoomStateEvent.Events, this.onRoomStateEvent);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
 
         this.initialMembershipCalculated = this.ensureRecalculateSessionMembers();
@@ -448,6 +469,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         this.roomSubset.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        this.roomSubset.off(RoomStateEvent.Events, this.onRoomStateEvent);
         this.roomSubset.off(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
     }
 
@@ -715,6 +737,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
     };
 
     /**
+     * Call this when a room state event has been updated.
+     */
+    private readonly onRoomStateEvent = (event: MatrixEvent): void => {
+        if (event.getType() !== EventType.RTCSlot) return;
+        if (event.getStateKey() !== computeSlotId(this.slotDescription)) return;
+        void this.ensureRecalculateSessionMembers();
+    };
+
+    /**
      * Call this when a sticky event update has occured.
      */
     private readonly onStickyEventUpdate: RoomStickyEventsMap[RoomStickyEventsEvent.Update] = (
@@ -899,16 +930,53 @@ function isValidMembership(
 }
 
 /**
+ * Reads the slot state event's content for the given slot description.
+ *
+ * @returns The slot event's content, or `undefined` if no slot event exists for the given description.
+ */
+function getSlotEventContent(
+    room: Pick<Room, "getLiveTimeline">,
+    slotDescription: SlotDescription,
+): RtcSlotEventContent | undefined {
+    const slotId = computeSlotId(slotDescription);
+    const slotEvent = room
+        .getLiveTimeline()
+        .getState(EventTimeline.FORWARDS)
+        ?.getStateEvents(EventType.RTCSlot, slotId);
+    if (!slotEvent) return undefined;
+
+    return slotEvent.getContent<RtcSlotEventContent>();
+}
+
+/**
+ * Whether the given slot is closed.
+ *
+ * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
+ * if no slot exists.
+ */
+function isSlotClosed(room: Pick<Room, "getLiveTimeline">, slotDescription: SlotDescription): boolean | undefined {
+    const content = getSlotEventContent(room, slotDescription) as Partial<RtcSlotEventContent> | undefined;
+    if (content === undefined) return undefined;
+
+    return (
+        content.status !== "open" ||
+        typeof content.application !== "object" ||
+        content.application?.type !== slotDescription.application
+    );
+}
+
+/**
  * Collects the raw member events from room state and sticky store.
  */
 function collectMembersEvents(
     room: Pick<Room, "getLiveTimeline" | "roomId" | "_unstable_getStickyEvents">,
+    slotDescription: SlotDescription,
     options: SessionMembershipsForSlotOpts,
     logger: Logger,
 ): MatrixEvent[] {
     const { listenForStickyEvents, listenForMemberStateEvents } = options;
     let callMemberEvents: MatrixEvent[] = [];
-    if (listenForStickyEvents) {
+    if (listenForStickyEvents && !isSlotClosed(room, slotDescription)) {
         // prefill with sticky events
         callMemberEvents = [...room._unstable_getStickyEvents()].filter((e) => e.getType() === EventType.RTCMembership);
     }

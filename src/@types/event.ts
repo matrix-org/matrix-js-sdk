@@ -58,6 +58,7 @@ import {
     type IRTCDeclineContent,
     type EncryptionKeysEventContent,
     type ICallNotifyContent,
+    type RtcSlotEventContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membershipData/index.ts";
@@ -156,6 +157,7 @@ export enum EventType {
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events
+    RTCSlot = "org.matrix.msc4143.rtc.slot",
     RTCMembership = "org.matrix.msc4143.rtc.member",
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
@@ -396,6 +398,7 @@ export interface StateEvents {
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
     [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
     [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
+    [EventType.RTCSlot]: RtcSlotEventContent | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
 
