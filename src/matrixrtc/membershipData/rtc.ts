@@ -38,7 +38,10 @@ export interface RtcMembershipData {
         rel_type: RelationType.Reference;
     };
     "application": RtcSlotEventContent["application"];
-    "rtc_transports": Transport[];
+    "transports": {
+        published: Transport[];
+        can_subscribe: string[];
+    };
     "versions": string[];
     "msc4354_sticky_key"?: string;
     "sticky_key"?: string;
@@ -97,16 +100,24 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
             if (data.application.type.includes("#")) errors.push(prefix + 'application.type must not include "#"');
         }
     }
-    if (data.rtc_transports === undefined || !Array.isArray(data.rtc_transports)) {
-        errors.push(prefix + "rtc_transports must be an array");
+    if (typeof data.transports !== "object" || data.transports === null || !Array.isArray(data.transports.published)) {
+        errors.push(prefix + "transports.published must be an array");
     } else {
         // validate that each transport has at least a string 'type'
-        for (const t of data.rtc_transports) {
+        for (const t of data.transports.published) {
             if (typeof t !== "object" || t === null || typeof (t as any).type !== "string") {
-                errors.push(prefix + "rtc_transports entries must be objects with a string type");
+                errors.push(prefix + "transports.published entries must be objects with a string type");
                 break;
             }
         }
+    }
+    if (
+        typeof data.transports !== "object" ||
+        data.transports === null ||
+        !Array.isArray(data.transports.can_subscribe) ||
+        !data.transports.can_subscribe.every((t: unknown) => typeof t === "string")
+    ) {
+        errors.push(prefix + "transports.can_subscribe must be an array of strings");
     }
     if (data.versions === undefined || !Array.isArray(data.versions)) {
         errors.push(prefix + "versions must be an array");
