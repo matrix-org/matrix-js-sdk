@@ -14,8 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-/* eslint-disable no-console */
-
 class JestSlowTestReporter {
     constructor(globalConfig, options) {
         this._globalConfig = globalConfig;

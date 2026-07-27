@@ -16,7 +16,6 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 
-import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 import { IndexedDBStoreWorker } from "../../../src/store/indexeddb-store-worker";
 
 function setupWorker(worker: IndexedDBStoreWorker): void {
@@ -38,7 +37,7 @@ describe("IndexedDBStore Worker", () => {
         await postMessageSuccessResolvers.promise;
 
         // @ts-ignore - private field access
-        (worker.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
+        worker.backend!.db!.onclose!({} as Event);
         expect(postMessage).toHaveBeenCalledWith({
             command: "closed",
         });

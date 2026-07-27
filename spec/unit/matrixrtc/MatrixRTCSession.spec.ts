@@ -139,10 +139,8 @@ describe("MatrixRTCSession", () => {
                 await sess.initialMembershipCalculated;
 
                 if (testConfig.listenForMemberStateEvents) {
-                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(stateWarningWasLogged()).toBeTruthy();
                 } else {
-                    // eslint-disable-next-line @vitest/no-conditional-expect
                     expect(stateWarningWasLogged()).toBeFalsy();
                 }
             });
@@ -827,27 +825,26 @@ describe("MatrixRTCSession", () => {
         });
 
         // TODO: re-enable this test when expiry is implemented
-        // eslint-disable-next-line @vitest/no-commented-out-tests
-        // it("emits an event at the time a membership event expires", () => {
-        //     vi.useFakeTimers();
-        //     try {
-        //         const membership = Object.assign({}, membershipTemplate);
-        //         const mockRoom = makeMockRoom([membership]);
+        it.skip("emits an event at the time a membership event expires", () => {
+            vi.useFakeTimers();
+            try {
+                const membership = Object.assign({}, rtcMembershipTemplate);
+                const mockRoom = makeMockRoom([membership]);
 
-        //         sess = MatrixRTCSession.roomsessionForSlot(client, mockRoom);
-        //         const membershipObject = sess.memberships[0];
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+                const membershipObject = sess.memberships[0];
 
-        //         const onMembershipsChanged = vi.fn();
-        //         sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+                const onMembershipsChanged = vi.fn();
+                sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
-        //         vi.advanceTimersByTime(61 * 1000 * 1000);
+                vi.advanceTimersByTime(61 * 1000 * 1000);
 
-        //         expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
-        //         expect(sess?.memberships.length).toEqual(0);
-        //     } finally {
-        //         vi.useRealTimers();
-        //     }
-        // });
+                expect(onMembershipsChanged).toHaveBeenCalledWith([membershipObject], []);
+                expect(sess?.memberships.length).toEqual(0);
+            } finally {
+                vi.useRealTimers();
+            }
+        });
     });
 
     describe("key management", () => {

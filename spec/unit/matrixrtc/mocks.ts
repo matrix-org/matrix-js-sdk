@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "stream";
+import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";

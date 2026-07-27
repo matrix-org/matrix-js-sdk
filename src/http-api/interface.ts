@@ -211,7 +211,6 @@ export interface Upload {
 }
 
 export interface UploadResponse {
-    // eslint-disable-next-line camelcase
     content_uri: string;
 }
 

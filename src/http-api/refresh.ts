@@ -97,7 +97,6 @@ export class TokenRefresher {
         return this._handleUnknownToken(snapshot, attempt);
     }
 
-    /* eslint-disable @typescript-eslint/naming-convention */
     private async _handleUnknownToken(): Promise<TokenRefreshOutcome>;
     private async _handleUnknownToken(snapshot: Snapshot, attempt: number): Promise<TokenRefreshOutcome>;
     private async _handleUnknownToken(snapshot?: Snapshot, attempt?: number): Promise<TokenRefreshOutcome> {

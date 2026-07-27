@@ -256,14 +256,8 @@ const SCROLLBACK_DELAY_MS = 3000;
 
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
-export const UNSTABLE_MSC3852_LAST_SEEN_UA = new UnstableValue(
-    "last_seen_user_agent",
-    "org.matrix.msc3852.last_seen_user_agent",
-);
-
 export interface IKeysUploadResponse {
     one_time_key_counts: {
-        // eslint-disable-line camelcase
         [algorithm: string]: number;
     };
 }
@@ -635,7 +629,6 @@ export interface IWellKnownConfig<T = IClientWellKnown> {
     action?: AutoDiscoveryAction;
     reason?: string;
     error?: Error | string;
-    // eslint-disable-next-line
     base_url?: string | null;
     // XXX: this is undocumented
     server_name?: string;
@@ -779,13 +772,10 @@ interface IUserDirectoryResponse {
 }
 
 export interface IMyDevice {
-    "device_id": string;
-    "display_name"?: string;
-    "last_seen_ip"?: string;
-    "last_seen_ts"?: number;
-    // UNSTABLE_MSC3852_LAST_SEEN_UA
-    "last_seen_user_agent"?: string;
-    "org.matrix.msc3852.last_seen_user_agent"?: string;
+    device_id: string;
+    display_name?: string;
+    last_seen_ip?: string;
+    last_seen_ts?: number;
 }
 
 export interface Keys {
@@ -898,7 +888,6 @@ interface IWhoamiResponse {
     device_id?: string;
     is_guest?: boolean;
 }
-/* eslint-enable camelcase */
 
 // We're using this constant for methods overloading and inspect whether a variable
 // contains an eventId or not. This was required to ensure backwards compatibility
@@ -1325,7 +1314,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     private serverCapabilitiesService: ServerCapabilities;
     public readonly retentionPolicyService: RetentionPolicyService;
-    // eslint-disable-next-line
     public readonly _unstable_shouldApplyMessageRetention: boolean;
 
     public constructor(opts: IMatrixClientCreateOpts) {
@@ -2349,21 +2337,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     public async deleteAccountData(eventType: keyof WritableAccountDataEvents): Promise<void> {
-        const msc3391DeleteAccountDataServerSupport = this.canSupport.get(Feature.AccountDataDeletion);
-        // if deletion is not supported overwrite with empty content
-        if (msc3391DeleteAccountDataServerSupport === ServerSupport.Unsupported) {
-            await this.setAccountData(eventType, {});
-            return;
-        }
-        const path = utils.encodeUri("/user/$userId/account_data/$type", {
-            $userId: this.getSafeUserId(),
-            $type: eventType,
-        });
-        const options =
-            msc3391DeleteAccountDataServerSupport === ServerSupport.Unstable
-                ? { prefix: "/_matrix/client/unstable/org.matrix.msc3391" }
-                : undefined;
-        return await this.http.authedRequest(Method.Delete, path, undefined, undefined, options);
+        await this.setAccountData(eventType, {});
     }
 
     /**
@@ -2680,7 +2654,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async unstable_createLiveBeacon(
         roomId: Room["roomId"],
         beaconInfoContent: MBeaconInfoEventContent,
@@ -2696,7 +2669,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async unstable_setLiveBeacon(
         roomId: string,
         beaconInfoContent: MBeaconInfoEventContent,
@@ -3484,7 +3456,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line
     public async _unstable_sendDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
         delayOpts: SendDelayedEventRequestOpts,
@@ -3519,7 +3490,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line
     public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
         stickDuration: number,
@@ -3561,7 +3531,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
         delayOpts: SendDelayedEventRequestOpts,
@@ -3597,7 +3566,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line
     public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
         roomId: string,
         stickDuration: number,
@@ -3629,7 +3597,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Note: This endpoint is unstable, and can throw an `Error`.
      *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
      */
-    // eslint-disable-next-line
     public async _unstable_getDelayedEvents(
         status?: "scheduled" | "finalised",
         delayId?: string | string[],
@@ -3663,7 +3630,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * - {@link _unstable_restartScheduledDelayedEvent}
      * - {@link _unstable_sendScheduledDelayedEvent}
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_updateDelayedEvent(
         delayId: string,
         action: UpdateDelayedEventAction,
@@ -3686,7 +3652,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws A M_NOT_FOUND error if no matching delayed event could be found.
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_cancelScheduledDelayedEvent(
         delayId: string,
         requestOptions: IRequestOpts = {},
@@ -3702,7 +3667,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws A M_NOT_FOUND error if no matching delayed event could be found.
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_restartScheduledDelayedEvent(
         delayId: string,
         requestOptions: IRequestOpts = {},
@@ -3721,7 +3685,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_sendScheduledDelayedEvent(
         delayId: string,
         requestOptions: IRequestOpts = {},
@@ -4345,7 +4308,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    // eslint-disable-next-line camelcase
     public setProfileInfo(info: "avatar_url", data: { avatar_url: string }): Promise<EmptyObject>;
     public setProfileInfo(info: "displayname", data: { displayname: string }): Promise<EmptyObject>;
     public setProfileInfo(info: "avatar_url" | "displayname", data: object): Promise<EmptyObject> {
@@ -6134,7 +6096,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     // TODO: on spec release, rename this to getMutualRooms
-    // eslint-disable-next-line
     public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
         // Initial variant of the MSC
         const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
@@ -6200,7 +6161,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Requires homeserver support for MSC4143.
      * @throws A M_NOT_FOUND error if not supported by the homeserver.
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_getRTCTransports(): Promise<Transport[]> {
         // There is no /versions endpoint to check for support, so we just have to attempt a request.
         return (
@@ -6848,7 +6808,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public async createRoom(options: ICreateRoomOpts): Promise<{ room_id: string }> {
-        // eslint-disable-line camelcase
         // some valid options include: room_alias_name, visibility, invite
 
         // inject the id_access_token if inviting 3rd party addresses
@@ -6980,7 +6939,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         newVersion: string,
         additionalCreators?: string[],
     ): Promise<{ replacement_room: string }> {
-        // eslint-disable-line camelcase
         const path = utils.encodeUri("/rooms/$roomId/upgrade", { $roomId: roomId });
         return this.http.authedRequest(Method.Post, path, undefined, {
             new_version: newVersion,
@@ -7246,7 +7204,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Rejects: with an error response.
      */
     public getRoomIdForAlias(alias: string): Promise<{ room_id: string; servers: string[] }> {
-        // eslint-disable-line camelcase
         const path = utils.encodeUri("/directory/room/$alias", {
             $alias: alias,
         });
@@ -7341,11 +7298,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: TODO
      * @returns Rejects: with an error response.
      */
-    public getProfileInfo(
-        userId: string,
-        info?: string,
-        // eslint-disable-next-line camelcase
-    ): Promise<{ avatar_url?: string; displayname?: string }> {
+    public getProfileInfo(userId: string, info?: string): Promise<{ avatar_url?: string; displayname?: string }> {
         const path = info
             ? utils.encodeUri("/profile/$userId/$info", { $userId: userId, $info: info })
             : utils.encodeUri("/profile/$userId", { $userId: userId });
@@ -7615,7 +7568,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async unbindThreePid(
         medium: string,
         address: string,
-        // eslint-disable-next-line camelcase
     ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/unbind";
         const data = {
@@ -7634,11 +7586,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *     (generally the empty JSON object)
      * @returns Rejects: with an error response.
      */
-    public deleteThreePid(
-        medium: string,
-        address: string,
-        // eslint-disable-next-line camelcase
-    ): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
+    public deleteThreePid(medium: string, address: string): Promise<{ id_server_unbind_result: IdServerUnbindResult }> {
         const path = "/account/3pid/delete";
         return this.http.authedRequest(Method.Post, path, undefined, { medium, address });
     }
@@ -7691,7 +7639,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @returns Promise which resolves: to an empty object `{}`
      * @returns Rejects: with an error response.
      */
-    // eslint-disable-next-line camelcase
     public setDeviceDetails(deviceId: string, body: { display_name: string }): Promise<EmptyObject> {
         const path = utils.encodeUri("/devices/$device_id", {
             $device_id: deviceId,

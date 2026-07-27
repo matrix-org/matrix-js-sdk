@@ -4,10 +4,11 @@
     "categories": {
         "correctness": "error",
         "perf": "error",
+        "restriction": "error",
     },
     "options": {
         "typeAware": true,
-        "reportUnusedDisableDirectives": "off",
+        "reportUnusedDisableDirectives": "warn",
         "denyWarnings": true,
     },
     "env": {
@@ -28,7 +29,7 @@
         },
     },
     "rules": {
-        "no-constant-condition": ["error", { "checkLoops": true }],
+        "no-constant-condition": ["error", { "checkLoops": "allExceptWhileTrue" }],
         "typescript/unbound-method": ["error", { "ignoreStatic": true }],
         "typescript/no-empty-object-type": [
             "error",
@@ -91,6 +92,21 @@
         // Disable some opinionated rules
         "unicorn/switch-case-braces": "off",
         "sort-keys": "off",
+        "import/no-relative-parent-imports": "off",
+        "no-undefined": "off",
+        "no-plusplus": "off",
+        "vitest/require-test-timeout": "off",
+        "unicorn/no-array-reduce": "off",
+        "typescript/no-dynamic-delete": "off",
+        "import/no-default-export": "off",
+        "import/unambiguous": "off",
+        "class-methods-use-this": "off",
+        "no-void": "off",
+        "no-bitwise": "off",
+        "no-eq-null": "off",
+
+        // Disable some rules by default for them to be enabled for `src` via overrides
+        "no-console": "off",
 
         // These would be nice to enable at some point
         "unicorn/prefer-set-has": "off",
@@ -111,6 +127,21 @@
         "typescript/no-implied-eval": "off",
         "typescript/no-misused-spread": "off",
         "promise/valid-params": "off",
+        "typescript/explicit-module-boundary-types": "off",
+        "typescript/promise-function-async": "off",
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-import-type-side-effects": "off",
+        "typescript/use-unknown-in-catch-callback-variable": "off",
+        "typescript/no-invalid-void-type": "off", // https://github.com/oxc-project/oxc/issues/20280
+        "no-param-reassign": "off",
+        "typescript/no-explicit-any": "off",
+        "import/no-cycle": "off",
+        "default-case": "off",
+        "promise/catch-or-return": "off",
+        "no-use-before-define": "off",
+        "guard-for-in": "error",
+        "complexity": "off",
+        "no-empty-function": "off",
     },
     "overrides": [
         {
@@ -118,6 +149,7 @@
             "rules": {
                 "no-console": "error",
                 "no-extra-boolean-cast": "error",
+                "unicorn/prefer-node-protocol": "off",
             },
         },
         {
@@ -127,6 +159,7 @@
                 // We don't need super strict typing in test utilities
                 "typescript/explicit-function-return-type": "off",
                 "typescript/explicit-member-accessibility": "off",
+                "typescript/explicit-module-boundary-types": "off",
                 "typescript/no-empty-object-type": "off",
                 "typescript/unbound-method": "off",
                 "typescript/no-floating-promises": "off",
@@ -170,6 +203,22 @@
                 "typescript/no-misused-promises": "error",
                 "typescript/require-await": "error",
                 "typescript/await-thenable": "error",
+            },
+        },
+        {
+            "files": ["examples/**/*"],
+            "rules": {
+                "no-var": "off",
+                "unicorn/prefer-node-protocol": "off",
+                "no-implicit-globals": "off",
+            },
+        },
+        { "files": ["*.ts", "spec/setupTests.ts", "scripts/**/*"], "rules": { "node/no-process-env": "off" } },
+        {
+            "files": ["**/*.cjs"],
+            "rules": {
+                "import/no-commonjs": "off",
+                "typescript/no-require-imports": "off",
             },
         },
     ],

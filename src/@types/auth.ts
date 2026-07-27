@@ -17,9 +17,6 @@ limitations under the License.
 import { UnstableValue } from "../NamespacedValue.ts";
 import { type IClientWellKnown } from "../client.ts";
 
-// disable lint because these are wire responses
-/* eslint-disable camelcase */
-
 /**
  * Represents a response to the CSAPI `/refresh` endpoint.
  */
@@ -28,8 +25,6 @@ export interface IRefreshTokenResponse {
     expires_in_ms: number;
     refresh_token: string;
 }
-
-/* eslint-enable camelcase */
 
 /**
  * Response to GET login flows as per https://spec.matrix.org/v1.3/client-server-api/#get_matrixclientv3login
@@ -58,7 +53,6 @@ export const OAUTH_AWARE_PREFERRED_FLOW_FIELD = new UnstableValue(
  */
 export interface ISSOFlow extends ILoginFlow {
     type: "m.login.sso" | "m.login.cas";
-    // eslint-disable-next-line camelcase
     identity_providers?: IIdentityProvider[];
     [OAUTH_AWARE_PREFERRED_FLOW_FIELD.name]?: boolean;
     [OAUTH_AWARE_PREFERRED_FLOW_FIELD.altName]?: boolean;

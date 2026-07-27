@@ -259,7 +259,9 @@ export class MemoryStore implements IStore {
             if (isValidFilterId(value)) {
                 return value;
             }
-        } catch {}
+        } catch {
+            // Do nothing
+        }
         return null;
     }
 
@@ -277,7 +279,9 @@ export class MemoryStore implements IStore {
             } else {
                 this.localStorage.removeItem(key);
             }
-        } catch {}
+        } catch {
+            // Do nothing
+        }
     }
 
     /**
@@ -288,13 +292,7 @@ export class MemoryStore implements IStore {
      */
     public storeAccountDataEvents(events: MatrixEvent[]): void {
         events.forEach((event) => {
-            // MSC3391: an event with content of {} should be interpreted as deleted
-            const isDeleted = !Object.keys(event.getContent()).length;
-            if (isDeleted) {
-                this.accountData.delete(event.getType());
-            } else {
-                this.accountData.set(event.getType(), event);
-            }
+            this.accountData.set(event.getType(), event);
         });
     }
 
