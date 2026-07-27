@@ -130,13 +130,27 @@ describe("MatrixClient syncing", () => {
         await room.addLiveEvents([thread.rootEvent], { addToState: false });
 
         // Initialize read receipt datastructure before testing the reaction
-        room.addReceiptToStructure(thread.rootEvent.getId()!, ReceiptType.Read, selfUserId, { ts: 1 }, false);
-        thread.thread.addReceiptToStructure(
-            threadReply.getId()!,
-            ReceiptType.Read,
-            selfUserId,
-            { thread_id: thread.thread.id, ts: 1 },
-            false,
+        room.addReceipt(
+            new MatrixEvent({
+                type: "m.receipt",
+                content: {
+                    [thread.rootEvent.getId()!]: {
+                        [ReceiptType.Read]: { [selfUserId]: { ts: 1 } },
+                    },
+                },
+            }),
+        );
+        room.addReceipt(
+            new MatrixEvent({
+                type: "m.receipt",
+                content: {
+                    [threadReply.getId()!]: {
+                        [ReceiptType.Read]: {
+                            [selfUserId]: { thread_id: thread.thread.id, ts: 1 },
+                        },
+                    },
+                },
+            }),
         );
         expect(room.getReadReceiptForUserId(selfUserId, false)?.eventId).toEqual(thread.rootEvent.getId());
         expect(thread.thread.getReadReceiptForUserId(selfUserId, false)?.eventId).toEqual(threadReply.getId());
