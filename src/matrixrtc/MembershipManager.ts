@@ -82,7 +82,6 @@ On Leave: ─────────  STOP ALL ABOVE
     sending it is the next step
 (4) Both (UpdateExpiry and RestartDelayedEvent) actions are
     scheduled when successfully sending the state event
-(5) Only if delayed event sending failed (fallback)
 (s) Successful restart/resend
 */
 
@@ -498,8 +497,6 @@ export class MembershipManager
                 if (!this.state.hasMemberStateEvent) {
                     return { replace: [] };
                 }
-                // This is only a fallback in case we do not have working delayed events support.
-                // first we should try to just send the scheduled leave event
                 return this.sendLeaveEvent(data?.leaveReason);
             }
         }

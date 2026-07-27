@@ -230,7 +230,7 @@ export type LeaveMembershipEventContent = {
     leave_reason?: LeaveReason;
 };
 
-export type LeaveCode = "delayed_leaved" | "user_action" | string;
+export type LeaveCode = "delayed_leaved" | "leave" | "slot_closed" | string;
 
 /**
  * Provides context on why the client left.
@@ -250,6 +250,12 @@ export const LEAVE_REASON_DELAYED: LeaveReason = {
 
 /** The member left intentionally (e.g. by hanging up a call) */
 export const LEAVE_REASON_HANGUP: LeaveReason = {
-    code: "user_leave",
+    code: "leave",
     reason: "The user intentionally left the rtc session.",
+};
+
+/** The member left because the call slot was closed */
+export const LEAVE_SLOT_CLOSED: LeaveReason = {
+    code: "slot_closed",
+    reason: "The member left because the slot was closed midway through the session",
 };
