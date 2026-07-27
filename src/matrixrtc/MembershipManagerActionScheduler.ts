@@ -149,12 +149,12 @@ export class ActionScheduler {
             replace: [
                 {
                     ts: Date.now(),
-                    type: MembershipActionType.CancelledScheduledDelayedLeaveEvent,
+                    type: MembershipActionType.SendLeaveEvent,
+                    data: leaveReason ? { leaveReason } : undefined,
                 },
                 {
                     ts: Date.now(),
-                    type: MembershipActionType.SendLeaveEvent,
-                    data: leaveReason ? { leaveReason } : undefined,
+                    type: MembershipActionType.CancelledScheduledDelayedLeaveEvent,
                 },
             ],
         });

@@ -66,14 +66,15 @@ On Join:  ───────────────┐   ┌─────�
 
 On Leave: ─────────  STOP ALL ABOVE
                            ▼
-            ┌─────────────────────────────────────┐
-            │ CancelledScheduledDelayedLeaveEvent │
-            └─────────────────────────────────────┘
-                           │
-                           ▼
                     ┌──────────────┐
                     │SendLeaveEvent│
                     └──────────────┘
+                           │
+                           ▼
+        ┌─────────────────────────────────────┐
+        │ CancelledScheduledDelayedLeaveEvent │
+        └─────────────────────────────────────┘
+
 (1) [Not found error] results in resending the delayed event
 (2) [hasMemberEvent = true] Sending the delayed event if we
     already have a call member event results jumping to the
@@ -114,12 +115,12 @@ export enum MembershipActionType {
     UpdateExpiry = "UpdateExpiry",
     //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
 
-    CancelledScheduledDelayedLeaveEvent = "CancelledScheduledDelayedLeaveEvent",
-    //  -> MembershipActionType.SendLeaveEvent
-    //  -> DelayedLeaveActionType.CancelledScheduledDelayedLeaveEvent on error we try again
-
     SendLeaveEvent = "SendLeaveEvent",
-    // -> MembershipActionType.SendLeaveEvent
+    // -> MembershipActionType.SendLeaveEvent for retry
+    // -> MembershipActionType.CancelledScheduledDelayedLeaveEvent
+
+    CancelledScheduledDelayedLeaveEvent = "CancelledScheduledDelayedLeaveEvent",
+    //  -> DelayedLeaveActionType.CancelledScheduledDelayedLeaveEvent on error we try again
 }
 
 export type MembershipActionData = {
@@ -412,12 +413,15 @@ export class MembershipManager
     private get networkErrorRetryMs(): number {
         return this.joinConfig?.networkErrorRetryMs ?? 3_000;
     }
+
     private get membershipEventExpiryMs(): number {
         return this.joinConfig?.membershipEventExpiryMs ?? DEFAULT_EXPIRE_DURATION;
     }
+
     private get membershipEventExpiryHeadroomMs(): number {
         return this.joinConfig?.membershipEventExpiryHeadroomMs ?? 5_000;
     }
+
     private computeNextExpiryActionTs(iteration: number): number {
         return (
             this.state.startTime +
@@ -425,18 +429,23 @@ export class MembershipManager
             this.membershipEventExpiryHeadroomMs
         );
     }
+
     protected get delayedLeaveEventDelayMs(): number {
         return this.delayedLeaveEventDelayMsOverride ?? this.joinConfig?.delayedLeaveEventDelayMs ?? 8_000;
     }
+
     private get delayedLeaveEventRestartMs(): number {
         return this.joinConfig?.delayedLeaveEventRestartMs ?? 5_000;
     }
+
     private get maximumRateLimitRetryCount(): number {
         return this.joinConfig?.maximumRateLimitRetryCount ?? 10;
     }
+
     private get maximumNetworkErrorRetryCount(): number {
         return this.joinConfig?.maximumNetworkErrorRetryCount ?? 10;
     }
+
     private get delayedLeaveEventRestartLocalTimeoutMs(): number {
         return this.joinConfig?.delayedLeaveEventRestartLocalTimeoutMs ?? 2000;
     }
@@ -470,13 +479,6 @@ export class MembershipManager
                 return this.restartDelayedEvent(this.state.delayId);
             }
             case MembershipActionType.CancelledScheduledDelayedLeaveEvent: {
-                // We are already good
-                if (!this.state.hasMemberStateEvent) {
-                    this.logger.debug(
-                        "MembershipManager: CancelledScheduledDelayedLeaveEvent but we are already not joined. No action needed.",
-                    );
-                    return {};
-                }
                 if (!this.state.delayId) {
                     this.logger.debug(
                         "MembershipManager: CancelledScheduledDelayedLeaveEvent but we do not have a delayId. Ignoring action.",
@@ -495,6 +497,9 @@ export class MembershipManager
             case MembershipActionType.SendLeaveEvent: {
                 // We are good already
                 if (!this.state.hasMemberStateEvent) {
+                    this.logger.debug(
+                        "MembershipManager: SendLeaveEvent but we are already not joined. No action needed.",
+                    );
                     return { replace: [] };
                 }
                 return this.sendLeaveEvent(data?.leaveReason);
@@ -682,7 +687,7 @@ export class MembershipManager
             .then(() => {
                 this.setAndEmitDelayId(undefined);
                 this.resetRateLimitCounter(MembershipActionType.CancelledScheduledDelayedLeaveEvent);
-                return {};
+                return { replace: [] };
             })
             .catch((e) => {
                 const repeatActionType = MembershipActionType.CancelledScheduledDelayedLeaveEvent;
@@ -783,7 +788,7 @@ export class MembershipManager
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
-                return { replace: [] };
+                return {};
             })
             .catch((e) => {
                 const update = this.actionUpdateFromErrors(e, MembershipActionType.SendLeaveEvent, "sendStateEvent");
@@ -1133,6 +1138,7 @@ export class StickyEventMembershipManager extends MembershipManager {
         ["sendStateEvent", "_unstable_sendStickyEvent"],
         ["sendDelayedStateEvent", "_unstable_sendStickyDelayedEvent"],
     ]);
+
     protected actionUpdateFromErrors(e: unknown, t: MembershipActionType, m: string): ActionUpdate | undefined {
         return super.actionUpdateFromErrors(e, t, StickyEventMembershipManager.nameMap.get(m) ?? "unknown");
     }
