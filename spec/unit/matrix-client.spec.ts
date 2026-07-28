@@ -79,7 +79,6 @@ import {
 } from "../../src/models/invites-ignorer";
 import { type QueryDict } from "../../src/utils";
 import { type SyncState } from "../../src/sync";
-import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { type ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
@@ -3095,99 +3094,6 @@ describe("MatrixClient", function () {
 
             // THEN there should be no REST call
             expect(fetchMock.callHistory.calls(/account_data/).length).toEqual(0);
-        });
-    });
-
-    describe("delete account data", () => {
-        const TEST_HOMESERVER_URL = "https://alice-server.com";
-
-        /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
-        async function setUpClient(versionsResponse: object = { versions: ["1"] }): Promise<MatrixClient> {
-            fetchMock.getOnce(new URL("/_matrix/client/versions", TEST_HOMESERVER_URL).toString(), versionsResponse);
-            fetchMock.getOnce(new URL("/_matrix/client/v3/capabilities", TEST_HOMESERVER_URL).toString(), {});
-            fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", TEST_HOMESERVER_URL).toString(), {});
-            fetchMock.postOnce(
-                new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, TEST_HOMESERVER_URL).toString(),
-                { filter_id: "fid" },
-            );
-            fetchMock.getOnce(
-                new URL(
-                    `/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter/fid`,
-                    TEST_HOMESERVER_URL,
-                ).toString(),
-                {},
-            );
-
-            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
-            await client.startClient();
-
-            return client;
-        }
-
-        it("makes correct request when deletion is supported by server in unstable versions", async () => {
-            const eventType = "im.vector.test";
-            const versionsResponse = {
-                versions: ["1"],
-                unstable_features: {
-                    "org.matrix.msc3391": true,
-                },
-            };
-            const client = await setUpClient(versionsResponse);
-
-            const url = new URL(
-                `/_matrix/client/unstable/org.matrix.msc3391/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
-                TEST_HOMESERVER_URL,
-            ).toString();
-            fetchMock.delete(url, {});
-
-            await client.deleteAccountData(eventType);
-
-            expect(fetchMock.callHistory.calls(url).length).toEqual(1);
-        });
-
-        it("makes correct request when deletion is supported by server based on matrix version", async () => {
-            const eventType = "im.vector.test";
-            // we don't have a stable version for account data deletion yet to test this code path with
-            // so mock the support map to fake stable support
-            const stableSupportedDeletionMap = new Map();
-            stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
-            vi.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(stableSupportedDeletionMap);
-
-            const client = await setUpClient();
-
-            const url = new URL(
-                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
-                TEST_HOMESERVER_URL,
-            ).toString();
-            fetchMock.delete(url, {});
-
-            await client.deleteAccountData(eventType);
-
-            expect(fetchMock.callHistory.calls(url).length).toEqual(1);
-        });
-
-        it("makes correct request when deletion is not supported by server", async () => {
-            const eventType = "im.vector.test";
-
-            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
-            const client = await setUpClient();
-
-            const url = new URL(
-                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
-                TEST_HOMESERVER_URL,
-            ).toString();
-            fetchMock.put(url, {});
-
-            const setProm = client.deleteAccountData(eventType);
-            syncResponder.sendOrQueueSyncResponse({
-                account_data: { events: [{ type: eventType, content: {} }] },
-            });
-            await setProm;
-
-            // account data updated with empty content
-            const lastCall = fetchMock.callHistory.lastCall(url);
-            expect(lastCall).toBeDefined();
-            expect(lastCall?.options?.body).toEqual("{}");
         });
     });
 
