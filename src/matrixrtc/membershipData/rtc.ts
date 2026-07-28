@@ -37,7 +37,7 @@ export interface RtcMembershipData {
         event_id: string;
         rel_type: RelationType.Reference;
     };
-    "application": RtcSlotEventContent["application"];
+    "application": RtcSlotApplicationContent;
     "transports": {
         published: Transport[];
         can_subscribe: string[];
