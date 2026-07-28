@@ -646,9 +646,7 @@ export class RoomWidgetClient extends MatrixClient {
         const { rtc_transports: rtcTransports } = await this.widgetApi
             .getRtcTransports()
             .catch(timeoutToConnectionError);
-        // The widget-api IRtcTransport and the js-sdk Transport types are structurally compatible.
-        // We recreate the objects so the linter catches any future divergence in the shapes.
-        return rtcTransports.map((transport) => ({ ...transport }));
+        return rtcTransports;
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
