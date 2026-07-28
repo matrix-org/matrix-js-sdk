@@ -233,8 +233,8 @@ importers:
         specifier: 0.0.1
         version: 0.0.1
       matrix-widget-api:
-        specifier: ^1.16.1
-        version: 1.17.0
+        specifier: ^1.18.0
+        version: 1.18.0
       p-retry:
         specifier: '8'
         version: 8.0.0
@@ -2315,8 +2315,8 @@ packages:
   matrix-mock-request@2.6.0:
     resolution: {integrity: sha512-D0n+FsoMvHBrBoo60IeGhyrNoCBdT8n+Wl+LMW+k5aR+k9QAxqGopPzJNk1tqeaJLFUhmvYLuNc8/VBKRpPy+Q==}
 
-  matrix-widget-api@1.17.0:
-    resolution: {integrity: sha512-5FHoo3iEP3Bdlv5jsYPWOqj+pGdFQNLWnJLiB0V7Ygne7bb+Gsj3ibyFyHWC6BVw+Z+tSW4ljHpO17I9TwStwQ==}
+  matrix-widget-api@1.18.0:
+    resolution: {integrity: sha512-4T2f2koWmx05p1BLcT/9YGGGPSXpPT+PA4Oap/5fjhXsWPxMGJiGL97YpANMYLKsnE1sScYFeuyxIgdc1Qo+Ew==}
 
   mdurl@2.0.0:
     resolution: {integrity: sha512-Lf+9+2r+Tdp5wXDXC4PcIBjTDtq4UKjCPMQhKIuzpJNW0b96kVqSwW0bT7FhRSfmAiFYgP+SCRvdrDozfh0U5w==}
@@ -4447,7 +4447,7 @@ snapshots:
     dependencies:
       expect: 30.4.1
 
-  matrix-widget-api@1.17.0:
+  matrix-widget-api@1.18.0:
     dependencies:
       '@types/events': 3.0.3
       events: 3.3.0
