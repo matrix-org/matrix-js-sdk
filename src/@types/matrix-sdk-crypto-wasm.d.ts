@@ -18,7 +18,6 @@ import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 declare module "@matrix-org/matrix-sdk-crypto-wasm" {
     interface SecretsBundle {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         to_json(): Promise<{
             cross_signing: {
                 master_key: string;

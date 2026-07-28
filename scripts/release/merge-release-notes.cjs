@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const fs = require("fs");
+const fs = require("node:fs");
 
 async function listReleases(github, owner, repo) {
     const response = await github.rest.repos.listReleases({
@@ -134,6 +134,7 @@ const main = async ({ github, releaseId, dependencies }) => {
         output = intro + "\n\n";
     }
 
+    // oxlint-disable-next-line guard-for-in
     for (const section in sections) {
         const lines = sections[section];
         if (!lines.length) continue;
@@ -151,13 +152,11 @@ if (require.main === module) {
     const { Octokit } = require("@octokit/rest");
     const github = new Octokit({ auth: process.env.GITHUB_TOKEN });
     if (process.argv.length < 4) {
-        // eslint-disable-next-line no-console
         console.error("Usage: node merge-release-notes.js owner/repo:release_id npm-package-name ...");
         process.exit(1);
     }
     const [releaseId, ...dependencies] = process.argv.slice(2);
     void main({ github, releaseId, dependencies }).then((output) => {
-        // eslint-disable-next-line no-console
         console.log(output);
     });
 }

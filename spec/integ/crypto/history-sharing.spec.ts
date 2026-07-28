@@ -125,15 +125,13 @@ async function setupClients(n: number, options = { setupNewCrossSigning: true })
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
 afterEach(async () => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 
     // Stop and clear the active clients

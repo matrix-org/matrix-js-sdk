@@ -18,7 +18,6 @@ import { type IdServerUnbindResult } from "./partials.ts";
 
 // Types relating to Synapse Admin APIs
 
-/* eslint-disable camelcase */
 export interface ISynapseAdminWhoisResponse {
     user_id: string;
     devices: {
@@ -37,4 +36,3 @@ export interface ISynapseAdminWhoisResponse {
 export interface ISynapseAdminDeactivateResponse {
     id_server_unbind_result: IdServerUnbindResult;
 }
-/* eslint-enable camelcase */

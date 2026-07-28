@@ -34,7 +34,6 @@ function matchesWildcard(actualValue: string, filterValue: string): boolean {
     }
 }
 
-/* eslint-disable camelcase */
 export interface IFilterComponent {
     "types"?: string[];
     "not_types"?: string[];
@@ -51,7 +50,6 @@ export interface IFilterComponent {
     "io.element.relation_senders"?: Array<RelationType | string>;
     "io.element.relation_types"?: string[];
 }
-/* eslint-enable camelcase */
 
 /**
  * FilterComponent is a section of a Filter definition which defines the
@@ -144,6 +142,7 @@ export class FilterComponent {
             },
         } as const;
 
+        // oxlint-disable-next-line guard-for-in
         for (const name in literalKeys) {
             const matchFunc = literalKeys[<keyof typeof literalKeys>name];
             const notName = "not_" + name;

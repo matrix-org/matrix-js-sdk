@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import path from "node:path";
 
 /**
  * Populate an IndexedDB store with a set of test data.
@@ -102,9 +102,9 @@ function upgradeDatabase(oldVersion: number, db: IDBDatabase) {
 }
 
 async function importData(db: IDBDatabase, dumpPath: string) {
-    const path = resolve(dumpPath);
+    const resolvedPath = path.resolve(dumpPath);
     const json: Record<string, Array<{ key?: any; value: any }>> = JSON.parse(
-        await readFile(path, { encoding: "utf8" }),
+        await readFile(resolvedPath, { encoding: "utf8" }),
     );
 
     for (const [storeName, data] of Object.entries(json)) {

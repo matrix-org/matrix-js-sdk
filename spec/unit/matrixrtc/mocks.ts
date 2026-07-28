@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "stream";
+import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
 import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
@@ -67,24 +67,27 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
     },
     slot_id: "m.call#ROOM",
     versions: [],
-    rtc_transports: [
-        {
-            type: "livekit",
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-            foci_preferred: [
-                {
-                    livekit_alias: "!alias:something.org",
-                    livekit_service_url: "https://livekit-jwt.something.io",
-                    type: "livekit",
-                },
-                {
-                    livekit_alias: "!alias:something.org",
-                    livekit_service_url: "https://livekit-jwt.something.dev",
-                    type: "livekit",
-                },
-            ],
-        },
-    ],
+    transports: {
+        published: [
+            {
+                type: "livekit",
+                focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+                foci_preferred: [
+                    {
+                        livekit_alias: "!alias:something.org",
+                        livekit_service_url: "https://livekit-jwt.something.io",
+                        type: "livekit",
+                    },
+                    {
+                        livekit_alias: "!alias:something.org",
+                        livekit_service_url: "https://livekit-jwt.something.dev",
+                        type: "livekit",
+                    },
+                ],
+            },
+        ],
+        can_subscribe: ["livekit"],
+    },
     msc4354_sticky_key: "m.call#",
 };
 

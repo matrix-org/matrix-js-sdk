@@ -937,7 +937,7 @@ describe("MSC3089TreeSpace", () => {
                 [UNSTABLE_MSC3089_LEAF.unstable!]: {}, // test to ensure we're definitely using unstable
             });
 
-            return Promise.resolve({ event_id: fileEventId }); // eslint-disable-line camelcase
+            return Promise.resolve({ event_id: fileEventId });
         });
         client.sendMessage = sendMsgFn;
 
@@ -1000,7 +1000,7 @@ describe("MSC3089TreeSpace", () => {
                 [UNSTABLE_MSC3089_LEAF.unstable!]: {}, // test to ensure we're definitely using unstable
             });
 
-            return Promise.resolve({ event_id: fileEventId }); // eslint-disable-line camelcase
+            return Promise.resolve({ event_id: fileEventId });
         });
         client.sendMessage = sendMsgFn;
 

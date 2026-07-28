@@ -251,7 +251,6 @@ async function migrateOlmSessions(
     storeHandle: RustSdkCryptoJs.StoreHandle,
     onBatchDone: (batchSize: number) => void,
 ): Promise<void> {
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const batch = await legacyStore.getEndToEndSessionsBatch();
         if (batch === null) return;
@@ -279,7 +278,6 @@ async function migrateMegolmSessions(
     storeHandle: RustSdkCryptoJs.StoreHandle,
     onBatchDone: (batchSize: number) => void,
 ): Promise<void> {
-    // eslint-disable-next-line no-constant-condition
     while (true) {
         const batch = await legacyStore.getEndToEndInboundGroupSessionsBatch();
         if (batch === null) return;

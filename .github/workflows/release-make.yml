@@ -80,7 +80,7 @@ jobs:
                   draft: true
                   latest: true
 
-            - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   ref: staging
                   # We will be pushing to this branch and want the CI to run after we do so we cannot use the GITHUB_TOKEN
@@ -89,7 +89,7 @@ jobs:
                   persist-credentials: true
 
             - name: Get actions scripts
-              uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false

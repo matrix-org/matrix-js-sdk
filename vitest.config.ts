@@ -7,7 +7,7 @@ Please see LICENSE files in the repository root for full details.
 
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 import { type Reporter } from "vitest/reporters";
-import { env } from "process";
+import { env } from "node:process";
 
 const reporters: NonNullable<ViteUserConfig["test"]>["reporters"] = [["default"]];
 

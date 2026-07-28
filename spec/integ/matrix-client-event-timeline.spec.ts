@@ -45,7 +45,6 @@ const roomId = "!foo:bar";
 const otherUserId = "@bob:localhost";
 
 const withoutRoomId = (e: Partial<IEvent>): Partial<IEvent> => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { room_id: _, ...copy } = e;
     return copy;
 };
@@ -2044,7 +2043,6 @@ describe("MatrixClient event timelines", function () {
             expect(timeline!.getEvents()[1]!.event).toEqual(THREAD_REPLY);
         }
 
-        // eslint-disable-next-line @vitest/expect-expect
         it("in stable mode", async () => {
             // @ts-ignore
             client.clientOpts.threadSupport = true;

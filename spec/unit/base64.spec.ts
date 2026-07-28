@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { TextEncoder, TextDecoder } from "util";
+import { TextEncoder, TextDecoder } from "node:util";
 
 import { decodeBase64, encodeBase64, encodeUnpaddedBase64, encodeUnpaddedBase64Url } from "../../src/base64";
 

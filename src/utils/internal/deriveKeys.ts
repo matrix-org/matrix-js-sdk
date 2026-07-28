@@ -31,7 +31,6 @@ export async function deriveKeys(key: Uint8Array<ArrayBuffer>, name: string): Pr
         {
             name: "HKDF",
             salt: zeroSalt,
-            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
             // @ts-ignore: https://github.com/microsoft/TypeScript-DOM-lib-generator/pull/879
             info: new TextEncoder().encode(name),
             hash: "SHA-256",

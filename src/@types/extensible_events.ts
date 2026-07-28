@@ -130,14 +130,14 @@ export function isEventTypeSame(given: ExtensibleEventType | null, expected: Ext
         if (typeof expected === "string") {
             return expected === given;
         } else {
-            return (expected as NamespacedValue<string, string>).matches(given as string);
+            return expected!.matches(given as string);
         }
     } else {
         if (typeof expected === "string") {
-            return (given as NamespacedValue<string, string>).matches(expected as string);
+            return given!.matches(expected as string);
         } else {
-            const expectedNs = expected as NamespacedValue<string, string>;
-            const givenNs = given as NamespacedValue<string, string>;
+            const expectedNs = expected!;
+            const givenNs = given!;
             return (
                 expectedNs.matches(givenNs.name) ||
                 (isProvided(givenNs.altName) && expectedNs.matches(givenNs.altName!))

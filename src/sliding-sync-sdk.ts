@@ -199,6 +199,7 @@ class ExtensionAccountData implements Extension<ExtensionAccountDataRequest, Ext
             this.processGlobalAccountData(data.global);
         }
 
+        // oxlint-disable-next-line guard-for-in
         for (const roomId in data.rooms) {
             const accountDataEvents = mapEvents(this.client, roomId, data.rooms[roomId]);
             const room = this.client.getRoom(roomId);
@@ -266,6 +267,7 @@ class ExtensionTyping implements Extension<ExtensionTypingRequest, ExtensionTypi
             return;
         }
 
+        // oxlint-disable-next-line guard-for-in
         for (const roomId in data.rooms) {
             processEphemeralEvents(this.client, roomId, [data.rooms[roomId]]);
         }
@@ -302,6 +304,7 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
             return;
         }
 
+        // oxlint-disable-next-line guard-for-in
         for (const roomId in data.rooms) {
             processEphemeralEvents(this.client, roomId, [data.rooms[roomId]]);
         }

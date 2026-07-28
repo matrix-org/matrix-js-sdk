@@ -170,9 +170,7 @@ interface ISyncParams {
     "filter"?: string;
     "timeout": number;
     "since"?: string;
-    // eslint-disable-next-line camelcase
     "full_state"?: boolean;
-    // eslint-disable-next-line camelcase
     "set_presence"?: SetPresence;
     "_cacheBuster"?: string | number; // not part of the API itself
     "org.matrix.msc4222.use_state_after"?: boolean; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
@@ -1764,7 +1762,7 @@ export class SyncApi {
                     // fire listeners
                     member.setMembershipEvent(inviteEvent, room.currentState);
                 },
-                function (err) {
+                function () {
                     // OH WELL.
                 },
             );
