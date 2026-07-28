@@ -1009,6 +1009,20 @@ describe("MatrixRTCSession", () => {
             expect(sess.memberships).toHaveLength(0);
         });
 
+        it("slots do not affect legacy state membership", async () => {
+            const mockRoom = makeMockRoom([], false);
+
+            // Closed slot
+            const slotEvent = mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId);
+            mockRoomState(mockRoom, [sessionMembershipTemplate], slotEvent);
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+
+            // Should see members in legacy mode even if slot is closed
+            expect(sess.memberships).toHaveLength(1);
+        });
+
         it("ignores sticky RTC memberships when closed even if application has been kept around", async () => {
             const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
             const slotEvent = mockSlotEvent(callSession, closedSlotContentWithApplication, mockRoom.roomId);
