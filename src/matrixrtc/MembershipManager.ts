@@ -500,7 +500,7 @@ export class MembershipManager
                     this.logger.debug(
                         "MembershipManager: SendLeaveEvent but we are already not joined. No action needed.",
                     );
-                    return { replace: [] };
+                    return {};
                 }
                 return this.sendLeaveEvent(data?.leaveReason);
             }
@@ -696,7 +696,7 @@ export class MembershipManager
                     this.setAndEmitDelayId(undefined);
                     return {};
                 }
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "CancelledScheduledDelayedLeaveEvent");
+                const update = this.actionUpdateFromErrors(e, repeatActionType, "cancelScheduledDelayedEvent");
                 if (update) return update;
 
                 // On any other error we fall back to SendLeaveEvent (this includes hard errors from rate limiting)

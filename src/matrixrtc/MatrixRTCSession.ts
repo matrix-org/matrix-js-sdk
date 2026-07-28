@@ -565,6 +565,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
+     *
+     * @param timeout
+     * @param leaveReason - The reason for the leave
      * @returns Whether the membership update was attempted and did not time out.
      */
     public async leaveRoomSession(

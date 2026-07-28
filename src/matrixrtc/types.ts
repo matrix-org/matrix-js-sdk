@@ -255,7 +255,7 @@ export const LEAVE_REASON_HANGUP: LeaveReason = {
 };
 
 /** The member left because the call slot was closed */
-export const LEAVE_SLOT_CLOSED: LeaveReason = {
+export const LEAVE_REASON_SLOT_CLOSED: LeaveReason = {
     code: "slot_closed",
     reason: "The member left because the slot was closed midway through the session",
 };

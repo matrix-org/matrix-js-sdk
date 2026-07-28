@@ -361,7 +361,7 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
-    [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string; leave_reason?: LeaveReason }; // An object containing just the sticky key is empty.
+    [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string; leave_reason?: LeaveReason };
 }
 
 /**

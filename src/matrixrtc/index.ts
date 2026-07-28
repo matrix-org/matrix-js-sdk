@@ -26,5 +26,6 @@ export {
     isMyMembership,
     LEAVE_REASON_DELAYED,
     LEAVE_REASON_HANGUP,
+    LEAVE_REASON_SLOT_CLOSED,
 } from "./types.ts";
 export { MembershipManagerEvent } from "./IMembershipManager.ts";
