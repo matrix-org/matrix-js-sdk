@@ -1969,6 +1969,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param args.storagePassword - An alternative to `storageKey`. A password which will be used to derive a key to
      *    encrypt the store with. Deriving a key from a password is (deliberately) a slow operation, so prefer
      *    to pass a `storageKey` directly where possible.
+     * @param args.caCertsPem - Optional PEM-formatted string that provides CA certificates. These will be used to check
+     *    X.509 signatures on user identities. Any user identity that has a valid signature according to the supplied
+     *    CAs will be considered verified, without any manual verification taking place.
      *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
@@ -1979,6 +1982,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             cryptoDatabasePrefix?: string;
             storageKey?: Uint8Array;
             storagePassword?: string;
+            caCertsPem?: string;
         } = {},
     ): Promise<void> {
         if (this.cryptoBackend) {
@@ -2024,6 +2028,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             },
 
             enableEncryptedStateEvents: this.enableEncryptedStateEvents,
+
+            caCertsPem: args.caCertsPem,
         });
 
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
