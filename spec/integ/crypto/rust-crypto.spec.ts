@@ -122,29 +122,6 @@ describe("MatrixClient.initRustCrypto", () => {
         );
     });
 
-    it("should pass on the caCertsPem if supplied", async () => {
-        // Given a Matrix client
-        const matrixClient = createClient({
-            baseUrl: "http://test.server",
-            userId: "@alice:localhost",
-            deviceId: "aliceDevice",
-        });
-
-        const initFromStore = vi.spyOn(OlmMachine, "initFromStore");
-
-        // When we init Rust crypto and pass a PEM for the CA certs
-        await matrixClient.initRustCrypto({ caCertsPem: CA_PEM });
-
-        // Then that PEM was passed in to the Olm machine
-        expect(initFromStore).toHaveBeenCalledWith(
-            expect.anything(),
-            expect.anything(),
-            expect.anything(),
-            expect.anything(),
-            CA_PEM,
-        );
-    });
-
     const CA_PEM = `-----BEGIN CERTIFICATE-----
 MIIFazCCA1OgAwIBAgIUcP2Ij9JBq8IQfZT5dhNLsbPXYwowDQYJKoZIhvcNAQEL
 BQAwRTELMAkGA1UEBhMCVUsxDzANBgNVBAgMBkxvbmRvbjETMBEGA1UECgwKZWxl
@@ -177,6 +154,29 @@ RFSPEY1fryCthLfa67ThB+IAonX4jU663sLoAQW1FEpJp3q08kKJOoCXlCMZ7g1P
 eXmIj7ZEOIsufPdiYuKDp/aUdgUHmuCGyegfoCJze36SdFX5q6z8Aq5nKPtz+FM=
 -----END CERTIFICATE-----
 `;
+
+    it("should pass on the caCertsPem if supplied", async () => {
+        // Given a Matrix client
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        const initFromStore = vi.spyOn(OlmMachine, "initFromStore");
+
+        // When we init Rust crypto and pass a PEM for the CA certs
+        await matrixClient.initRustCrypto({ caCertsPem: CA_PEM });
+
+        // Then that PEM was passed in to the Olm machine
+        expect(initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            CA_PEM,
+        );
+    });
 
     // eslint-disable-next-line @vitest/expect-expect
     it("should ignore a second call", async () => {
