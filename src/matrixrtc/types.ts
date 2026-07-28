@@ -230,7 +230,7 @@ export type LeaveMembershipEventContent = {
     leave_reason?: LeaveReason;
 };
 
-export type LeaveCode = "delayed_leaved" | "leave" | "slot_closed" | string;
+export type LeaveCode = "delayed_leave" | "leave" | "slot_closed" | string;
 
 /**
  * Provides context on why the client left.
@@ -244,7 +244,7 @@ export type LeaveReason = {
 
 /** The member left through a scheduled delayed leave event */
 export const LEAVE_REASON_DELAYED: LeaveReason = {
-    code: "delayed_leaved",
+    code: "delayed_leave",
     reason: "The user was removed due to inactivity (no heartbeat received).",
 };
 
