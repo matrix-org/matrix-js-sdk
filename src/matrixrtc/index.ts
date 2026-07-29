@@ -27,5 +27,6 @@ export {
     LEAVE_REASON_DELAYED,
     LEAVE_REASON_HANGUP,
     LEAVE_REASON_SLOT_CLOSED,
+    RTC_SLOT_ENCRYPTION_PER_MEMBER,
 } from "./types.ts";
 export { MembershipManagerEvent } from "./IMembershipManager.ts";

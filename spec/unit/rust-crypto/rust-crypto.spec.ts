@@ -135,10 +135,16 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase", logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            undefined,
+        );
     });
 
-    it("passes through the store params (key)", async () => {
+    it("passes through the store params (key) and CA certs", async () => {
         const mockStore = { free: vi.fn() } as unknown as StoreHandle;
         vi.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
 
@@ -147,6 +153,8 @@ describe("initRustCrypto", () => {
 
         const storeKey = new Uint8Array(32);
         const logger = new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto"));
+        const caCertsPem = "MY_PEM etc...";
+
         await initRustCrypto({
             logger,
             http: {} as MatrixClient["http"],
@@ -156,10 +164,17 @@ describe("initRustCrypto", () => {
             cryptoCallbacks: {} as CryptoCallbacks,
             storePrefix: "storePrefix",
             storeKey: storeKey,
+            caCertsPem,
         });
 
         expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey, logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            caCertsPem,
+        );
     });
 
     it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
@@ -183,7 +198,13 @@ describe("initRustCrypto", () => {
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith(null, null, logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            undefined,
+        );
     });
 
     it("Should get secrets from inbox on start", async () => {

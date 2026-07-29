@@ -201,15 +201,32 @@ export interface Transport {
 }
 
 /**
- * Event content for a `m.rtc.slot` state event.
+ * Event content for `org.matrix.msc4143.rtc.slot` state events.
  */
 export interface RtcSlotEventContent<T extends string = string> {
-    application: {
-        type: T;
-        // other application specific keys
-        [key: string]: unknown;
-    };
-    slot_id: string;
+    status: "open" | "closed";
+    application?: RtcSlotApplicationContent<T>;
+    encryption?: RtcSlotEncryptionContent;
+}
+
+/**
+ * Content of the `application` object within `org.matrix.msc4143.rtc.slot` events.
+ */
+export interface RtcSlotApplicationContent<T extends string = string> {
+    type: T;
+    // Other application specific keys.
+    [key: string]: unknown;
+}
+
+export const RTC_SLOT_ENCRYPTION_PER_MEMBER = "org.matrix.msc4143.per_member";
+
+/**
+ * Content of the `encryption` object within `org.matrix.msc4143.rtc.slot` events.
+ */
+export interface RtcSlotEncryptionContent {
+    type: typeof RTC_SLOT_ENCRYPTION_PER_MEMBER;
+    // Other encryption-mechanism specific keys.
+    [key: string]: unknown;
 }
 
 /**
