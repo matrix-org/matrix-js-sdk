@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mocked } from "vitest";
 
-import { makeMockEvent } from "./mocks.ts";
+import { makeMatrixEvent } from "./mocks.ts";
 import { ClientEvent, EventType, type MatrixClient } from "../../../src";
 import { ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { getMockClientWithEventEmitter } from "../../test-utils/client.ts";
@@ -122,24 +122,23 @@ describe("ToDeviceKeyTransport", () => {
         const testEncoded = "ABCDEDF";
         const testKeyIndex = 2;
 
-        mockClient.emit(
-            ClientEvent.ToDeviceEvent,
-            makeMockEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, {
-                keys: {
-                    index: testKeyIndex,
-                    key: testEncoded,
-                },
-                member: {
-                    claimed_device_id: "BOBDEVICE",
-                },
-                room_id: roomId,
-                session: {
-                    application: "m.call",
-                    call_id: "",
-                    scope: "m.room",
-                },
-            }),
-        );
+        const mockEvent = makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, {
+            keys: {
+                index: testKeyIndex,
+                key: testEncoded,
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+            },
+            room_id: roomId,
+            session: {
+                application: "m.call",
+                call_id: "",
+                scope: "m.room",
+            },
+        });
+        mockEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+        mockClient.emit(ClientEvent.ToDeviceEvent, mockEvent);
 
         const { userId, deviceId, keyBase64Encoded, index } = await receivedKeyResolvers.promise;
         expect(userId).toBe("@bob:example.org");
@@ -148,6 +147,41 @@ describe("ToDeviceKeyTransport", () => {
         expect(index).toBe(testKeyIndex);
 
         expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(1);
+    });
+
+    it("should drop non-encrypted/clear to-devic events", () => {
+        const receivedKeyResolvers = vi.fn();
+        transport.on(KeyTransportEvents.ReceivedKeys, (membership, keyBase64Encoded, index, _timestamp) => {
+            receivedKeyResolvers();
+        });
+        transport.start();
+
+        const testEncoded = "ABCDEDF";
+        const testKeyIndex = 2;
+
+        const clearEvent = makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, {
+            keys: {
+                index: testKeyIndex,
+                key: testEncoded,
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+            },
+            room_id: roomId,
+            session: {
+                application: "m.call",
+                call_id: "",
+                scope: "m.room",
+            },
+        });
+        mockClient.emit(ClientEvent.ToDeviceEvent, clearEvent);
+
+        expect(receivedKeyResolvers).toHaveBeenCalledTimes(0);
+
+        clearEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+        mockClient.emit(ClientEvent.ToDeviceEvent, clearEvent);
+
+        expect(receivedKeyResolvers).toHaveBeenCalledTimes(1);
     });
 
     it("should not sent to ourself", async () => {
@@ -168,24 +202,24 @@ describe("ToDeviceKeyTransport", () => {
         const testEncoded = "ABCDEDF";
         const testKeyIndex = 2;
 
-        mockClient.emit(
-            ClientEvent.ToDeviceEvent,
-            makeMockEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, {
-                keys: {
-                    index: testKeyIndex,
-                    key: testEncoded,
-                },
-                member: {
-                    claimed_device_id: "BOBDEVICE",
-                },
-                room_id: "!anotherroom:id",
-                session: {
-                    application: "m.call",
-                    call_id: "",
-                    scope: "m.room",
-                },
-            }),
-        );
+        const keyEvent = makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, {
+            keys: {
+                index: testKeyIndex,
+                key: testEncoded,
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+            },
+            room_id: "!anotherroom:id",
+            session: {
+                application: "m.call",
+                call_id: "",
+                scope: "m.room",
+            },
+        });
+
+        keyEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+        mockClient.emit(ClientEvent.ToDeviceEvent, keyEvent);
 
         expect(mockLogger.warn).toHaveBeenCalledWith("Malformed Event: Mismatch roomId");
         expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(0);
@@ -240,7 +274,7 @@ describe("ToDeviceKeyTransport", () => {
 
             mockClient.emit(
                 ClientEvent.ToDeviceEvent,
-                makeMockEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, event),
+                makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, event),
             );
 
             expect(mockLogger.warn).toHaveBeenCalled();
