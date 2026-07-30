@@ -137,6 +137,7 @@ export class IndexedDBStoreWorker {
                 seq: msg.seq,
                 // Can't be an Error because they're not structured cloneable
                 error: "Unrecognised command",
+                // oxlint-disable-next-line unicorn/require-post-message-target-origin
             });
             return;
         }

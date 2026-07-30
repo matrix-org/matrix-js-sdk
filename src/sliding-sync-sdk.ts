@@ -366,7 +366,7 @@ export class SlidingSyncSdk {
             }
             room = _createAndReEmitRoom(this.client, roomId, this.opts);
         }
-        await this.processRoomData(this.client, room!, roomData);
+        await this.processRoomData(this.client, room, roomData);
     }
 
     private onLifecycle(state: SlidingSyncState, resp: MSC3575SlidingSyncResponse | null, err?: Error): void {

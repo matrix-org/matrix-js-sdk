@@ -289,7 +289,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @param membershipEvents - the membership events to store
      */
     public async setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
-        logger.log(`LL: backend about to store ${membershipEvents.length}` + ` members for ${roomId}`);
+        logger.log(`LL: backend about to store ${membershipEvents.length} members for ${roomId}`);
         const tx = this.db!.transaction(["oob_membership_events"], "readwrite");
         const store = tx.objectStore("oob_membership_events");
         membershipEvents.forEach((e) => {

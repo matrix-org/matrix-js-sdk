@@ -39,11 +39,11 @@ describe("MatrixClient events", function () {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         const client = testClient.client;
         const httpBackend = testClient.httpBackend;
-        httpBackend!.when("GET", "/versions").respond(200, {});
-        httpBackend!.when("GET", "/pushrules").respond(200, {});
-        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+        httpBackend.when("GET", "/versions").respond(200, {});
+        httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
 
-        return [client!, httpBackend];
+        return [client, httpBackend];
     };
 
     beforeEach(function () {

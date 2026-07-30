@@ -32,7 +32,8 @@ import {
     UnstableApiVersion,
 } from "matrix-widget-api";
 
-import { MatrixEvent, type IEvent, type IContent, EventStatus } from "./models/event.ts";
+import { type Transport } from "./matrixrtc/index.ts";
+import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
 import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
@@ -137,6 +138,13 @@ export interface ICapabilities {
      * @defaultValue false
      */
     receiveSticky?: boolean;
+
+    /**
+     * Whether this client needs to be able to discover the RTC transports the host can reach.
+     * @experimental Part of MSC4515
+     * @defaultValue false
+     */
+    rtcTransports?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -285,6 +293,9 @@ export class RoomWidgetClient extends MatrixClient {
         if (capabilities.turnServers) {
             this.widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
         }
+        if (capabilities.rtcTransports) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4515RtcTransports);
+        }
     }
 
     public async supportUpdateState(): Promise<boolean> {
@@ -408,7 +419,7 @@ export class RoomWidgetClient extends MatrixClient {
         // We need the additional as assertion for the EW linter to be happy.
         // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
         // above
-        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs as number | undefined;
+        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs;
 
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts
@@ -622,6 +633,21 @@ export class RoomWidgetClient extends MatrixClient {
         };
     }
 
+    /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_getRTCTransports} (MSC4143):
+     * a widget cannot make authenticated homeserver calls itself, so we ask the host over the
+     * widget API instead (MSC4515). Requires the `rtcTransports` capability and a host that
+     * advertises the `org.matrix.msc4515` API version (otherwise the request throws).
+     */
+    public override async _unstable_getRTCTransports(): Promise<Transport[]> {
+        const { rtc_transports: rtcTransports } = await this.widgetApi
+            .getRtcTransports()
+            .catch(timeoutToConnectionError);
+        return rtcTransports;
+    }
+
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
         // map: user Id → device Id → payload
         const contentMap: MapWithDefault<string, Map<string, ToDevicePayload>> = new MapWithDefault(() => new Map());
@@ -726,7 +752,7 @@ export class RoomWidgetClient extends MatrixClient {
         // Verify the room ID matches, since it's possible for the client to
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
-            const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
+            const event = new MatrixEvent(ev.detail.data);
 
             // Only inject once we have update the txId
             await this.updateTxId(event);
@@ -768,7 +794,7 @@ export class RoomWidgetClient extends MatrixClient {
         const event = new MatrixEvent({
             type: ev.detail.data.type,
             sender: ev.detail.data.sender,
-            content: ev.detail.data.content as IContent,
+            content: ev.detail.data.content,
         });
         // Mark the event as encrypted if it was, using fake contents and keys since those are unknown to us
         if (ev.detail.data.encrypted) event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
@@ -791,7 +817,7 @@ export class RoomWidgetClient extends MatrixClient {
             // send us state updates from other rooms if this widget is always
             // on screen
             if (rawEvent.room_id === this.roomId) {
-                const event = new MatrixEvent(rawEvent as Partial<IEvent>);
+                const event = new MatrixEvent(rawEvent);
 
                 if (this.syncApi instanceof SyncApi) {
                     await this.syncApi.injectRoomEvents(this.room!, undefined, [event]);

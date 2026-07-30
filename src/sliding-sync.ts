@@ -658,7 +658,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
             // oxlint-disable-next-line guard-for-in
             for (const roomId in resp.rooms) {
-                await this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
+                await this.invokeRoomDataListeners(roomId, resp.rooms[roomId]);
             }
 
             this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);

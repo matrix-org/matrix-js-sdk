@@ -421,7 +421,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent<IContent>()).toEqual({
+            expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
             });
@@ -447,7 +447,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent<IContent>()).toEqual({
+            expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: uisi **",
             });
@@ -473,7 +473,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent<IContent>()).toEqual({
+            expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
             });
@@ -657,6 +657,7 @@ function mainTimelineLiveEventIds(room: Room): Array<string> {
 function threadLiveEventIds(room: Room, threadIndex: number): Array<string> {
     return room
         .getThreads()
+        // oxlint-disable-next-line no-unexpected-multiline - weird interplay with oxfmt & oxlint
         [threadIndex].getUnfilteredTimelineSet()
         .getLiveTimeline()
         .getEvents()

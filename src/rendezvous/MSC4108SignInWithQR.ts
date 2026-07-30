@@ -385,7 +385,7 @@ export class MSC4108SignInWithQR {
             );
         }
         if (payload.type === PayloadType.Failure) {
-            throw new RendezvousError("Failed", (payload as FailurePayload).reason);
+            throw new RendezvousError("Failed", payload.reason);
         }
         if (payload.type !== PayloadType.ProtocolAccepted) {
             throw new RendezvousError("Unexpected message received", MSC4108FailureReason.UnexpectedMessageReceived);
@@ -412,11 +412,10 @@ export class MSC4108SignInWithQR {
             } else if (res.error === "access_denied") {
                 reason = MSC4108FailureReason.UserCancelled;
             }
-            const payload: FailurePayload = {
+            await this.send({
                 type: PayloadType.Failure,
                 reason,
-            };
-            await this.send(payload);
+            } satisfies FailurePayload);
 
             throw new RendezvousError("Rejection from device authorization endpoint", reason);
         }

@@ -939,7 +939,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     private getFunctionalMembers(): string[] {
         const mFunctionalMembers = this.currentState.getStateEvents(UNSTABLE_ELEMENT_FUNCTIONAL_USERS.name, "");
         if (Array.isArray(mFunctionalMembers?.getContent().service_members)) {
-            return mFunctionalMembers!.getContent().service_members;
+            return mFunctionalMembers.getContent().service_members;
         }
         return [];
     }
@@ -949,7 +949,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
         // Only generate a fallback avatar if the conversation is with a single specific other user (a "DM").
         let nonFunctionalMemberCount = 0;
-        this.getMembers()!.forEach((m) => {
+        this.getMembers().forEach((m) => {
             if (m.membership !== "join" && m.membership !== "invite") return;
             if (functionalMembers.includes(m.userId)) return;
             nonFunctionalMemberCount++;
@@ -1070,7 +1070,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (rawMembersEvents === null || this.hasEncryptionStateEvent()) {
             fromServer = true;
             rawMembersEvents = await this.loadMembersFromServer();
-            logger.log(`LL: got ${rawMembersEvents.length} ` + `members from server for room ${this.roomId}`);
+            logger.log(`LL: got ${rawMembersEvents.length} members from server for room ${this.roomId}`);
         }
         const memberEvents = rawMembersEvents.filter(noUnsafeEventProps).map(this.client.getEventMapper());
         return { memberEvents, fromServer };
@@ -1129,7 +1129,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         .getMembers()
                         .filter((m) => m.isOutOfBand())
                         .map((m) => m.events.member?.event as IStateEventWithRoomId);
-                    logger.log(`LL: telling store to write ${oobMembers.length}` + ` members for room ${this.roomId}`);
+                    logger.log(`LL: telling store to write ${oobMembers.length} members for room ${this.roomId}`);
                     const store = this.client.store;
                     return (
                         store
@@ -1171,7 +1171,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     private cleanupAfterLeaving(): void {
         this.clearLoadedMembersIfNeeded().catch((err) => {
-            logger.error(`error after clearing loaded members from ` + `room ${this.roomId} after leaving`);
+            logger.error(`error after clearing loaded members from room ${this.roomId} after leaving`);
             logger.log(err);
         });
     }
@@ -2078,7 +2078,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         };
 
         if (filterType === ThreadFilterType.My) {
-            definition!.room!.timeline![FILTER_RELATED_BY_SENDERS.name] = [myUserId];
+            definition.room!.timeline![FILTER_RELATED_BY_SENDERS.name] = [myUserId];
         }
 
         filter.setDefinition(definition);
@@ -2410,7 +2410,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const threadRootId = event.threadRootId;
 
         // Where the parent is the thread root and this is a non-thread relation this should live only in the main timeline
-        if (!!parentEventId && !isThreadRelation && (threadRootId === parentEventId || roots?.has(parentEventId!))) {
+        if (!!parentEventId && !isThreadRelation && (threadRootId === parentEventId || roots?.has(parentEventId))) {
             return {
                 shouldLiveInRoom: true,
                 shouldLiveInThread: false,
@@ -3208,7 +3208,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             );
         } else {
             // When `threadSupport` is disabled treat all events as timelineEvents
-            return [events as MatrixEvent[], [] as MatrixEvent[], [] as MatrixEvent[]];
+            return [events, [] as MatrixEvent[], [] as MatrixEvent[]];
         }
     }
 
@@ -3240,7 +3240,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         Object.keys(content).forEach((eventId: string) => {
             Object.keys(content[eventId]).forEach((receiptType: ReceiptType | string) => {
                 Object.keys(content[eventId][receiptType]).forEach((userId: string) => {
-                    const receipt = content[eventId][receiptType][userId] as Receipt;
+                    const receipt = content[eventId][receiptType][userId];
                     const receiptForMainTimeline = !receipt.thread_id || receipt.thread_id === MAIN_ROOM_TIMELINE;
                     const receiptDestination: Thread | this | undefined = receiptForMainTimeline
                         ? this

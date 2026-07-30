@@ -252,7 +252,7 @@ export class IgnoredInvites {
             // `sources` could contain non-string / invalid room ids
             .filter((roomId) => typeof roomId === "string")
             .map((roomId) => this.client.getRoom(roomId))
-            .filter((room) => !!room) as Room[];
+            .filter((room) => !!room);
         if (sourceRooms.length != sources.length) {
             hasChanges = true;
         }

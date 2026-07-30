@@ -126,7 +126,7 @@ export class OAuth2 {
                 throw error;
             } else {
                 logger.error("Dynamic registration request failed", error);
-                throw new Error(OAuth2Error.DynamicRegistrationFailed);
+                throw new Error(OAuth2Error.DynamicRegistrationFailed, { cause: error });
             }
         }
     }

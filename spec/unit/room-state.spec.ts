@@ -23,7 +23,7 @@ import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { RoomMemberEvent } from "../../src/models/room-member";
 import { BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
 import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
-import { type IContent, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
 import { type MatrixClient } from "../../src/client";
 import { Room } from "../../src/models/room";
@@ -171,7 +171,7 @@ describe("RoomState", function () {
             expect(state.getStateEvents("foo.bar.baz", "keyname")).toEqual(null);
         });
 
-        it("should return an empty list if a state_key was not specified and there" + " was no match", function () {
+        it("should return an empty list if a state_key was not specified and there was no match", function () {
             expect(state.getStateEvents("foo.bar.baz")).toEqual([]);
         });
 
@@ -185,7 +185,7 @@ describe("RoomState", function () {
 
         it("should return a single MatrixEvent if a state_key was specified", function () {
             const event = state.getStateEvents("m.room.member", userA);
-            expect(event?.getContent<IContent>()).toMatchObject({
+            expect(event?.getContent()).toMatchObject({
                 membership: KnownMembership.Join,
             });
         });
@@ -783,30 +783,27 @@ describe("RoomState", function () {
             expect(state.maySendStateEvent("m.room.name", userA)).toEqual(true);
         });
 
-        it(
-            "should say members with power >=50 may send state with power level event " + "but no state default",
-            function () {
-                const powerLevelEvent = new MatrixEvent({
-                    type: "m.room.power_levels",
-                    room_id: roomId,
-                    sender: userA,
-                    state_key: "",
-                    content: {
-                        users_default: 10,
-                        // state_default: 50, "intentionally left blank"
-                        events_default: 25,
-                        users: {
-                            [userA]: 50,
-                        },
+        it("should say members with power >=50 may send state with power level event but no state default", function () {
+            const powerLevelEvent = new MatrixEvent({
+                type: "m.room.power_levels",
+                room_id: roomId,
+                sender: userA,
+                state_key: "",
+                content: {
+                    users_default: 10,
+                    // state_default: 50, "intentionally left blank"
+                    events_default: 25,
+                    users: {
+                        [userA]: 50,
                     },
-                });
+                },
+            });
 
-                state.setStateEvents([powerLevelEvent]);
+            state.setStateEvents([powerLevelEvent]);
 
-                expect(state.maySendStateEvent("m.room.name", userA)).toEqual(true);
-                expect(state.maySendStateEvent("m.room.name", userB)).toEqual(false);
-            },
-        );
+            expect(state.maySendStateEvent("m.room.name", userA)).toEqual(true);
+            expect(state.maySendStateEvent("m.room.name", userB)).toEqual(false);
+        });
 
         it("should obey state_default", function () {
             const powerLevelEvent = new MatrixEvent({
@@ -913,7 +910,7 @@ describe("RoomState", function () {
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
 
-        it("should, once used, override counting members from state, " + "also after clone", function () {
+        it("should, once used, override counting members from state, also after clone", function () {
             state.setStateEvents([
                 utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userA, room: roomId }),
             ]);
@@ -944,7 +941,7 @@ describe("RoomState", function () {
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
 
-        it("should, once used, override counting members from state, " + "also after clone", function () {
+        it("should, once used, override counting members from state, also after clone", function () {
             state.setStateEvents([
                 utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userB, room: roomId }),
             ]);
