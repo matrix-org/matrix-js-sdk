@@ -74,7 +74,7 @@ describe("PerSessionKeyBackupDownloader", () => {
     }
 
     beforeEach(async () => {
-        mockEmitter = new TypedEventEmitter() as TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap>;
+        mockEmitter = new TypedEventEmitter();
 
         mockHttp = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
             baseUrl: "http://server/",

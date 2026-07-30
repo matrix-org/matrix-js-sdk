@@ -245,7 +245,7 @@ describe("getEventTimeline support", function () {
 
         return startClient(httpBackend, client).then(function () {
             const room = client.getRoom(roomId)!;
-            const timelineSet = room!.getTimelineSets()[0];
+            const timelineSet = room.getTimelineSets()[0];
             return expect(client.getEventTimeline(timelineSet, "event")).rejects.toBeTruthy();
         });
     });
@@ -257,7 +257,7 @@ describe("getEventTimeline support", function () {
 
         return startClient(httpBackend, client).then(() => {
             const room = client.getRoom(roomId)!;
-            const timelineSet = room!.getTimelineSets()[0];
+            const timelineSet = room.getTimelineSets()[0];
             httpBackend.when("GET", `/rooms/${encodeURIComponent(roomId)}/context/event`).respond(200, () => ({
                 event: {
                     event_id: "event",
@@ -645,8 +645,8 @@ describe("MatrixClient event timelines", function () {
             client.stopClient(); // we don't need the client to be syncing at this time
             const room = client.getRoom(roomId)!;
             const threadRoot = new MatrixEvent(THREAD_ROOT);
-            const thread = room.createThread(THREAD_ROOT.event_id!, threadRoot, [threadRoot], false)!;
-            const timelineSet = room.getTimelineSets()[0]!;
+            const thread = room.createThread(THREAD_ROOT.event_id!, threadRoot, [threadRoot], false);
+            const timelineSet = room.getTimelineSets()[0];
 
             httpBackend
                 .when("GET", "/rooms/!foo%3Abar/context/" + encodeURIComponent(THREAD_ROOT.event_id!))
@@ -766,7 +766,7 @@ describe("MatrixClient event timelines", function () {
             await startClient(httpBackend, client);
 
             const room = client.getRoom(roomId)!;
-            const timelineSet = room.getTimelineSets()[0]!;
+            const timelineSet = room.getTimelineSets()[0];
             await expect(client.getLatestTimeline(timelineSet)).rejects.toBeTruthy();
         });
 
@@ -1413,7 +1413,7 @@ describe("MatrixClient event timelines", function () {
 
             it("should allow fetching all threads", async function () {
                 const room = client.getRoom(roomId)!;
-                const timelineSets = await room!.createThreadsTimelineSets();
+                const timelineSets = await room.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 respondToThreads();
                 respondToThreads();
@@ -1425,7 +1425,7 @@ describe("MatrixClient event timelines", function () {
                 const room = new Room("room123", client, "john", {
                     pendingEventOrdering: PendingEventOrdering.Detached,
                 });
-                const timelineSets = await room!.createThreadsTimelineSets();
+                const timelineSets = await room.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
 
                 const event = utils.mkMessage({
@@ -1536,7 +1536,7 @@ describe("MatrixClient event timelines", function () {
                 const room = client.getRoom(roomId)!;
 
                 // Setup room threads
-                const timelineSets = await room!.createThreadsTimelineSets();
+                const timelineSets = await room.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 respondToThreads(threadsResponse);
                 respondToThreads(threadsResponse);
@@ -1547,7 +1547,7 @@ describe("MatrixClient event timelines", function () {
                 expect(threadIds).toContain(THREAD_ROOT.event_id);
                 expect(threadIds).toContain(THREAD2_ROOT.event_id);
                 const [allThreads] = timelineSets!;
-                const timeline = allThreads.getLiveTimeline()!;
+                const timeline = allThreads.getLiveTimeline();
                 // Test threads are in chronological order (first thread should be first because it has a more recent reply)
                 expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD_ROOT.event_id,
@@ -1564,7 +1564,7 @@ describe("MatrixClient event timelines", function () {
                 await prom;
                 expect(thread.length).toBe(2);
                 // Test threads are in chronological order
-                expect(timeline!.getEvents().map((it) => it.event.event_id)).toEqual([
+                expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD2_ROOT.event_id,
                     THREAD_ROOT.event_id,
                 ]);
@@ -1659,7 +1659,7 @@ describe("MatrixClient event timelines", function () {
                 const room = client.getRoom(roomId)!;
 
                 // Set up room threads
-                const timelineSets = await room!.createThreadsTimelineSets();
+                const timelineSets = await room.createThreadsTimelineSets();
                 expect(timelineSets).not.toBeNull();
                 respondToThreads(threadsResponse);
                 respondToThreads(threadsResponse);
@@ -1672,7 +1672,7 @@ describe("MatrixClient event timelines", function () {
                 expect(threadIds).toContain(THREAD_ROOT.event_id);
                 expect(threadIds).toContain(THREAD2_ROOT.event_id);
                 const [allThreads] = timelineSets!;
-                const timeline = allThreads.getLiveTimeline()!;
+                const timeline = allThreads.getLiveTimeline();
                 // Test threads are in chronological order
                 expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD_ROOT.event_id,
@@ -1689,7 +1689,7 @@ describe("MatrixClient event timelines", function () {
                 await prom;
                 expect(thread.length).toBe(1); // reactions don't count towards the length of a thread
                 // Test thread order is unchanged
-                expect(timeline!.getEvents().map((it) => it.event.event_id)).toEqual([
+                expect(timeline.getEvents().map((it) => it.event.event_id)).toEqual([
                     THREAD_ROOT.event_id,
                     THREAD2_ROOT.event_id,
                 ]);
@@ -1753,7 +1753,7 @@ describe("MatrixClient event timelines", function () {
 
                 const timelineSetsPromise = room.createThreadsTimelineSets();
                 expect(timelineSetsPromise).not.toBeNull();
-                await flushHttp(timelineSetsPromise!);
+                await flushHttp(timelineSetsPromise);
                 respondToFilter();
                 respondToSync();
                 respondToSync();
@@ -1851,7 +1851,7 @@ describe("MatrixClient event timelines", function () {
 
         it("should work when /send returns before /sync", function () {
             const room = client.getRoom(roomId)!;
-            const timelineSet = room.getTimelineSets()[0]!;
+            const timelineSet = room.getTimelineSets()[0];
 
             return Promise.all([
                 client
@@ -1949,9 +1949,9 @@ describe("MatrixClient event timelines", function () {
         return Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)])
             .then(function () {
                 const room = client.getRoom(roomId)!;
-                const tl = room.getLiveTimeline()!;
-                expect(tl!.getEvents().length).toEqual(3);
-                expect(tl!.getEvents()[1].isRedacted()).toBe(true);
+                const tl = room.getLiveTimeline();
+                expect(tl.getEvents().length).toEqual(3);
+                expect(tl.getEvents()[1].isRedacted()).toBe(true);
 
                 const sync2 = {
                     next_batch: "batch2",
@@ -1978,7 +1978,7 @@ describe("MatrixClient event timelines", function () {
             })
             .then(function () {
                 const room = client.getRoom(roomId)!;
-                const tl = room.getLiveTimeline()!;
+                const tl = room.getLiveTimeline();
                 expect(tl.getEvents().length).toEqual(1);
             });
     });
@@ -2040,7 +2040,7 @@ describe("MatrixClient event timelines", function () {
 
             await Promise.all([httpBackend.flushAllExpected(), utils.syncPromise(client)]);
 
-            expect(timeline!.getEvents()[1]!.event).toEqual(THREAD_REPLY);
+            expect(timeline!.getEvents()[1].event).toEqual(THREAD_REPLY);
         }
 
         it("in stable mode", async () => {

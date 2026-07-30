@@ -32,7 +32,6 @@ import { TestClient } from "../TestClient";
 import { THREAD_RELATION_TYPE } from "../../src/models/thread";
 import { type IFilterDefinition } from "../../src/filter";
 import { type ISearchResults } from "../../src/@types/search";
-import { type IStore } from "../../src/store";
 import { SetPresence } from "../../src/sync";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -52,7 +51,7 @@ describe("MatrixClient", function () {
         const store = new MemoryStore();
 
         const testClient = new TestClient(userId, "aliceDevice", accessToken, undefined, {
-            store: store as IStore,
+            store: store,
             identityServer: {
                 getAccessToken: () => Promise.resolve(identityAccessToken),
             },

@@ -105,7 +105,6 @@ class MockAnalyser {
 }
 
 export class MockAudioContext {
-    constructor() {}
     public createAnalyser() {
         return new MockAnalyser();
     }

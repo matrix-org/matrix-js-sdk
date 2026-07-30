@@ -66,7 +66,7 @@ describe("IndexedDBStore", () => {
         // Simulate a broken IDB
         (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
             const err = new Error(
-                "Failed to execute 'transaction' on 'IDBDatabase': " + "The database connection is closing.",
+                "Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
             );
             err.name = "InvalidStateError";
             throw err;

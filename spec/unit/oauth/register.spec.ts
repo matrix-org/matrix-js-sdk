@@ -37,7 +37,7 @@ describe("registerClient()", () => {
     const delegatedAuthConfig = makeDelegatedAuthMetadata(issuer);
 
     it("should make correct request to register client", async () => {
-        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
@@ -52,7 +52,7 @@ describe("registerClient()", () => {
                 method: "POST",
             }),
         );
-        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options!.body as string)).toEqual(
+        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options.body as string)).toEqual(
             expect.objectContaining({
                 client_name: clientName,
                 client_uri: baseUrl,
@@ -69,7 +69,7 @@ describe("registerClient()", () => {
     });
 
     it("should throw when registration request fails", async () => {
-        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint, {
             status: 500,
         });
         await expect(() => OAuth2.registerClient(delegatedAuthConfig, metadata)).rejects.toThrow(
@@ -78,7 +78,7 @@ describe("registerClient()", () => {
     });
 
     it("should throw when registration response is invalid", async () => {
-        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint, {
             status: 200,
             // no clientId in response
             body: "{}",
@@ -101,7 +101,7 @@ describe("registerClient()", () => {
     });
 
     it("should filter out invalid URIs", async () => {
-        fetchMock.post(delegatedAuthConfig.registration_endpoint!, {
+        fetchMock.post(delegatedAuthConfig.registration_endpoint, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
@@ -112,7 +112,7 @@ describe("registerClient()", () => {
                 policy_uri: "https://policy-uri/",
             }),
         ).toEqual(dynamicClientId);
-        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options!.body as string)).not.toEqual(
+        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options.body as string)).not.toEqual(
             expect.objectContaining({
                 tos_uri: "http://just.testing/tos",
                 policy_uri: "https://policy-uri/",
@@ -129,7 +129,7 @@ describe("registerClient()", () => {
             ],
         };
 
-        fetchMock.post(config.registration_endpoint!, {
+        fetchMock.post(config.registration_endpoint, {
             status: 200,
             body: JSON.stringify({ client_id: dynamicClientId }),
         });
@@ -144,7 +144,7 @@ describe("registerClient()", () => {
                 method: "POST",
             }),
         );
-        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options!.body as string)).toEqual(
+        expect(JSON.parse(fetchMock.callHistory.callLogs[0].options.body as string)).toEqual(
             expect.objectContaining({
                 client_name: clientName,
                 client_uri: baseUrl,

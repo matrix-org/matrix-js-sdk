@@ -93,7 +93,7 @@ export class MediaHandler extends TypedEventEmitter<
     public async setAudioSettings(opts: AudioSettings): Promise<void> {
         logger.info(`MediaHandler setAudioSettings() running (opts=${JSON.stringify(opts)})`);
 
-        this.audioSettings = Object.assign({}, opts) as AudioSettings;
+        this.audioSettings = Object.assign({}, opts);
         await this.updateLocalUsermediaStreams();
     }
 
