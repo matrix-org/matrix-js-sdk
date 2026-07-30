@@ -142,10 +142,10 @@ export class ActionScheduler {
     }
 
     public initiateJoin(): void {
-        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
+        this.wakeup({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
     }
     public initiateLeave(leaveReason?: LeaveReason): void {
-        this.wakeup?.({
+        this.wakeup({
             replace: [
                 {
                     ts: Date.now(),

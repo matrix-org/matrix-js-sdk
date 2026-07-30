@@ -588,7 +588,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      *
-     * @param timeout
+     * @param timeout - Optional timeout in milliseconds that fires if the leave takes too long to complete.
      * @param leaveReason - The reason for the leave
      * @returns Whether the membership update was attempted and did not time out.
      */
