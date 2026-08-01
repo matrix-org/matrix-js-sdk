@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+
 import { type Mock } from "vitest";
 
 import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
