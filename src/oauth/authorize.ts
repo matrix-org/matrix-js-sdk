@@ -24,7 +24,7 @@ import {
     hasRequiredStringProperty,
     isRecord,
 } from "../@types/type-guards.ts";
-import { Method } from "../http-api";
+import { Method } from "../http-api/index.ts";
 import { OAuthGrantType } from "./register.ts";
 import { sleep } from "../utils.ts";
 

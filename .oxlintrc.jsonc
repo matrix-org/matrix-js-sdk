@@ -165,6 +165,9 @@
                 "no-console": "error",
                 "no-extra-boolean-cast": "error",
                 "unicorn/prefer-node-protocol": "off",
+
+                // Require extensions on imports to maintain Node compatibility and avoid issues with ESM resolution
+                "import/extensions": ["error", "ignorePackages"],
             },
         },
         {
