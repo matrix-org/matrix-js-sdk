@@ -149,7 +149,7 @@ describe("ToDeviceKeyTransport", () => {
         expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(1);
     });
 
-    it("should drop non-encrypted/clear to-devic events", () => {
+    it("should drop non-encrypted/clear to-device events", () => {
         const receivedKeyResolvers = vi.fn();
         transport.on(KeyTransportEvents.ReceivedKeys, (membership, keyBase64Encoded, index, _timestamp) => {
             receivedKeyResolvers();
