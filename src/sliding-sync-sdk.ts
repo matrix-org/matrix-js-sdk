@@ -35,6 +35,8 @@ import {
     type IMinimalEvent,
     type IRoomEvent,
     type IStateEvent,
+    type IStickyEvent,
+    type IStickyStateEvent,
     type IStrippedState,
     type ISyncResponse,
     type ReceivedToDeviceMessage,
@@ -311,6 +313,73 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
     }
 }
 
+type ExtensionStickyEventsRequest = {
+    enabled: boolean;
+    /** Max events per response; the server may return fewer. */
+    limit?: number;
+    /** The `next_batch` of the previous response. */
+    since?: string;
+};
+
+type ExtensionStickyEventsResponse = {
+    /** Only sent when there were changes. */
+    next_batch?: string;
+    rooms?: Record<string, { events: Array<IStickyEvent | IStickyStateEvent> }>;
+};
+
+/**
+ * Delivers sticky events (MSC4354) over sliding sync.
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4480
+ *
+ * Sticky events expire after a duration instead of living in the timeline forever, and the server
+ * re-sends the unexpired ones (e.g. on join) so late joiners still see them.
+ *
+ * The server sends them for every room matched by a list or subscription, even rooms currently
+ * outside the list window. Sticky events already in a room's timeline are excluded here, so
+ * `processRoomData` picks those up separately.
+ */
+class ExtensionStickyEvents implements Extension<ExtensionStickyEventsRequest, ExtensionStickyEventsResponse> {
+    private nextBatch?: string;
+
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        // Keeps MSC4354's number, as the extension was originally specified there.
+        return "org.matrix.msc4354.sticky_events";
+    }
+
+    public when(): ExtensionState {
+        // Sticky events are stored on a Room, so the room has to exist first.
+        return ExtensionState.PostProcess;
+    }
+
+    public async onRequest(isInitial: boolean): Promise<ExtensionStickyEventsRequest> {
+        return {
+            enabled: true,
+            limit: 100,
+            // Undefined until the first response, which asks for all unexpired sticky events.
+            since: this.nextBatch,
+        };
+    }
+
+    public async onResponse(data: ExtensionStickyEventsResponse): Promise<void> {
+        for (const [roomId, roomData] of Object.entries(data?.rooms ?? {})) {
+            const room = this.client.getRoom(roomId);
+            if (!room) {
+                // Dropping is safe: unexpired sticky events are re-sent once we know the room.
+                logger.debug(`Ignoring sticky events for unknown room ${roomId}`);
+                continue;
+            }
+            room._unstable_addStickyEvents(mapEvents(this.client, roomId, roomData.events ?? []));
+        }
+
+        // next_batch is only returned when there were changes, and must be echoed back as `since`.
+        if (data?.next_batch) {
+            this.nextBatch = data.next_batch;
+        }
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -344,6 +413,7 @@ export class SlidingSyncSdk {
             new ExtensionAccountData(this.client),
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
+            new ExtensionStickyEvents(this.client),
         ];
         if (this.syncOpts.cryptoCallbacks) {
             extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks));
@@ -704,6 +774,10 @@ export class SlidingSyncSdk {
         room.updateMyMembership(KnownMembership.Join);
 
         room.setMSC4186SummaryData(roomData.heroes, roomData.joined_count, roomData.invited_count);
+
+        // The MSC4480 extension excludes sticky events already present in the timeline, so we have
+        // to pick those up here. See ExtensionStickyEvents for the rest.
+        room._unstable_addStickyEvents(timelineEvents.filter((e) => e.unstableStickyInfo !== undefined));
 
         room.recalculate();
         if (roomData.initial) {
