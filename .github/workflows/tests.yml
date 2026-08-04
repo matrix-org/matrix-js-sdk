@@ -33,6 +33,10 @@ jobs:
                   cache: true
                   install: true
 
+            - name: Get number of CPU cores
+              id: cpu-cores
+              uses: SimenB/github-actions-cpu-cores@97330871fe1b7d3529392ea000e3d2c4b357e403 # v3
+
             - name: Run tests
               run: |
                   pnpm test \
