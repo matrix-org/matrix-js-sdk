@@ -42,14 +42,14 @@ jobs:
                   sparse-checkout: |
                       scripts/release
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache_dependency_path: release-repo/pnpm-lock.yaml
-                  package_json_file: release-repo/package.json
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
-              with:
-                  cache: "pnpm"
-                  node-version-file: release-repo/package.json
+                  runtime: node
+                  cache: true
+                  install: false
+                  cache-dependency-path: release-repo/pnpm-lock.yaml
+                  package-json-file: release-repo/package.json
 
             - name: Install Deps
               working-directory: release-repo
