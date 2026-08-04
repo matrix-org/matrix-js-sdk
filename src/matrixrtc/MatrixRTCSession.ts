@@ -681,7 +681,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
-        const lifetime = this.joinConfig?.notificationLifetimeMs ?? 60_000;
+        const lifetime = this.joinConfig?.notificationLifetimeMs ?? 90_000;
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
