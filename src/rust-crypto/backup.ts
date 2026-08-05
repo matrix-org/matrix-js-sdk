@@ -23,10 +23,10 @@ import {
     type KeyBackupCheck,
     type KeyBackupInfo,
     type KeyBackupSession,
-    type Curve25519SessionData,
     type KeyBackupRestoreOpts,
     type KeyBackupRestoreResult,
     type KeyBackupRoomSessions,
+    type NewKeyBackupInfo,
 } from "../crypto-api/keybackup.ts";
 import { type Logger } from "../logger.ts";
 import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -41,7 +41,6 @@ import {
     CryptoEvent,
     ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
-import { type AESEncryptedSecretStoragePayload } from "../@types/AESEncryptedSecretStoragePayload.ts";
 import { type IMegolmSessionData } from "../@types/crypto.ts";
 
 /** Authentification of the backup info, depends on algorithm */
@@ -325,11 +324,6 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             return null;
         }
         this.checkedForBackup = true;
-
-        if (backupInfo && !backupInfo.version) {
-            this.logger.warn("active backup lacks a useful 'version'; ignoring it");
-            backupInfo = undefined;
-        }
         this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
@@ -356,34 +350,51 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 this.logger.debug("Key backup present on server but not trusted: not enabling key backup");
             }
         } else {
-            if (activeVersion === null) {
-                this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
-                await this.enableKeyBackup(backupInfo);
-            } else if (activeVersion !== backupInfo.version) {
-                this.logger.debug(
-                    `On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`,
-                );
-                // This will remove any pending backup request, remove the backup key and reset the backup state of each room key we have.
-                await this.disableKeyBackup();
-                // Enabling will now trigger re-upload of all the keys
-                await this.enableKeyBackup(backupInfo);
-            } else {
-                this.logger.debug(`Backup version ${backupInfo.version} still current`);
-            }
+            await this.enableOrSwitchKeyBackup(backupInfo, activeVersion);
         }
         return { backupInfo, trustInfo };
     }
 
+    /**
+     * Enable key backup upload for the given backup version, if it is not already.
+     *
+     * If backup is currently enabled for a different version, disables it first.
+     *
+     * Also emits one or more {@link CryptoEvent.KeyBackupStatus} events if the backup status changes.
+     *
+     * @param backupInfo - the desired backup version (and the encryption key).
+     * @param activeVersion - the current active backup version (or `null`, if none).
+     */
+    private async enableOrSwitchKeyBackup(backupInfo: KeyBackupInfo, activeVersion: string | null): Promise<void> {
+        if (activeVersion === null) {
+            this.logger.debug(`Found usable key backup v${backupInfo.version}: enabling key backups`);
+            await this.enableKeyBackup(backupInfo);
+        } else if (activeVersion !== backupInfo.version) {
+            this.logger.debug(`On backup version ${activeVersion} but found version ${backupInfo.version}: switching.`);
+            // This will remove any pending backup request, remove the backup upload key from the OlmMachine and reset
+            // the backup state of each room key we have.
+            await this.disableKeyBackup();
+            // Enabling will now trigger re-upload of all the keys
+            await this.enableKeyBackup(backupInfo);
+        } else {
+            this.logger.debug(`Backup version ${backupInfo.version} still current`);
+        }
+    }
+
+    /**
+     * Helper for {@link enableOrSwitchKeyBackup}.
+     *
+     * Enables key backup upload for the given backup version. Also emits
+     * a {@link CryptoEvent.KeyBackupStatus} event.
+     */
     private async enableKeyBackup(backupInfo: KeyBackupInfo): Promise<void> {
         // we know for certain it must be a Curve25519 key, because we have verified it and only Curve25519
         // keys can be verified.
-        //
-        // we also checked it has a valid `version`.
         await this.olmMachine.enableBackupV1(
             (backupInfo.auth_data as Curve25519AuthData).public_key,
-            backupInfo.version!,
+            backupInfo.version,
         );
-        this.activeBackupVersion = backupInfo.version!;
+        this.activeBackupVersion = backupInfo.version;
 
         this.emit(CryptoEvent.KeyBackupStatus, true);
 
@@ -560,16 +571,24 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
-     * Creates a new key backup by generating a new random private key.
+     * Creates a new key backup by generating a new random private key, and then enable key backup upload and download
+     * using the new backup version.
      *
      * If there is an existing backup server side it will be deleted and replaced
      * by the new one.
+     *
+     * Saves the decryption key in the Rust SDK's CryptoStore.
      *
      * @param signObject - Method that should sign the backup with existing device and
      * existing identity.
      * @returns a KeyBackupCreationInfo - All information related to the backup.
      */
     public async setupKeyBackup(signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        // Wait for any active call to `checkKeyBackupAndEnable` to complete, to avoid racing with it
+        if (this.keyBackupCheckInProgress) {
+            await this.keyBackupCheckInProgress;
+        }
+
         // Clean up any existing backup
         await this.deleteAllKeyBackupVersions();
 
@@ -580,19 +599,36 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         await signObject(authData);
 
+        const backupData: NewKeyBackupInfo = {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+        };
+
         const res = await this.http.authedRequest<{ version: string }>(
             Method.Post,
             "/room_keys/version",
             undefined,
-            {
-                algorithm: pubKey.algorithm,
-                auth_data: authData,
-            },
+            backupData,
             {
                 prefix: ClientPrefix.V3,
             },
         );
 
+        // This backup was just created and signed locally, so use the creation response to make up a full
+        // `KeyBackupInfo` struct representing the new backup, instead of doing another discovery/trust check.
+        const backupInfo: KeyBackupInfo = {
+            algorithm: pubKey.algorithm,
+            auth_data: authData,
+            version: res.version,
+            count: 0,
+            etag: "", // we never actually use the etag, so we can just make up a value
+        };
+
+        // saveBackupDecryptionKey emits KeyBackupDecryptionKeyCached. Cache and
+        // enable the created backup first so listeners observe the new version.
+        this.serverBackupInfo = backupInfo;
+        this.checkedForBackup = true;
+        await this.enableOrSwitchKeyBackup(backupInfo, await this.getActiveBackupVersion());
         await this.saveBackupDecryptionKey(randomKey, res.version);
 
         return {
@@ -863,9 +899,7 @@ export class RustBackupDecryptor implements BackupDecryptor {
     /**
      * Implements {@link BackupDecryptor#decryptSessions}
      */
-    public async decryptSessions(
-        ciphertexts: Record<string, KeyBackupSession<Curve25519SessionData | AESEncryptedSecretStoragePayload>>,
-    ): Promise<IMegolmSessionData[]> {
+    public async decryptSessions(ciphertexts: Record<string, KeyBackupSession>): Promise<IMegolmSessionData[]> {
         const keys: IMegolmSessionData[] = [];
         for (const [sessionId, sessionData] of Object.entries(ciphertexts)) {
             try {

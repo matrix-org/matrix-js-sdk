@@ -1,3 +1,39 @@
+Changes in [42.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.1.0) (2026-08-04)
+==================================================================================================
+## 🦖 Deprecations
+
+* Remove support for MSC3391 \& MSC3852 ([#5446](https://github.com/matrix-org/matrix-js-sdk/pull/5446)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Allow passing a CA cert PEM when setting up Rust crypto ([#5443](https://github.com/matrix-org/matrix-js-sdk/pull/5443)). Contributed by @andybalaam.
+* Improve types for `/room_keys/version` requests ([#5419](https://github.com/matrix-org/matrix-js-sdk/pull/5419)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Include existing data when updating user profile cache ([#5427](https://github.com/matrix-org/matrix-js-sdk/pull/5427)). Contributed by @dbkr.
+* Fix key backup cached event ordering ([#5281](https://github.com/matrix-org/matrix-js-sdk/pull/5281)). Contributed by @gumadeiras.
+
+
+Changes in [42.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.0.0) (2026-07-21)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Properly support Matrix v1.18 OAuth2 APIs ([#5390](https://github.com/matrix-org/matrix-js-sdk/pull/5390)). Contributed by @t3chguy.
+* Remove unused getContentUri ([#5400](https://github.com/matrix-org/matrix-js-sdk/pull/5400)). Contributed by @t3chguy.
+
+
+Changes in [41.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.9.0) (2026-07-07)
+==================================================================================================
+## ✨ Features
+
+* Add method `CryptoApi.getUserCrossSigningKeys` ([#5389](https://github.com/matrix-org/matrix-js-sdk/pull/5389)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix restarting delayed events via compatibility path in RoomWidgetClient ([#5380](https://github.com/matrix-org/matrix-js-sdk/pull/5380)). Contributed by @robintown.
+
+
 Changes in [41.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.8.0) (2026-06-23)
 ==================================================================================================
 ## ✨ Features

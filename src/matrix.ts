@@ -44,7 +44,7 @@ export * from "./models/typed-event-emitter.ts";
 export * from "./models/user.ts";
 export * from "./models/device.ts";
 export * from "./models/search-result.ts";
-export * from "./oidc/index.ts";
+export * from "./oauth/index.ts";
 export * from "./scheduler.ts";
 export * from "./filter.ts";
 export * from "./timeline-window.ts";

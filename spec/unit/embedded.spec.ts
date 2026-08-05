@@ -16,8 +16,7 @@ limitations under the License.
 
 // We have to use EventEmitter here to mock part of the matrix-widget-api
 // project, which doesn't know about our TypeEventEmitter implementation at all
-// eslint-disable-next-line no-restricted-imports
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 import { type MockedObject } from "vitest";
 import {
     type WidgetApi,
@@ -47,6 +46,7 @@ import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
 import { SlidingSync } from "../../src/sliding-sync";
 import { logger } from "../../src/logger";
+import { ConnectionError } from "../../src/http-api/errors";
 import { flushPromises } from "../test-utils/flushPromises";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../../src/models/room-sticky-events";
 
@@ -99,6 +99,7 @@ class MockWidgetApi extends EventEmitter {
     });
     public readStateEvents = vi.fn(async () => []);
     public getTurnServers = vi.fn(async () => []);
+    public getRtcTransports = vi.fn(async () => ({ rtc_transports: [] }));
     public sendContentLoaded = vi.fn().mockResolvedValue(undefined);
 
     public transport = {
@@ -1139,8 +1140,8 @@ describe("RoomWidgetClient", () => {
         });
     });
 
-    describe("oidc token", () => {
-        it("requests an oidc token", async () => {
+    describe("oauth2 token", () => {
+        it("requests an oauth2 token", async () => {
             await makeClient({});
             expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });
@@ -1232,5 +1233,42 @@ describe("RoomWidgetClient", () => {
         emitServer2!();
         expect(await emittedServer).toEqual([clientServer2]);
         expect(client.getTurnServers()).toEqual([clientServer2]);
+    });
+
+    describe("RTC transports", () => {
+        const transport = { type: "livekit", livekit_service_url: "https://livekit-jwt.example.com" };
+
+        it("requests the capability when opted in", async () => {
+            await makeClient({ rtcTransports: true });
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4515RtcTransports);
+        });
+
+        it("does not request the capability when not opted in", async () => {
+            await makeClient({});
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4515RtcTransports);
+        });
+
+        it("gets RTC transports from the host", async () => {
+            widgetApi.getRtcTransports.mockResolvedValue({ rtc_transports: [transport] });
+
+            await makeClient({ rtcTransports: true });
+            expect(await client._unstable_getRTCTransports()).toEqual([transport]);
+            expect(widgetApi.getRtcTransports).toHaveBeenCalled();
+        });
+
+        it("propagates errors from the host", async () => {
+            const error = new Error("Missing capability");
+            widgetApi.getRtcTransports.mockRejectedValue(error);
+
+            await makeClient({ rtcTransports: true });
+            await expect(client._unstable_getRTCTransports()).rejects.toThrow(error);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.getRtcTransports.mockRejectedValue(new Error("Request timed out"));
+
+            await makeClient({ rtcTransports: true });
+            await expect(client._unstable_getRTCTransports()).rejects.toThrow(ConnectionError);
+        });
     });
 });

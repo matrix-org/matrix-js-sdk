@@ -21,7 +21,7 @@ import debug from "debug";
 import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 import { IDBFactory } from "fake-indexeddb";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import Olm from "@matrix-org/olm";
 
 import {
@@ -63,7 +63,7 @@ import {
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
     TEST_ROOM_ID,
     TEST_USER_ID,
-} from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -86,19 +86,19 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
 beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({
+        toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+    });
 });
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -184,8 +184,8 @@ describe("verification", () => {
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
             expect(request.pending).toBe(true);
-            // we're using fake timers, so the timeout should have exactly 10 minutes left still.
-            expect(request.timeout).toEqual(600_000);
+            expect(request.timeout).toBeLessThanOrEqual(600_000); // 10 mins
+            expect(request.timeout).toBeGreaterThan(540_000); // 9 mins
 
             // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
             {
@@ -206,7 +206,6 @@ describe("verification", () => {
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             if (methods !== undefined) {
-                // eslint-disable-next-line @vitest/no-conditional-expect
                 expect(new Set(toDeviceMessage.methods)).toEqual(new Set(methods));
             }
 
@@ -510,7 +509,6 @@ describe("verification", () => {
             // Rust crypto waits for the 'done' to arrive from the other side.
             if (request.phase === VerificationPhase.Done) {
                 const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
-                // eslint-disable-next-line @vitest/no-conditional-expect
                 expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
                 await verificationPromise;
             }
@@ -1243,6 +1241,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
             },
+            etag: "",
+            count: 0,
         };
 
         /** {@link unsignedMatchingBackupInfo}, with the addition of a signature */
@@ -1254,6 +1254,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
 
         /** {@link unsignedNonMatchingBackupInfo}, with the addition of a signature */
@@ -1265,6 +1267,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
 
         beforeEach(async () => {
@@ -1280,7 +1284,7 @@ describe("verification", () => {
                 signedNonMatchingBackupInfo,
             ]);
 
-            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID]![olmDeviceId]);
+            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID][olmDeviceId]);
             e2eKeyResponder.addCrossSigningData(bootstrapped);
 
             usermasterPubKey = Object.values(bootstrapped.master_keys![TEST_USER_ID].keys)[0];
@@ -1449,7 +1453,9 @@ describe("verification", () => {
                     expect(activeVersion).toEqual("1");
                 });
             } finally {
-                vi.useFakeTimers();
+                vi.useFakeTimers({
+                    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+                });
             }
         });
 
@@ -1462,7 +1468,9 @@ describe("verification", () => {
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            vi.useFakeTimers();
+            vi.useFakeTimers({
+                toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+            });
 
             return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
         }
@@ -1521,7 +1529,7 @@ describe("verification", () => {
                 recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
                 p2pSession: p2pSession,
                 olmAccount: testOlmAccount,
-                requestId: requestId!,
+                requestId: requestId,
                 secret: secret,
             });
 

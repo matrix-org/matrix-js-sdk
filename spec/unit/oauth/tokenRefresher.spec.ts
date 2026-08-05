@@ -20,8 +20,8 @@ limitations under the License.
 
 import fetchMock from "@fetch-mock/vitest";
 
-import { OidcTokenRefresher, TokenRefreshLogoutError } from "../../../src";
-import { makeDelegatedAuthConfig } from "../../test-utils/oidc";
+import { OAuth2, TokenRefresher, TokenRefreshLogoutError } from "../../../src";
+import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
 
 describe("OidcTokenRefresher", () => {
     // OidcTokenRefresher props
@@ -32,18 +32,13 @@ describe("OidcTokenRefresher", () => {
     const clientId = "test-client-id";
     const redirectUri = "https://test.org";
     const deviceId = "abc123";
-    const idTokenClaims = {
-        exp: Date.now() / 1000 + 100000,
-        aud: clientId,
-        iss: authConfig.issuer,
-        sub: "123",
-        iat: 123,
-    };
-    // used to mock a valid token response, as consumed by OidcClient library
-    const scope = `openid urn:matrix:org.matrix.msc2967.client:api:* urn:matrix:org.matrix.msc2967.client:device:${deviceId}`;
+    // used to mock a valid token response
+    const scope = `urn:matrix:client:api:* urn:matrix:client:device:${deviceId}`;
 
     // auth config used in mocked calls to OP .well-known
-    const config = makeDelegatedAuthConfig(authConfig.issuer);
+    const config = makeDelegatedAuthMetadata(authConfig.issuer);
+
+    const auth = new OAuth2(config, { clientId, redirectUri, deviceId });
 
     const makeTokenResponse = (accessToken: string, refreshToken?: string) => ({
         access_token: accessToken,
@@ -54,15 +49,6 @@ describe("OidcTokenRefresher", () => {
     });
 
     beforeEach(() => {
-        fetchMock.get(`${config.issuer}.well-known/openid-configuration`, config, { name: "openid-configuration" });
-        fetchMock.get(`${config.issuer}jwks`, {
-            status: 200,
-            headers: {
-                "Content-Type": "application/json",
-            },
-            keys: [],
-        });
-
         fetchMock.post(
             config.token_endpoint,
             {
@@ -81,48 +67,11 @@ describe("OidcTokenRefresher", () => {
     });
 
     describe("doRefreshAccessToken()", () => {
-        it("should throw when oidcClient has not been initialised", async () => {
-            fetchMock.modifyRoute("openid-configuration", {
-                response: {
-                    ok: false,
-                    status: 404,
-                },
-            });
-
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow("Failed to initialise OIDC client.");
-        });
-
-        it("should retry initialisation", async () => {
-            fetchMock.modifyRoute("openid-configuration", {
-                response: {
-                    ok: false,
-                    status: 404,
-                },
-            });
-
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await expect(refresher.doRefreshAccessToken("token")).rejects.toThrow("Failed to initialise OIDC client.");
-
-            // put the successful mock back
-            fetchMock.modifyRoute("openid-configuration", {
-                response: config,
-            });
-
-            const result = await refresher.doRefreshAccessToken("token");
-
-            expect(result).toEqual(
-                expect.objectContaining({
-                    accessToken: "new-access-token",
-                    refreshToken: "new-refresh-token",
-                }),
-            );
-        });
-
         it("should refresh the tokens", async () => {
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
 
-            const result = await refresher.doRefreshAccessToken("refresh-token");
+            const result = await refresher.tokenRefreshFunction("refresh-token");
 
             expect(fetchMock).toHaveFetched(config.token_endpoint, {
                 method: "POST",
@@ -137,13 +86,12 @@ describe("OidcTokenRefresher", () => {
         });
 
         it("should persist the new tokens", async () => {
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            // spy on our stub
-            vi.spyOn(refresher as any, "persistTokens");
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
 
-            await refresher.doRefreshAccessToken("refresh-token");
+            await refresher.tokenRefreshFunction("refresh-token");
 
-            expect((refresher as any).persistTokens).toHaveBeenCalledWith(
+            expect(fn).toHaveBeenCalledWith(
                 expect.objectContaining({
                     accessToken: "new-access-token",
                     refreshToken: "new-refresh-token",
@@ -169,14 +117,14 @@ describe("OidcTokenRefresher", () => {
                     ...makeTokenResponse("second-new-access-token", "second-new-refresh-token"),
                 });
 
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await refresher.oidcClientReady;
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
             // reset call counts
             fetchMock.clearHistory();
 
             const refreshToken = "refresh-token";
-            const first = refresher.doRefreshAccessToken(refreshToken);
-            const second = refresher.doRefreshAccessToken(refreshToken);
+            const first = refresher.tokenRefreshFunction(refreshToken);
+            const second = refresher.tokenRefreshFunction(refreshToken);
 
             const result1 = await second;
             const result2 = await first;
@@ -193,7 +141,7 @@ describe("OidcTokenRefresher", () => {
             expect(result1).toEqual(result2);
 
             // call again after first request resolves
-            const third = await refresher.doRefreshAccessToken("first-new-refresh-token");
+            const third = await refresher.tokenRefreshFunction("first-new-refresh-token");
 
             // called token endpoint, got new tokens
             expect(third).toEqual(
@@ -214,10 +162,10 @@ describe("OidcTokenRefresher", () => {
                 },
             });
 
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await refresher.oidcClientReady;
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
+            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.toThrow();
         });
 
         it("should make fresh request after a failed request", async () => {
@@ -238,16 +186,16 @@ describe("OidcTokenRefresher", () => {
                     ...makeTokenResponse("second-new-access-token", "second-new-refresh-token"),
                 });
 
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await refresher.oidcClientReady;
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
             // reset call counts
             fetchMock.clearHistory();
 
             // first call fails
-            await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow();
+            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.toThrow();
 
             // call again after first request resolves
-            const result = await refresher.doRefreshAccessToken("first-new-refresh-token");
+            const result = await refresher.tokenRefreshFunction("first-new-refresh-token");
 
             // called token endpoint, got new tokens
             expect(result).toEqual(
@@ -272,10 +220,23 @@ describe("OidcTokenRefresher", () => {
                 },
             });
 
-            const refresher = new OidcTokenRefresher(authConfig.issuer, clientId, redirectUri, deviceId, idTokenClaims);
-            await refresher.oidcClientReady;
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefreshAccessToken("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
+        });
+
+        it("should not throw TokenRefreshLogoutError when hitting temporal http error", async () => {
+            fetchMock.modifyRoute("token-endpoint", {
+                response: {
+                    status: 500,
+                },
+            });
+
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
+
+            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
     });
 });

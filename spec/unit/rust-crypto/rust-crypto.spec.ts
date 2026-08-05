@@ -48,6 +48,7 @@ import {
     MatrixHttpApi,
     MemoryCryptoStore,
     TypedEventEmitter,
+    MatrixError,
 } from "../../../src";
 import { emitPromise, mkEvent, waitFor } from "../../test-utils/test-utils";
 import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
@@ -67,10 +68,10 @@ import {
     EventShieldReason,
     type ImportRoomKeysOpts,
     type KeyBackupCheck,
-    type KeyBackupInfo,
+    type NewKeyBackupInfo,
     type VerificationRequest,
 } from "../../../src/crypto-api";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -128,16 +129,22 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storePassphrase: "storePassphrase",
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase", logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            undefined,
+        );
     });
 
-    it("passes through the store params (key)", async () => {
+    it("passes through the store params (key) and CA certs", async () => {
         const mockStore = { free: vi.fn() } as unknown as StoreHandle;
         vi.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
 
@@ -146,19 +153,28 @@ describe("initRustCrypto", () => {
 
         const storeKey = new Uint8Array(32);
         const logger = new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto"));
+        const caCertsPem = "MY_PEM etc...";
+
         await initRustCrypto({
             logger,
             http: {} as MatrixClient["http"],
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storeKey: storeKey,
+            caCertsPem,
         });
 
         expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey, logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            caCertsPem,
+        );
     });
 
     it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
@@ -175,14 +191,20 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: null,
             storeKey: new Uint8Array(),
             storePassphrase: "storePassphrase",
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith(null, null, logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            undefined,
+        );
     });
 
     it("Should get secrets from inbox on start", async () => {
@@ -198,7 +220,7 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storePassphrase: "storePassphrase",
         });
@@ -268,7 +290,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -378,7 +400,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -418,7 +440,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -841,6 +863,8 @@ describe("RustCrypto", () => {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
                     } else if (method === "GET" && backupAuthData) {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    } else {
+                        throw new MatrixError({ errcode: "M_NOT_FOUND" }, 404);
                     }
                 }
                 return Promise.resolve({});
@@ -885,6 +909,7 @@ describe("RustCrypto", () => {
                     asJSON: vi.fn().mockReturnValue("{}"),
                 }),
                 saveBackupDecryptionKey: vi.fn(),
+                enableBackupV1: vi.fn(),
                 exportCrossSigningKeys: vi.fn().mockResolvedValue({
                     masterKey: "sosecret",
                     userSigningKey: "secrets",
@@ -901,7 +926,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 secretStorage,
-                {} as CryptoCallbacks,
+                {},
                 false,
             );
             vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
@@ -1010,7 +1035,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
             rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
@@ -1128,7 +1153,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1346,7 +1371,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1531,7 +1556,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             await rustCrypto.storeSessionBackupPrivateKey(
                 new TextEncoder().encode(key),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
@@ -1588,7 +1613,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1669,7 +1694,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
             return { olmMachine, rustCrypto };
         }
@@ -1741,7 +1766,7 @@ describe("RustCrypto", () => {
                 testData.TEST_USER_ID,
                 testData.TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
 
             // Wait for the key backup to be available
@@ -1756,7 +1781,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -1799,7 +1824,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -1956,11 +1981,10 @@ describe("RustCrypto", () => {
                 device_id: dehydratedDeviceBody.device_id,
                 device_data: dehydratedDeviceBody.device_data,
             });
-            fetchMock.post(
+            fetchMock.get(
                 `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
                 {
                     events: [],
-                    next_batch: "token",
                 },
             );
 
@@ -2062,11 +2086,10 @@ describe("RustCrypto", () => {
                     "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
                     putDehydratedDeviceMock,
                 );
-                fetchMock.post(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
+                fetchMock.get(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
                     status: 200,
                     body: {
                         events: [],
-                        next_batch: "foo",
                     },
                 });
                 getDehydratedDeviceMock.mockClear();
@@ -2369,7 +2392,12 @@ describe("RustCrypto", () => {
             });
             // If the backup is deleted, we will return an empty object
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
-                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+                return backupIsDeleted
+                    ? {
+                          status: 404,
+                          body: { errcode: "M_NOT_FOUND" },
+                      }
+                    : testData.SIGNED_BACKUP_DATA;
             });
 
             let dehydratedDeviceIsDeleted = false;
@@ -2379,7 +2407,7 @@ describe("RustCrypto", () => {
             });
 
             // A new key backup should be created after the reset
-            let newKeyBackupInfo!: KeyBackupInfo;
+            let newKeyBackupInfo!: NewKeyBackupInfo;
             fetchMock.post("path:/_matrix/client/v3/room_keys/version", (callLog) => {
                 newKeyBackupInfo = JSON.parse(callLog.options.body as string);
                 return { version: "2" };
@@ -2477,7 +2505,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -2617,7 +2645,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
 
             // @ts-ignore mocking outgoingRequestProcessor
@@ -2674,7 +2702,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
-    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
+    cryptoCallbacks: CryptoCallbacks = {},
 ): Promise<RustCrypto> {
     return await initRustCrypto({
         logger: new DebugLogger(debug("matrix-js-sdk:test:rust-crypto.spec")),

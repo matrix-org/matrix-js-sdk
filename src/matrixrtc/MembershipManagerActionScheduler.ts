@@ -101,7 +101,7 @@ export class ActionScheduler {
                     );
                     try {
                         // `this.wakeup` can also be called and sets the `wakeupUpdate` object while we are in the handler.
-                        handlerResult = await this.membershipLoopHandler(nextAction.type as MembershipActionType);
+                        handlerResult = await this.membershipLoopHandler(nextAction.type);
                     } catch (e) {
                         // Preserve the original error as `cause`.
                         throw new Error(`The MembershipManager shut down because of the end condition: ${e}`, {

@@ -47,7 +47,7 @@ import {
     TEST_ROOM_ID,
     TEST_USER_ID,
     PER_ROOM_CURVE25519_KEY_BACKUP_DATA,
-} from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
 
 const debug = mkDebug("matrix-js-sdk:history-sharing");
 
@@ -125,15 +125,13 @@ async function setupClients(n: number, options = { setupNewCrossSigning: true })
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
 afterEach(async () => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 
     // Stop and clear the active clients
@@ -296,7 +294,7 @@ describe("History Sharing", () => {
     });
 
     test("Room keys are not imported if the bundle arrives more than 24H after the invite is accepted", async () => {
-        vitest.useFakeTimers();
+        vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
 
         const [alice, bob] = await setupClients(2);
         const { homeserverUrl: aliceHomeserverUrl, client: aliceClient, syncResponder: aliceSyncResponder } = alice;
@@ -359,7 +357,7 @@ describe("History Sharing", () => {
         expect(event.isDecryptionFailure()).toBeTruthy();
 
         // 24 hours elapse before the room key bundle message arrives.
-        vitest.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+        vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
 
         fetchMock.getOnce(`begin:${bobHomeserverUrl}/_matrix/client/v1/media/download/alice-server/here`, {
             body: uploadedBlob,
@@ -379,7 +377,7 @@ describe("History Sharing", () => {
 
         // Wait a bit to ensure the event is not decrypted.
         for (let i = 0; i < 10; i++) {
-            await vitest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
         }
 
         expect(event.isDecryptionFailure()).toBeTruthy();
@@ -519,7 +517,7 @@ describe("History Sharing", () => {
             .getCrypto()!
             .storeSessionBackupPrivateKey(
                 Buffer.from(BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                SIGNED_BACKUP_DATA.version!,
+                SIGNED_BACKUP_DATA.version,
             );
 
         await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
@@ -711,7 +709,7 @@ describe("History Sharing", () => {
                 sender: aliceClient.getSafeUserId(),
                 content: firstMessage,
                 event_id: "$event_id",
-            }) as any,
+            }),
         );
         bobSyncResponder.sendOrQueueSyncResponse(bobSyncResponse);
         await syncPromise(bobClient);
@@ -799,7 +797,7 @@ describe("History Sharing", () => {
                     sender: bobClient.getSafeUserId(),
                     content: bobEventM1Content,
                     event_id: "$event_id_m1",
-                }) as any,
+                }),
             );
             syncResponse.to_device = {
                 events: [
@@ -875,7 +873,7 @@ describe("History Sharing", () => {
                     sender: bobClient.getSafeUserId(),
                     content: bobEventM1Content,
                     event_id: "$event_id_m1",
-                }) as any,
+                }),
             );
             charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(charlieClient);
@@ -941,7 +939,7 @@ describe("History Sharing", () => {
                             type: EventType.RoomMember,
                             sender: charlieClient.getSafeUserId(),
                             state_key: charlieClient.getSafeUserId(),
-                        }) as any,
+                        }),
                     ],
                 };
             } else {
@@ -951,13 +949,13 @@ describe("History Sharing", () => {
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }) as any,
+                    }),
                     mkEventCustom({
                         content: { membership: config.leftState },
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }) as any,
+                    }),
                 );
             }
             // Bob syncs to learn about Charlie's leaving (and joining if non-gappy).
@@ -1074,7 +1072,7 @@ describe("History Sharing", () => {
     );
 
     afterEach(async () => {
-        vitest.useRealTimers();
+        vi.useRealTimers();
     });
 });
 

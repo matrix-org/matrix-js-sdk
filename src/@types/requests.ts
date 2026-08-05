@@ -24,9 +24,6 @@ import { type MatrixError } from "../matrix.ts";
 import { type IRoomEvent } from "../sync-accumulator.ts";
 import { type EventType, type RelationType, type RoomType } from "./event.ts";
 
-// allow camelcase as these are things that go onto the wire
-/* eslint-disable camelcase */
-
 export interface IJoinRoomOpts {
     /**
      * If the caller has a keypair 3pid invite, the signing URL is passed in this parameter.
@@ -341,5 +338,3 @@ export interface IStatusResponse extends IPresenceOpts {
     currently_active?: boolean;
     last_active_ago?: number;
 }
-
-/* eslint-enable camelcase */

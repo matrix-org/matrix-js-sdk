@@ -22,7 +22,7 @@ import { RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
-import { type SlotDescription } from "./types.ts";
+import { type RtcSlotEventContent, type SlotDescription } from "./types.ts";
 import { computeSlotId } from "./utils.ts";
 
 export enum MatrixRTCSessionManagerEvents {
@@ -99,6 +99,25 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     /**
+     * Reads the current slot state event's content for the given room's session.
+     *
+     * @returns The slot event's content, or `undefined` if no slot event exists for the session.
+     */
+    public getRtcSlot(room: Room): RtcSlotEventContent | undefined {
+        return this.getRoomSession(room).getRtcSlot();
+    }
+
+    /**
+     * Whether the given room's slot is closed.
+     *
+     * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
+     * if no slot exists.
+     */
+    public isSlotClosed(room: Room): boolean | undefined {
+        return this.getRoomSession(room).isSlotClosed();
+    }
+
+    /**
      * Gets the main MatrixRTC session for a room, returning an empty session
      * if no members are currently participating
      */
@@ -129,7 +148,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private readonly onRoomState = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.GroupCallMemberPrefix) {
+        if (event.getType() !== EventType.GroupCallMemberPrefix && event.getType() !== EventType.RTCSlot) {
             return;
         }
         const room = this.client.getRoom(event.getRoomId());

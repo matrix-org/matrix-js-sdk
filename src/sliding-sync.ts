@@ -479,6 +479,7 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
 
     private async getExtensionRequest(isInitial: boolean): Promise<Record<string, object | undefined>> {
         const ext: Record<string, object | undefined> = {};
+        // oxlint-disable-next-line guard-for-in
         for (const extName in this.extensions) {
             ext[extName] = await this.extensions[extName].onRequest(isInitial);
         }
@@ -655,8 +656,9 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
             }
             await this.onPreExtensionsResponse(resp.extensions);
 
+            // oxlint-disable-next-line guard-for-in
             for (const roomId in resp.rooms) {
-                await this.invokeRoomDataListeners(roomId, resp!.rooms[roomId]);
+                await this.invokeRoomDataListeners(roomId, resp.rooms[roomId]);
             }
 
             this.invokeLifecycleListeners(SlidingSyncState.Complete, resp);

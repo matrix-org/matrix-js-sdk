@@ -22,7 +22,6 @@ import { type Mocked } from "vitest";
 import {
     createClient,
     encodeBase64,
-    type IContent,
     type ICreateClientOpts,
     type IEvent,
     type IMegolmSessionData,
@@ -34,7 +33,7 @@ import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { advanceTimersUntil, awaitDecryption, syncPromise } from "../../test-utils/test-utils";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { flushPromises } from "../../test-utils/flushPromises";
 import {
@@ -57,7 +56,6 @@ const TEST_DEVICE_ID = "xzcvb";
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -123,7 +121,9 @@ describe("megolm-keys backup", () => {
     let e2eKeyResponder: E2EKeyResponder;
 
     beforeEach(async () => {
-        vi.useFakeTimers();
+        vi.useFakeTimers({
+            toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+        });
 
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
@@ -192,7 +192,7 @@ describe("megolm-keys backup", () => {
                 const aliceCrypto = aliceClient.getCrypto()!;
                 await aliceCrypto.storeSessionBackupPrivateKey(
                     Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                    testData.SIGNED_BACKUP_DATA.version!,
+                    testData.SIGNED_BACKUP_DATA.version,
                 );
 
                 // start after saving the private key
@@ -203,6 +203,7 @@ describe("megolm-keys backup", () => {
                 await waitForDeviceList();
                 await aliceClient.getCrypto()!.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
                 await aliceClient.getCrypto()!.checkKeyBackupAndEnable();
+                await vi.runOnlyPendingTimersAsync();
             } /* it can take a while to initialise the crypto library on the first pass, so bump up the timeout. */,
             10000,
         );
@@ -238,7 +239,7 @@ describe("megolm-keys backup", () => {
 
             // Eventually, decryption succeeds.
             await awaitDecryption(event, { waitOnDecryptionFailure: true });
-            expect(event.getContent<IContent>()).toEqual(testData.CLEAR_EVENT.content);
+            expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
         });
 
         it("handles error on backup query gracefully", async () => {
@@ -261,7 +262,6 @@ describe("megolm-keys backup", () => {
             await flushBackupRequest();
 
             // we should not have logged an error.
-            // eslint-disable-next-line no-console
             expect(console.error).not.toHaveBeenCalled();
         });
 
@@ -328,7 +328,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo.version,
             );
 
             const result = await advanceTimersUntil(aliceCrypto.restoreKeyBackup());
@@ -378,7 +378,7 @@ describe("megolm-keys backup", () => {
 
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo.version,
             );
 
             const progressCallback = vi.fn();
@@ -437,7 +437,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo.version,
             );
 
             const progressCallback = vi.fn();
@@ -472,7 +472,7 @@ describe("megolm-keys backup", () => {
                 // DecryptSessions does not reject on decryption failure, but just skip the key
                 decryptSessions: vi.fn().mockImplementation((sessions) => {
                     // simulate fail to decrypt 2 keys out of all
-                    const decrypted = [];
+                    const decrypted: Mocked<IMegolmSessionData>[] = [];
                     const keys = Object.keys(sessions);
                     for (let i = 0; i < keys.length - decryptionFailureCount; i++) {
                         decrypted.push({
@@ -494,7 +494,7 @@ describe("megolm-keys backup", () => {
             const check = await aliceCrypto.checkKeyBackupAndEnable();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 decodeRecoveryKey(testData.BACKUP_DECRYPTION_KEY_BASE58),
-                check!.backupInfo!.version!,
+                check!.backupInfo.version,
             );
 
             const result = await aliceCrypto.restoreKeyBackup();
@@ -580,7 +580,7 @@ describe("megolm-keys backup", () => {
 
             const someRoomKeys = testData.MEGOLM_SESSION_DATA_ARRAY;
 
-            const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+            const uploadMockEmitter = mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version);
 
             const uploadPromises = someRoomKeys.map(
                 (data) =>
@@ -662,7 +662,7 @@ describe("megolm-keys backup", () => {
             const result = await aliceCrypto.checkKeyBackupAndEnable();
             expect(result).toBeTruthy();
 
-            mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version!);
+            mockUploadEmitter(testData.SIGNED_BACKUP_DATA.version);
             await aliceCrypto.importRoomKeys(someRoomKeys);
 
             // The backup loop is waiting a random amount of time to avoid different clients firing at the same time.
@@ -866,7 +866,7 @@ describe("megolm-keys backup", () => {
         // Delete the backup and we are expecting the key backup to be disabled
         const keyBackupStatus = Promise.withResolvers<boolean>();
         aliceClient.once(CryptoEvent.KeyBackupStatus, (enabled) => keyBackupStatus.resolve(enabled));
-        await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version!);
+        await aliceCrypto.deleteKeyBackupVersion(testData.SIGNED_BACKUP_DATA.version);
         expect(await keyBackupStatus.promise).toBe(false);
 
         // The backup info should not be available anymore
@@ -906,7 +906,7 @@ describe("megolm-keys backup", () => {
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             const result = await aliceCrypto.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
@@ -920,7 +920,7 @@ describe("megolm-keys backup", () => {
             await aliceClient.startClient();
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             const backup: KeyBackupInfo = JSON.parse(JSON.stringify(testData.SIGNED_BACKUP_DATA));
@@ -961,7 +961,7 @@ describe("megolm-keys backup", () => {
             // Alice does *not* trust the device that signed the backup, but *does* have the decryption key.
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             const result = await aliceCrypto.checkKeyBackupAndEnable();
@@ -1077,7 +1077,7 @@ describe("megolm-keys backup", () => {
             const aliceCrypto = aliceClient.getCrypto()!;
             await aliceCrypto.storeSessionBackupPrivateKey(
                 Buffer.from(testData.BACKUP_DECRYPTION_KEY_BASE64, "base64"),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
 
             // start after saving the private key
@@ -1131,7 +1131,7 @@ describe("megolm-keys backup", () => {
             const event = room.getLiveTimeline().getEvents()[0];
             await advanceTimersUntil(awaitDecryption(event, { waitOnDecryptionFailure: true }));
 
-            expect(event.getContent<IContent>()).toEqual(testData.CLEAR_EVENT.content);
+            expect(event.getContent()).toEqual(testData.CLEAR_EVENT.content);
 
             // =====
             // Second suppose now that the backup has changed to version 2

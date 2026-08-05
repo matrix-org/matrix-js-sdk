@@ -21,7 +21,6 @@ import { MigrationState } from "../../../../src/crypto/store/base";
 describe("IndexedDBCryptoStore", () => {
     describe("Test `existsAndIsNotMigrated`", () => {
         beforeEach(async () => {
-            // eslint-disable-next-line no-global-assign
             indexedDB = new IDBFactory();
         });
 

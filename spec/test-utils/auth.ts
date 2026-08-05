@@ -14,4 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-export { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../src/testing.ts";
+export { makeDelegatedAuthMetadata } from "../../src/testing.ts";

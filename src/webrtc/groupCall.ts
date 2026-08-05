@@ -1323,7 +1323,7 @@ export class GroupCall extends TypedEventEmitter<
      */
 
     public getUserMediaFeed(userId: string, deviceId: string): CallFeed | undefined {
-        return this.userMediaFeeds.find((f) => f.userId === userId && f.deviceId! === deviceId);
+        return this.userMediaFeeds.find((f) => f.userId === userId && f.deviceId === deviceId);
     }
 
     private addUserMediaFeed(callFeed: CallFeed): void {
@@ -1334,7 +1334,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private replaceUserMediaFeed(existingFeed: CallFeed, replacementFeed: CallFeed): void {
         const feedIndex = this.userMediaFeeds.findIndex(
-            (f) => f.userId === existingFeed.userId && f.deviceId! === existingFeed.deviceId,
+            (f) => f.userId === existingFeed.userId && f.deviceId === existingFeed.deviceId,
         );
 
         if (feedIndex === -1) {
@@ -1350,7 +1350,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private removeUserMediaFeed(callFeed: CallFeed): void {
         const feedIndex = this.userMediaFeeds.findIndex(
-            (f) => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
+            (f) => f.userId === callFeed.userId && f.deviceId === callFeed.deviceId,
         );
 
         if (feedIndex === -1) {
@@ -1397,7 +1397,7 @@ export class GroupCall extends TypedEventEmitter<
      */
 
     public getScreenshareFeed(userId: string, deviceId: string): CallFeed | undefined {
-        return this.screenshareFeeds.find((f) => f.userId === userId && f.deviceId! === deviceId);
+        return this.screenshareFeeds.find((f) => f.userId === userId && f.deviceId === deviceId);
     }
 
     private addScreenshareFeed(callFeed: CallFeed): void {
@@ -1407,7 +1407,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private replaceScreenshareFeed(existingFeed: CallFeed, replacementFeed: CallFeed): void {
         const feedIndex = this.screenshareFeeds.findIndex(
-            (f) => f.userId === existingFeed.userId && f.deviceId! === existingFeed.deviceId,
+            (f) => f.userId === existingFeed.userId && f.deviceId === existingFeed.deviceId,
         );
 
         if (feedIndex === -1) {
@@ -1422,7 +1422,7 @@ export class GroupCall extends TypedEventEmitter<
 
     private removeScreenshareFeed(callFeed: CallFeed): void {
         const feedIndex = this.screenshareFeeds.findIndex(
-            (f) => f.userId === callFeed.userId && f.deviceId! === callFeed.deviceId,
+            (f) => f.userId === callFeed.userId && f.deviceId === callFeed.deviceId,
         );
 
         if (feedIndex === -1) {
@@ -1469,7 +1469,7 @@ export class GroupCall extends TypedEventEmitter<
             const content = e.getContent<Record<any, unknown>>();
             const calls: Record<any, unknown>[] = Array.isArray(content["m.calls"]) ? content["m.calls"] : [];
             const call = calls.find((call) => call["m.call_id"] === this.groupCallId);
-            const devices: Record<any, unknown>[] = Array.isArray(call?.["m.devices"]) ? call!["m.devices"] : [];
+            const devices: Record<any, unknown>[] = Array.isArray(call?.["m.devices"]) ? call["m.devices"] : [];
 
             // Filter out invalid and expired devices
             let validDevices = devices.filter(

@@ -140,7 +140,6 @@ function runCallbacks(): void {
 
     // get the list of things to call
     const callbacksToRun: Callback[] = [];
-    // eslint-disable-next-line
     while (true) {
         const first = callbackList[0];
         if (!first || first.runAt > timestamp) {

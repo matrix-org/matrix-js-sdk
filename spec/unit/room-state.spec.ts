@@ -21,9 +21,9 @@ import { makeBeaconEvent, makeBeaconInfoEvent } from "../test-utils/beacon";
 import { filterEmitCallsByEventType } from "../test-utils/emitter";
 import { RoomState, RoomStateEvent } from "../../src/models/room-state";
 import { RoomMemberEvent } from "../../src/models/room-member";
-import { type Beacon, BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
+import { BeaconEvent, getBeaconInfoIdentifier } from "../../src/models/beacon";
 import { EventType, RelationType, UNSTABLE_MSC2716_MARKER } from "../../src/@types/event";
-import { type IContent, MatrixEvent, MatrixEventEvent } from "../../src/models/event";
+import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { M_BEACON } from "../../src/@types/beacon";
 import { type MatrixClient } from "../../src/client";
 import { Room } from "../../src/models/room";
@@ -171,7 +171,7 @@ describe("RoomState", function () {
             expect(state.getStateEvents("foo.bar.baz", "keyname")).toEqual(null);
         });
 
-        it("should return an empty list if a state_key was not specified and there" + " was no match", function () {
+        it("should return an empty list if a state_key was not specified and there was no match", function () {
             expect(state.getStateEvents("foo.bar.baz")).toEqual([]);
         });
 
@@ -179,13 +179,13 @@ describe("RoomState", function () {
             const events = state.getStateEvents("m.room.member");
             expect(events.length).toEqual(2);
             // ordering unimportant
-            expect([userA, userB].indexOf(events[0].getStateKey() as string)).not.toEqual(-1);
-            expect([userA, userB].indexOf(events[1].getStateKey() as string)).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[0].getStateKey()!)).not.toEqual(-1);
+            expect([userA, userB].indexOf(events[1].getStateKey()!)).not.toEqual(-1);
         });
 
         it("should return a single MatrixEvent if a state_key was specified", function () {
             const event = state.getStateEvents("m.room.member", userA);
-            expect(event?.getContent<IContent>()).toMatchObject({
+            expect(event?.getContent()).toMatchObject({
                 membership: KnownMembership.Join,
             });
         });
@@ -577,7 +577,7 @@ describe("RoomState", function () {
 
             state.setStateEvents([beaconEvent]);
             const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beaconEvent));
-            const destroySpy = vi.spyOn(beaconInstance as Beacon, "destroy");
+            const destroySpy = vi.spyOn(beaconInstance!, "destroy");
             expect(beaconInstance?.isLive).toEqual(true);
 
             state.setStateEvents([redactedBeaconEvent]);
@@ -783,30 +783,27 @@ describe("RoomState", function () {
             expect(state.maySendStateEvent("m.room.name", userA)).toEqual(true);
         });
 
-        it(
-            "should say members with power >=50 may send state with power level event " + "but no state default",
-            function () {
-                const powerLevelEvent = new MatrixEvent({
-                    type: "m.room.power_levels",
-                    room_id: roomId,
-                    sender: userA,
-                    state_key: "",
-                    content: {
-                        users_default: 10,
-                        // state_default: 50, "intentionally left blank"
-                        events_default: 25,
-                        users: {
-                            [userA]: 50,
-                        },
+        it("should say members with power >=50 may send state with power level event but no state default", function () {
+            const powerLevelEvent = new MatrixEvent({
+                type: "m.room.power_levels",
+                room_id: roomId,
+                sender: userA,
+                state_key: "",
+                content: {
+                    users_default: 10,
+                    // state_default: 50, "intentionally left blank"
+                    events_default: 25,
+                    users: {
+                        [userA]: 50,
                     },
-                });
+                },
+            });
 
-                state.setStateEvents([powerLevelEvent]);
+            state.setStateEvents([powerLevelEvent]);
 
-                expect(state.maySendStateEvent("m.room.name", userA)).toEqual(true);
-                expect(state.maySendStateEvent("m.room.name", userB)).toEqual(false);
-            },
-        );
+            expect(state.maySendStateEvent("m.room.name", userA)).toEqual(true);
+            expect(state.maySendStateEvent("m.room.name", userB)).toEqual(false);
+        });
 
         it("should obey state_default", function () {
             const powerLevelEvent = new MatrixEvent({
@@ -913,7 +910,7 @@ describe("RoomState", function () {
             expect(state.getJoinedMemberCount()).toEqual(100);
         });
 
-        it("should, once used, override counting members from state, " + "also after clone", function () {
+        it("should, once used, override counting members from state, also after clone", function () {
             state.setStateEvents([
                 utils.mkMembership({ event: true, mship: KnownMembership.Join, user: userA, room: roomId }),
             ]);
@@ -944,7 +941,7 @@ describe("RoomState", function () {
             expect(state.getInvitedMemberCount()).toEqual(100);
         });
 
-        it("should, once used, override counting members from state, " + "also after clone", function () {
+        it("should, once used, override counting members from state, also after clone", function () {
             state.setStateEvents([
                 utils.mkMembership({ event: true, mship: KnownMembership.Invite, user: userB, room: roomId }),
             ]);
@@ -1120,7 +1117,7 @@ describe("RoomState", function () {
 
                 expect(state.beacons.size).toEqual(2);
 
-                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beaconInstance = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beaconInstance, "addLocations");
 
                 await state.processBeaconEvents([location1, location2, location3], mockClient);
@@ -1187,7 +1184,7 @@ describe("RoomState", function () {
                 });
                 state.setStateEvents([beacon1, beacon2]);
 
-                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beacon, "addLocations").mockClear();
                 state.processBeaconEvents([location, otherRelatedEvent], mockClient);
                 expect(addLocationsSpy).not.toHaveBeenCalled();
@@ -1248,7 +1245,7 @@ describe("RoomState", function () {
                 });
                 vi.spyOn(decryptingRelatedEvent, "isBeingDecrypted").mockReturnValue(true);
                 state.setStateEvents([beacon1, beacon2]);
-                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beacon, "addLocations").mockClear();
                 await state.processBeaconEvents([decryptingRelatedEvent], mockClient);
 
@@ -1274,7 +1271,7 @@ describe("RoomState", function () {
                 mockClient.decryptEventIfNeeded.mockReturnValue(decryptEventResolvers.promise);
 
                 state.setStateEvents([beacon1, beacon2]);
-                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1)) as Beacon;
+                const beacon = state.beacons.get(getBeaconInfoIdentifier(beacon1))!;
                 const addLocationsSpy = vi.spyOn(beacon, "addLocations").mockClear();
                 const prom = state.processBeaconEvents([decryptingRelatedEvent], mockClient);
 

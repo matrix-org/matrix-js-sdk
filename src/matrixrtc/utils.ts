@@ -24,8 +24,6 @@ export class OutdatedKeyFilter {
     // Map of participantId -> keyIndex -> timestamp
     private tsBuffer: Map<EncryptionKeyMapKey, Map<number, number>> = new Map();
 
-    public constructor() {}
-
     /**
      * Check if there is a recent key with the same keyId (index) and then use the creationTS to decide what to
      * do with the key. If the key received is older than the one already in the buffer, it is ignored.

@@ -34,8 +34,8 @@ import {
     SIGNED_CROSS_SIGNING_KEYS_DATA,
     SIGNED_TEST_DEVICE_DATA,
     USER_CROSS_SIGNING_PRIVATE_KEY_BASE64,
-} from "../../test-utils/test-data";
-import * as testData from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { CryptoEvent } from "../../../src/crypto-api";
@@ -43,7 +43,6 @@ import { CryptoEvent } from "../../../src/crypto-api";
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -138,7 +137,7 @@ describe("cross-signing", () => {
             // check that the cross-signing keys have been uploaded
             expect(fetchMock.callHistory.called("upload-cross-signing-keys")).toBeTruthy();
             const keysOpts = fetchMock.callHistory.lastCall("upload-cross-signing-keys")!.options;
-            const keysBody = JSON.parse(keysOpts!.body as string);
+            const keysBody = JSON.parse(keysOpts.body as string);
             expect(keysBody.auth).toEqual(authDict); // check uia dict was passed
             // there should be a key of each type
             // master key is signed by the device
@@ -152,7 +151,7 @@ describe("cross-signing", () => {
             // check the publish call
             expect(fetchMock.callHistory.called("upload-sigs")).toBeTruthy();
             const sigsOpts = fetchMock.callHistory.lastCall("upload-sigs")!.options;
-            const body = JSON.parse(sigsOpts!.body as string);
+            const body = JSON.parse(sigsOpts.body as string);
             // there should be a signature for our device, by our self-signing key.
             expect(body).toHaveProperty([TEST_USER_ID, TEST_DEVICE_ID, "signatures", TEST_USER_ID, sskId]);
         });
@@ -235,7 +234,7 @@ describe("cross-signing", () => {
             // Expect the signature to be uploaded
             expect(fetchMock.callHistory.called("upload-sigs")).toBeTruthy();
             const sigsOpts = fetchMock.callHistory.lastCall("upload-sigs")!.options;
-            const body = JSON.parse(sigsOpts!.body as string);
+            const body = JSON.parse(sigsOpts.body as string);
             // the device should have a signature with the public self cross signing keys.
             expect(body).toHaveProperty([
                 TEST_USER_ID,
@@ -477,7 +476,7 @@ describe("cross-signing", () => {
             // check that a sig for the device was uploaded
             const calls = fetchMock.callHistory.calls("upload-sigs");
             expect(calls.length).toEqual(1);
-            const body = JSON.parse(calls[0].options!.body as string);
+            const body = JSON.parse(calls[0].options.body as string);
             const deviceSig = body[aliceClient.getSafeUserId()][testData.TEST_DEVICE_ID];
             expect(deviceSig).toHaveProperty("signatures");
         });

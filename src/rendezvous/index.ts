@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixClient, OAuthGrantType, type OidcClientConfig } from "../matrix.ts";
+import { type MatrixClient, OAuthGrantType, type ValidatedAuthMetadata } from "../matrix.ts";
 import { MSC4108FailureReason, type RendezvousFailureListener } from "./RendezvousFailureReason.ts";
 import { MSC4108SignInWithQR } from "./MSC4108SignInWithQR.ts";
 import { MSC4108RendezvousSession } from "./transports/MSC4108RendezvousSession.ts";
@@ -39,7 +39,7 @@ export * from "./channels/index.ts";
  * @returns true if the homeserver that the client is connected to supports a variant of sign-in with QR that we can use, false otherwise.
  */
 export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boolean> {
-    let metadata: OidcClientConfig;
+    let metadata: ValidatedAuthMetadata;
     try {
         metadata = await client.getAuthMetadata();
     } catch (e) {

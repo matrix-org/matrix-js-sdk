@@ -938,14 +938,12 @@ describe("MembershipManager", () => {
     });
 
     describe("updateCallIntent()", () => {
-        // eslint-disable-next-line @vitest/expect-expect
         it("should fail if the user has not joined the call", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             // After joining we want our own focus to be the one we select.
-            try {
-                await manager.updateCallIntent("video");
-                throw Error("Should have thrown");
-            } catch {}
+            await expect(manager.updateCallIntent("video")).rejects.toThrowErrorMatchingInlineSnapshot(
+                `[Error: You cannot update your intent before joining the call]`,
+            );
         });
 
         it("can adjust the intent", async () => {
@@ -1016,7 +1014,10 @@ describe("MembershipManager", () => {
                                 device_id: "AAAAAAA",
                             },
                             slot_id: "m.call#ROOM",
-                            rtc_transports: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
+                            transports: {
+                                published: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
+                                can_subscribe: ["livekit"],
+                            },
                             versions: [],
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },

@@ -367,7 +367,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
         // Decide whether this event is going to be added at the end of the timeline.
         const lastReply = this.lastReply();
-        const isNewestReply = !lastReply || event.localTimestamp >= lastReply!.localTimestamp;
+        const isNewestReply = !lastReply || event.localTimestamp >= lastReply.localTimestamp;
 
         if (!Thread.hasServerSideSupport) {
             // When there's no server-side support, just add it to the end of the timeline.
@@ -914,8 +914,8 @@ export const FILTER_RELATED_BY_REL_TYPES = new ServerControlledNamespacedValue(
 export const THREAD_RELATION_TYPE = new ServerControlledNamespacedValue("m.thread", "io.element.thread");
 
 export enum ThreadFilterType {
-    "My",
-    "All",
+    My,
+    All,
 }
 
 export function threadFilterTypeToFilter(type: ThreadFilterType | null): "all" | "participated" {

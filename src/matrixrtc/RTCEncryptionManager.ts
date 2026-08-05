@@ -342,7 +342,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             })
             .map((membership) => {
                 return {
-                    userId: membership.sender!,
+                    userId: membership.sender,
                     deviceId: membership.deviceId,
                     membershipTs: membership.createdTs(),
                 };
@@ -446,7 +446,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private nextKeyIndex(): number {
         if (this.outboundSession) {
-            return (this.outboundSession!.keyId + 1) % 256;
+            return (this.outboundSession.keyId + 1) % 256;
         }
         return 0;
     }

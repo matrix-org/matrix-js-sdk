@@ -170,9 +170,7 @@ interface ISyncParams {
     "filter"?: string;
     "timeout": number;
     "since"?: string;
-    // eslint-disable-next-line camelcase
     "full_state"?: boolean;
-    // eslint-disable-next-line camelcase
     "set_presence"?: SetPresence;
     "_cacheBuster"?: string | number; // not part of the API itself
     "org.matrix.msc4222.use_state_after"?: boolean; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
@@ -1121,7 +1119,8 @@ export class SyncApi {
 
         // handle presence events (User objects)
         if (Array.isArray(data.presence?.events)) {
-            data.presence!.events.filter(noUnsafeEventProps)
+            data.presence.events
+                .filter(noUnsafeEventProps)
                 .map(client.getEventMapper())
                 .forEach(function (presenceEvent) {
                     let user = client.store.getUser(presenceEvent.getSender()!);
@@ -1140,7 +1139,7 @@ export class SyncApi {
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.filter(noUnsafeEventProps).map(client.getEventMapper());
             const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
-                m[c.getType()!] = client.store.getAccountData(c.getType());
+                m[c.getType()] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
             client.store.storeAccountDataEvents(events);
@@ -1153,7 +1152,7 @@ export class SyncApi {
                     const rules = accountDataEvent.getContent<IPushRules>();
                     client.setPushRules(rules);
                 }
-                const prevEvent = prevEventsMap[accountDataEvent.getType()!];
+                const prevEvent = prevEventsMap[accountDataEvent.getType()];
                 client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                 return accountDataEvent;
             });
@@ -1764,7 +1763,7 @@ export class SyncApi {
                     // fire listeners
                     member.setMembershipEvent(inviteEvent, room.currentState);
                 },
-                function (err) {
+                function () {
                     // OH WELL.
                 },
             );

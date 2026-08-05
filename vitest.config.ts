@@ -7,7 +7,7 @@ Please see LICENSE files in the repository root for full details.
 
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 import { type Reporter } from "vitest/reporters";
-import { env } from "process";
+import { env } from "node:process";
 
 const reporters: NonNullable<ViteUserConfig["test"]>["reporters"] = [["default"]];
 
@@ -16,7 +16,7 @@ const slowTestReporter: Reporter = {
         const tests = testModules
             .flatMap((m) => Array.from(m.children.allTests()))
             .filter((test) => test.diagnostic()?.slow);
-        tests.sort((x, y) => x.diagnostic()!.duration! - y.diagnostic()!.duration!);
+        tests.sort((x, y) => x.diagnostic()!.duration - y.diagnostic()!.duration);
         tests.reverse();
 
         if (tests.length > 0) {
@@ -43,6 +43,7 @@ export default defineConfig({
         coverage: {
             provider: "v8",
             include: ["src/**/*.ts"],
+            exclude: ["**/crypto-test-data/**"],
             reporter: "lcov",
         },
         environment: "node",

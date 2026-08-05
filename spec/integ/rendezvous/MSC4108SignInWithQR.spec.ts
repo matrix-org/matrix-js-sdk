@@ -27,14 +27,14 @@ import {
 } from "../../../src/rendezvous";
 import {
     ClientPrefix,
-    DEVICE_CODE_SCOPE,
+    OAuthGrantType,
     type IHttpOpts,
     type IMyDevice,
     type MatrixClient,
     MatrixError,
     MatrixHttpApi,
 } from "../../../src";
-import { makeDelegatedAuthConfig, mockOpenIdConfiguration } from "../../test-utils/oidc";
+import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
 
 function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled: boolean }): MatrixClient {
     const baseUrl = "https://example.com";
@@ -55,7 +55,9 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
         getDomain: () => "example.com",
         getDevice: vi.fn(),
         getCrypto: vi.fn(() => crypto),
-        getAuthMetadata: vi.fn().mockResolvedValue(makeDelegatedAuthConfig("https://issuer/", [DEVICE_CODE_SCOPE])),
+        getAuthMetadata: vi
+            .fn()
+            .mockResolvedValue(makeDelegatedAuthMetadata("https://issuer/", [OAuthGrantType.DeviceAuthorization])),
     } as unknown as MatrixClient;
     client.http = new MatrixHttpApi<IHttpOpts & { onlyData: true }>(client, {
         baseUrl: client.baseUrl,
@@ -66,22 +68,12 @@ function makeMockClient(opts: { userId: string; deviceId: string; msc4108Enabled
 }
 
 describe("MSC4108SignInWithQR", () => {
-    beforeEach(() => {
-        fetchMock.get("https://issuer/jwks", {
-            status: 200,
-            headers: {
-                "Content-Type": "application/json",
-            },
-            keys: [],
-        });
-    });
-
     const url = "https://fallbackserver/rz/123";
     const deviceId = "DEADB33F";
     const verificationUri = "https://example.com/verify";
     const verificationUriComplete = "https://example.com/verify/complete";
-    const metadata = mockOpenIdConfiguration();
-    const clientId = "oidc-client-id";
+    const metadata = makeDelegatedAuthMetadata();
+    const clientId = "client-id";
 
     it("should generate qr code data as expected", async () => {
         const session = new MSC4108RendezvousSession({
@@ -168,6 +160,8 @@ describe("MSC4108SignInWithQR", () => {
         it("should be able to connect with opponent and share verificationUri", async () => {
             fetchMock.post(metadata.device_authorization_endpoint!, {
                 device_code: "test",
+                user_code: "uc",
+                expires_in: 9999,
                 verification_uri: verificationUriComplete,
             });
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
@@ -183,7 +177,12 @@ describe("MSC4108SignInWithQR", () => {
         });
 
         it("should abort if device already exists", async () => {
-            fetchMock.post(metadata.device_authorization_endpoint!, { device_code: "test" });
+            fetchMock.post(metadata.device_authorization_endpoint!, {
+                device_code: "test",
+                user_code: "uc",
+                expires_in: 9999,
+                verification_uri: verificationUriComplete,
+            });
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
 
             vi.mocked(client.getDevice).mockResolvedValue({} as IMyDevice);
@@ -219,6 +218,8 @@ describe("MSC4108SignInWithQR", () => {
             vi.mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
             fetchMock.post(metadata.device_authorization_endpoint!, {
                 device_code: "test",
+                user_code: "uc",
+                expires_in: 9999,
                 verification_uri: verificationUriComplete,
             });
 
@@ -398,6 +399,8 @@ describe("MSC4108SignInWithQR", () => {
         it("should be able to connect with opponent and share verificationUri", async () => {
             fetchMock.post(metadata.device_authorization_endpoint!, {
                 device_code: "test",
+                user_code: "uc",
+                expires_in: 9999,
                 verification_uri: verificationUriComplete,
             });
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
@@ -406,6 +409,7 @@ describe("MSC4108SignInWithQR", () => {
 
             await Promise.all([
                 expect(ourLogin.deviceAuthorizationGrant({ metadata, clientId, deviceId })).resolves.toEqual({
+                    userCode: "uc",
                     verificationUri: verificationUriComplete,
                 }),
                 expect(opponentLogin.deviceAuthorizationGrant({ clientId, deviceId, metadata })).resolves.toEqual({
@@ -417,6 +421,8 @@ describe("MSC4108SignInWithQR", () => {
         it("should abort if device already exists", async () => {
             fetchMock.post(metadata.device_authorization_endpoint!, {
                 device_code: "test",
+                user_code: "uc",
+                expires_in: 9999,
                 verification_uri: verificationUri,
             });
             await Promise.all([ourLogin.negotiateProtocols(), opponentLogin.negotiateProtocols()]);
@@ -435,6 +441,8 @@ describe("MSC4108SignInWithQR", () => {
             vi.mocked(client.getDevice).mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
             fetchMock.post(metadata.device_authorization_endpoint!, {
                 device_code: "test",
+                user_code: "uc",
+                expires_in: 9999,
                 verification_uri: verificationUriComplete,
             });
 
