@@ -3889,6 +3889,23 @@ describe("MatrixClient", function () {
                 },
             ]);
         });
+
+        it("Caches the rtc transport properties", async () => {
+            const transport = { type: "livekit", livekit_service_url: "https://asfu.org" };
+            httpLookups.push({
+                method: "GET",
+                path: `/rtc/transports`,
+                data: { rtc_transports: [transport] satisfies Transport[] },
+                prefix: "/_matrix/client/unstable/org.matrix.msc4143",
+            });
+
+            await client.startClient();
+
+            await vi.runOnlyPendingTimersAsync();
+
+            const rtcTransports = client.cachedRtcTransports.get();
+            expect(rtcTransports).toStrictEqual([transport]);
+        });
     });
     describe("getUrlPreview", () => {
         it("makes a well-formed request to the new endpoint", async () => {

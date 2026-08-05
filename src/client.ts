@@ -247,6 +247,7 @@ import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { RTCTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 
 export type Store = IStore;
 
@@ -1316,6 +1317,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly retentionPolicyService: RetentionPolicyService;
     public readonly _unstable_shouldApplyMessageRetention: boolean;
 
+    public cachedRtcTransports: RTCTransportsCachedValue;
+
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -1432,6 +1435,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // having lots of event listeners is not unusual. 0 means "unlimited".
         this.setMaxListeners(0);
+
+        this.cachedRtcTransports = new RTCTransportsCachedValue(this, this.logger);
     }
 
     public set store(newStore: Store) {
@@ -1522,6 +1527,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this._unstable_shouldApplyMessageRetention) {
             this.retentionPolicyService?.start();
         }
+
+        this.cachedRtcTransports.start();
     }
 
     /**
@@ -1577,6 +1584,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC.stop();
 
         this.serverCapabilitiesService.stop();
+
+        this.cachedRtcTransports.stop();
     }
 
     /**
