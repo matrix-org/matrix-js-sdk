@@ -1973,6 +1973,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    X.509 signatures on user identities. Any user identity that has a valid signature according to the supplied
      *    CAs will be considered verified, without any manual verification taking place.
      *
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
      */
