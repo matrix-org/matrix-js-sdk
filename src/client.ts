@@ -1097,6 +1097,7 @@ export enum ClientEvent {
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
     UserProfileUpdate = "userProfileUpdate",
+    RtcTransportsUpdated = "rtcTransportsUpdated",
 }
 
 type RoomEvents =
@@ -1167,6 +1168,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
+    [ClientEvent.RtcTransportsUpdated]: (transports: Transport[]) => void;
     /**
      *
      * @param userId - the user ID of the profile which was updated

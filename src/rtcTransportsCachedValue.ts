@@ -16,7 +16,7 @@ limitations under the License.
 
 import { ClientCachedValue } from "./clientCachedValue.ts";
 import { type Transport } from "./matrixrtc/index.ts";
-import { type MatrixClient } from "./client.ts";
+import { ClientEvent, type MatrixClient } from "./client.ts";
 import { type Logger } from "./logger.ts";
 import { MatrixError } from "./http-api/index.ts";
 
@@ -32,6 +32,11 @@ export class RTCTransportsCachedValue extends ClientCachedValue<Transport[]> {
 
     protected fetch(client: MatrixClient): Promise<Transport[]> {
         return this.client._unstable_getRTCTransports();
+    }
+
+    protected valueCached(value: Transport[]): void {
+        super.valueCached(value);
+        this.client.emit(ClientEvent.RtcTransportsUpdated, value);
     }
 
     protected shouldCacheError(error: any): boolean {
