@@ -21,7 +21,7 @@ import { logger } from "../../src/logger.ts";
 
 class MockClientCachedValue extends ClientCachedValue<string> {
     public fetchFn = vi.fn();
-    public cachedCallback = vi.fn<string>();
+    public cachedCallback = vi.fn();
 
     protected async fetch(client: any): Promise<string> {
         return this.fetchFn();
@@ -150,7 +150,7 @@ describe("ClientCachedValue", () => {
     it("should clear an existing timeout handle when stopped", async () => {
         const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
         const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-        setTimeoutSpy.mockReturnValue(123);
+        setTimeoutSpy.mockReturnValue(123 as unknown as ReturnType<typeof setTimeout>);
 
         clientCachedValue.start();
         await vi.advanceTimersByTimeAsync(100);
@@ -163,7 +163,7 @@ describe("ClientCachedValue", () => {
 
     it("should not arm a refresh trigger if no ttl is provided", async () => {
         const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
-        setTimeoutSpy.mockReturnValue(123);
+        setTimeoutSpy.mockReturnValue(123 as unknown as ReturnType<typeof setTimeout>);
 
         clientCachedValue = new MockClientCachedValue("mock", mockClient, undefined, logger);
         clientCachedValue.start();
