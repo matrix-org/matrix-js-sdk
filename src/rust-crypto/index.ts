@@ -30,12 +30,11 @@ import {
 import { type CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
- * Create a new `RustCrypto` implementation
+ * The arguments used to initialise RustCrypto, passed in to initRustCrypto.
  *
- * @param args - Parameter object
  * @internal
  */
-export async function initRustCrypto(args: {
+export interface InitRustCryptoArgs {
     /** A `Logger` instance that will be used for debug output. */
     logger: Logger;
 
@@ -104,7 +103,15 @@ export async function initRustCrypto(args: {
      * considered verified, without any manual verification taking place.
      */
     caCertsPem?: string;
-}): Promise<RustCrypto> {
+}
+
+/**
+ * Create a new `RustCrypto` implementation
+ *
+ * @param args - InitRustCryptoArgs
+ * @internal
+ */
+export async function initRustCrypto(args: InitRustCryptoArgs): Promise<RustCrypto> {
     const { logger } = args;
 
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
@@ -132,18 +139,7 @@ export async function initRustCrypto(args: {
         });
     }
 
-    const rustCrypto = await initOlmMachine(
-        logger,
-        args.http,
-        args.userId,
-        args.deviceId,
-        args.secretStorage,
-        args.cryptoCallbacks,
-        storeHandle,
-        args.legacyCryptoStore,
-        args.enableEncryptedStateEvents,
-        args.caCertsPem,
-    );
+    const rustCrypto = await initOlmMachine(args, storeHandle);
 
     storeHandle.free();
 
@@ -152,16 +148,18 @@ export async function initRustCrypto(args: {
 }
 
 async function initOlmMachine(
-    logger: Logger,
-    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    userId: string,
-    deviceId: string,
-    secretStorage: ServerSideSecretStorage,
-    cryptoCallbacks: CryptoCallbacks,
+    {
+        logger,
+        http,
+        userId,
+        deviceId,
+        secretStorage,
+        cryptoCallbacks,
+        legacyCryptoStore,
+        enableEncryptedStateEvents,
+        caCertsPem,
+    }: InitRustCryptoArgs,
     storeHandle: StoreHandle,
-    legacyCryptoStore?: CryptoStore,
-    enableEncryptedStateEvents?: boolean,
-    caCertsPem?: string,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
