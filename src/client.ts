@@ -53,7 +53,7 @@ import * as utils from "./utils.ts";
 import { deepCompare, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
-import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
+import { type AutoDiscoveryAction } from "./autodiscovery.ts";
 import { encodeUnpaddedBase64Url } from "./base64.ts";
 import { TypedReEmitter } from "./ReEmitter.ts";
 import { logger, type Logger } from "./logger.ts";
@@ -248,6 +248,7 @@ import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointE
 import { type Transport } from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
 import { RTCTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
+import { WellKnownCachedValue } from "./WellKnownCachedValue.ts";
 
 export type Store = IStore;
 
@@ -1274,7 +1275,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncLeftRoomsPromise?: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts?: IStoredClientOpts;
-    protected clientWellKnownIntervalID?: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback?: ResetTimelineCallback;
 
     public canSupport = new Map<Feature, ServerSupport>();
@@ -1286,8 +1286,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
     protected serverVersionsPromise?: Promise<IServerVersions>;
 
-    protected clientWellKnown?: IClientWellKnown;
-    protected clientWellKnownPromise?: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
     protected checkTurnServersIntervalID?: ReturnType<typeof setInterval>;
@@ -1318,6 +1316,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly _unstable_shouldApplyMessageRetention: boolean;
 
     public cachedRtcTransports: RTCTransportsCachedValue;
+    protected cachedWellKnown: WellKnownCachedValue;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1437,6 +1436,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.setMaxListeners(0);
 
         this.cachedRtcTransports = new RTCTransportsCachedValue(this, this.logger);
+        this.cachedWellKnown = new WellKnownCachedValue(this, this.logger);
     }
 
     public set store(newStore: Store) {
@@ -1516,11 +1516,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
 
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
-            this.clientWellKnownIntervalID = setInterval(() => {
-                void this.fetchClientWellKnown();
-            }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            void this.fetchClientWellKnown();
+            this.cachedWellKnown.setTTLMillis(1000 * this.clientOpts.clientWellKnownPollPeriod);
         }
+        this.cachedWellKnown.start();
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
@@ -1575,10 +1573,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         globalThis.clearInterval(this.checkTurnServersIntervalID);
         this.checkTurnServersIntervalID = undefined;
 
-        if (this.clientWellKnownIntervalID !== undefined) {
-            globalThis.clearInterval(this.clientWellKnownIntervalID);
-        }
-
         this.toDeviceMessageQueue.stop();
 
         this.matrixRTC.stop();
@@ -1586,6 +1580,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.serverCapabilitiesService.stop();
 
         this.cachedRtcTransports.stop();
+        this.cachedWellKnown.stop();
     }
 
     /**
@@ -6055,23 +6050,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Post, path, undefined, undefined, { prefix: "" });
     }
 
-    protected async fetchClientWellKnown(): Promise<void> {
-        // `getRawClientConfig` does not throw or reject on network errors, instead
-        // it absorbs errors and returns `{}`.
-        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain() ?? undefined);
-        this.clientWellKnown = await this.clientWellKnownPromise;
-        this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
-    }
-
     public getClientWellKnown(): IClientWellKnown | undefined {
-        return this.clientWellKnown;
+        return this.cachedWellKnown.get();
     }
 
-    public waitForClientWellKnown(): Promise<IClientWellKnown> {
+    public async waitForClientWellKnown(): Promise<IClientWellKnown> {
         if (!this.clientRunning) {
             throw new Error("Client is not running");
         }
-        return this.clientWellKnownPromise!;
+        const wellKnown = await this.cachedWellKnown.wait();
+        return wellKnown!;
     }
 
     /**

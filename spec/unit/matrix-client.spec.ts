@@ -24,6 +24,7 @@ import { type MockedObject, type Mocked } from "vitest";
 import { logger } from "../../src/logger";
 import {
     ClientEvent,
+    type IClientWellKnown,
     type IMatrixClientCreateOpts,
     type ITurnServerResponse,
     MatrixClient,
@@ -48,6 +49,7 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
+    AutoDiscovery,
     ClientPrefix,
     ConditionKind,
     ContentHelpers,
@@ -3907,6 +3909,30 @@ describe("MatrixClient", function () {
             expect(rtcTransports).toStrictEqual([transport]);
         });
     });
+
+    describe("Well-known", () => {
+        it("caches the well-known value", async () => {
+            const A_WELLKNOWN: IClientWellKnown = {
+                "m.homeserver": {
+                    base_url: "https://hs.org",
+                },
+                "m.identity_server": {
+                    base_url: "https://is.org",
+                },
+            };
+
+            void client.startClient();
+
+            vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+
+            const value = await client.waitForClientWellKnown();
+            expect(value).toStrictEqual(A_WELLKNOWN);
+
+            const cached = client.getClientWellKnown();
+            expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+    });
+
     describe("getUrlPreview", () => {
         it("makes a well-formed request to the new endpoint", async () => {
             client.getVersions = vi.fn().mockResolvedValue({

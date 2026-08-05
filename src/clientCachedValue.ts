@@ -110,6 +110,7 @@ export abstract class ClientCachedValue<ValueType> {
      * @protected
      */
     protected valueCached(value: ValueType): void {
+        this.logger.trace(`New cachedValue: ${value}`);
         // nop - Use to emit changes if needed
     }
 
