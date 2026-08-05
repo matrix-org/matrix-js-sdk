@@ -105,7 +105,7 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     } else {
         // validate that each transport has at least a string 'type'
         for (const t of data.transports.published) {
-            if (typeof t !== "object" || t === null || typeof (t as any).type !== "string") {
+            if (typeof t !== "object" || t === null || typeof t.type !== "string") {
                 errors.push(prefix + "transports.published entries must be objects with a string type");
                 break;
             }

@@ -487,7 +487,7 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
     if (rustSeenMSK && rustSeenMSK == legacyLocallyTrustedMSK) {
         logger.info(`Post Migration: Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`);
         // Let's mark the user identity as locally verified as part of the migration.
-        await rustOwnIdentity!.verify();
+        await rustOwnIdentity.verify();
         // As well as marking the MSK as trusted, `OlmMachine.verify` returns a
         // `SignatureUploadRequest` which will publish a signature of the MSK using
         // this device. In this case, we ignore the request: since the user hasn't

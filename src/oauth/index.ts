@@ -34,7 +34,7 @@ import {
 } from "./register.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { sha256 } from "../digest.ts";
-import { HTTPError, Method } from "../http-api";
+import { HTTPError, Method } from "../http-api/index.ts";
 import { logger } from "../logger.ts";
 import { OAuth2Error } from "./error.ts";
 import { secureRandomString } from "../randomstring.ts";
@@ -126,7 +126,7 @@ export class OAuth2 {
                 throw error;
             } else {
                 logger.error("Dynamic registration request failed", error);
-                throw new Error(OAuth2Error.DynamicRegistrationFailed);
+                throw new Error(OAuth2Error.DynamicRegistrationFailed, { cause: error });
             }
         }
     }

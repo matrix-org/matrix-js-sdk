@@ -56,7 +56,7 @@ export class CallStatsReportGatherer {
             receivedVideoMedia: 0,
             audioTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0, concealedAudio: 0, totalAudio: 0 },
             videoTrackSummary: { count: 0, muted: 0, maxPacketLoss: 0, maxJitter: 0, concealedAudio: 0, totalAudio: 0 },
-        } as CallStatsReportSummary;
+        } satisfies CallStatsReportSummary;
         if (this.isActive) {
             const statsPromise = this.pc.getStats();
             if (typeof statsPromise?.then === "function") {
@@ -96,7 +96,7 @@ export class CallStatsReportGatherer {
     }
 
     private processStatsReport(groupCallId: string, localUserId: string): void {
-        const byteSentStatsReport: ByteSentStatsReport = new Map<TrackID, ByteSend>() as ByteSentStatsReport;
+        const byteSentStatsReport: ByteSentStatsReport = new Map<TrackID, ByteSend>();
         byteSentStatsReport.callId = this.callId;
         byteSentStatsReport.opponentMemberId = this.opponentMemberId;
 

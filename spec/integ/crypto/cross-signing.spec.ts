@@ -137,7 +137,7 @@ describe("cross-signing", () => {
             // check that the cross-signing keys have been uploaded
             expect(fetchMock.callHistory.called("upload-cross-signing-keys")).toBeTruthy();
             const keysOpts = fetchMock.callHistory.lastCall("upload-cross-signing-keys")!.options;
-            const keysBody = JSON.parse(keysOpts!.body as string);
+            const keysBody = JSON.parse(keysOpts.body as string);
             expect(keysBody.auth).toEqual(authDict); // check uia dict was passed
             // there should be a key of each type
             // master key is signed by the device
@@ -151,7 +151,7 @@ describe("cross-signing", () => {
             // check the publish call
             expect(fetchMock.callHistory.called("upload-sigs")).toBeTruthy();
             const sigsOpts = fetchMock.callHistory.lastCall("upload-sigs")!.options;
-            const body = JSON.parse(sigsOpts!.body as string);
+            const body = JSON.parse(sigsOpts.body as string);
             // there should be a signature for our device, by our self-signing key.
             expect(body).toHaveProperty([TEST_USER_ID, TEST_DEVICE_ID, "signatures", TEST_USER_ID, sskId]);
         });
@@ -234,7 +234,7 @@ describe("cross-signing", () => {
             // Expect the signature to be uploaded
             expect(fetchMock.callHistory.called("upload-sigs")).toBeTruthy();
             const sigsOpts = fetchMock.callHistory.lastCall("upload-sigs")!.options;
-            const body = JSON.parse(sigsOpts!.body as string);
+            const body = JSON.parse(sigsOpts.body as string);
             // the device should have a signature with the public self cross signing keys.
             expect(body).toHaveProperty([
                 TEST_USER_ID,
@@ -476,7 +476,7 @@ describe("cross-signing", () => {
             // check that a sig for the device was uploaded
             const calls = fetchMock.callHistory.calls("upload-sigs");
             expect(calls.length).toEqual(1);
-            const body = JSON.parse(calls[0].options!.body as string);
+            const body = JSON.parse(calls[0].options.body as string);
             const deviceSig = body[aliceClient.getSafeUserId()][testData.TEST_DEVICE_ID];
             expect(deviceSig).toHaveProperty("signatures");
         });

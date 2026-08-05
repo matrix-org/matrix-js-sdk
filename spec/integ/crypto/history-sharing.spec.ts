@@ -709,7 +709,7 @@ describe("History Sharing", () => {
                 sender: aliceClient.getSafeUserId(),
                 content: firstMessage,
                 event_id: "$event_id",
-            }) as any,
+            }),
         );
         bobSyncResponder.sendOrQueueSyncResponse(bobSyncResponse);
         await syncPromise(bobClient);
@@ -797,7 +797,7 @@ describe("History Sharing", () => {
                     sender: bobClient.getSafeUserId(),
                     content: bobEventM1Content,
                     event_id: "$event_id_m1",
-                }) as any,
+                }),
             );
             syncResponse.to_device = {
                 events: [
@@ -873,7 +873,7 @@ describe("History Sharing", () => {
                     sender: bobClient.getSafeUserId(),
                     content: bobEventM1Content,
                     event_id: "$event_id_m1",
-                }) as any,
+                }),
             );
             charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(charlieClient);
@@ -939,7 +939,7 @@ describe("History Sharing", () => {
                             type: EventType.RoomMember,
                             sender: charlieClient.getSafeUserId(),
                             state_key: charlieClient.getSafeUserId(),
-                        }) as any,
+                        }),
                     ],
                 };
             } else {
@@ -949,13 +949,13 @@ describe("History Sharing", () => {
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }) as any,
+                    }),
                     mkEventCustom({
                         content: { membership: config.leftState },
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }) as any,
+                    }),
                 );
             }
             // Bob syncs to learn about Charlie's leaving (and joining if non-gappy).

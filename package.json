@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "42.0.0",
+    "version": "42.1.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -62,7 +62,7 @@
         "content-type": "^2.0.0",
         "loglevel": "^1.9.2",
         "matrix-events-sdk": "0.0.1",
-        "matrix-widget-api": "^1.16.1",
+        "matrix-widget-api": "^1.18.0",
         "p-retry": "8",
         "sdp-transform": "^3.0.0",
         "unhomoglyph": "^1.0.6"
@@ -97,9 +97,9 @@
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
-        "oxfmt": "^0.60.0",
+        "oxfmt": "^0.61.0",
         "oxlint": "^1.70.0",
-        "oxlint-tsgolint": "^0.25.0",
+        "oxlint-tsgolint": "^7.0.0",
         "typedoc": "^0.28.1",
         "typedoc-plugin-coverage": "^4.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",

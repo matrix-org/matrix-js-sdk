@@ -1338,7 +1338,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const userId = opts.userId || null;
         this.credentials = { userId };
 
-        this.http = new MatrixHttpApi(this as ConstructorParameters<typeof MatrixHttpApi>[0], {
+        this.http = new MatrixHttpApi(this, {
             fetchFn: opts.fetchFn,
             baseUrl: opts.baseUrl,
             idBaseUrl: opts.idBaseUrl,
@@ -2135,7 +2135,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public deleteKeysFromBackup(roomId: string, sessionId: undefined, version?: string): Promise<void>;
     public deleteKeysFromBackup(roomId: string, sessionId: string, version?: string): Promise<void>;
     public async deleteKeysFromBackup(roomId?: string, sessionId?: string, version?: string): Promise<void> {
-        const path = this.makeKeyBackupPath(roomId!, sessionId!, version);
+        const path = this.makeKeyBackupPath(roomId, sessionId, version);
         await this.http.authedRequest(Method.Delete, path.path, path.queryData, undefined, { prefix: ClientPrefix.V3 });
     }
 
@@ -3200,14 +3200,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse> {
         if (typeof threadId !== "string" && threadId !== null) {
             txnId = content as string;
-            content = threadId as RoomMessageEventContent;
+            content = threadId;
             threadId = null;
         }
 
         const eventType = EventType.RoomMessage;
         const sendContent = content as RoomMessageEventContent;
 
-        return this.sendEvent(roomId, threadId as string | null, eventType, sendContent, txnId);
+        return this.sendEvent(roomId, threadId, eventType, sendContent, txnId);
     }
 
     /**
@@ -3316,8 +3316,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             text = (info as string) || "Image";
-            info = url as ImageInfo;
-            url = threadId as string;
+            info = url;
+            url = threadId;
             threadId = null;
         }
         const content = {
@@ -3357,8 +3357,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
             text = (info as string) || "Sticker";
-            info = url as ImageInfo;
-            url = threadId as string;
+            info = url;
+            url = threadId;
             threadId = null;
         }
         const content = {
@@ -3390,7 +3390,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         htmlBody?: string,
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
-            htmlBody = body as string;
+            htmlBody = body;
             body = threadId;
             threadId = null;
         }
@@ -3418,7 +3418,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         htmlBody?: string,
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
-            htmlBody = body as string;
+            htmlBody = body;
             body = threadId;
             threadId = null;
         }
@@ -3446,7 +3446,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         htmlBody?: string,
     ): Promise<ISendEventResponse> {
         if (!threadId?.startsWith(EVENT_ID_PREFIX) && threadId !== null) {
-            htmlBody = body as string;
+            htmlBody = body;
             body = threadId;
             threadId = null;
         }
@@ -5567,7 +5567,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (promise) {
             return new Promise<void>((resolve, reject) => {
                 // Update this.pushRules when the operation completes
-                promise!
+                promise
                     .then(() => {
                         this.getPushRules()
                             .then((result) => {
@@ -6992,8 +6992,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             room_id: roomId,
             type: eventType,
             state_key: stateKey,
-            // Cast safety: StateEvents[K] is a stronger bound than IContent, which has [key: string]: any
-            content: content as IContent,
+            content,
         });
 
         await this.encryptStateEventIfNeeded(event, room ?? undefined);
@@ -7036,7 +7035,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // If the crypto impl thinks we shouldn't encrypt, then we shouldn't.
         // Safety: we checked the crypto impl exists above.
-        if (!(await this.cryptoBackend!.isStateEncryptionEnabledInRoom(room.roomId))) {
+        if (!(await this.cryptoBackend.isStateEncryptionEnabledInRoom(room.roomId))) {
             return;
         }
 

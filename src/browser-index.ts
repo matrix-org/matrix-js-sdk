@@ -37,7 +37,7 @@ try {
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {
-    sdk.setCryptoStoreFactory(() => new sdk.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
+    sdk.setCryptoStoreFactory(() => new sdk.IndexedDBCryptoStore(indexedDB, "matrix-js-sdk:crypto"));
 }
 
 export * from "./matrix.ts";
