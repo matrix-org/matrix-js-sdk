@@ -19,23 +19,19 @@ jobs:
         strategy:
             matrix:
                 specs: [integ, unit]
-                node: ["lts/*", 22]
+                node: [lts, 22]
         steps:
             - name: Checkout code
               uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - name: Setup Node
-              id: setupNode
-              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version: ${{ matrix.node }}
-
-            - name: Install dependencies
-              run: "pnpm install"
+                  runtime: node@${{ matrix.node }}
+                  cache: true
+                  install: true
 
             - name: Get number of CPU cores
               id: cpu-cores
@@ -55,13 +51,13 @@ jobs:
               if: env.ENABLE_COVERAGE == 'true'
               run: mv coverage/lcov.info coverage/${NODE_VERSION}-${{ matrix.specs }}.lcov.info
               env:
-                  NODE_VERSION: ${{ steps.setupNode.outputs.node-version }}
+                  NODE_VERSION: ${{ matrix.node }}
 
             - name: Upload Artifact
               if: env.ENABLE_COVERAGE == 'true'
               uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
               with:
-                  name: coverage-${{ matrix.specs }}-${{ matrix.node == 'lts/*' && 'lts' || matrix.node }}
+                  name: coverage-${{ matrix.specs }}-${{ matrix.node }}
                   path: |
                       coverage
                       !coverage/lcov-report

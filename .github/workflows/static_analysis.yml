@@ -18,14 +18,12 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Typecheck
               run: "pnpm run lint:types"
@@ -38,14 +36,12 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Run Linter
               run: "pnpm run lint:js"
@@ -58,14 +54,12 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Build Types
               run: "pnpm build:types"
@@ -92,14 +86,12 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Run Linter
               run: "pnpm lint:workflows"
@@ -115,14 +107,12 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Generate Docs
               run: "pnpm run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
@@ -143,14 +133,12 @@ jobs:
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Run linter
               run: "pnpm run lint:knip"
@@ -165,11 +153,12 @@ jobs:
                   repository: element-hq/element-web
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
               with:
-                  cache: "pnpm"
-                  node-version: "lts/*"
+                  runtime: node
+                  cache: true
+                  install: false
 
             - name: Install Dependencies
               run: "./scripts/layered.sh"
