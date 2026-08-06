@@ -27,6 +27,7 @@ describe("RtcTransportsCachedValue", () => {
     beforeEach(() => {
         mockClient = {
             _unstable_getRTCTransports: vi.fn(),
+            emit: vi.fn(),
         } as unknown as MockedObject<MatrixClient>;
         rtcTransportsCachedValue = new RTCTransportsCachedValue(mockClient, logger);
     });
