@@ -73,7 +73,9 @@ export abstract class ClientCachedValue<ValueType> {
     public start(): void {
         this.isStopped = false;
         // Request a fetch as soon as possible
-        void this.doFetch();
+        this.doFetch().catch((err) => {
+            this.logger.debug("Cached value fetch on start did fail", err);
+        });
     }
 
     /**
