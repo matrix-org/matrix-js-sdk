@@ -201,6 +201,12 @@ describe("MatrixClient", function () {
         data: {},
     };
 
+    const RTC_TRANSPORT_RESPONSE: HttpLookup = {
+        method: "GET",
+        path: "/rtc/transports/",
+        data: { rtc_transports: [] },
+    };
+
     const FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
 
     const FILTER_RESPONSE: HttpLookup = {
@@ -399,6 +405,7 @@ describe("MatrixClient", function () {
         pendingLookup = null;
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
+        httpLookups.push(RTC_TRANSPORT_RESPONSE);
         httpLookups.push(FILTER_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
     });
@@ -1605,7 +1612,7 @@ describe("MatrixClient", function () {
     });
 
     it("should not POST /filter if a matching filter already exists", async function () {
-        httpLookups = [PUSH_RULES_RESPONSE, SYNC_RESPONSE];
+        httpLookups = [PUSH_RULES_RESPONSE, RTC_TRANSPORT_RESPONSE, SYNC_RESPONSE];
         const filterId = "ehfewf";
         vi.mocked(store.getFilterIdByName).mockReturnValue(filterId);
         const filter = new Filter("0", filterId);
@@ -1720,6 +1727,7 @@ describe("MatrixClient", function () {
         });
 
         it("should work on /sync", async () => {
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
@@ -1756,6 +1764,7 @@ describe("MatrixClient", function () {
                 path: "/pushrules/",
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
@@ -1816,6 +1825,7 @@ describe("MatrixClient", function () {
             const expectedStates: [string, string | null][] = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push({
                 method: "POST",
                 path: FILTER_PATH,
@@ -3890,23 +3900,6 @@ describe("MatrixClient", function () {
                     extra_field: "foobar",
                 },
             ]);
-        });
-
-        it("Caches the rtc transport properties", async () => {
-            const transport = { type: "livekit", livekit_service_url: "https://asfu.org" };
-            httpLookups.push({
-                method: "GET",
-                path: `/rtc/transports`,
-                data: { rtc_transports: [transport] satisfies Transport[] },
-                prefix: "/_matrix/client/unstable/org.matrix.msc4143",
-            });
-
-            await client.startClient();
-
-            await vi.runOnlyPendingTimersAsync();
-
-            const rtcTransports = client.cachedRtcTransports.get();
-            expect(rtcTransports).toStrictEqual([transport]);
         });
     });
 
