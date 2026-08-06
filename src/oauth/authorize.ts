@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { secureRandomString } from "../randomstring.ts";
-import { OAuth2Error } from "./error.ts";
+import { OAuth2Error, type OAuth2ErrorResponse } from "./error.ts";
 import { type ValidatedAuthMetadata } from "./discover.ts";
 import {
     hasOptionalNumberProperty,
@@ -127,10 +127,7 @@ export function isValidDeviceAccessTokenResponse(response: unknown): response is
 /**
  * Error from the OAuth2 token endpoint when exchanging a token for grant_type device_code.
  */
-export interface DeviceAccessTokenError {
-    error: string;
-    error_description?: string;
-    error_uri?: string;
+export interface DeviceAccessTokenError extends OAuth2ErrorResponse {
     session_state?: string;
 }
 
