@@ -29,7 +29,8 @@ export interface PollingCachedValueOptions<ValueType> {
     /** Fetches a fresh value. Rejections are retried according to the retry policy. */
     fetch: () => Promise<ValueType>;
     /**
-     * The time-to-live before the value gets refreshed.
+     * The default time-to-live before the value gets refreshed, overridable per run
+     * via {@link PollingCachedValue.start}.
      * If undefined the value never expires; use {@link PollingCachedValue.refresh} to clear the cache.
      */
     ttlMillis?: number;
@@ -85,21 +86,18 @@ export class PollingCachedValue<ValueType> {
 
     /**
      * Call this as early as possible and when the value can already be fetched.
+     * @param ttlMillis - The time-to-live before the value gets refreshed, overriding the one
+     *     given at construction. If omitted the configured default is kept.
      */
-    public start(): void {
+    public start(ttlMillis?: number): void {
+        if (ttlMillis !== undefined) {
+            this.ttlMillis = ttlMillis;
+        }
         this.isStopped = false;
         // Request a fetch as soon as possible
         this.doFetch().catch((err) => {
             this.logger.debug("Cached value fetch on start did fail", err);
         });
-    }
-
-    /**
-     * Set the time-to-live for the cached value.
-     * @param TTL The time-to-live in milliseconds.
-     */
-    public setTTLMillis(TTL: number): void {
-        this.ttlMillis = TTL;
     }
     /**
      * Call when the client is stopped, or when the cached value is no longer needed.

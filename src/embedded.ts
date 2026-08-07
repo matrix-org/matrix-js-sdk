@@ -357,10 +357,9 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        if (opts.clientWellKnownPollPeriod !== undefined) {
-            this.cachedWellKnown.setTTLMillis(1000 * opts.clientWellKnownPollPeriod);
-        }
-        this.cachedWellKnown.start();
+        this.cachedWellKnown.start(
+            opts.clientWellKnownPollPeriod !== undefined ? 1000 * opts.clientWellKnownPollPeriod : undefined,
+        );
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
 

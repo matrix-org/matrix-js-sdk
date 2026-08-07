@@ -163,6 +163,28 @@ describe("PollingCachedValue", () => {
         setTimeoutSpy.mockRestore();
     });
 
+    it("should let start() override the configured ttl", async () => {
+        fetchFn.mockResolvedValue("HelloWorld!");
+
+        // Configured with TTL, but started with a shorter one
+        clientCachedValue.start(TTL / 10);
+        await vi.advanceTimersByTimeAsync(TTL / 10 + 10);
+
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
+
+    it("should keep the configured ttl when start() is given none", async () => {
+        fetchFn.mockResolvedValue("HelloWorld!");
+
+        clientCachedValue.start();
+
+        await vi.advanceTimersByTimeAsync(TTL / 2);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
+
+        await vi.advanceTimersByTimeAsync(TTL / 2 + 10);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
+    });
+
     it("should retry fetch on next wait for non-cacheable errors", async () => {
         const nonRetryableError = new MatrixError({ errcode: "M_FORBIDDEN", error: "Forbidden" }, 403);
         fetchFn.mockRejectedValueOnce(nonRetryableError).mockResolvedValueOnce("Recovered");
