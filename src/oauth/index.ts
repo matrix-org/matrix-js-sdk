@@ -34,7 +34,7 @@ import {
 } from "./register.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { sha256 } from "../digest.ts";
-import { HTTPError, Method } from "../http-api/index.ts";
+import { HTTPError, isMatrixErrorResponse, MatrixError, Method } from "../http-api/index.ts";
 import { logger } from "../logger.ts";
 import { isOAuth2ErrorResponse, OAuth2Error, type OAuth2ErrorResponse, OAuth2HTTPError } from "./error.ts";
 import { secureRandomString } from "../randomstring.ts";
@@ -289,20 +289,24 @@ export class OAuth2 {
         });
 
         if (res.status >= 400) {
-            let errorResponse: OAuth2ErrorResponse | undefined;
+            let body: unknown;
             try {
-                const body = await res.json();
-                if (isOAuth2ErrorResponse(body)) {
-                    errorResponse = body;
-                }
+                body = await res.json();
             } catch {
-                // The endpoint didn't give us a JSON body, so we definitely have no OAuth 2.0 error response to use
+                // The endpoint didn't give us a JSON body, so we can't determine the error type. We'll throw a generic
+                // HTTPError below.
             }
-            if (errorResponse) {
-                throw new OAuth2HTTPError(error, res.status, res.headers, errorResponse);
-            } else {
-                throw new HTTPError(error, res.status, res.headers);
+            // Because the Matrix C-S API error response format is so similar to the OAuth 2.0 error response format
+            // the ordering of these checks is important. We want to check for a Matrix error response first, and only
+            // if it isn't one do we check for an OAuth 2.0 error response.
+            // This essentially relies on `errcode` not being present in an OAuth 2.0 error response.
+            if (isMatrixErrorResponse(body)) {
+                throw new MatrixError(body, res.status, undefined, undefined, res.headers);
             }
+            if (isOAuth2ErrorResponse(body)) {
+                throw new OAuth2HTTPError(error, res.status, res.headers, body);
+            }
+            throw new HTTPError(error, res.status, res.headers);
         }
 
         return await res.json();
