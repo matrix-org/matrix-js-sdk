@@ -65,10 +65,8 @@ export function isOAuth2ErrorResponse(response: unknown): response is OAuth2Erro
 }
 
 /**
- * An error thrown when a request to an OAuth 2.0 endpoint fails.
- *
- * If the endpoint responded with a JSON body matching the error response format specified in
- * https://datatracker.ietf.org/doc/html/rfc6749#section-5.2 then it is available as {@link errorResponse}.
+ * An error thrown when a request to an OAuth 2.0 endpoint fails with a body matching the error
+ * response format specified in [RFC 6749 section 5.2](https://datatracker.ietf.org/doc/html/rfc6749#section-5.2).
  */
 export class OAuth2HTTPError extends HTTPError implements OAuth2ErrorResponse {
     /**
