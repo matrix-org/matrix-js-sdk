@@ -76,11 +76,7 @@ export class PollingCachedValue<ValueType> {
      * Ensures that the value was fetched once before getting the actual cached value.
      */
     public async wait(): Promise<ValueType | undefined> {
-        try {
-            await this.doFetch();
-        } catch (error) {
-            // Ignore errors, as wait should not throw
-        }
+        await this.doFetch();
         return this.cached;
     }
 

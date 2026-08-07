@@ -189,8 +189,8 @@ describe("PollingCachedValue", () => {
         const nonRetryableError = new MatrixError({ errcode: "M_FORBIDDEN", error: "Forbidden" }, 403);
         fetchFn.mockRejectedValueOnce(nonRetryableError).mockResolvedValueOnce("Recovered");
 
-        const firstValue = await clientCachedValue.wait();
-        expect(firstValue).toBeUndefined();
+        const firstValue = clientCachedValue.wait();
+        await expect(firstValue).rejects.toThrow(nonRetryableError);
         expect(fetchFn).toHaveBeenCalledTimes(1);
         expect(clientCachedValue.get()).toBeUndefined();
 
@@ -237,12 +237,12 @@ describe("PollingCachedValue", () => {
         });
         fetchFn.mockRejectedValue(cacheableError);
 
-        const firstValue = await cacheableClientCachedValue.wait();
-        expect(firstValue).toBeUndefined();
+        const firstValue = cacheableClientCachedValue.wait();
+        await expect(firstValue).rejects.toThrow(cacheableError);
         expect(fetchFn).toHaveBeenCalledTimes(1);
 
-        const secondValue = await cacheableClientCachedValue.wait();
-        expect(secondValue).toBeUndefined();
+        const secondValue = cacheableClientCachedValue.wait();
+        await expect(secondValue).rejects.toThrow(cacheableError);
         expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 });
