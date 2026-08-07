@@ -22,7 +22,7 @@ import { sleep } from "./utils.ts";
 /**
  * Defines a generic mechanism to fetch and cache values for the client.
  */
-export abstract class ClientCachedValue<ValueType> {
+export abstract class ClientPollingCachedValue<ValueType> {
     protected cached?: ValueType;
     protected fetchPromise?: Promise<ValueType>;
     protected ttlTimeoutHandle?: ReturnType<typeof setTimeout>;
@@ -45,7 +45,7 @@ export abstract class ClientCachedValue<ValueType> {
         rootLogger: Logger,
     ) {
         this.ttlMillis = ttlMillis;
-        this.logger = rootLogger.getChild(`ClientCachedValue<${name}>`);
+        this.logger = rootLogger.getChild(`ClientPollingCachedValue<${name}>`);
     }
 
     /**

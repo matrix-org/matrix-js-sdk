@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientCachedValue } from "./clientCachedValue.ts";
+import { ClientPollingCachedValue } from "./clientPollingCachedValue.ts";
 import { ClientEvent, type IClientWellKnown, type MatrixClient } from "./client.ts";
 import { type Logger } from "./logger.ts";
 import { AutoDiscovery } from "./autodiscovery.ts";
@@ -22,7 +22,7 @@ import { AutoDiscovery } from "./autodiscovery.ts";
 /**
  * Caches the well-known configuration for the client
  */
-export class WellKnownCachedValue extends ClientCachedValue<IClientWellKnown> {
+export class WellKnownCachedValue extends ClientPollingCachedValue<IClientWellKnown> {
     public constructor(client: MatrixClient, logger: Logger) {
         super("WellKnown", client, undefined /*No expiration by default*/, logger);
     }

@@ -15,11 +15,11 @@ limitations under the License.
 */
 
 import { afterEach, beforeEach, describe, vi, it, expect } from "vitest";
-import { ClientCachedValue } from "../../src/clientCachedValue.ts";
+import { ClientPollingCachedValue } from "../../src/clientPollingCachedValue.ts";
 import { MatrixError } from "../../src";
 import { logger } from "../../src/logger.ts";
 
-class MockClientCachedValue extends ClientCachedValue<string> {
+class MockClientCachedValue extends ClientPollingCachedValue<string> {
     public fetchFn = vi.fn();
     public cachedCallback = vi.fn();
 

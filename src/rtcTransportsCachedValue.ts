@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientCachedValue } from "./clientCachedValue.ts";
+import { ClientPollingCachedValue } from "./clientPollingCachedValue.ts";
 import { type Transport } from "./matrixrtc/index.ts";
 import { ClientEvent, type MatrixClient } from "./client.ts";
 import { type Logger } from "./logger.ts";
@@ -25,7 +25,7 @@ const TRANSPORT_CACHE_TTL_MILLISECONDS = 1000 * 60 * 60 * 24; // 1 day
 /**
  * Caches the rtc/transport discovery end-point for the client
  */
-export class RTCTransportsCachedValue extends ClientCachedValue<Transport[]> {
+export class RTCTransportsCachedValue extends ClientPollingCachedValue<Transport[]> {
     public constructor(client: MatrixClient, logger: Logger) {
         super("RTCTransports", client, TRANSPORT_CACHE_TTL_MILLISECONDS, logger);
     }
