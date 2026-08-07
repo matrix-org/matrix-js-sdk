@@ -247,8 +247,9 @@ import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
-import { RTCTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
-import { WellKnownCachedValue } from "./WellKnownCachedValue.ts";
+import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
+import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
+import { type PollingCachedValue } from "./pollingCachedValue.ts";
 
 export type Store = IStore;
 
@@ -1317,8 +1318,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly retentionPolicyService: RetentionPolicyService;
     public readonly _unstable_shouldApplyMessageRetention: boolean;
 
-    public cachedRtcTransports: RTCTransportsCachedValue;
-    protected cachedWellKnown: WellKnownCachedValue;
+    public cachedRtcTransports: PollingCachedValue<Transport[]>;
+    protected cachedWellKnown: PollingCachedValue<IClientWellKnown>;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1437,8 +1438,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // having lots of event listeners is not unusual. 0 means "unlimited".
         this.setMaxListeners(0);
 
-        this.cachedRtcTransports = new RTCTransportsCachedValue(this, this.logger);
-        this.cachedWellKnown = new WellKnownCachedValue(this, this.logger);
+        this.cachedRtcTransports = createRtcTransportsCachedValue(this, this.logger);
+        this.cachedWellKnown = createWellKnownCachedValue(this, this.logger);
     }
 
     public set store(newStore: Store) {

@@ -14,38 +14,54 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixClient } from "./client.ts";
 import { calculateRetryBackoff } from "./http-api/index.ts";
 import { type Logger } from "./logger.ts";
 import { sleep } from "./utils.ts";
 
 /**
- * Defines a generic mechanism to fetch and cache values for the client.
+ * How to fetch and cache a given value, as passed to {@link PollingCachedValue}.
  */
-export abstract class ClientPollingCachedValue<ValueType> {
-    protected cached?: ValueType;
-    protected fetchPromise?: Promise<ValueType>;
-    protected ttlTimeoutHandle?: ReturnType<typeof setTimeout>;
+export interface PollingCachedValueOptions<ValueType> {
+    /** The name of the cached value (for tracing/logs). */
+    name: string;
+    /** The logger to derive this value's child logger from. */
+    logger: Logger;
+    /** Fetches a fresh value. Rejections are retried according to the retry policy. */
+    fetch: () => Promise<ValueType>;
+    /**
+     * The time-to-live before the value gets refreshed.
+     * If undefined the value never expires; use {@link PollingCachedValue.refresh} to clear the cache.
+     */
+    ttlMillis?: number;
+    /** Called when a new value is cached. Use to emit changes if needed. */
+    onValueCached?: (value: ValueType) => void;
+    /**
+     * Determines whether a non-transient error should be cached.
+     * By default errors are not cached, i.e. the next attempt retries the fetch.
+     */
+    shouldCacheError?: (error: unknown) => boolean;
+}
+
+/**
+ * Defines a generic mechanism to fetch and cache a value, refreshing it periodically.
+ */
+export class PollingCachedValue<ValueType> {
+    private cached?: ValueType;
+    private fetchPromise?: Promise<ValueType>;
+    private ttlTimeoutHandle?: ReturnType<typeof setTimeout>;
 
     private isStopped = false;
     private ttlMillis?: number;
 
     private readonly logger: Logger;
+
     /**
-     * Build a generic mechanism allowing to fetch and cache a given value from the homeserver.
-     * @param name - The name of the cached value (for tracing/logs).
-     * @param client - The matrix client
-     * @param ttlMillis - The time-to-live before the value get refreshed. If undefined use refresh() to clear cache.
-     * @param rootLogger
+     * Build a generic mechanism allowing to fetch and cache a given value.
+     * @param opts - Describes what to fetch and how to cache it, see {@link PollingCachedValueOptions}.
      */
-    public constructor(
-        protected readonly name: string,
-        protected readonly client: MatrixClient,
-        ttlMillis: number | undefined,
-        rootLogger: Logger,
-    ) {
-        this.ttlMillis = ttlMillis;
-        this.logger = rootLogger.getChild(`ClientPollingCachedValue<${name}>`);
+    public constructor(private readonly opts: PollingCachedValueOptions<ValueType>) {
+        this.ttlMillis = opts.ttlMillis;
+        this.logger = opts.logger.getChild(`PollingCachedValue<${opts.name}>`);
     }
 
     /**
@@ -68,7 +84,7 @@ export abstract class ClientPollingCachedValue<ValueType> {
     }
 
     /**
-     * Call this as early as possible and when the client is already capable of fetching the value.
+     * Call this as early as possible and when the value can already be fetched.
      */
     public start(): void {
         this.isStopped = false;
@@ -104,28 +120,6 @@ export abstract class ClientPollingCachedValue<ValueType> {
         return this.cached;
     }
 
-    protected abstract fetch(client: MatrixClient): Promise<ValueType>;
-
-    /**
-     * Called when a new value is cached.
-     * @param value The value that was cached.
-     * @protected
-     */
-    protected valueCached(value: ValueType): void {
-        this.logger.trace(`New cachedValue: ${value}`);
-        // nop - Use to emit changes if needed
-    }
-
-    /**
-     * Determines whether a non-transient error should be cached.
-     * @param error The error to evaluate.
-     * @protected
-     */
-    protected shouldCacheError(error: any): boolean {
-        // By default retry to fetch the value on error
-        return false;
-    }
-
     private async doFetch(force: boolean = false): Promise<void> {
         if (this.fetchPromise && !force) {
             await this.fetchPromise;
@@ -141,7 +135,8 @@ export abstract class ClientPollingCachedValue<ValueType> {
                 this.fetchPromise = undefined;
                 return;
             }
-            this.valueCached(value);
+            this.logger.trace(`New cachedValue: ${value}`);
+            this.opts.onValueCached?.(value);
             // The value is cached only for a given time.
             if (this.ttlMillis) {
                 this.ttlTimeoutHandle = setTimeout(() => {
@@ -155,7 +150,7 @@ export abstract class ClientPollingCachedValue<ValueType> {
                 this.fetchPromise = undefined;
                 return;
             }
-            if (!this.shouldCacheError(error)) {
+            if (!this.opts.shouldCacheError?.(error)) {
                 // clear the promise, i.e next tentative will retry to fetch
                 this.fetchPromise = undefined;
             }
@@ -171,7 +166,7 @@ export abstract class ClientPollingCachedValue<ValueType> {
         let currentRetryCount = 0;
         while (true) {
             try {
-                return await this.fetch(this.client);
+                return await this.opts.fetch();
             } catch (e) {
                 this.logger.trace(`Failed to fetch retry: ${e}`);
                 if (this.isStopped) {

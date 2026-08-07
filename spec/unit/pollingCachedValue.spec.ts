@@ -14,31 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { afterEach, beforeEach, describe, vi, it, expect } from "vitest";
-import { ClientPollingCachedValue } from "../../src/clientPollingCachedValue.ts";
+import { afterEach, beforeEach, describe, vi, it, expect, type Mock } from "vitest";
+import { PollingCachedValue } from "../../src/pollingCachedValue.ts";
 import { MatrixError } from "../../src";
 import { logger } from "../../src/logger.ts";
 
-class MockClientCachedValue extends ClientPollingCachedValue<string> {
-    public fetchFn = vi.fn();
-    public cachedCallback = vi.fn();
-
-    protected async fetch(client: any): Promise<string> {
-        return this.fetchFn();
-    }
-
-    protected valueCached(value: string) {
-        this.cachedCallback(value);
-    }
-}
-
-class ShouldCacheErrorClientCachedValue extends MockClientCachedValue {
-    protected override shouldCacheError(error: any): boolean {
-        return true;
-    }
-}
-
-describe("ClientCachedValue", () => {
+describe("PollingCachedValue", () => {
     beforeEach(() => {
         vi.useFakeTimers();
     });
@@ -48,25 +29,34 @@ describe("ClientCachedValue", () => {
     });
 
     const TTL = 10000;
-    const mockClient = {} as any;
-    let clientCachedValue: MockClientCachedValue;
+    let fetchFn: Mock<() => Promise<string>>;
+    let cachedCallback: Mock<(value: string) => void>;
+    let clientCachedValue: PollingCachedValue<string>;
 
     beforeEach(() => {
-        clientCachedValue = new MockClientCachedValue("mock", mockClient, TTL, logger);
+        fetchFn = vi.fn<() => Promise<string>>();
+        cachedCallback = vi.fn<(value: string) => void>();
+        clientCachedValue = new PollingCachedValue({
+            name: "mock",
+            logger,
+            ttlMillis: TTL,
+            fetch: fetchFn,
+            onValueCached: cachedCallback,
+        });
     });
 
     it("should fetch and cache the value", async () => {
-        clientCachedValue.fetchFn.mockResolvedValue("HelloWorld!");
+        fetchFn.mockResolvedValue("HelloWorld!");
 
         const value = await clientCachedValue.wait();
 
         expect(value).toBe("HelloWorld!");
         expect(clientCachedValue.get()).toBe("HelloWorld!");
-        expect(clientCachedValue.cachedCallback).toHaveBeenCalledWith("HelloWorld!");
+        expect(cachedCallback).toHaveBeenCalledWith("HelloWorld!");
     });
 
     it("should not call again once the value is cached", async () => {
-        clientCachedValue.fetchFn.mockResolvedValue("HelloWorld!");
+        fetchFn.mockResolvedValue("HelloWorld!");
 
         const value = await clientCachedValue.wait();
 
@@ -76,16 +66,16 @@ describe("ClientCachedValue", () => {
         await clientCachedValue.wait();
 
         expect(clientCachedValue.get()).toBe("HelloWorld!");
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 
     it("should expire the cache after the specified time", async () => {
-        clientCachedValue.fetchFn.mockResolvedValue("HelloWorld!");
+        fetchFn.mockResolvedValue("HelloWorld!");
 
         const value = await clientCachedValue.wait();
         expect(value).toBe("HelloWorld!");
 
-        clientCachedValue.fetchFn.mockResolvedValue("NewValue!");
+        fetchFn.mockResolvedValue("NewValue!");
 
         // Within the refresh period, so still the old value
         await vi.advanceTimersByTimeAsync(TTL / 2);
@@ -97,11 +87,11 @@ describe("ClientCachedValue", () => {
         const newValue = await clientCachedValue.wait();
         expect(newValue).toBe("NewValue!");
 
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(2);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
     });
 
     it("should automatically retry limit exceeded transient errors", async () => {
-        clientCachedValue.fetchFn.mockImplementation(() => {
+        fetchFn.mockImplementation(() => {
             throw new MatrixError(
                 { errcode: "M_LIMIT_EXCEEDED", error: "Too many requests", retry_after_ms: 1000 },
                 429,
@@ -120,22 +110,22 @@ describe("ClientCachedValue", () => {
         await Promise.resolve(); // flush microtasks
         expect(settled).toBe(false); // still pending
 
-        clientCachedValue.fetchFn.mockResolvedValue("OOO");
+        fetchFn.mockResolvedValue("OOO");
         await vi.advanceTimersByTimeAsync(2000);
 
         const value = await fetchPromise;
         expect(value).toBe("OOO");
         expect(settled).toBe(true);
 
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(2);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
     });
 
     it("should start fetching and avoid scheduling refresh once stopped", async () => {
         const resolver = Promise.withResolvers<string>();
-        clientCachedValue.fetchFn.mockImplementation(() => resolver.promise);
+        fetchFn.mockImplementation(() => resolver.promise);
 
         clientCachedValue.start();
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
 
         clientCachedValue.stop();
         resolver.resolve("FromStart");
@@ -144,7 +134,7 @@ describe("ClientCachedValue", () => {
         expect(clientCachedValue.get()).toBe("FromStart");
 
         await vi.advanceTimersByTimeAsync(TTL + 10);
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 
     it("should clear an existing timeout handle when stopped", async () => {
@@ -165,7 +155,7 @@ describe("ClientCachedValue", () => {
         const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
         setTimeoutSpy.mockReturnValue(123 as unknown as ReturnType<typeof setTimeout>);
 
-        clientCachedValue = new MockClientCachedValue("mock", mockClient, undefined, logger);
+        clientCachedValue = new PollingCachedValue({ name: "mock", logger, fetch: fetchFn });
         clientCachedValue.start();
         await vi.advanceTimersByTimeAsync(100);
 
@@ -175,16 +165,16 @@ describe("ClientCachedValue", () => {
 
     it("should retry fetch on next wait for non-cacheable errors", async () => {
         const nonRetryableError = new MatrixError({ errcode: "M_FORBIDDEN", error: "Forbidden" }, 403);
-        clientCachedValue.fetchFn.mockRejectedValueOnce(nonRetryableError).mockResolvedValueOnce("Recovered");
+        fetchFn.mockRejectedValueOnce(nonRetryableError).mockResolvedValueOnce("Recovered");
 
         const firstValue = await clientCachedValue.wait();
         expect(firstValue).toBeUndefined();
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
         expect(clientCachedValue.get()).toBeUndefined();
 
         const secondValue = await clientCachedValue.wait();
         expect(secondValue).toBe("Recovered");
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(2);
+        expect(fetchFn).toHaveBeenCalledTimes(2);
     });
 
     it("should stop retrying immediately when stopped during fetch error", async () => {
@@ -192,17 +182,17 @@ describe("ClientCachedValue", () => {
             { errcode: "M_LIMIT_EXCEEDED", error: "Too many requests", retry_after_ms: 1000 },
             429,
         );
-        clientCachedValue.fetchFn.mockRejectedValue(retryableError);
+        fetchFn.mockRejectedValue(retryableError);
         clientCachedValue.stop();
 
         const value = await clientCachedValue.wait();
         expect(value).toBeUndefined();
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 
     it("should reuse same promise for rapid calls", async () => {
         const loader = Promise.withResolvers<string>();
-        clientCachedValue.fetchFn.mockImplementation(() => loader.promise);
+        fetchFn.mockImplementation(() => loader.promise);
 
         const race = Promise.race([clientCachedValue.wait(), clientCachedValue.wait(), clientCachedValue.wait()]);
 
@@ -211,20 +201,26 @@ describe("ClientCachedValue", () => {
         loader.resolve("FOO");
         const value = await race;
         expect(value).toBe("FOO");
-        expect(clientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 
     it("should reuse rejected promise when error is marked cacheable", async () => {
         const cacheableError = new MatrixError({ errcode: "M_FORBIDDEN", error: "Forbidden" }, 403);
-        const cacheableClientCachedValue = new ShouldCacheErrorClientCachedValue("mock", mockClient, TTL, logger);
-        cacheableClientCachedValue.fetchFn.mockRejectedValue(cacheableError);
+        const cacheableClientCachedValue = new PollingCachedValue({
+            name: "mock",
+            logger,
+            ttlMillis: TTL,
+            fetch: fetchFn,
+            shouldCacheError: () => true,
+        });
+        fetchFn.mockRejectedValue(cacheableError);
 
         const firstValue = await cacheableClientCachedValue.wait();
         expect(firstValue).toBeUndefined();
-        expect(cacheableClientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
 
         const secondValue = await cacheableClientCachedValue.wait();
         expect(secondValue).toBeUndefined();
-        expect(cacheableClientCachedValue.fetchFn).toHaveBeenCalledTimes(1);
+        expect(fetchFn).toHaveBeenCalledTimes(1);
     });
 });

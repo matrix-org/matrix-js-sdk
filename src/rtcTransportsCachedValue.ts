@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientPollingCachedValue } from "./clientPollingCachedValue.ts";
+import { PollingCachedValue } from "./pollingCachedValue.ts";
 import { type Transport } from "./matrixrtc/index.ts";
 import { ClientEvent, type MatrixClient } from "./client.ts";
 import { type Logger } from "./logger.ts";
@@ -23,26 +23,18 @@ import { MatrixError } from "./http-api/index.ts";
 const TRANSPORT_CACHE_TTL_MILLISECONDS = 1000 * 60 * 60 * 24; // 1 day
 
 /**
- * Caches the rtc/transport discovery end-point for the client
+ * Builds a cache for the rtc/transport discovery end-point of the given client.
  */
-export class RTCTransportsCachedValue extends ClientPollingCachedValue<Transport[]> {
-    public constructor(client: MatrixClient, logger: Logger) {
-        super("RTCTransports", client, TRANSPORT_CACHE_TTL_MILLISECONDS, logger);
-    }
-
-    protected fetch(client: MatrixClient): Promise<Transport[]> {
-        return this.client._unstable_getRTCTransports();
-    }
-
-    protected valueCached(value: Transport[]): void {
-        super.valueCached(value);
-        this.client.emit(ClientEvent.RtcTransportsUpdated, value);
-    }
-
-    protected shouldCacheError(error: any): boolean {
+export function createRtcTransportsCachedValue(client: MatrixClient, logger: Logger): PollingCachedValue<Transport[]> {
+    return new PollingCachedValue({
+        name: "RTCTransports",
+        logger,
+        ttlMillis: TRANSPORT_CACHE_TTL_MILLISECONDS,
+        fetch: () => client._unstable_getRTCTransports(),
+        onValueCached: (transports) => client.emit(ClientEvent.RtcTransportsUpdated, transports),
         // If the end point is not supported by the homeserver it will be a 404 error.
         // This is a final error, it can be cached, no need to retry everytime.
         // It will retry when ttl has expired.
-        return error instanceof MatrixError && error.httpStatus === 404;
-    }
+        shouldCacheError: (error) => error instanceof MatrixError && error.httpStatus === 404,
+    });
 }

@@ -14,25 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientPollingCachedValue } from "./clientPollingCachedValue.ts";
+import { PollingCachedValue } from "./pollingCachedValue.ts";
 import { ClientEvent, type IClientWellKnown, type MatrixClient } from "./client.ts";
 import { type Logger } from "./logger.ts";
 import { AutoDiscovery } from "./autodiscovery.ts";
 
 /**
- * Caches the well-known configuration for the client
+ * Builds a cache for the well-known configuration of the given client.
  */
-export class WellKnownCachedValue extends ClientPollingCachedValue<IClientWellKnown> {
-    public constructor(client: MatrixClient, logger: Logger) {
-        super("WellKnown", client, undefined /*No expiration by default*/, logger);
-    }
-
-    protected fetch(client: MatrixClient): Promise<IClientWellKnown> {
-        return AutoDiscovery.getRawClientConfig(client.getDomain() ?? undefined);
-    }
-
-    protected valueCached(value: IClientWellKnown): void {
-        super.valueCached(value);
-        this.client.emit(ClientEvent.ClientWellKnown, value);
-    }
+export function createWellKnownCachedValue(client: MatrixClient, logger: Logger): PollingCachedValue<IClientWellKnown> {
+    return new PollingCachedValue({
+        name: "WellKnown",
+        logger,
+        // No expiration by default
+        ttlMillis: undefined,
+        fetch: () => AutoDiscovery.getRawClientConfig(client.getDomain() ?? undefined),
+        onValueCached: (wellKnown) => client.emit(ClientEvent.ClientWellKnown, wellKnown),
+    });
 }

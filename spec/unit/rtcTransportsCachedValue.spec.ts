@@ -17,19 +17,20 @@ limitations under the License.
 import { describe, vi, it, expect, type MockedObject, beforeEach, afterEach } from "vitest";
 import { type MatrixClient, MatrixError } from "../../src";
 import { logger } from "../../src/logger.ts";
-import { RTCTransportsCachedValue } from "../../src/rtcTransportsCachedValue.ts";
+import { createRtcTransportsCachedValue } from "../../src/rtcTransportsCachedValue.ts";
+import { type PollingCachedValue } from "../../src/pollingCachedValue.ts";
 import { type Transport } from "../../src/matrixrtc";
 
 describe("RtcTransportsCachedValue", () => {
     let mockClient: MockedObject<MatrixClient>;
-    let rtcTransportsCachedValue: RTCTransportsCachedValue;
+    let rtcTransportsCachedValue: PollingCachedValue<Transport[]>;
 
     beforeEach(() => {
         mockClient = {
             _unstable_getRTCTransports: vi.fn(),
             emit: vi.fn(),
         } as unknown as MockedObject<MatrixClient>;
-        rtcTransportsCachedValue = new RTCTransportsCachedValue(mockClient, logger);
+        rtcTransportsCachedValue = createRtcTransportsCachedValue(mockClient, logger);
     });
 
     it("should fetch the transport using discovery api", async () => {
