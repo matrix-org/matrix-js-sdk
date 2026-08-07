@@ -118,6 +118,11 @@ export class PollingCachedValue<ValueType> {
         return this.cached;
     }
 
+    /**
+     * Internal fetch method
+     * @param force - if set to true will force a fetch of the value even if a fetch is already in progress.
+     * @private
+     */
     private async doFetch(force: boolean = false): Promise<void> {
         if (this.fetchPromise && !force) {
             await this.fetchPromise;
@@ -127,14 +132,13 @@ export class PollingCachedValue<ValueType> {
         this.fetchPromise = this.fetchWithRetryPolicy();
 
         try {
-            const value = await this.fetchPromise;
-            this.cached = value;
+            this.cached = await this.fetchPromise;
             if (this.isStopped) {
                 this.fetchPromise = undefined;
                 return;
             }
-            this.logger.trace(`New cachedValue: ${value}`);
-            this.opts.onValueCached?.(value);
+            this.logger.trace(`New cachedValue: ${this.cached}`);
+            this.opts.onValueCached?.(this.cached);
             // The value is cached only for a given time.
             if (this.ttlMillis) {
                 this.ttlTimeoutHandle = setTimeout(() => {
