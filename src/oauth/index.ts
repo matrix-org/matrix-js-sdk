@@ -36,7 +36,7 @@ import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { sha256 } from "../digest.ts";
 import { HTTPError, isMatrixErrorResponse, MatrixError, Method } from "../http-api/index.ts";
 import { logger } from "../logger.ts";
-import { isOAuth2ErrorResponse, OAuth2Error, type OAuth2ErrorResponse, OAuth2HTTPError } from "./error.ts";
+import { isOAuth2ErrorResponse, OAuth2Error, OAuth2HTTPError } from "./error.ts";
 import { secureRandomString } from "../randomstring.ts";
 import { type NonEmptyArray } from "../@types/common.ts";
 
