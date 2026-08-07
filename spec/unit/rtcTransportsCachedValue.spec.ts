@@ -46,9 +46,9 @@ describe("RtcTransportsCachedValue", () => {
     it("should not hammering server if end-point not supported", async () => {
         mockClient._unstable_getRTCTransports.mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
 
-        await rtcTransportsCachedValue.wait();
-        await rtcTransportsCachedValue.wait();
-        await rtcTransportsCachedValue.wait();
+        await rtcTransportsCachedValue.wait().catch(() => {});
+        await rtcTransportsCachedValue.wait().catch(() => {});
+        await rtcTransportsCachedValue.wait().catch(() => {});
 
         expect(mockClient._unstable_getRTCTransports).toHaveBeenCalledTimes(1);
 
