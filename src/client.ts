@@ -53,7 +53,7 @@ import * as utils from "./utils.ts";
 import { deepCompare, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
-import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
+import { type AutoDiscoveryAction } from "./autodiscovery.ts";
 import { encodeUnpaddedBase64Url } from "./base64.ts";
 import { TypedReEmitter } from "./ReEmitter.ts";
 import { logger, type Logger } from "./logger.ts";
@@ -247,6 +247,9 @@ import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import { type Transport } from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
+import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
+import { type PollingCachedValue } from "./pollingCachedValue.ts";
 
 export type Store = IStore;
 
@@ -1095,6 +1098,7 @@ export enum ClientEvent {
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
     UserProfileUpdate = "userProfileUpdate",
+    RtcTransportsUpdated = "rtcTransportsUpdated",
 }
 
 type RoomEvents =
@@ -1165,6 +1169,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
+    [ClientEvent.RtcTransportsUpdated]: (transports: Transport[]) => void;
     /**
      *
      * @param userId - the user ID of the profile which was updated
@@ -1273,7 +1278,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncLeftRoomsPromise?: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts?: IStoredClientOpts;
-    protected clientWellKnownIntervalID?: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback?: ResetTimelineCallback;
 
     public canSupport = new Map<Feature, ServerSupport>();
@@ -1285,8 +1289,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
     protected serverVersionsPromise?: Promise<IServerVersions>;
 
-    protected clientWellKnown?: IClientWellKnown;
-    protected clientWellKnownPromise?: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
     protected checkTurnServersIntervalID?: ReturnType<typeof setInterval>;
@@ -1315,6 +1317,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private serverCapabilitiesService: ServerCapabilities;
     public readonly retentionPolicyService: RetentionPolicyService;
     public readonly _unstable_shouldApplyMessageRetention: boolean;
+
+    public cachedRtcTransports: PollingCachedValue<Transport[]>;
+    protected cachedWellKnown: PollingCachedValue<IClientWellKnown>;
 
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
@@ -1432,6 +1437,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // having lots of event listeners is not unusual. 0 means "unlimited".
         this.setMaxListeners(0);
+
+        this.cachedRtcTransports = createRtcTransportsCachedValue(this, this.logger);
+        this.cachedWellKnown = createWellKnownCachedValue(this, this.logger);
     }
 
     public set store(newStore: Store) {
@@ -1510,18 +1518,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
 
-        if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
-            this.clientWellKnownIntervalID = setInterval(() => {
-                void this.fetchClientWellKnown();
-            }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            void this.fetchClientWellKnown();
-        }
+        this.cachedWellKnown.start(
+            this.clientOpts.clientWellKnownPollPeriod !== undefined
+                ? 1000 * this.clientOpts.clientWellKnownPollPeriod
+                : undefined,
+        );
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
         if (this._unstable_shouldApplyMessageRetention) {
             this.retentionPolicyService?.start();
         }
+
+        this.cachedRtcTransports.start();
     }
 
     /**
@@ -1568,15 +1577,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         globalThis.clearInterval(this.checkTurnServersIntervalID);
         this.checkTurnServersIntervalID = undefined;
 
-        if (this.clientWellKnownIntervalID !== undefined) {
-            globalThis.clearInterval(this.clientWellKnownIntervalID);
-        }
-
         this.toDeviceMessageQueue.stop();
 
         this.matrixRTC.stop();
 
         this.serverCapabilitiesService.stop();
+
+        this.cachedRtcTransports.stop();
+        this.cachedWellKnown.stop();
     }
 
     /**
@@ -6054,23 +6062,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Post, path, undefined, undefined, { prefix: "" });
     }
 
-    protected async fetchClientWellKnown(): Promise<void> {
-        // `getRawClientConfig` does not throw or reject on network errors, instead
-        // it absorbs errors and returns `{}`.
-        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain() ?? undefined);
-        this.clientWellKnown = await this.clientWellKnownPromise;
-        this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
-    }
-
     public getClientWellKnown(): IClientWellKnown | undefined {
-        return this.clientWellKnown;
+        return this.cachedWellKnown.get();
     }
 
-    public waitForClientWellKnown(): Promise<IClientWellKnown> {
+    public async waitForClientWellKnown(): Promise<IClientWellKnown> {
         if (!this.clientRunning) {
             throw new Error("Client is not running");
         }
-        return this.clientWellKnownPromise!;
+        const wellKnown = await this.cachedWellKnown.wait();
+        return wellKnown!;
     }
 
     /**

@@ -24,6 +24,7 @@ import { type MockedObject, type Mocked } from "vitest";
 import { logger } from "../../src/logger";
 import {
     ClientEvent,
+    type IClientWellKnown,
     type IMatrixClientCreateOpts,
     type ITurnServerResponse,
     MatrixClient,
@@ -48,6 +49,7 @@ import * as testUtils from "../test-utils/test-utils";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
+    AutoDiscovery,
     ClientPrefix,
     ConditionKind,
     ContentHelpers,
@@ -197,6 +199,12 @@ describe("MatrixClient", function () {
         method: "GET",
         path: "/pushrules/",
         data: {},
+    };
+
+    const RTC_TRANSPORT_RESPONSE: HttpLookup = {
+        method: "GET",
+        path: "/rtc/transports/",
+        data: { rtc_transports: [] },
     };
 
     const FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
@@ -397,6 +405,7 @@ describe("MatrixClient", function () {
         pendingLookup = null;
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
+        httpLookups.push(RTC_TRANSPORT_RESPONSE);
         httpLookups.push(FILTER_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
     });
@@ -1603,7 +1612,7 @@ describe("MatrixClient", function () {
     });
 
     it("should not POST /filter if a matching filter already exists", async function () {
-        httpLookups = [PUSH_RULES_RESPONSE, SYNC_RESPONSE];
+        httpLookups = [PUSH_RULES_RESPONSE, RTC_TRANSPORT_RESPONSE, SYNC_RESPONSE];
         const filterId = "ehfewf";
         vi.mocked(store.getFilterIdByName).mockReturnValue(filterId);
         const filter = new Filter("0", filterId);
@@ -1718,6 +1727,7 @@ describe("MatrixClient", function () {
         });
 
         it("should work on /sync", async () => {
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
@@ -1754,6 +1764,7 @@ describe("MatrixClient", function () {
                 path: "/pushrules/",
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
@@ -1814,6 +1825,7 @@ describe("MatrixClient", function () {
             const expectedStates: [string, string | null][] = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push({
                 method: "POST",
                 path: FILTER_PATH,
@@ -3890,6 +3902,30 @@ describe("MatrixClient", function () {
             ]);
         });
     });
+
+    describe("Well-known", () => {
+        it("caches the well-known value", async () => {
+            const A_WELLKNOWN: IClientWellKnown = {
+                "m.homeserver": {
+                    base_url: "https://hs.org",
+                },
+                "m.identity_server": {
+                    base_url: "https://is.org",
+                },
+            };
+
+            void client.startClient();
+
+            vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+
+            const value = await client.waitForClientWellKnown();
+            expect(value).toStrictEqual(A_WELLKNOWN);
+
+            const cached = client.getClientWellKnown();
+            expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+    });
+
     describe("getUrlPreview", () => {
         it("makes a well-formed request to the new endpoint", async () => {
             client.getVersions = vi.fn().mockResolvedValue({

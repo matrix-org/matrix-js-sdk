@@ -357,12 +357,9 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        if (opts.clientWellKnownPollPeriod !== undefined) {
-            this.clientWellKnownIntervalID = setInterval(() => {
-                this.fetchClientWellKnown();
-            }, 1000 * opts.clientWellKnownPollPeriod);
-            this.fetchClientWellKnown();
-        }
+        this.cachedWellKnown.start(
+            opts.clientWellKnownPollPeriod !== undefined ? 1000 * opts.clientWellKnownPollPeriod : undefined,
+        );
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
 
