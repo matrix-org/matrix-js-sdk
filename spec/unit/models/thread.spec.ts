@@ -899,6 +899,86 @@ describe("Thread", () => {
                 expect(replaceIds[2]).toBe(edit3.getId());
             });
 
+            it("aggregates edits while initialization is pending when their target is already known", async () => {
+                const previousSupport = Thread.hasServerSideSupport;
+                Thread.setServerSideSupport(FeatureSupport.Stable);
+
+                const myUserId = "@alice:example.org";
+                const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                    timelineSupport: false,
+                });
+                const client = testClient.client;
+                client.supportsThreads = vi.fn().mockReturnValue(true);
+
+                const room = new Room("!room:z", client, myUserId, {
+                    pendingEventOrdering: PendingEventOrdering.Detached,
+                });
+                vi.spyOn(client, "getRoom").mockReturnValue(room);
+
+                const rootEvent = mkMessage({ room: room.roomId, user: myUserId, msg: "Root", event: true });
+                const originalMessage = mkMessage({
+                    room: room.roomId,
+                    user: myUserId,
+                    msg: "Thinking…",
+                    relatesTo: {
+                        "rel_type": THREAD_RELATION_TYPE.name,
+                        "event_id": rootEvent.getId()!,
+                        "m.in_reply_to": { event_id: rootEvent.getId()! },
+                    },
+                    event: true,
+                });
+                rootEvent.setUnsigned({
+                    "m.relations": {
+                        [THREAD_RELATION_TYPE.name]: {
+                            count: 1,
+                            current_user_participated: true,
+                            latest_event: originalMessage.event,
+                        },
+                    },
+                });
+
+                vi.spyOn(client, "fetchRoomEvent").mockResolvedValue(rootEvent.event);
+                const paginationStarted = Promise.withResolvers<void>();
+                const finishPagination = Promise.withResolvers<void>();
+                const freshOriginalMessage = new MatrixEvent({ ...originalMessage.event });
+                vi.spyOn(client, "paginateEventTimeline").mockImplementation(async (timeline) => {
+                    paginationStarted.resolve();
+                    await finishPagination.promise;
+                    timeline.getTimelineSet().addEventToTimeline(freshOriginalMessage, timeline, {
+                        toStartOfTimeline: false,
+                        roomState: room.currentState,
+                        addToState: false,
+                    });
+                    return true;
+                });
+
+                const thread = room.createThread(rootEvent.getId()!, rootEvent, [originalMessage], false);
+
+                try {
+                    await paginationStarted.promise;
+                    const onUpdate = vi.fn();
+                    thread.on(ThreadEvent.Update, onUpdate);
+                    const edit1 = mkEdit(originalMessage, client, myUserId, room.roomId, "First chunk", 1);
+                    const edit2 = mkEdit(originalMessage, client, myUserId, room.roomId, "Complete answer", 2);
+
+                    thread.addEvent(edit1, false);
+                    thread.addEvent(edit2, false);
+
+                    await vi.waitFor(() => expect(originalMessage.replacingEvent()).toBe(edit2));
+                    expect(onUpdate).toHaveBeenCalled();
+
+                    const initialized = emitPromise(thread, RoomEvent.TimelineReset);
+                    finishPagination.resolve();
+                    await initialized;
+
+                    await vi.waitFor(() => expect(freshOriginalMessage.replacingEvent()).toBe(edit2));
+                    expect(freshOriginalMessage.getContent().body).toBe("Complete answer");
+                } finally {
+                    finishPagination.resolve();
+                    Thread.setServerSideSupport(previousSupport);
+                }
+            });
+
             it("Reactions aggregate pre-init and remain idempotent on replay", async () => {
                 const myUserId = "@alice:example.org";
                 const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
