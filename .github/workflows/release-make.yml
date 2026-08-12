@@ -140,7 +140,6 @@ jobs:
                   runtime: node
                   cache: true
                   install: true
-                  package-json-file: ${{ inputs.dist-dir }}/package.json
 
             - name: Handle develop dependencies
               working-directory: ${{ inputs.dist-dir }}
