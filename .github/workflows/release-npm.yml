@@ -33,15 +33,18 @@ jobs:
                   runtime: node
                   cache: true
                   install: true
-                  cache-dependency-path: release-repo/pnpm-lock.yaml
-                  package-json-file: release-repo/package.json
 
             - name: 🚀 Publish to npm
               id: npm-publish
               working-directory: ${{ inputs.dir }}
               run: |
-                  pnpm publish --provenance --access public --publish-branch staging --tag "$TAG"
+                  version=$(jq -r '.version' package.json)
+                  if [[ "$version" == *-rc.* ]]; then
+                      tag=next
+                  else
+                      tag=latest
+                  fi
+
+                  pnpm publish --provenance --access public --publish-branch staging --tag "$tag"
                   release=$(jq -r '"\(.name)@\(.version)"' package.json)
                   echo "id=$release" >> $GITHUB_OUTPUT
-              env:
-                  TAG: ${{ contains(steps.npm-publish.outputs.id, '-rc.') && 'next' || 'latest' }}
