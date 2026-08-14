@@ -132,6 +132,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      */
     public initialEventsFetched = !Thread.hasServerSideSupport;
     private initalEventFetchProm: Promise<boolean> | undefined;
+    private preInitEventTargets = new Map<string, MatrixEvent>();
+    private preInitObserverState = { active: true };
 
     /**
      * An array of events to add to the timeline once the thread has been initialised
@@ -170,6 +172,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         this.reEmitter = new TypedReEmitter(this);
 
         this.reEmitter.reEmit(this.timelineSet, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
+        this.once(ThreadEvent.Delete, () => {
+            this.preInitObserverState.active = false;
+        });
 
         this.room.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
         this.room.on(RoomEvent.Redaction, this.onRedaction);
@@ -364,6 +369,15 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         // Modify this event to point at our room's state, and mark its thread
         // as this.
         this.setEventMetadata(event);
+        const eventId = event.getId();
+        if (
+            !this.initialEventsFetched &&
+            eventId &&
+            !event.isRelation(RelationType.Annotation) &&
+            !event.isRelation(RelationType.Replace)
+        ) {
+            this.preInitEventTargets.set(eventId, event);
+        }
 
         // Decide whether this event is going to be added at the end of the timeline.
         const lastReply = this.lastReply();
@@ -438,11 +452,32 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
              */
             this.replayEvents?.push(event);
 
-            // For annotations (reactions), aggregate immediately (pre-init) to keep
-            // reaction counts/summary visible while the thread is still initialising.
-            // Only aggregate as child: parent aggregation is unnecessary here.
+            // Aggregate annotations immediately to keep reaction counts visible.
             if (event.isRelation(RelationType.Annotation)) {
                 this.timelineSet.relations?.aggregateChildEvent(event, this.timelineSet);
+            }
+
+            // Edits can also be aggregated immediately when their target is already
+            // known. If it is not known yet, replay still handles them after pagination.
+            if (event.isRelation(RelationType.Replace)) {
+                const targetEventId = event.getRelation()?.event_id;
+                const targetEvent = targetEventId ? this.findPreInitTargetEvent(targetEventId) : undefined;
+                if (targetEvent && targetEventId) {
+                    const weakThread = new WeakRef(this);
+                    const observerState = this.preInitObserverState;
+                    const eventId = event.getId();
+                    void this.timelineSet.relations
+                        .aggregateChildEvent(event, this.timelineSet, targetEvent)
+                        .then(() => {
+                            const thread = weakThread.deref();
+                            if (!thread || !observerState.active) return;
+                            const effectiveTarget = thread.findPreInitTargetEvent(targetEventId);
+                            if (effectiveTarget?.replacingEvent()?.getId() === eventId) {
+                                thread.emit(ThreadEvent.Update, thread);
+                            }
+                        })
+                        .catch((error) => logger.error("Failed to aggregate pre-initialization thread edit: ", error));
+                }
             }
         } else {
             // Case 2: this is happening later, and we have a timeline. In
@@ -472,6 +507,15 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
             // Aggregation is handled by EventTimelineSet when inserting/adding.
         }
+    }
+
+    private findPreInitTargetEvent(eventId: string): MatrixEvent | undefined {
+        return (
+            this.timelineSet.findEventById(eventId) ??
+            this.room.findEventById(eventId) ??
+            this.preInitEventTargets.get(eventId) ??
+            (this.lastEvent?.getId() === eventId ? this.lastEvent : undefined)
+        );
     }
 
     public async processEvent(event: MatrixEvent | null | undefined): Promise<void> {
@@ -642,6 +686,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                         this.addEvent(event, false);
                     }
                     this.replayEvents = null;
+                    this.preInitEventTargets.clear();
                     // just to make sure that, if we've created a timeline window for this thread before the thread itself
                     // existed (e.g. when creating a new thread), we'll make sure the panel is force refreshed correctly.
                     this.emit(RoomEvent.TimelineReset, this.room, this.timelineSet, true);

@@ -28,20 +28,23 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
+              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
               with:
                   runtime: node
                   cache: true
                   install: true
-                  cache-dependency-path: release-repo/pnpm-lock.yaml
-                  package-json-file: release-repo/package.json
 
             - name: 🚀 Publish to npm
               id: npm-publish
               working-directory: ${{ inputs.dir }}
               run: |
-                  pnpm publish --provenance --access public --publish-branch staging --tag "$TAG"
+                  version=$(jq -r '.version' package.json)
+                  if [[ "$version" == *-rc.* ]]; then
+                      tag=next
+                  else
+                      tag=latest
+                  fi
+
+                  pnpm publish --provenance --access public --publish-branch staging --tag "$tag"
                   release=$(jq -r '"\(.name)@\(.version)"' package.json)
                   echo "id=$release" >> $GITHUB_OUTPUT
-              env:
-                  TAG: ${{ contains(steps.npm-publish.outputs.id, '-rc.') && 'next' || 'latest' }}
