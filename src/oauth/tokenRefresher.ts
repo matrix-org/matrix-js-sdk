@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { type AccessTokens, HTTPError, type TokenRefreshFunction, TokenRefreshLogoutError } from "../http-api/index.ts";
+import { OAuth2HTTPError } from "./error.ts";
 import { type OAuth2 } from "./index.ts";
 
 /**
@@ -54,8 +55,14 @@ export class TokenRefresher {
     };
 
     private shouldLogoutOnError(error: HTTPError): boolean {
-        // As per https://spec.matrix.org/v1.18/client-server-api/#refresh-token-grant
-        return typeof error.httpStatus === "number" && error.httpStatus < 500 && error.httpStatus >= 400;
+        // Treat as logout as per https://spec.matrix.org/v1.18/client-server-api/#refresh-token-grant
+        // after making sure it is an RFC 6749 section 5.2 error response
+        return (
+            error instanceof OAuth2HTTPError &&
+            typeof error.httpStatus === "number" &&
+            error.httpStatus < 500 &&
+            error.httpStatus >= 400
+        );
     }
 
     private async getNewTokens(refreshToken: string): Promise<AccessTokens> {

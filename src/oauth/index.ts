@@ -36,7 +36,7 @@ import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { sha256 } from "../digest.ts";
 import { HTTPError, Method } from "../http-api/index.ts";
 import { logger } from "../logger.ts";
-import { OAuth2Error } from "./error.ts";
+import { isOAuth2ErrorResponse, OAuth2Error, type OAuth2ErrorResponse, OAuth2HTTPError } from "./error.ts";
 import { secureRandomString } from "../randomstring.ts";
 import { type NonEmptyArray } from "../@types/common.ts";
 
@@ -289,7 +289,20 @@ export class OAuth2 {
         });
 
         if (res.status >= 400) {
-            throw new HTTPError(error, res.status, res.headers);
+            let errorResponse: OAuth2ErrorResponse | undefined;
+            try {
+                const body = await res.json();
+                if (isOAuth2ErrorResponse(body)) {
+                    errorResponse = body;
+                }
+            } catch {
+                // The endpoint didn't give us a JSON body, so we definitely have no OAuth 2.0 error response to use
+            }
+            if (errorResponse) {
+                throw new OAuth2HTTPError(error, res.status, res.headers, errorResponse);
+            } else {
+                throw new HTTPError(error, res.status, res.headers);
+            }
         }
 
         return await res.json();
