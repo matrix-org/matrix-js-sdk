@@ -889,6 +889,47 @@ describe("MatrixRTCSession", () => {
 
             await sess.leaveRoomSession();
         });
+
+        it("reports and emits when the key rotation participant limit is reached", async () => {
+            client.encryptAndSendToDevice = vi.fn().mockResolvedValue(undefined);
+            const ownMembership = {
+                ...sessionMembershipTemplate,
+                user_id: client.getUserId()!,
+                device_id: client.getDeviceId()!,
+            };
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:user.example", device_id: "BBBBBB" };
+            const carl = { ...sessionMembershipTemplate, user_id: "@carl:user.example", device_id: "CCCCCC" };
+
+            const mockRoom = makeMockRoom([ownMembership, bob]);
+            const sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                manageMediaKeys: true,
+                keyRotationParticipantLimit: 3,
+            });
+            await flushPromises();
+
+            const onKeyRotationSuppressedChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.KeyRotationSuppressedChanged, onKeyRotationSuppressedChanged);
+
+            expect(sess.isKeyRotationSuppressed).toBe(false);
+
+            // A third participant takes us to the limit
+            mockRoomState(mockRoom, [ownMembership, bob, carl]);
+            await sess._onRTCSessionMemberUpdate();
+
+            expect(sess.isKeyRotationSuppressed).toBe(true);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenCalledExactlyOnceWith(true);
+
+            // Back below the limit
+            mockRoomState(mockRoom, [ownMembership, bob]);
+            await sess._onRTCSessionMemberUpdate();
+
+            expect(sess.isKeyRotationSuppressed).toBe(false);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenLastCalledWith(false);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenCalledTimes(2);
+
+            await sess.leaveRoomSession();
+        });
     });
 
     describe("read status", () => {
