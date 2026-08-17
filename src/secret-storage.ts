@@ -21,8 +21,7 @@ limitations under the License.
  */
 
 import { type TypedEventEmitter } from "./models/typed-event-emitter.ts";
-import { ClientEvent, type ClientEventHandlerMap } from "./client.ts";
-import { type MatrixEvent } from "./models/event.ts";
+import { type ClientEvent, type ClientEventHandlerMap } from "./client.ts";
 import { secureRandomString } from "./randomstring.ts";
 import { logger } from "./logger.ts";
 import encryptAESSecretStorageItem from "./utils/encryptAESSecretStorageItem.ts";
@@ -370,35 +369,13 @@ export class ServerSideSecretStorageImpl implements ServerSideSecretStorage {
     /**
      * Implementation of {@link ServerSideSecretStorage#setDefaultKeyId}.
      */
-    public setDefaultKeyId(keyId: string | null): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            const listener = (ev: MatrixEvent): void => {
-                if (ev.getType() !== "m.secret_storage.default_key") {
-                    //  Different account data item
-                    return;
-                }
-
-                // If keyId === null, the content should be an empty object.
-                // Otherwise, the `key` in the content object should match keyId.
-                const content = ev.getContent();
-                const isSameKey = keyId === null ? Object.keys(content).length === 0 : content.key === keyId;
-                if (isSameKey) {
-                    this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
-                    resolve();
-                }
-            };
-            this.accountDataAdapter.on(ClientEvent.AccountData, listener);
-
-            // The spec [1] says that the value of the account data entry should be an object with a `key` property.
-            // It doesn't specify how to delete the default key; we do it by setting the account data to an empty object.
-            //
-            // [1]: https://spec.matrix.org/v1.13/client-server-api/#key-storage
-            const newValue: Record<string, never> | { key: string } = keyId === null ? {} : { key: keyId };
-            this.accountDataAdapter.setAccountData("m.secret_storage.default_key", newValue).catch((e) => {
-                this.accountDataAdapter.removeListener(ClientEvent.AccountData, listener);
-                reject(e);
-            });
-        });
+    public async setDefaultKeyId(keyId: string | null): Promise<void> {
+        // The spec [1] says that the value of the account data entry should be an object with a `key` property.
+        // It doesn't specify how to delete the default key; we do it by setting the account data to an empty object.
+        //
+        // [1]: https://spec.matrix.org/v1.13/client-server-api/#key-storage
+        const newValue: Record<string, never> | { key: string } = keyId === null ? {} : { key: keyId };
+        await this.accountDataAdapter.setAccountData("m.secret_storage.default_key", newValue);
     }
 
     /**

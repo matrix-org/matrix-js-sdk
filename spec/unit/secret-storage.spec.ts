@@ -14,6 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMock from "@fetch-mock/vitest";
 import { type Mocked } from "vitest";
 
 import {
@@ -29,7 +30,9 @@ import {
 } from "../../src/secret-storage";
 import { secureRandomString } from "../../src/randomstring";
 import { type SecretInfo } from "../../src/secret-storage.ts";
-import { type AccountDataEvents, ClientEvent, MatrixEvent, TypedEventEmitter } from "../../src";
+import { type AccountDataEvents, createClient, TypedEventEmitter } from "../../src";
+import { SyncResponder } from "../test-utils/SyncResponder.ts";
+import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
 
 declare module "../../src/@types/event" {
     interface SecretStorageAccountDataEvents {
@@ -287,12 +290,9 @@ describe("ServerSideSecretStorageImpl", function () {
     describe("setDefaultKeyId", function () {
         let secretStorage: ServerSideSecretStorage;
         let accountDataAdapter: Mocked<AccountDataClient>;
-        let accountDataPromise: PromiseWithResolvers<void>;
         beforeEach(() => {
             accountDataAdapter = mockAccountDataClient();
-            accountDataPromise = Promise.withResolvers();
             accountDataAdapter.setAccountData.mockImplementation(() => {
-                accountDataPromise.resolve();
                 return Promise.resolve({});
             });
 
@@ -300,37 +300,43 @@ describe("ServerSideSecretStorageImpl", function () {
         });
 
         it("should set the default key id", async function () {
-            const setDefaultPromise = secretStorage.setDefaultKeyId("keyId");
-            await accountDataPromise.promise;
+            await secretStorage.setDefaultKeyId("keyId");
 
             expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith("m.secret_storage.default_key", {
                 key: "keyId",
             });
-
-            accountDataAdapter.emit(
-                ClientEvent.AccountData,
-                new MatrixEvent({
-                    type: "m.secret_storage.default_key",
-                    content: { key: "keyId" },
-                }),
-            );
-            await setDefaultPromise;
         });
 
         it("should set the default key id with a null key id", async function () {
-            const setDefaultPromise = secretStorage.setDefaultKeyId(null);
-            await accountDataPromise.promise;
-
+            await secretStorage.setDefaultKeyId(null);
             expect(accountDataAdapter.setAccountData).toHaveBeenCalledWith("m.secret_storage.default_key", {});
+        });
 
-            accountDataAdapter.emit(
-                ClientEvent.AccountData,
-                new MatrixEvent({
-                    type: "m.secret_storage.default_key",
-                    content: {},
-                }),
-            );
-            await setDefaultPromise;
+        it("should return even if it makes no change", async function () {
+            // This test ensures that setDefaultKeyId still resolves, even if
+            // setAccountData detects that no change needs to be made to the
+            // account data, and doesn't actually make an HTTP request.  For
+            // this reason, we need to use the real implementation of the secret
+            // storage, rather than the mock implementation.
+            vi.useFakeTimers();
+            const baseUrl = "https://matrix.example";
+            const userId = "@alice:matrix.example";
+            const syncResponder = new SyncResponder(baseUrl);
+            mockInitialApiRequests(baseUrl, userId);
+            const client = createClient({ baseUrl, userId });
+            await client.startClient();
+
+            // The existing default key is `null`.
+            syncResponder.sendOrQueueSyncResponse({
+                account_data: { events: [{ type: "m.secret_storage.default_key", content: null }] },
+            });
+            await vi.advanceTimersByTimeAsync(1);
+
+            // We set the default key to `null`.
+            await secretStorage.setDefaultKeyId(null);
+
+            // We should not have made an HTTP call.
+            expect(fetchMock.callHistory.calls(/account_data/).length).toEqual(0);
         });
     });
 
