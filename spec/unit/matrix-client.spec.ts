@@ -1344,6 +1344,32 @@ describe("MatrixClient", function () {
             await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
         });
 
+        it("resolves to undefined if the property is not set on the extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    error: { errcode: "M_NOT_FOUND", httpStatus: 404 },
+                },
+            ];
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toBeUndefined();
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("rethrows other errors when fetching a property from an extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    error: { errcode: "M_FORBIDDEN", httpStatus: 403 },
+                },
+            ];
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).rejects.toThrow(MatrixError);
+            expect(httpLookups).toHaveLength(0);
+        });
+
         it("preserves previously cached keys when writing through the profile cache", async () => {
             const storedProfile = { other_key: "bar" };
             const testProfile = { test_key: "foo" };

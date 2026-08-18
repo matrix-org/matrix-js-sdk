@@ -7379,10 +7379,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
-     * @returns The property value.
+     * @returns The property value, or `undefined` if the key was not set OR the profile could not be found.
      *
      * @throws An error if the server does not support MSC4133.
-     * @throws A M_NOT_FOUND error if the key was not set OR the profile could not be found.
      */
     public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
@@ -7394,15 +7393,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (storedProfile?.[key] !== undefined) {
             return storedProfile[key];
         }
-        const profile = (await this.http.authedRequest(
-            Method.Get,
-            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
-            undefined,
-            undefined,
-            {
-                prefix: await this.getExtendedProfileRequestPrefix(),
-            },
-        )) as SyncUserProfile;
+        let profile: SyncUserProfile;
+        try {
+            profile = (await this.http.authedRequest(
+                Method.Get,
+                utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+                undefined,
+                undefined,
+                {
+                    prefix: await this.getExtendedProfileRequestPrefix(),
+                },
+            )) as SyncUserProfile;
+        } catch (e) {
+            if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
+                // The key is not set on the profile (or the profile does not exist).
+                return undefined;
+            }
+            throw e;
+        }
 
         // write through to the cache
         await this.store.storeUserProfiles(
