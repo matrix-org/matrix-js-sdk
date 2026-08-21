@@ -6907,7 +6907,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @param includeMembership - the membership type to include in the response
      * @param excludeMembership - the membership type to exclude from the response
-     * @param atEventId - the id of the event for which moment in the timeline the members should be returned for
+     * @param atSyncToken - the point in time, as a sync pagination token, for when the members should be returned for
      * @returns Promise which resolves: dictionary of userid to profile information
      * @returns Rejects: with an error response.
      */
@@ -6915,7 +6915,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         includeMembership?: string,
         excludeMembership?: string,
-        atEventId?: string,
+        atSyncToken?: string,
     ): Promise<{ [userId: string]: IStateEventWithRoomId[] }> {
         const queryParams: Record<string, string> = {};
         if (includeMembership) {
@@ -6924,8 +6924,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (excludeMembership) {
             queryParams.not_membership = excludeMembership;
         }
-        if (atEventId) {
-            queryParams.at = atEventId;
+        if (atSyncToken) {
+            queryParams.at = atSyncToken;
         }
 
         const queryString = utils.encodeParams(queryParams);
