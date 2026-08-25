@@ -451,6 +451,175 @@ describe("RTCEncryptionManager", () => {
             );
         });
 
+        it("Should not rotate key when a user joins and the participant limit is reached", async () => {
+            vi.useFakeTimers();
+
+            const members = [
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
+                aStateBaseMembership("@carl:example.org", "CARLDEVICE"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            const gracePeriod = 1_000;
+            // initial rollout
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(1);
+
+            onEncryptionKeysChanged.mockClear();
+            mockTransport.sendKey.mockClear();
+
+            // Well past the grace period, so only the participant limit can prevent a rotation here
+            await vi.advanceTimersByTimeAsync(gracePeriod + 5_000);
+            members.push(aStateBaseMembership("@dave:example.org", "DAVEDEVICE"));
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(1);
+
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+                expect.any(String),
+                // The key index should not have been incremented
+                0,
+                // And the existing key only sent to the new joiner
+                [expect.objectContaining({ userId: "@dave:example.org", deviceId: "DAVEDEVICE" })],
+            );
+
+            // The key has not changed, so there is nothing to roll out locally
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+        });
+
+        it("Should rotate key when a user joins and the participant limit is not reached yet", async () => {
+            vi.useFakeTimers();
+
+            const members = [
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            const gracePeriod = 1_000;
+            // initial rollout
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(1);
+
+            onEncryptionKeysChanged.mockClear();
+            mockTransport.sendKey.mockClear();
+
+            await vi.advanceTimersByTimeAsync(gracePeriod + 5_000);
+            members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(1);
+
+            // 3 participants is still below the limit of 4, so this rotates as usual
+            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+                expect.any(String),
+                1,
+                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+            );
+
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(onEncryptionKeysChanged).toHaveBeenCalled();
+        });
+
+        it("Should not rotate key when a user leaves and the participant limit is reached", async () => {
+            vi.useFakeTimers();
+
+            const members = [
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
+                aStateBaseMembership("@carl:example.org", "CARLDEVICE"),
+                aStateBaseMembership("@dave:example.org", "DAVEDEVICE"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            // initial rollout
+            encryptionManager.join({ keyRotationParticipantLimit: 3 });
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(1);
+
+            onEncryptionKeysChanged.mockClear();
+            mockTransport.sendKey.mockClear();
+
+            // Dave leaves, 3 participants are left which is still at the limit
+            getMembershipMock.mockReturnValue(members.slice(0, 3));
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(5_000);
+
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+        });
+
+        it("Should rotate key once the session shrinks below the participant limit", async () => {
+            vi.useFakeTimers();
+
+            const members = [
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
+                aStateBaseMembership("@carl:example.org", "CARLDEVICE"),
+                aStateBaseMembership("@dave:example.org", "DAVEDEVICE"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            // initial rollout
+            encryptionManager.join({ keyRotationParticipantLimit: 3 });
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(1);
+
+            mockTransport.sendKey.mockClear();
+
+            // Dave leaves, the rotation is suppressed as we are still at the limit
+            getMembershipMock.mockReturnValue(members.slice(0, 3));
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(5_000);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            // Carl leaves as well, we are now below the limit and the key is rotated. Dave, who left while we
+            // were above the limit, is excluded by this rotation too.
+            const remaining = members.slice(0, 2);
+            getMembershipMock.mockReturnValue(remaining);
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(5_000);
+
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+                expect.any(String),
+                1,
+                remaining.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+            );
+        });
+
+        it("Should expose whether key rotation is suppressed", () => {
+            const members = [
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            encryptionManager.join({ keyRotationParticipantLimit: 3 });
+            expect(encryptionManager.isKeyRotationSuppressed).toBe(false);
+
+            members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
+            expect(encryptionManager.isKeyRotationSuppressed).toBe(true);
+
+            getMembershipMock.mockReturnValue(members.slice(0, 2));
+            expect(encryptionManager.isKeyRotationSuppressed).toBe(false);
+        });
+
+        it("Should never report key rotation as suppressed if encryption is disabled", () => {
+            getMembershipMock.mockReturnValue([
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
+                aStateBaseMembership("@carl:example.org", "CARLDEVICE"),
+            ]);
+
+            encryptionManager.join({ manageMediaKeys: false, keyRotationParticipantLimit: 3 });
+
+            expect(encryptionManager.isKeyRotationSuppressed).toBe(false);
+        });
+
         it("Should not distribute keys if encryption is disabled", async () => {
             vi.useFakeTimers();
             const members = [
