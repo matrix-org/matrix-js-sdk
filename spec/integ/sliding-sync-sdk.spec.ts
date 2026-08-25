@@ -1104,4 +1104,100 @@ describe("SlidingSyncSdk", () => {
             // we expect it not to crash
         });
     });
+
+    describe("ExtensionStickyEvents", () => {
+        let ext: Extension<any, any>;
+
+        const stickyEvent = (durationMs: number, stickyKey: string) => ({
+            type: "m.test.sticky",
+            sender: selfUserId,
+            event_id: `$sticky_${stickyKey}`,
+            origin_server_ts: Date.now(),
+            msc4354_sticky: { duration_ms: durationMs },
+            content: { msc4354_sticky_key: stickyKey },
+        });
+
+        beforeAll(async () => {
+            await setupClient();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("org.matrix.msc4354.sticky_events");
+        });
+
+        it("gets enabled all the time", async () => {
+            let reqJson: any = await ext.onRequest(true);
+            expect(reqJson.enabled).toEqual(true);
+            expect(reqJson.limit).toBeGreaterThan(0);
+            expect(reqJson.since).toBeUndefined();
+            reqJson = await ext.onRequest(false);
+            expect(reqJson.enabled).toEqual(true);
+            expect(reqJson.since).toBeUndefined();
+        });
+
+        it("updates the since value", async () => {
+            await ext.onResponse({ next_batch: "12345" });
+            expect(await ext.onRequest(false)).toMatchObject({ since: "12345" });
+        });
+
+        it("keeps the previous since value when there are no changes", async () => {
+            await ext.onResponse({ next_batch: "23456" });
+            await ext.onResponse({});
+            expect(await ext.onRequest(false)).toMatchObject({ since: "23456" });
+        });
+
+        it("adds sticky events to the room", async () => {
+            const roomId = "!sticky:localhost";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with sticky events",
+                required_state: [
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                ],
+                timeline: [mkOwnEvent(EventType.RoomMessage, { body: "hello" })],
+                initial: true,
+            });
+            await emitPromise(client!, ClientEvent.Room);
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeTruthy();
+
+            await ext.onResponse({
+                next_batch: "34567",
+                rooms: { [roomId]: { events: [stickyEvent(300000, "key1")] } },
+            });
+
+            const events = Array.from(room._unstable_getStickyEvents());
+            expect(events.map((e) => e.getId())).toEqual(["$sticky_key1"]);
+        });
+
+        it("adds sticky events that arrived in the timeline", async () => {
+            const roomId = "!sticky_timeline:localhost";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with a sticky timeline event",
+                required_state: [
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                ],
+                timeline: [stickyEvent(300000, "from_timeline") as unknown as IRoomEvent],
+                initial: true,
+            });
+            await emitPromise(client!, ClientEvent.Room);
+
+            const room = client!.getRoom(roomId)!;
+            const events = Array.from(room._unstable_getStickyEvents());
+            expect(events.map((e) => e.getId())).toEqual(["$sticky_from_timeline"]);
+        });
+
+        // eslint-disable-next-line @vitest/expect-expect
+        it("gracefully handles missing rooms and fields", async () => {
+            await ext.onResponse({
+                next_batch: "45678",
+                rooms: { "!unknown:localhost": { events: [stickyEvent(300000, "key2")] } },
+            });
+            await ext.onResponse({ next_batch: "56789", rooms: {} });
+            // we expect it not to crash
+        });
+    });
 });

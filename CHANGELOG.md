@@ -1,3 +1,11 @@
+Changes in [42.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.2.0) (2026-08-18)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Fix pre-initialization thread edits when target is known ([#5440](https://github.com/matrix-org/matrix-js-sdk/pull/5440)). Contributed by @basnijholt.
+* Fix package failing to load in Node ESM due to directory import ([#5460](https://github.com/matrix-org/matrix-js-sdk/pull/5460)). Contributed by @syphernl.
+
+
 Changes in [42.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.1.0) (2026-08-04)
 ==================================================================================================
 ## 🦖 Deprecations

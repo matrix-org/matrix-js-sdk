@@ -19,6 +19,7 @@ import { type IMatrixApiError as IWidgetMatrixError } from "matrix-widget-api";
 import { type IUsageLimit } from "../@types/partials.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { NamespacedValue } from "../NamespacedValue.ts";
+import { hasRequiredStringProperty, isRecord } from "../@types/type-guards.ts";
 
 interface IErrorJson extends Partial<IUsageLimit> {
     [key: string]: any; // extensible
@@ -78,6 +79,21 @@ export class HTTPError extends Error {
         }
         return null;
     }
+}
+
+/**
+ * Check if the given (JSON-parsed) response body looks like a Matrix error
+ * response as specified in https://spec.matrix.org/v1.19/client-server-api/#standard-error-response
+ *
+ * @param response - the parsed response body to check
+ * @returns whether the response is a valid {@link MatrixError}
+ */
+export function isMatrixErrorResponse(response: unknown): response is MatrixError {
+    return (
+        isRecord(response) &&
+        hasRequiredStringProperty(response, "error") &&
+        hasRequiredStringProperty(response, "errcode")
+    );
 }
 
 export class MatrixError extends HTTPError {
