@@ -36,8 +36,14 @@ import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
 
 /**
  * Default for {@link EncryptionConfig.keyRotationParticipantLimit}.
+ *
+ * Setting this to undefined implies that we do not have a limit and full rotations are always done.
+ * This is the most secure and least performant option.
+ * It is highly recommended to set this to < 50 for acutal client deployments.
+ * But before setting this, make yourself familiar with the exact security implications.
+ * Key, rotations will stop when reaching this user limit in a call. The call will still be encrypted.
  */
-const DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT = 30;
+const DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT: number | undefined = undefined;
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -160,6 +166,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      */
     public get isKeyRotationSuppressed(): boolean {
         if (!this.manageMediaKeys) return false;
+        if (this.keyRotationParticipantLimit === undefined) return false;
         return this.getMemberships().length >= this.keyRotationParticipantLimit;
     }
 
