@@ -445,8 +445,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 toDistributeTo,
             );
             newOutboundEncryptionSession.sharedWith.push(...toDistributeTo);
+            const outboundSessionList = newOutboundEncryptionSession.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",");
             this.logger?.trace(
-                `key index:${newOutboundEncryptionSession.keyId} sent to ${newOutboundEncryptionSession.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
+                `key index:${newOutboundEncryptionSession.keyId} sent to ${outboundSessionList}`,
             );
             if (hasKeyChanged) {
                 // Delay a bit before using this key
