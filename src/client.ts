@@ -245,7 +245,12 @@ import { sha256 } from "./digest.ts";
 import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
-import { type Transport } from "./matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
 import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
@@ -6179,6 +6184,57 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
             })
         ).rtc_transports;
+    }
+
+    /**
+     * Requests a token to authenticate against a LiveKit SFU with (MSC4195).
+     *
+     * The homeserver checks that we are joined to `room_id` before obtaining a token from the SFU. If
+     * `server_name` names a remote homeserver, our homeserver forwards the request to it over federation,
+     * which is how a token for another homeserver's SFU is obtained.
+     *
+     * Requires homeserver support for MSC4195.
+     *
+     * @param body - The details of the `m.rtc.member` event to obtain a token for, and the SFU to obtain it from.
+     * @returns The JWT to authenticate with when connecting to the SFU.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
+     * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
+     * of the answering server's SFUs.
+     */
+    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        // There is no /versions flag to check for support, so we just have to attempt a request.
+        return await this.http.authedRequest<LivekitGetTokenResponse>(
+            Method.Post,
+            "/rtc/livekit/get_token",
+            undefined,
+            body,
+            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+        );
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver (MSC4195).
+     *
+     * The homeserver restarts the delayed event for as long as it observes our connection to the SFU, and
+     * sends it once we disconnect, so the client does not have to restart it itself. This is more reliable
+     * than client-side restarts under poor network conditions.
+     *
+     * large timeouts are recommended for delayed delegation (in the range of hours)
+     * Requires homeserver support for MSC4195.
+     *
+     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, or a M_BAD_JSON error if the delayed
+     * event's timeout is below one hour.
+     */
+    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        // There is no /versions flag to check for support, so we just have to attempt a request.
+        return await this.http.authedRequest<EmptyObject>(
+            Method.Post,
+            "/rtc/livekit/delegate_delayed_leave",
+            undefined,
+            body,
+            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+        );
     }
 
     /**

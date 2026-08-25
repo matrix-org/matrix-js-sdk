@@ -89,7 +89,12 @@ import { makeDelegatedAuthMetadata } from "../test-utils/auth.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
-import { type Transport } from "../../src/matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "../../src/matrixrtc/index.ts";
 import { type IStore } from "../../src/store/index.ts";
 
 vi.useFakeTimers();
@@ -3926,6 +3931,115 @@ describe("MatrixClient", function () {
                     extra_field: "foobar",
                 },
             ]);
+        });
+    });
+
+    describe("MSC4195 LiveKit endpoints", () => {
+        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
+
+        describe("_unstable_getLivekitToken", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "thejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("passes on the server name of a remote homeserver", async () => {
+                const body = {
+                    url: "wss://livekit.remote.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    server_name: "remote.example.com",
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "theremotejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "theremotejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
+                    },
+                ];
+                await expect(
+                    client._unstable_getLivekitToken({
+                        url: "wss://not-an-sfu.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+
+        describe("_unstable_delegateDelayedLeave", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    delay_id: "1234567890",
+                } satisfies LivekitDelegateDelayedLeaveRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: {},
+                    },
+                ];
+                expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
+                    },
+                ];
+                await expect(
+                    client._unstable_delegateDelayedLeave({
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                        delay_id: "1234567890",
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
+                expect(httpLookups.length).toEqual(0);
+            });
         });
     });
 

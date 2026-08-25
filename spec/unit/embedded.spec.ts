@@ -100,6 +100,10 @@ class MockWidgetApi extends EventEmitter {
     public readStateEvents = vi.fn(async () => []);
     public getTurnServers = vi.fn(async () => []);
     public getRtcTransports = vi.fn(async () => ({ rtc_transports: [] }));
+    public requestCapabilityToGetRtcLivekitToken = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToDelegateRtcLivekitDelayedLeave = vi.fn().mockResolvedValue(undefined);
+    public getRtcLivekitToken = vi.fn(async () => ({ jwt: "" }));
+    public delegateRtcLivekitDelayedLeave = vi.fn(async () => ({}));
     public sendContentLoaded = vi.fn().mockResolvedValue(undefined);
 
     public transport = {
@@ -1269,6 +1273,105 @@ describe("RoomWidgetClient", () => {
 
             await makeClient({ rtcTransports: true });
             await expect(client._unstable_getRTCTransports()).rejects.toThrow(ConnectionError);
+        });
+    });
+
+    describe("LiveKit token", () => {
+        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
+        const body = {
+            url: "wss://livekit.example.org",
+            room_id: "!1:example.org",
+            slot_id: "m.call#ROOM",
+            member,
+        };
+
+        it("requests the capability when opted in", async () => {
+            await makeClient({ rtcLivekitGetToken: true });
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        });
+
+        it("does not request the capability when not opted in", async () => {
+            await makeClient({});
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        });
+
+        it("gets a token from the host", async () => {
+            widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            expect(await client._unstable_getLivekitToken({ ...body, server_name: "remote.example.org" })).toEqual({
+                jwt: "thejwt",
+            });
+            expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "remote.example.org" });
+        });
+
+        it("defaults the server name to our own homeserver", async () => {
+            widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+            expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "example.org" });
+        });
+
+        it("throws if the server name cannot be determined", async () => {
+            await makeClient({ rtcLivekitGetToken: true });
+            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow("server name");
+            expect(widgetApi.getRtcLivekitToken).not.toHaveBeenCalled();
+        });
+
+        it("propagates errors from the host", async () => {
+            const error = new Error("Missing capability");
+            widgetApi.getRtcLivekitToken.mockRejectedValue(error);
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(error);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.getRtcLivekitToken.mockRejectedValue(new Error("Request timed out"));
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(ConnectionError);
+        });
+    });
+
+    describe("delegated delayed leave", () => {
+        const body = {
+            room_id: "!1:example.org",
+            slot_id: "m.call#ROOM",
+            member: { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" },
+            delay_id: "1234567890",
+        };
+
+        it("requests the capability when opted in", async () => {
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
+        });
+
+        it("does not request the capability when not opted in", async () => {
+            await makeClient({});
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
+        });
+
+        it("delegates the delayed leave event via the host", async () => {
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+            expect(widgetApi.delegateRtcLivekitDelayedLeave).toHaveBeenCalledWith(body);
+        });
+
+        it("propagates errors from the host", async () => {
+            const error = new Error("Missing capability");
+            widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(error);
+
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(error);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(new Error("Request timed out"));
+
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
         });
     });
 });
