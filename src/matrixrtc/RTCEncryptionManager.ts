@@ -404,9 +404,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
         // Rotating means sending the new key to every participant, this is expensive in large session.
         if (this.isKeyRotationSuppressed) {
-            this.logger?.debug(
-                `New joiners detected, but the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit}), keeping the key`,
-            );
+            if (anyJoined.length > 0) {
+                this.logger?.debug(
+                    `New joiners detected, but the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit}), keeping the key`,
+                );
+            }
             toDistributeTo = anyJoined;
         } else {
             if (anyLeft.length > 0) {

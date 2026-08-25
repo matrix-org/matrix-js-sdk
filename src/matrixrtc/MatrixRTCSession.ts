@@ -835,6 +835,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // Clear the flag.
         this.membershipNeedsRecalculation = false;
         const oldMemberships = this.memberships;
+        // Needs to be computed before `this.memberships` is updated below, since it is derived from it.
+        const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
@@ -876,7 +878,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         } else {
             this.logger.debug(`No membership changes detected for room ${this.roomSubset.roomId}`);
         }
-        const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
         this.encryptionManager?.onMembershipsUpdate(oldMemberships);
