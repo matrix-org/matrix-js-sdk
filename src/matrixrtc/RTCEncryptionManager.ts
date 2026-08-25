@@ -39,7 +39,7 @@ import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
  *
  * Setting this to undefined implies that we do not have a limit and full rotations are always done.
  * This is the most secure and least performant option.
- * It is highly recommended to set this to < 50 for acutal client deployments.
+ * It is highly recommended to set this to < 50 for client deployments that are planned to be used for large calls.
  * But before setting this, make yourself familiar with the exact security implications.
  * Key, rotations will stop when reaching this user limit in a call. The call will still be encrypted.
  */
@@ -162,6 +162,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     /**
      * Whether the session currently has too many participants for the key to be rotated.
+     *
+     * This is computed by checking the participant count. If there are too many participants for efficient rotations,
+     * the key rotation will be suppressed.
+     * While this is true, the current key is still shared with new joiners and the current call is still fully encrypted,
+     * but no new key is generated for joiners or leavers. Changes are signalled by {@link MatrixRTCSessionEvent.KeyRotationSuppressedChanged}.
      * @see EncryptionConfig.keyRotationParticipantLimit
      */
     public get isKeyRotationSuppressed(): boolean {

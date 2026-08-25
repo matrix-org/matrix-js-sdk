@@ -16,7 +16,7 @@ export function getEncryptionKeyMapKey(membership: CallMembershipIdentityParts):
  */
 export interface IEncryptionManager {
     /**
-     * Whether the session currently has too many participants for the media key to be rotated.
+     * Whether the key rotation is currently halted.
      * @see EncryptionConfig.keyRotationParticipantLimit
      */
     readonly isKeyRotationSuppressed: boolean;

@@ -214,7 +214,7 @@ export interface EncryptionConfig {
      * on every join/leave becomes prohibitive. At this limit the current key is kept and
      * distributed to new joiners. No new keys are generated for joiners/leavers.
      *
-     * Defaults to 30.
+     * Defaults to undefined.
      */
     keyRotationParticipantLimit?: number;
 
@@ -311,11 +311,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * Whether the session currently has too many participants for the media key to be rotated.
-     *
-     * While this is true, the current key is still shared with new joiners, but no new key is generated for
-     * joiners or leavers. Changes are signalled by {@link MatrixRTCSessionEvent.KeyRotationSuppressedChanged}.
-     * @see EncryptionConfig.keyRotationParticipantLimit
+     * Whether the key rotation is currently halted.
+     * mirror of: EncryptionConfig.keyRotationParticipantLimit
      */
     public get isKeyRotationSuppressed(): boolean {
         return this.encryptionManager?.isKeyRotationSuppressed ?? false;
