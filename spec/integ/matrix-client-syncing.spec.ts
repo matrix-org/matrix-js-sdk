@@ -227,7 +227,8 @@ describe("MatrixClient syncing", () => {
 
             // noinspection ES6MissingAwait
             client!.startClient();
-            await httpBackend!.flushAllExpected();
+            // wait for all three syncs to be processed, not just for their responses to be delivered
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(3)]);
 
             expect(fires).toBe(3);
         });
@@ -342,7 +343,8 @@ describe("MatrixClient syncing", () => {
 
             // noinspection ES6MissingAwait
             client!.startClient();
-            await httpBackend!.flushAllExpected();
+            // wait for all three syncs to be processed, not just for their responses to be delivered
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(3)]);
 
             expect(fires).toBe(3);
         });
@@ -2670,7 +2672,8 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
 
         // noinspection ES6MissingAwait
         idbClient.startClient();
-        await idbHttpBackend.flushAllExpected();
+        // wait for the sync to be processed, not just for its response to be delivered
+        await Promise.all([idbHttpBackend.flushAllExpected(), utils.syncPromise(idbClient)]);
 
         expect(fires).toBe(1);
 
