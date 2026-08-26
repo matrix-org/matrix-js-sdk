@@ -142,6 +142,9 @@ export interface SyncCryptoCallbacks {
     /**
      * Called by the /sync loop when one time key counts and unused fallback key details are received.
      *
+     * For a given /sync response, this is called before {@link preprocessToDeviceMessages} and
+     * {@link processDeviceLists}, so that the implementation has an up-to-date count when processing those.
+     *
      * @param oneTimeKeysCounts - the received one time key counts
      * @param unusedFallbackKeys - the received unused fallback keys
      */

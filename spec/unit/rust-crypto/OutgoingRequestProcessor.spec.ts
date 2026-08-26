@@ -271,6 +271,39 @@ describe("OutgoingRequestProcessor", () => {
         httpBackend.verifyNoOutstandingRequests();
     });
 
+    it("passes the one-time key counts from /keys/upload responses to the callback", async () => {
+        const onKeysUploadResponse = vi.fn();
+        const httpApi = processor["http"];
+        processor = new OutgoingRequestProcessor(logger, olmMachine, httpApi, onKeysUploadResponse);
+
+        const reqProm = processor.makeOutgoingRequest(new KeysUploadRequest("1234", '{ "one_time_keys": {} }'));
+        httpBackend
+            .when("POST", "/_matrix/client/v3/keys/upload")
+            .respond(200, { one_time_key_counts: { signed_curve25519: 50 } });
+        await httpBackend.flushAllExpected();
+        await reqProm;
+
+        expect(onKeysUploadResponse).toHaveBeenCalledExactlyOnceWith({ signed_curve25519: 50 });
+        expect(olmMachine.markRequestAsSent).toHaveBeenCalledWith(
+            "1234",
+            RustSdkCryptoJs.RequestType.KeysUpload,
+            JSON.stringify({ one_time_key_counts: { signed_curve25519: 50 } }),
+        );
+    });
+
+    it("does not call the callback for other requests", async () => {
+        const onKeysUploadResponse = vi.fn();
+        const httpApi = processor["http"];
+        processor = new OutgoingRequestProcessor(logger, olmMachine, httpApi, onKeysUploadResponse);
+
+        const reqProm = processor.makeOutgoingRequest(new KeysQueryRequest("1234", "{}"));
+        httpBackend.when("POST", "/_matrix/client/v3/keys/query").respond(200, { device_keys: {} });
+        await httpBackend.flushAllExpected();
+        await reqProm;
+
+        expect(onKeysUploadResponse).not.toHaveBeenCalled();
+    });
+
     it("does not explode with unknown requests", async () => {
         const outgoingRequest = { id: "5678", type: 987 } as unknown as OutgoingRequest;
         const markSentCallPromise = awaitCallToMarkAsSent();

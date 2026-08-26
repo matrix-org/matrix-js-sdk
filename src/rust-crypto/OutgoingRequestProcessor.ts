@@ -52,6 +52,11 @@ export class OutgoingRequestProcessor {
         private readonly logger: Logger,
         private readonly olmMachine: OlmMachine,
         private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+        /**
+         * Optional callback, called with the `one_time_key_counts` from the response to each successful
+         * `POST /_matrix/client/v3/keys/upload` request.
+         */
+        private readonly onKeysUploadResponse?: (oneTimeKeyCounts: Record<string, number>) => void,
     ) {}
 
     public async makeOutgoingRequest<T>(
@@ -65,6 +70,7 @@ export class OutgoingRequestProcessor {
          */
         if (msg instanceof KeysUploadRequest) {
             resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/upload", {}, msg.body);
+            this.notifyKeysUploadResponse(resp);
         } else if (msg instanceof KeysQueryRequest) {
             resp = await this.requestWithRetry(Method.Post, "/_matrix/client/v3/keys/query", {}, msg.body);
         } else if (msg instanceof KeysClaimRequest) {
@@ -180,6 +186,23 @@ export class OutgoingRequestProcessor {
 
         const resp = await uiaCallback(makeRequest);
         return JSON.stringify(resp);
+    }
+
+    /**
+     * Pass the `one_time_key_counts` from a `/keys/upload` response to {@link onKeysUploadResponse}, if set.
+     *
+     * @param resp - the raw JSON response to the `/keys/upload` request.
+     */
+    private notifyKeysUploadResponse(resp: string): void {
+        if (!this.onKeysUploadResponse) return;
+        try {
+            const oneTimeKeyCounts = JSON.parse(resp)?.one_time_key_counts;
+            if (typeof oneTimeKeyCounts === "object" && oneTimeKeyCounts !== null) {
+                this.onKeysUploadResponse(oneTimeKeyCounts);
+            }
+        } catch (e) {
+            this.logger.warn("Unable to parse one_time_key_counts from /keys/upload response", e);
+        }
     }
 
     private async requestWithRetry(

@@ -1138,6 +1138,85 @@ describe("RustCrypto", () => {
         });
     });
 
+    describe("one-time key counts", () => {
+        let rustCrypto: RustCrypto;
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+
+        beforeEach(() => {
+            olmMachine = {
+                receiveSyncChanges: vi.fn().mockResolvedValue([]),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                new DebugLogger(debug("matrix-js-sdk:test:RustCrypto")),
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {},
+            );
+        });
+
+        /** The one-time key counts passed to `OlmMachine.receiveSyncChanges` on its most recent call */
+        function lastReceivedOneTimeKeyCounts(): Map<string, number> {
+            return olmMachine.receiveSyncChanges.mock.lastCall![2];
+        }
+
+        it("passes the counts and unused fallback keys reported by the server to the OlmMachine", async () => {
+            await rustCrypto.processKeyCounts({ signed_curve25519: 42 }, ["signed_curve25519"]);
+
+            expect(olmMachine.receiveSyncChanges).toHaveBeenCalledTimes(1);
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map([["signed_curve25519", 42]]));
+            expect(olmMachine.receiveSyncChanges.mock.lastCall![3]).toEqual(new Set(["signed_curve25519"]));
+        });
+
+        it("passes an empty count map while the server has not reported any counts", async () => {
+            await rustCrypto.preprocessToDeviceMessages([]);
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map());
+        });
+
+        it("reuses the last reported counts when processing to-device messages and device lists", async () => {
+            // `OlmMachine.receiveSyncChanges` needs a count on every call, and treats a missing count as "no
+            // one-time keys on the server", which would make it generate a new batch of keys. So, once the server
+            // has told us the count, we must keep passing it on the calls that don't have a count of their own.
+            // https://github.com/matrix-org/matrix-js-sdk/issues/5501
+            await rustCrypto.processKeyCounts({ signed_curve25519: 42 }, []);
+
+            await rustCrypto.preprocessToDeviceMessages([]);
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map([["signed_curve25519", 42]]));
+
+            await rustCrypto.processDeviceLists({ changed: ["@bob:example.com"] });
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map([["signed_curve25519", 42]]));
+
+            // A new count from the server replaces the remembered one.
+            await rustCrypto.processKeyCounts({ signed_curve25519: 7 }, []);
+            await rustCrypto.preprocessToDeviceMessages([]);
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map([["signed_curve25519", 7]]));
+
+            expect(olmMachine.receiveSyncChanges).toHaveBeenCalledTimes(5);
+        });
+
+        it("uses the counts from the latest /keys/upload response", async () => {
+            // The server also tells us the count in the response to each `/keys/upload`, and the OlmMachine updates
+            // its own count from that; we must do the same, so that we don't pass a stale (or missing) count on the
+            // next to-device or device-list call.
+            await rustCrypto.processKeyCounts({ signed_curve25519: 10 }, []);
+            rustCrypto["onKeysUploadResponse"]({ signed_curve25519: 50 });
+
+            await rustCrypto.preprocessToDeviceMessages([]);
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map([["signed_curve25519", 50]]));
+        });
+
+        it("reuses the last reported counts when the server only reports unused fallback keys", async () => {
+            await rustCrypto.processKeyCounts({ signed_curve25519: 42 }, undefined);
+            await rustCrypto.processKeyCounts(undefined, ["signed_curve25519"]);
+
+            expect(olmMachine.receiveSyncChanges).toHaveBeenCalledTimes(2);
+            expect(lastReceivedOneTimeKeyCounts()).toEqual(new Map([["signed_curve25519", 42]]));
+            expect(olmMachine.receiveSyncChanges.mock.lastCall![3]).toEqual(new Set(["signed_curve25519"]));
+        });
+    });
+
     describe(".getEncryptionInfoForEvent", () => {
         let rustCrypto: RustCrypto;
         let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;

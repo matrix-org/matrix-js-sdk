@@ -1185,6 +1185,16 @@ export class SyncApi {
             }
         }
 
+        // Handle one_time_keys_count and unused fallback keys.
+        //
+        // This must happen before the to-device events and device list changes are processed: the crypto layer has
+        // to give the OlmMachine a one-time key count on every call it makes for those, and using a stale count from
+        // an earlier /sync response would make it generate (and upload) one-time keys that are not needed.
+        await this.syncOpts.cryptoCallbacks?.processKeyCounts(
+            data.device_one_time_keys_count,
+            data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
+        );
+
         // handle to-device events
         if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
             const toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
@@ -1578,12 +1588,6 @@ export class SyncApi {
                 // substantial bit of rework :/.
             }
         }
-
-        // Handle one_time_keys_count and unused fallback keys
-        await this.syncOpts.cryptoCallbacks?.processKeyCounts(
-            data.device_one_time_keys_count,
-            data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
-        );
     }
 
     /**

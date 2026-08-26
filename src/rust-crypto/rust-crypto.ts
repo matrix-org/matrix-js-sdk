@@ -175,7 +175,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         private readonly enableEncryptedStateEvents: boolean = false,
     ) {
         super();
-        this.outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, http);
+        this.outgoingRequestProcessor = new OutgoingRequestProcessor(logger, olmMachine, http, (oneTimeKeyCounts) =>
+            this.onKeysUploadResponse(oneTimeKeyCounts),
+        );
         this.outgoingRequestsManager = new OutgoingRequestsManager(
             this.logger,
             olmMachine,
@@ -1691,16 +1693,42 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
+     * The most recent one-time key counts reported by the server, either in a `/sync` response (see
+     * {@link processKeyCounts}) or in the response to a `/keys/upload` request (see {@link onKeysUploadResponse}).
+     *
+     * `OlmMachine.receiveSyncChanges` requires a one-time key count on every call and (since
+     * matrix-sdk-crypto-wasm 18.5.0) treats a missing `signed_curve25519` entry as "there are no one-time keys
+     * on the server", which makes the `OlmMachine` generate a fresh batch of keys for upload. To avoid that
+     * happening on the calls made from {@link preprocessToDeviceMessages} and {@link processDeviceLists}, which
+     * have no count of their own, we remember the last count the server actually reported and pass that instead.
+     * See https://github.com/matrix-org/matrix-js-sdk/issues/5501.
+     *
+     * `undefined` until the server has reported a count.
+     */
+    private lastOneTimeKeysCounts?: Map<string, number>;
+
+    /**
+     * Called with the `one_time_key_counts` from the response to each `/keys/upload` request.
+     *
+     * The `OlmMachine` updates its own idea of the number of uploaded keys from this response, so we do the same
+     * with {@link lastOneTimeKeysCounts}, to keep the two in step.
+     */
+    private onKeysUploadResponse(oneTimeKeyCounts: Record<string, number>): void {
+        this.lastOneTimeKeysCounts = new Map<string, number>(Object.entries(oneTimeKeyCounts));
+    }
+
+    /**
      * Apply sync changes to the olm machine
      * @param events - the received to-device messages
-     * @param oneTimeKeysCounts - the received one time key counts
+     * @param oneTimeKeysCounts - the received one time key counts. If omitted, the most recent counts reported by
+     *    the server are used (see {@link lastOneTimeKeysCounts}), or an empty map if there are none yet.
      * @param unusedFallbackKeys - the received unused fallback keys
      * @param devices - the received device list updates
      * @returns A list of processed to-device messages.
      */
     private async receiveSyncChanges({
         events,
-        oneTimeKeysCounts = new Map<string, number>(),
+        oneTimeKeysCounts = this.lastOneTimeKeysCounts ?? new Map<string, number>(),
         unusedFallbackKeys,
         devices = new RustSdkCryptoJs.DeviceLists(),
     }: {
@@ -1723,8 +1751,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @returns A list of preprocessed to-device messages.
      */
     public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<ReceivedToDeviceMessage[]> {
-        // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
-        // one-time-keys, or fallback keys, so just pass empty data.
+        // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes or
+        // fallback keys, so pass empty data for those. The one-time key count defaults to the last count reported by
+        // the server (see `receiveSyncChanges`).
         const processed = await this.receiveSyncChanges({ events });
 
         const received: ReceivedToDeviceMessage[] = [];
@@ -1819,6 +1848,11 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     ): Promise<void> {
         const mapOneTimeKeysCount = oneTimeKeysCounts && new Map<string, number>(Object.entries(oneTimeKeysCounts));
         const setUnusedFallbackKeys = unusedFallbackKeys && new Set<string>(unusedFallbackKeys);
+
+        if (mapOneTimeKeysCount !== undefined) {
+            // Remember the count, for use on subsequent `receiveSyncChanges` calls which have no count of their own.
+            this.lastOneTimeKeysCounts = mapOneTimeKeysCount;
+        }
 
         if (mapOneTimeKeysCount !== undefined || setUnusedFallbackKeys !== undefined) {
             await this.receiveSyncChanges({

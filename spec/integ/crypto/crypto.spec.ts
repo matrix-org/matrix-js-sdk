@@ -1452,6 +1452,43 @@ describe("crypto", () => {
             expect(res.keysCount).toBeGreaterThan(0);
             expect(res.fallbackKeysCount).toBeGreaterThan(0);
         });
+
+        it("should not upload one-time keys when a sync only carries to-device messages or device list changes", async () => {
+            // Regression test for https://github.com/matrix-org/matrix-js-sdk/issues/5501: the crypto layer has to
+            // give the OlmMachine a one-time key count when it processes to-device messages and device list changes,
+            // and if it passes an empty count, the OlmMachine (since matrix-sdk-crypto-wasm 18.5.0) takes that to
+            // mean that the server has no one-time keys, and generates a new batch on every such sync.
+            expectAliceKeyQuery({ device_keys: { "@alice:localhost": {} }, failures: {} });
+            await startClientAndAwaitFirstSync();
+
+            // Wait for the initial batch of one-time keys to be uploaded. The E2EKeyReceiver replies with the number
+            // of keys it now holds, so the OlmMachine knows that there are 50 keys on the server.
+            const initialKeys = await keyReceiver.awaitOneTimeKeyUpload();
+            const keyUploadsAfterInitialBatch = fetchMock.callHistory.calls("keys-upload").length;
+
+            // A sync which reports the count, and also carries a to-device message
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 2,
+                to_device: { events: [{ type: "org.example.test", sender: "@bob:localhost", content: {} }] },
+                device_one_time_keys_count: { signed_curve25519: Object.keys(initialKeys).length },
+            });
+            await syncPromise(aliceClient);
+
+            // A sync which carries a to-device message and device list changes, but does not report the count
+            syncResponder.sendOrQueueSyncResponse({
+                next_batch: 3,
+                to_device: { events: [{ type: "org.example.test", sender: "@bob:localhost", content: {} }] },
+                device_lists: { changed: ["@bob:localhost"] },
+            });
+            await syncPromise(aliceClient);
+
+            // Give the outgoing request loop a chance to run, then check that no further keys were uploaded.
+            syncResponder.sendOrQueueSyncResponse({ next_batch: 4 });
+            await syncPromise(aliceClient);
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            await flushPromises();
+            expect(fetchMock.callHistory.calls("keys-upload").length).toEqual(keyUploadsAfterInitialBatch);
+        });
     });
 
     describe("getUserDeviceInfo", () => {
