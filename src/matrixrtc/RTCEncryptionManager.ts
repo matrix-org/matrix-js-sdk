@@ -95,14 +95,41 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private useKeyDelay = 5000;
 
     /**
+     * The amount of keys that can be shared per minute.
+     * This is a shared contingent so it scales quadratically with the amount of users.
+     * Each additional user increases
+     *  - the amount of to-device messages per rotation
+     *  - the amount of all rotations (whole call) per leave/join event
+     *
+     * The client can only share sharedPerMinuteKeyRotationContingent/N keys per minute where N is the number of call participants.
+     * As each rotation sends N-1 to-device messages, the client can only do sharedPerMinuteKeyRotationContingent/(N*(N-1)) = clientRotationsPerMinute.
+     * This implies that each key share has to be at least 60s / clientRotationsPerMinute apart.
+     *
+     * This implies the following rotation interval:
+     *  - 2000: 50 users: 1.2min, 100 users: 4.9min, 200: users: 19.9min
+     *  - 3000: 50 users: 0.8min, 100 users: 3.3min, 200: users: 13.2min
+     *  - 5000: 50 users: 0.5min, 100 users: 1.9min, 200: users: 7.9min
+     */
+    private sharedPerMinuteToDeviceContingent = 3000;
+
+    /**
      * We want to avoid rolling out a new outbound key when the previous one was created less than `keyRotationGracePeriodMs` milliseconds ago.
-     * This is to avoid expensive key rotations when users quickly join the call in a row.
+     * This is a computed property. With more users in a call each roation implies more to-device messages.
+     * This value increases quadratically with more users.
+     *
+     * With `N` participants each rotation sends `N-1` to-device messages and every participant does a rotation.
+     * That is where the quadratic scaling comes from: more to-device messages per rotation for one user and more user who need to rotate.
+     * The call as a whole can only afford a limit amount per time.
+     * See {@link RTCEncryptionManager.sharedPerMinuteToDeviceContingent} for more details.
      *
      * This must be higher than `useKeyDelay` to have an effect.
      * If it is lower, the current key will always be older than the grace period.
      * @private
      */
-    private keyRotationGracePeriodMs = 10_000;
+    private get keyRotationGracePeriodMs(): number {
+        const participantCount = this.getMemberships().length;
+        return (60_000 * participantCount * (participantCount - 1)) / this.sharedPerMinuteToDeviceContingent;
+    }
 
     /**
      * The number of participants at or above which we stop rotating the key altogether.
@@ -254,7 +281,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
         this.useHashedRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
-        this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
+        this.sharedPerMinuteToDeviceContingent =
+            joinConfig?.sharedPerMinuteToDeviceContingent ?? this.sharedPerMinuteToDeviceContingent;
         this.keyRotationParticipantLimit =
             joinConfig?.keyRotationParticipantLimit ?? DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT;
 
@@ -339,8 +367,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     };
 
     /**
-     * Called when the ownMembership of the call changes.
-     * This encryption manager is very basic, it will rotate the key everytime this is called.
+     * Called when the memberships of the call change. (including ownMembership)
      * @param oldMemberships - This parameter is not used here, but it is kept for compatibility with the interface.
      */
     public onMembershipsUpdate(oldMemberships: CallMembership[] = []): void {
@@ -349,10 +376,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
         // Ensure the key is distributed. This will be no-op if the key is already being distributed to everyone.
         // If there is an ongoing distribution, it will be completed before a new one is started.
         this.ensureKeyDistribution();
+
         // ensure key emission to the rtc backend
         this.checkKeysWithoutMatchingRTCMembership();
     }
 
+    private enableJitterRotationDelay: boolean = false;
     private async rolloutOutboundKey(): Promise<void> {
         const isFirstKey = this.outboundSession == null;
         if (isFirstKey) {
@@ -412,37 +441,60 @@ export class RTCEncryptionManager implements IEncryptionManager {
         let toDistributeTo: ParticipantDeviceInfo[] = [];
         //default to current session
         let newOutboundEncryptionSession: OutboundEncryptionSession = this.outboundSession!;
-        let hasKeyChanged = false;
+        // default to the config/json hard limit for rotation suppression. (DEFAULT false)
+        let suppressKeyRotation = this.isKeyRotationSuppressed;
 
+        // Check if we are too early to rotate again
+        const creationTs = this.outboundSession?.creationTS;
+        const activeKeyAge = creationTs ? Date.now() - creationTs : undefined;
+        const nowInsideKeyRotationGracePeriod = activeKeyAge && activeKeyAge < this.keyRotationGracePeriodMs;
+
+        if (nowInsideKeyRotationGracePeriod) {
+            // Suppress manually as the last rotation is too recent.
+            suppressKeyRotation = true;
+            // We prohibit combining jitter and keyRotationGracePeriodMs delays.
+            // Will be reset once we update outside the keyRotationGracePeriodMs time window.
+            this.enableJitterRotationDelay = false;
+            const waitForNextRotationMs = this.keyRotationGracePeriodMs - activeKeyAge;
+            this.logger?.debug(
+                `Membership Change Detect, but last key rotation is too recent for the current member count (age:${activeKeyAge}).
+                Rotating in ${waitForNextRotationMs}`,
+            );
+            // Schedule next ensureKeyDistribution as we did not rotate here.
+            // We do not need to track any duplicated schedules of ensureKeyDistribution.
+            // currentKeyDistributionPromise will make sure that we do not race/collide.
+            void sleep(waitForNextRotationMs).then(() => this.ensureKeyDistribution());
+        } else if (this.enableJitterRotationDelay) {
+            // We reach this without any key rollouts inside the keyRotationGracePeriodMs (which sets enableJitterRotationDelay = false )
+            // This is a "first member change in a while" situation. So all clients would rotate.
+            // To mitigate this burst sitation we don't rotate immediately but delay it randomly (jitter key distributions compared to other participants)
+            suppressKeyRotation = true;
+            // Schedule next ensureKeyDistribution as we did not rotate here.
+            // We do not need to track any duplicated schedules of ensureKeyDistribution.
+            // currentKeyDistributionPromise will make sure that we do not race/collide.
+            void sleep(this.keyRotationGracePeriodMs * Math.random()).then(() => this.ensureKeyDistribution());
+        } else if (!this.enableJitterRotationDelay) {
+            // Enable jitter delay again. We reached this because we actually rotate (no suppressKeyRotation = true in the if-else branch)
+            // So the next rotation needs to have a jitter delay EXCEPT there is a member change inside the GracePeriod window
+            this.enableJitterRotationDelay = true;
+        }
+
+        let hasKeyChanged = false;
         // Rotating means sending the new key to every participant, this is expensive in large session.
-        if (this.isKeyRotationSuppressed) {
+        if (suppressKeyRotation) {
+            // If we suppress we only share with newJoiners (but no new key will be generated)
             if (anyJoined.length > 0) {
                 this.logger?.debug(
                     `New joiners detected, but the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit}), keeping the key`,
                 );
             }
             toDistributeTo = anyJoined;
-        } else {
-            if (anyLeft.length > 0) {
-                // We need to rotate the key
-                newOutboundEncryptionSession = this.createNewOutboundSession();
-                hasKeyChanged = true;
-                toDistributeTo = toShareWith;
-            } else if (anyJoined.length > 0) {
-                const keyAge = Date.now() - this.outboundSession!.creationTS;
-                if (keyAge < this.keyRotationGracePeriodMs) {
-                    this.logger?.debug(
-                        `New joiners detected, but the key is recent enough (age:${keyAge}), keeping it`,
-                    );
-                    toDistributeTo = anyJoined;
-                } else {
-                    this.logger?.debug(`New joiners detected, rotating the key`);
-                    // We need to rotate the key
-                    newOutboundEncryptionSession = this.createNewOutboundSession();
-                    hasKeyChanged = true;
-                    toDistributeTo = toShareWith;
-                }
-            }
+        } else if (anyJoined.length > 0 && anyLeft.length > 0) {
+            hasKeyChanged = true;
+
+            // No need to check for any keyRotationGracePeriodMs here -> handled indirectly with to suppressKeyRotation;
+            newOutboundEncryptionSession = this.createNewOutboundSession();
+            toDistributeTo = toShareWith;
         }
         // return early if we dont have anything to distribute.
         if (toDistributeTo.length === 0) {
