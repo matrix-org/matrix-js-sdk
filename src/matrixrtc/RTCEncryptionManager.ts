@@ -381,7 +381,30 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.checkKeysWithoutMatchingRTCMembership();
     }
 
+    /**
+     * Whether the next rollout has to use a random delay before rotating.
+     *
+     * A membership change is observed by every client of the session at the same time, so without a jitter all
+     * of them would rotate (and send `N-1` to-device messages each) at the same moment.
+     * The flag is consumed by the rollout that schedules the jittered rotation, so that the scheduled rollout
+     * does actually rotate. It is set again by every rollout that rotates.
+     * A membership change inside {@link RTCEncryptionManager.keyRotationGracePeriodMs} clears it as well:
+     * the grace period delay already spreads that rotation out, the two delays must not be combined.
+     * @private
+     */
     private enableJitterRotationDelay: boolean = false;
+
+    /**
+     * Set when a membership change should have rotated the key, but the rotation was postponed
+     * (either by the grace period or by the jitter delay).
+     *
+     * The rollout that was scheduled by the postponing rollout then rotates, even if the memberships did not
+     * change again in the meantime (the joiners of the postponed round already received the current key, so they
+     * no longer show up as `anyJoined`).
+     * @private
+     */
+    private shouldRotateKey: boolean = false;
+
     private async rolloutOutboundKey(): Promise<void> {
         const isFirstKey = this.outboundSession == null;
         if (isFirstKey) {
@@ -444,18 +467,40 @@ export class RTCEncryptionManager implements IEncryptionManager {
         // default to the config/json hard limit for rotation suppression. (DEFAULT false)
         let suppressKeyRotation = this.isKeyRotationSuppressed;
 
-        // Check if we are too early to rotate again
-        const creationTs = this.outboundSession?.creationTS;
-        const activeKeyAge = creationTs ? Date.now() - creationTs : undefined;
-        const nowInsideKeyRotationGracePeriod = activeKeyAge && activeKeyAge < this.keyRotationGracePeriodMs;
+        // A membership change requires a rotation if someone we shared the current key with is gone (`anyLeft`)
+        // or if someone joined who is not supposed to be able to decrypt the media we sent before they joined (`anyJoined`).
+        const membershipChanged = anyLeft.length > 0 || anyJoined.length > 0;
+        if (!membershipChanged && !this.shouldRotateKey) {
+            // Nothing changed and there is no rotation that we postponed earlier: nothing to do.
+            return;
+        }
 
-        if (nowInsideKeyRotationGracePeriod) {
+        // Check if we are too early to rotate again. (`outboundSession` is always set at this point)
+        const activeKeyAge = Date.now() - this.outboundSession!.creationTS;
+        const gracePeriodMs = this.keyRotationGracePeriodMs;
+        const nowInsideKeyRotationGracePeriod = activeKeyAge < gracePeriodMs;
+
+        if (suppressKeyRotation) {
+            // The session is too large to rotate at all (hard limit). The key is only shared with the new joiners.
+            // There is nothing to schedule: this will not change until the session shrinks again, which will
+            // show up as a membership change of its own.
+            this.logger?.debug(
+                `Key rotation is suppressed, the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit})`,
+            );
+        } else if (isFirstKey) {
+            // The key we just created above was never shared with anyone, so there is nothing to rotate away from:
+            // it is distributed as is to the current members (they all show up as `anyJoined`).
+            suppressKeyRotation = true;
+            // The next membership change is one that every client in the session observes at the same time,
+            // so the rotation it triggers needs to be jittered.
+            this.enableJitterRotationDelay = true;
+        } else if (nowInsideKeyRotationGracePeriod) {
             // Suppress manually as the last rotation is too recent.
             suppressKeyRotation = true;
             // We prohibit combining jitter and keyRotationGracePeriodMs delays.
             // Will be reset once we update outside the keyRotationGracePeriodMs time window.
             this.enableJitterRotationDelay = false;
-            const waitForNextRotationMs = this.keyRotationGracePeriodMs - activeKeyAge;
+            const waitForNextRotationMs = gracePeriodMs - activeKeyAge;
             this.logger?.debug(
                 `Membership Change Detect, but last key rotation is too recent for the current member count (age:${activeKeyAge}).
                 Rotating in ${waitForNextRotationMs}`,
@@ -463,17 +508,23 @@ export class RTCEncryptionManager implements IEncryptionManager {
             // Schedule next ensureKeyDistribution as we did not rotate here.
             // We do not need to track any duplicated schedules of ensureKeyDistribution.
             // currentKeyDistributionPromise will make sure that we do not race/collide.
+            this.shouldRotateKey = membershipChanged || this.shouldRotateKey;
             void sleep(waitForNextRotationMs).then(() => this.ensureKeyDistribution());
         } else if (this.enableJitterRotationDelay) {
             // We reach this without any key rollouts inside the keyRotationGracePeriodMs (which sets enableJitterRotationDelay = false )
             // This is a "first member change in a while" situation. So all clients would rotate.
             // To mitigate this burst sitation we don't rotate immediately but delay it randomly (jitter key distributions compared to other participants)
             suppressKeyRotation = true;
+            // Consume the jitter: the rollout we schedule here is the one that actually rotates.
+            this.enableJitterRotationDelay = false;
+            const jitterDelayMs = gracePeriodMs * Math.random();
+            this.logger?.debug(`Membership change detected, jittering the rotation by ${jitterDelayMs}ms`);
             // Schedule next ensureKeyDistribution as we did not rotate here.
             // We do not need to track any duplicated schedules of ensureKeyDistribution.
             // currentKeyDistributionPromise will make sure that we do not race/collide.
-            void sleep(this.keyRotationGracePeriodMs * Math.random()).then(() => this.ensureKeyDistribution());
-        } else if (!this.enableJitterRotationDelay) {
+            this.shouldRotateKey = membershipChanged || this.shouldRotateKey;
+            void sleep(jitterDelayMs).then(() => this.ensureKeyDistribution());
+        } else {
             // Enable jitter delay again. We reached this because we actually rotate (no suppressKeyRotation = true in the if-else branch)
             // So the next rotation needs to have a jitter delay EXCEPT there is a member change inside the GracePeriod window
             this.enableJitterRotationDelay = true;
@@ -484,13 +535,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
         if (suppressKeyRotation) {
             // If we suppress we only share with newJoiners (but no new key will be generated)
             if (anyJoined.length > 0) {
-                this.logger?.debug(
-                    `New joiners detected, but the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit}), keeping the key`,
-                );
+                this.logger?.debug(`New joiners detected, but the rotation is suppressed, keeping the key`);
             }
             toDistributeTo = anyJoined;
-        } else if (anyJoined.length > 0 && anyLeft.length > 0) {
+        } else {
+            // We are not suppressed and we know that a rotation is needed (either from this membership change or
+            // from a change we deferred earlier), so rotate and send the new key to everyone.
             hasKeyChanged = true;
+            this.shouldRotateKey = false;
 
             // No need to check for any keyRotationGracePeriodMs here -> handled indirectly with to suppressKeyRotation;
             newOutboundEncryptionSession = this.createNewOutboundSession();
