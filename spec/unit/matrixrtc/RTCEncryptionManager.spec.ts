@@ -26,6 +26,35 @@ import { logger } from "../../../src/logger.ts";
 import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
 
+/**
+ * The rotation grace period is not configured directly, it is derived from the number of participants:
+ * `60_000 * N * (N - 1) / sharedPerMinuteToDeviceContingent`.
+ *
+ * With this contingent the grace period is a comfortable `1_000 * N * (N - 1)` ms, see {@link gracePeriodMsFor}.
+ * The default contingent (3000) would give 40ms for 2 participants and 240ms for 4, which is impractical to test with.
+ */
+const TEST_CONTINGENT = 60;
+
+/**
+ * The grace period the encryption manager will use for a session with `participantCount` **other** participants.
+ * (`getMemberships()` is mocked to return the other members only in this spec, our own membership is not part of it)
+ */
+function gracePeriodMsFor(participantCount: number, contingent: number = TEST_CONTINGENT): number {
+    return (60_000 * participantCount * (participantCount - 1)) / contingent;
+}
+
+/** The shape in which a membership is handed to {@link IKeyTransport.sendKey} */
+function participantInfo(membership: CallMembership) {
+    return { userId: membership.sender, deviceId: membership.deviceId, membershipTs: membership.createdTs() };
+}
+
+const OWN_MEMBERSHIP = {
+    userId: "@alice:example.org",
+    deviceId: "DEVICE01",
+    memberId: "@alice:example.org:DEVICE01",
+};
+const OWN_RTC_BACKEND_IDENTITY = "@alice:example.org:DEVICE01";
+
 describe("RTCEncryptionManager", () => {
     // The manager being tested
     let encryptionManager: RTCEncryptionManager;
@@ -57,6 +86,11 @@ describe("RTCEncryptionManager", () => {
             logger,
             rtcIdentifierProvider,
         );
+    });
+
+    afterEach(() => {
+        // Some tests spy on `Math.random` to make the rotation jitter deterministic.
+        vi.restoreAllMocks();
     });
 
     it("should start and stop the transport properly", () => {
@@ -120,6 +154,7 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should re-distribute keys to members whom callMemberhsip ts has changed", async () => {
+            vi.useFakeTimers();
             let members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE", 1000)];
             getMembershipMock.mockReturnValue(members);
 
@@ -151,15 +186,32 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // There are no membership change but the callMembership ts has changed (reset?)
-            // Resend the key
+            // That member counts as a new joiner: resend the key
             encryptionManager.onMembershipsUpdate();
-            await vi.runOnlyPendingTimersAsync();
+            await flushPromises();
 
-            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
-            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(
+                1,
                 expect.any(String),
                 // Re send the same key to that user
                 0,
+                [
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "BOBDEVICE",
+                        membershipTs: 2000,
+                    },
+                ],
+            );
+
+            // And, as for any other joiner, the key is rotated afterwards.
+            // With a single other participant the grace period (and therefore the jitter) is 0ms.
+            await vi.runOnlyPendingTimersAsync();
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(
+                2,
+                expect.any(String),
+                // The key index has been incremented
+                1,
                 [
                     {
                         userId: "@bob:example.org",
@@ -179,9 +231,10 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 15_000; // 15 seconds
+            // With 3 participants and this contingent the grace period is 6s
+            const gracePeriod = gracePeriodMsFor(3);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -199,10 +252,9 @@ describe("RTCEncryptionManager", () => {
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             await vi.advanceTimersByTimeAsync(gracePeriod / 2);
             encryptionManager.onMembershipsUpdate();
+            await flushPromises();
 
-            await vi.runOnlyPendingTimersAsync();
-
-            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(
                 expect.any(String),
                 // It should not have incremented the key index
                 0,
@@ -210,31 +262,54 @@ describe("RTCEncryptionManager", () => {
                 [{ userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1000 }],
             );
 
+            // The rotation is deferred to the end of the grace period, not skipped: nothing happens before that.
+            await vi.advanceTimersByTimeAsync(gracePeriod / 2 - 2);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+
+            // Now the grace period of the current key has elapsed, it is rotated for everyone.
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(
+                expect.any(String),
+                1,
+                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+            );
+
+            // And is used locally after the `useKeyDelay`
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
             await vi.advanceTimersByTimeAsync(1000);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
         });
 
-        // Test an edge case where the use key delay is higher than the grace period.
-        // This means that no matter what, the key once rolled out will be too old to be re-used for the new member that
-        // joined within the grace period.
+        // Test an edge case where the use key delay is higher than the grace period. That is the case for any small
+        // session with the default contingent (the grace period is 240ms for 4 participants).
+        // This means that a membership change can arrive while the previous key is still being rolled out, and that
+        // the key once rolled out is always too old to be considered "recent enough" for the next joiner.
         // So we expect another rotation to happen in all cases where a new member joins.
-        // eslint-disable-next-line @vitest/expect-expect
         it("test grace period lower than delay period", async () => {
             vi.useFakeTimers();
+            // Make the jitter deterministic: half of the grace period
+            vi.spyOn(Math, "random").mockReturnValue(0.5);
 
-            const members = [
-                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
-                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
-            ];
-            getMembershipMock.mockReturnValue(members);
+            const bob = aStateBaseMembership("@bob:example.org", "BOBDEVICE");
+            const bob2 = aStateBaseMembership("@bob:example.org", "BOBDEVICE2");
+            const carl = aStateBaseMembership("@carl:example.org", "CARLDEVICE");
+            const david = aStateBaseMembership("@david:example.org", "DAVDEVICE");
+            getMembershipMock.mockReturnValue([bob, bob2]);
 
-            const gracePeriod = 3_000; // 3 seconds
-            const useKeyDelay = gracePeriod + 2_000; // 5 seconds
+            const useKeyDelay = 5_000;
+            // The default contingent gives a grace period of 120ms for 3 and 240ms for 4 participants,
+            // both far below the `useKeyDelay`.
+            expect(gracePeriodMsFor(4, 3000)).toBeLessThan(useKeyDelay);
+
             // initial rollout
-            encryptionManager.join({
-                useKeyDelay,
-                keyRotationGracePeriodMs: gracePeriod,
-            });
+            encryptionManager.join({ useKeyDelay });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -244,35 +319,54 @@ describe("RTCEncryptionManager", () => {
             // The existing members have been talking for 5mn
             await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
-            // A new member joins, that should trigger a key rotation.
-            members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
+            // A new member joins, that should trigger a key rotation (jittered by 120ms/2).
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
             encryptionManager.onMembershipsUpdate();
-            await vi.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3, 3000) / 2);
 
-            // A new member joins, within the grace period, but under the delay period
-            members.push(aStateBaseMembership("@david:example.org", "DAVDEVICE"));
-            await vi.advanceTimersByTimeAsync((useKeyDelay - gracePeriod) / 2);
+            // A new member joins while the rotated key is still in its `useKeyDelay` window
+            await vi.advanceTimersByTimeAsync(1_000);
+            getMembershipMock.mockReturnValue([bob, bob2, carl, david]);
             encryptionManager.onMembershipsUpdate();
 
-            // Wait past the delay period
-            await vi.advanceTimersByTimeAsync(5_000);
+            // Wait past the delay period of the ongoing rollout and the jitter of the rotation it triggers...
+            await vi.advanceTimersByTimeAsync(useKeyDelay + gracePeriodMsFor(4, 3000));
+            // ...and past the delay period of that second rotation
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
 
-            // Even though the new member joined within the grace period, the key should be rotated because once the delay period has passed
-            // also the grace period is exceeded/the key is too old to be reshared.
-
-            // CARLDEVICE should have received a key with index 1 and another one with index 2
+            // CARLDEVICE joined while key 0 was in use: it gets that key right away so that it can decrypt,
+            // then the rotation to key 1 and the one triggered by DAVDEVICE (key 2).
+            expectKeyAtIndexToHaveBeenSentTo(mockTransport, 0, "@carl:example.org", "CARLDEVICE");
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 1, "@carl:example.org", "CARLDEVICE");
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 2, "@carl:example.org", "CARLDEVICE");
-            // Of course, should not have received the first key
-            expectKeyAtIndexNotToHaveBeenSentTo(mockTransport, 0, "@carl:example.org", "CARLDEVICE");
 
-            // DAVDEVICE should only have received a key with index 2
+            // DAVDEVICE joined while key 1 was in use, so it never sees key 0
+            expectKeyAtIndexNotToHaveBeenSentTo(mockTransport, 0, "@david:example.org", "DAVDEVICE");
+            expectKeyAtIndexToHaveBeenSentTo(mockTransport, 1, "@david:example.org", "DAVDEVICE");
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 2, "@david:example.org", "DAVDEVICE");
-            expectKeyAtIndexNotToHaveBeenSentTo(mockTransport, 1, "@david:example.org", "DAVDEVICE");
+
+            // Both rotations have been rolled out locally, in order
+            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+            expect(onEncryptionKeysChanged).toHaveBeenNthCalledWith(
+                1,
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+            expect(onEncryptionKeysChanged).toHaveBeenNthCalledWith(
+                2,
+                expect.any(Uint8Array<ArrayBufferLike>),
+                2,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
         });
 
         it("Should rotate key when a user join past the rotation grace period", async () => {
             vi.useFakeTimers();
+            // Make the jitter deterministic: half of the grace period
+            const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
 
             const members = [
                 aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
@@ -280,20 +374,37 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 15_000; // 15 seconds
+            // With 3 participants and this contingent the grace period is 6s
+            const gracePeriod = gracePeriodMsFor(3);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
+            randomSpy.mockClear();
 
-            await vi.advanceTimersByTimeAsync(gracePeriod + 1000);
+            await vi.advanceTimersByTimeAsync(gracePeriod);
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
+            await flushPromises();
 
-            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+            // The current key is shared with the new joiner right away, so that they can decrypt our media
+            // while we wait for the jitter delay.
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 0, [
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1000 },
+            ]);
+            // This is the first membership change in a while: every participant would rotate at the same time,
+            // so the rotation is delayed by `gracePeriod * Math.random()`.
+            expect(randomSpy).toHaveBeenCalledTimes(1);
+
+            await vi.advanceTimersByTimeAsync(gracePeriod * 0.5 - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(
                 expect.any(String),
                 // It should have incremented the key index
                 1,
@@ -306,9 +417,15 @@ describe("RTCEncryptionManager", () => {
             );
 
             // Wait for useKeyDelay to pass
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
             await vi.advanceTimersByTimeAsync(5000);
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalled();
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
         });
 
         it("Should not rotate key when several users join within the rotation grace period", async () => {
@@ -320,8 +437,9 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            // initial rollout
-            encryptionManager.join(undefined);
+            // initial rollout. With this contingent the grace period is 6s for 3 participants and grows up to 42s
+            // for 7, so all the joins below land inside the grace period of the very first key.
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -461,9 +579,13 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 1_000;
+            // With 4 participants and this contingent the grace period is 12s
+            const gracePeriod = gracePeriodMsFor(4);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.join({
+                sharedPerMinuteToDeviceContingent: TEST_CONTINGENT,
+                keyRotationParticipantLimit: 4,
+            });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -499,19 +621,24 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 1_000;
+            // With 3 participants and this contingent the grace period is 6s
+            const gracePeriod = gracePeriodMsFor(3);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.join({
+                sharedPerMinuteToDeviceContingent: TEST_CONTINGENT,
+                keyRotationParticipantLimit: 4,
+            });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            await vi.advanceTimersByTimeAsync(gracePeriod + 5_000);
+            await vi.advanceTimersByTimeAsync(gracePeriod);
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
-            await vi.advanceTimersByTimeAsync(1);
+            // Wait out the jitter delay, which is at most one grace period
+            await vi.advanceTimersByTimeAsync(gracePeriod);
 
             // 3 participants is still below the limit of 4, so this rotates as usual
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -635,6 +762,167 @@ describe("RTCEncryptionManager", () => {
 
             expect(mockTransport.sendKey).not.toHaveBeenCalled();
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("Rotation delays", () => {
+        const bob = aStateBaseMembership("@bob:example.org", "BOBDEVICE");
+        const bob2 = aStateBaseMembership("@bob:example.org", "BOBDEVICE2");
+        const carl = aStateBaseMembership("@carl:example.org", "CARLDEVICE");
+        const dave = aStateBaseMembership("@dave:example.org", "DAVEDEVICE");
+        const eve = aStateBaseMembership("@eve:example.org", "EVEDEVICE");
+
+        const useKeyDelay = 1_000;
+
+        it("Should do a full rotation after a jitter delay when a user leaves", async () => {
+            vi.useFakeTimers();
+            // The jitter is `gracePeriod * Math.random()`, so 90% of the grace period here
+            const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.9);
+
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout: the first key is distributed as is, there is nothing to rotate away from.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 0, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+            ]);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                0,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+            mockTransport.sendKey.mockClear();
+            onEncryptionKeysChanged.mockClear();
+            randomSpy.mockClear();
+
+            // Nothing happens for a while: the current key gets older than the grace period. The grace period of
+            // the session we are about to have (2 remaining participants) is 2s.
+            const gracePeriod = gracePeriodMsFor(2);
+            await vi.advanceTimersByTimeAsync(gracePeriod);
+
+            // Carl leaves. Every other participant sees that at the same time and would rotate at the same time,
+            // so we delay our rotation by a random part of the grace period instead of rotating right away.
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            expect(randomSpy).toHaveBeenCalledTimes(1);
+            // Nothing is sent in the meantime: there is no joiner to share the current key with.
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(gracePeriod * 0.9 - 1);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            // The jitter delay has elapsed: a new key is created and sent to the remaining participants only.
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+
+            // It is only used locally after the `useKeyDelay`, to give the other participants time to receive it.
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+        });
+
+        it("Should rotate consecutively without any jitter when the membership keeps changing inside the grace period", async () => {
+            vi.useFakeTimers();
+            // Only used to prove that no jitter delay is involved in this scenario
+            const randomSpy = vi.spyOn(Math, "random");
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // Carl joins 100ms later, well inside the grace period of key 0 (6s for 3 participants)
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            // Dave joins 100ms after that, again inside the grace period (12s for 4 participants)
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl, dave]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            // Both of them only got the current key, no rotation happened yet...
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(2, expect.any(String), 0, [participantInfo(carl)]);
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(3, expect.any(String), 0, [participantInfo(dave)]);
+            // ...and the pending rotation is not jittered, the grace period delay already spreads it out.
+            expect(randomSpy).not.toHaveBeenCalled();
+
+            // The rotation happens when key 0 leaves the grace period of the session it belongs to
+            // (12s for the 4 participants we have now), and not before.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(4) - 200 - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(4);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+                participantInfo(dave),
+            ]);
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+
+            // Eve joins 100ms later, inside the grace period of the key we just rotated to.
+            // The same thing happens again: the current key is shared with her and the rotation is deferred to the
+            // end of the grace period of key 1 (20s for 5 participants), again without any jitter.
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl, dave, eve]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(5);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [participantInfo(eve)]);
+
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(5) - useKeyDelay - 100 - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(5);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(6);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 2, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+                participantInfo(dave),
+                participantInfo(eve),
+            ]);
+
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                2,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+
+            // The two rotations were driven by the grace period only, `Math.random` was never consulted.
+            expect(randomSpy).not.toHaveBeenCalled();
         });
     });
 
