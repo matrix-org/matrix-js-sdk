@@ -200,7 +200,8 @@ export class OAuth2 {
         params.append("redirect_uri", this.context.redirectUri);
         params.append("code", code);
 
-        const tokenResponse = await this.fetch("token", params, OAuth2Error.CodeExchangeFailed);
+        const res = await this.fetch("token", params, OAuth2Error.CodeExchangeFailed);
+        const tokenResponse = await res.json();
 
         // throws when response is invalid
         validateBearerTokenResponse(tokenResponse);
@@ -217,7 +218,8 @@ export class OAuth2 {
         params.append("client_id", this.context.clientId);
         params.append("refresh_token", refreshToken);
 
-        const tokenResponse = await this.fetch("token", params, OAuth2Error.RefreshTokenFailed);
+        const res = await this.fetch("token", params, OAuth2Error.RefreshTokenFailed);
+        const tokenResponse = await res.json();
 
         // throws when response is invalid
         validateBearerTokenResponse(tokenResponse);
@@ -237,6 +239,10 @@ export class OAuth2 {
             params.append("token_type_hint", type);
         }
 
+        // [RFC 7009 section 2.2](https://www.rfc-editor.org/rfc/rfc7009.html#section-2.2) says:
+        // > The content of the response body is ignored by the client as all
+        // > necessary information is conveyed in the response code.
+        // so, we don't do anything with the response body.
         await this.fetch("revocation", params, OAuth2Error.RevokeTokenFailed);
 
         const headers = new Headers();
@@ -273,11 +279,15 @@ export class OAuth2 {
         });
     }
 
+    /**
+     * Make a request to one of the OAuth 2.0 endpoints, throwing if it responds with an error.
+     * @returns the {@link Response}, for the caller to parse if the endpoint returns a body.
+     */
     private async fetch(
         target: "token" | "registration" | "revocation",
         params: URLSearchParams,
         error: OAuth2Error,
-    ): Promise<unknown> {
+    ): Promise<Response> {
         const url = this.metadata[`${target}_endpoint`];
         const res = await fetch(url, {
             method: Method.Post,
@@ -309,6 +319,6 @@ export class OAuth2 {
             throw new HTTPError(error, res.status, res.headers);
         }
 
-        return await res.json();
+        return res;
     }
 }
