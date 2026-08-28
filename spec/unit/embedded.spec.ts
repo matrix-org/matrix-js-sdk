@@ -1345,12 +1345,16 @@ describe("RoomWidgetClient", () => {
 
         it("requests the capability when opted in", async () => {
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(
+                MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave,
+            );
         });
 
         it("does not request the capability when not opted in", async () => {
             await makeClient({});
-            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(
+                MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave,
+            );
         });
 
         it("delegates the delayed leave event via the host", async () => {
