@@ -512,6 +512,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
             // This is a "first member change in a while" situation. So all clients would rotate.
             // To mitigate this burst sitation we don't rotate immediately but delay it randomly (jitter key distributions compared to other participants)
             // Consume the jitter: the rollout we schedule here is the one that actually rotates.
+            //
+            // NOTE: Math.random() is a non-cryptographic PRNG
+            // This class is encryption related and a non-cryptographic PRNG looks dangerous.
+            // In this case the randomness has a optimization reason. An attacker who is able to predict the outcome
+            // is not an issue. A perfectly uniform transparent and predictable distribution of key rotations would be even more desirable
+            // than random. Random will give good enough distributions with many participants. Which is the exact case we try to optimise.
             const jitterDelayMs = gracePeriodMs * Math.random();
             this.logger?.debug(`Membership change detected, jittering the rotation by ${jitterDelayMs}ms`);
             // Schedule next ensureKeyDistribution as we did not rotate here.
