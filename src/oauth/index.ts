@@ -238,9 +238,6 @@ export class OAuth2 {
         }
 
         await this.fetch("revocation", params, OAuth2Error.RevokeTokenFailed);
-
-        const headers = new Headers();
-        headers.set("Content-Type", "application/x-www-form-urlencoded");
     }
 
     /**
