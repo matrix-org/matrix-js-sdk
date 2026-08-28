@@ -818,6 +818,7 @@ describe("MatrixClient", function () {
             ).rejects.toThrow(errorMessage);
 
             await expect(client._unstable_getDelayedEvents()).rejects.toThrow(errorMessage);
+            await expect(client._unstable_getDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
 
             await expect(
                 client._unstable_updateDelayedEvent("anyDelayId", UpdateDelayedEventAction.Send),
