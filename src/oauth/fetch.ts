@@ -25,6 +25,7 @@ import { type Logger } from "../logger.ts";
  * Neither the request nor the response body is logged, as they routinely contain credentials.
  * Query parameter values are redacted for the same reason.
  *
+ * @internal
  * @param logger - the logger to write the request and response lines to.
  * @param resource - the URL to request.
  * @param options - the options to pass to `fetch`.

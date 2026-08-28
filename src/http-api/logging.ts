@@ -18,6 +18,7 @@ limitations under the License.
  * Produce a version of the given URL which is safe to write to logs, by redacting the values of any query parameters,
  * as they may contain secrets.
  *
+ * @internal
  * @param url - the URL to sanitize.
  * @returns the sanitized URL, or `"??"` if the URL could not be parsed.
  */
