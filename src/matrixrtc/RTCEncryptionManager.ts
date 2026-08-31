@@ -305,7 +305,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * If this function is called repeatedly while a distribution is in progress,
      * the calls will be coalesced to a single new distribution (that will start just after the current one has completed).
      */
-    private ensureKeyDistribution(): void {
+    private ensureKeyDistribution(scheduled: boolean = false): void {
         // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
         // to create a NoOpEncryptionManager that does nothing and use it for the session.
         // This will be done when removing the legacy EncryptionManager.
@@ -313,14 +313,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
         if (this.currentKeyDistributionPromise == null) {
             this.logger?.debug(`No active rollout, start a new one`);
             // start a rollout
-            this.currentKeyDistributionPromise = this.rolloutOutboundKey().then(() => {
+            this.currentKeyDistributionPromise = this.rolloutOutboundKey(scheduled).then(() => {
                 this.logger?.debug(`Rollout completed`);
                 this.currentKeyDistributionPromise = null;
                 if (this.needToEnsureKeyAgain) {
                     this.logger?.debug(`New Rollout needed`);
                     this.needToEnsureKeyAgain = false;
                     // rollout a new one
-                    this.ensureKeyDistribution();
+                    this.ensureKeyDistribution(scheduled);
                 }
             });
         } else {
@@ -381,32 +381,10 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.checkKeysWithoutMatchingRTCMembership();
     }
 
-    /**
-     * Whether the next rollout has to use a random delay before rotating.
-     *
-     * A membership change is observed by every client of the session at the same time, so without a jitter all
-     * of them would rotate (and send `N-1` to-device messages each) at the same moment.
-     * The flag is consumed by the rollout that schedules the jittered rotation, so that the scheduled rollout
-     * does actually rotate. It is set again by every rollout that rotates.
-     * A membership change inside {@link RTCEncryptionManager.keyRotationGracePeriodMs} clears it as well:
-     * the grace period delay already spreads that rotation out, the two delays must not be combined.
-     * @private
-     */
-    private enableJitterRotationDelay: boolean = false;
-
-    /**
-     * Set when a membership change should have rotated the key, but the rotation was postponed
-     * (either by the grace period or by the jitter delay).
-     *
-     * The rollout that was scheduled by the postponing rollout then rotates, even if the memberships did not
-     * change again in the meantime (the joiners of the postponed round already received the current key, so they
-     * no longer show up as `anyJoined`).
-     * @private
-     */
-    private membershipChangedSinceLastRotation: boolean = false;
-
-    private async rolloutOutboundKey(): Promise<void> {
-        const isFirstKey = this.outboundSession == null;
+    private rotationBlockedUntilTs: number = 0;
+    private scheduledForBlockTs: number | undefined = undefined;
+    private async rolloutOutboundKey(scheduled: boolean = false): Promise<void> {
+        const isFirstKey = this.outboundSession === null;
         if (isFirstKey) {
             // create the first key
             const firstKey = {
@@ -461,79 +439,53 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 ),
         );
 
-        //default to current session
-
         // A membership change requires a rotation if someone we shared the current key with is gone (`anyLeft`)
         // or if someone joined who is not supposed to be able to decrypt the media we sent before they joined (`anyJoined`).
         const membershipChanged = anyLeft.length > 0 || anyJoined.length > 0;
-        this.membershipChangedSinceLastRotation = membershipChanged || this.membershipChangedSinceLastRotation;
-        // Special case the first key.
-        if (isFirstKey) this.membershipChangedSinceLastRotation = false;
-        if (!(membershipChanged || this.membershipChangedSinceLastRotation)) {
+
+        // Default to the current session: unless we rotate below, the new joiners simply get the current key.
+        let newOutboundEncryptionSession: OutboundEncryptionSession = this.outboundSession!;
+        let hasKeyChanged = false;
+        let toDistributeTo: ParticipantDeviceInfo[] = [];
+
+        if (!membershipChanged && !scheduled) {
             // Nothing changed and there is no rotation that we postponed earlier: nothing to do.
             return;
         }
+        const rotationJitter = Math.random() * 2;
+        const now = Date.now();
 
-        // Check if we are too early to rotate again. (`outboundSession` is always set at this point)
-        const activeKeyAge = Date.now() - this.outboundSession!.creationTS;
-        const gracePeriodMs = this.keyRotationGracePeriodMs;
-        const nowInsideKeyRotationGracePeriod = activeKeyAge < gracePeriodMs;
-
-        let newOutboundEncryptionSession: OutboundEncryptionSession = this.outboundSession!;
-        let hasKeyChanged = false;
-        let toDistributeTo = anyJoined;
-
-        if (this.isKeyRotationSuppressed || isFirstKey) {
-            this.enableJitterRotationDelay = true;
+        if (this.isKeyRotationSuppressed) {
             // The session is too large to rotate at all (hard limit). The key is only shared with the new joiners.
             // There is nothing to schedule: this will not change until the session shrinks again, which will
             // show up as a membership change of its own.
+            toDistributeTo = anyJoined;
             this.logger?.debug(
                 `Key rotation is suppressed, the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit})`,
             );
-        } else if (nowInsideKeyRotationGracePeriod) {
-            // We prohibit combining jitter and keyRotationGracePeriodMs delays.
-            // Will be reset once we update outside the keyRotationGracePeriodMs time window.
-            this.enableJitterRotationDelay = false;
-            const waitForNextRotationMs = gracePeriodMs - activeKeyAge;
-            this.logger?.debug(
-                `Membership Change Detect, but last key rotation is too recent for the current member count (age:${activeKeyAge}).
-                Rotating in ${waitForNextRotationMs}`,
-            );
-            // Schedule next ensureKeyDistribution as we did not rotate here.
-            // We do not need to track any duplicated schedules of ensureKeyDistribution.
-            // currentKeyDistributionPromise will make sure that we do not race/collide.
-            void sleep(waitForNextRotationMs).then(() => this.ensureKeyDistribution());
-        } else if (this.enableJitterRotationDelay) {
-            // disable jitterRotationDelay so in the next ensureKeyDistribution sleep(jitterDelayMs)
-            // we actually do the rotation.
-            this.enableJitterRotationDelay = false;
-            // We reach this without any key rollouts inside the keyRotationGracePeriodMs (which sets enableJitterRotationDelay = false )
-            // This is a "first member change in a while" situation. So all clients would rotate.
-            // To mitigate this burst sitation we don't rotate immediately but delay it randomly (jitter key distributions compared to other participants)
-            // Consume the jitter: the rollout we schedule here is the one that actually rotates.
-            //
-            // NOTE: Math.random() is a non-cryptographic PRNG
-            // This class is encryption related and a non-cryptographic PRNG looks dangerous.
-            // In this case the randomness has a optimization reason. An attacker who is able to predict the outcome
-            // is not an issue. A perfectly uniform transparent and predictable distribution of key rotations would be even more desirable
-            // than random. Random will give good enough distributions with many participants. Which is the exact case we try to optimise.
-            const jitterDelayMs = gracePeriodMs * Math.random();
-            this.logger?.debug(`Membership change detected, jittering the rotation by ${jitterDelayMs}ms`);
-            // Schedule next ensureKeyDistribution as we did not rotate here.
-            // We do not need to track any duplicated schedules of ensureKeyDistribution.
-            // currentKeyDistributionPromise will make sure that we do not race/collide.
-            void sleep(jitterDelayMs).then(() => this.ensureKeyDistribution());
-        } else {
-            // Actually do the rotation
-            this.enableJitterRotationDelay = true;
+        } else if (isFirstKey) {
+            // key is shared with everyone toDistributeTo = anyJoined = toShareWith (because alreadySharedWith=[])
+            toDistributeTo = anyJoined;
+            this.rotationBlockedUntilTs = now + this.keyRotationGracePeriodMs * rotationJitter;
+        } else if (scheduled) {
+            // This is caused by a scheduled sleep(blockTime) -> we rotate right away
             newOutboundEncryptionSession = this.createNewOutboundSession();
             hasKeyChanged = true;
             toDistributeTo = toShareWith;
-        }
-
-        // return early if we dont have anything to distribute.
-        if (toDistributeTo.length === 0) {
+            // We set a blockTs but do not schedule a ensureKeyDistribution. Reason: We might not need to rotate after the block.
+            // Only if there was a memship change until rotationBlockedUntilTs.
+            this.rotationBlockedUntilTs = now + this.keyRotationGracePeriodMs;
+        } else if (this.rotationBlockedUntilTs <= now) {
+            // Currently Not-Blocked! But we dont distribute immediatly prohibit bursts.
+            // We apply jitter -> dont rotate now -> toDistributeTo = [];
+            const blockTime = this.keyRotationGracePeriodMs * rotationJitter;
+            this.rotationBlockedUntilTs = blockTime + now;
+            this.scheduleEnsureKeyDistributionIfNotYetScheduled(blockTime);
+            return;
+        } else if (now < this.rotationBlockedUntilTs) {
+            // Currently Blocked! We prohibit rotation (toDistributeTo = []). But we schedule ensureKeyDistribution.
+            // If already scheduled we dont reschedule to prohibit the `if(scheduled)` case to be fire multiple times.
+            this.scheduleEnsureKeyDistributionIfNotYetScheduled(this.rotationBlockedUntilTs - now);
             return;
         }
 
@@ -550,7 +502,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 .join(",");
             this.logger?.trace(`key index:${newOutboundEncryptionSession.keyId} sent to ${outboundSessionList}`);
             if (hasKeyChanged) {
-                this.membershipChangedSinceLastRotation = false;
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
                 this.logger?.trace(`Delay Rollout for key:${newOutboundEncryptionSession.keyId}...`);
@@ -565,6 +516,13 @@ export class RTCEncryptionManager implements IEncryptionManager {
             }
         } catch (err) {
             this.logger?.error(`Failed to rollout key`, err);
+        }
+    }
+
+    private scheduleEnsureKeyDistributionIfNotYetScheduled(blockTime: number): void {
+        if (this.scheduledForBlockTs !== this.rotationBlockedUntilTs) {
+            this.scheduledForBlockTs = this.rotationBlockedUntilTs;
+            void sleep(blockTime).then(() => this.ensureKeyDistribution(true));
         }
     }
 
