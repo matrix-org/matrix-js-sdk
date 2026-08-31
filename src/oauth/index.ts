@@ -35,7 +35,8 @@ import {
 import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { sha256 } from "../digest.ts";
 import { HTTPError, isMatrixErrorResponse, MatrixError, Method } from "../http-api/index.ts";
-import { logger } from "../logger.ts";
+import { type Logger, logger as rootLogger } from "../logger.ts";
+import { fetchWithLogging } from "./fetch.ts";
 import { isOAuth2ErrorResponse, OAuth2Error, OAuth2HTTPError } from "./error.ts";
 import { secureRandomString } from "../randomstring.ts";
 import { type NonEmptyArray } from "../@types/common.ts";
@@ -67,12 +68,14 @@ export class OAuth2 {
      * @param authMetadata - Auth config from {@link MatrixClient.getAuthMetadata}
      * @param clientMetadata - The metadata for the client which to register,
      *     grant_types & response_types & token_endpoint_auth_method will be sanely calculated if omitted.
+     * @param logger - Optional logger to use for the request, defaults to the root logger of the js-sdk.
      * @returns Promise<string> resolved with registered clientId
      * @throws when registration is not supported, on failed request or invalid response
      */
     public static async registerClient(
         authMetadata: ValidatedAuthMetadata,
         clientMetadata: OAuthRegistrationRequest,
+        logger: Logger = rootLogger,
     ): Promise<string> {
         const defaultGrantTypes: NonEmptyArray<string> = [
             OAuthGrantType.AuthorizationCode,
@@ -102,7 +105,7 @@ export class OAuth2 {
         };
 
         try {
-            const response = await fetch(authMetadata.registration_endpoint, {
+            const response = await fetchWithLogging(logger, authMetadata.registration_endpoint, {
                 method: Method.Post,
                 headers: {
                     "Accept": "application/json",
@@ -133,9 +136,16 @@ export class OAuth2 {
 
     public readonly context: Required<Context>;
 
+    /**
+     * @param metadata - The validated OAuth 2.0 metadata for the Identity Provider.
+     * @param context - The persistent context needed for the OAuth flows.
+     * @param logger - Optional logger to use for the requests made by this instance,
+     *     defaults to the root logger of the js-sdk.
+     */
     public constructor(
         public readonly metadata: ValidatedAuthMetadata,
         context: Context,
+        private readonly logger: Logger = rootLogger,
     ) {
         this.context = {
             clientId: context.clientId,
@@ -257,6 +267,7 @@ export class OAuth2 {
             scope: scope ?? generateScope(this.context.deviceId),
             metadata: this.metadata,
             clientId: this.context.clientId,
+            logger: this.logger,
         });
     }
 
@@ -273,6 +284,7 @@ export class OAuth2 {
             session,
             metadata: this.metadata,
             clientId: this.context.clientId,
+            logger: this.logger,
         });
     }
 
@@ -286,7 +298,7 @@ export class OAuth2 {
         error: OAuth2Error,
     ): Promise<Response> {
         const url = this.metadata[`${target}_endpoint`];
-        const res = await fetch(url, {
+        const res = await fetchWithLogging(this.logger, url, {
             method: Method.Post,
             headers: {
                 "Content-Type": "application/x-www-form-urlencoded",
