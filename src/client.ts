@@ -6114,7 +6114,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Gets a set of room IDs in common with another user.
      *
      * @param userId - The userId to check.
-     * @returns Promise which resolves to an array of rooms
+     * @returns Promise which resolves to an array of room IDs
      * @returns Rejects: with an error response.
      */
     public async getMutualRooms(userId: string): Promise<string[]> {
