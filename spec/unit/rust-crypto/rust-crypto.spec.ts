@@ -141,10 +141,12 @@ describe("initRustCrypto", () => {
             mockStore,
             logger,
             undefined,
+            undefined,
+            undefined,
         );
     });
 
-    it("passes through the store params (key) and CA certs", async () => {
+    it("passes through the store params (key), CA certs and sign function", async () => {
         const mockStore = { free: vi.fn() } as unknown as StoreHandle;
         vi.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
 
@@ -154,6 +156,16 @@ describe("initRustCrypto", () => {
         const storeKey = new Uint8Array(32);
         const logger = new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto"));
         const caCertsPem = "MY_PEM etc...";
+        const x509Signer = async (item: Uint8Array) => {
+            return {
+                signature_bytes: item,
+                certificate_chain: "CHAIN",
+                signature_scheme: "RsaPssSha512" as const,
+            };
+        };
+        const x509Validity = () => {
+            return 10000;
+        };
 
         await initRustCrypto({
             logger,
@@ -165,6 +177,8 @@ describe("initRustCrypto", () => {
             storePrefix: "storePrefix",
             storeKey: storeKey,
             caCertsPem,
+            x509Signer,
+            x509Validity,
         });
 
         expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey, logger);
@@ -174,6 +188,8 @@ describe("initRustCrypto", () => {
             mockStore,
             logger,
             caCertsPem,
+            x509Signer,
+            x509Validity,
         );
     });
 
@@ -203,6 +219,8 @@ describe("initRustCrypto", () => {
             expect.anything(),
             mockStore,
             logger,
+            undefined,
+            undefined,
             undefined,
         );
     });

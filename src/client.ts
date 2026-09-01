@@ -1980,7 +1980,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param args.caCertsPem - Optional PEM-formatted string that provides CA certificates. These will be used to check
      *    X.509 signatures on user identities. Any user identity that has a valid signature according to the supplied
      *    CAs will be considered verified, without any manual verification taking place.
-     *
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     * @param args.x509Signer - Optional async function for signing some data with an X.509 certificate. Used to sign
+     *    the user's identity so compatible clients will recognise this user as verified without manual verification
+     *    taking place. If you supply this you must also supply `x509Validity`.
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     * @param args.x509Validity - Optional function returning the validity period of the X.509 certificate used for
+     *    signing, as the number of milliseconds since the Unix epoch. If you supply this you must also supply
+     *    `x509Signer`.
      *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
      *
      * @returns a Promise which will resolve when the crypto layer has been
@@ -1993,6 +2000,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             storageKey?: Uint8Array;
             storagePassword?: string;
             caCertsPem?: string;
+            x509Signer?: (item: Uint8Array) => Promise<{
+                signature_bytes: Uint8Array;
+                certificate_chain: string;
+                signature_scheme: "RsaPssSha512";
+            }>;
+            x509Validity?: () => number;
         } = {},
     ): Promise<void> {
         if (this.cryptoBackend) {
@@ -2040,6 +2053,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             enableEncryptedStateEvents: this.enableEncryptedStateEvents,
 
             caCertsPem: args.caCertsPem,
+            x509Signer: args.x509Signer,
+            x509Validity: args.x509Validity,
         });
 
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
