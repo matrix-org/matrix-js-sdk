@@ -6123,8 +6123,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
 
         // Stable version found in the spec
-        const stableMutualRoomsSupport = await this.isVersionSupported("v1.19")
-            || (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS));
+        const stableMutualRoomsSupport =
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS));
 
         // Accumulated rooms
         const rooms: string[] = [];
@@ -6161,7 +6162,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
             // Latest unstable variant that changed from path elements to query elements
-            const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS);
+            const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
+                UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
+            );
 
             let path;
             let query;
