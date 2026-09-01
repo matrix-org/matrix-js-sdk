@@ -1983,11 +1983,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
      * @param args.x509Signer - Optional async function for signing some data with an X.509 certificate. Used to sign
      *    the user's identity so compatible clients will recognise this user as verified without manual verification
-     *    taking place. If you supply this you must also supply rawX509Validity.
+     *    taking place. If you supply this you must also supply `x509Validity`.
      *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
      * @param args.x509Validity - Optional function returning the validity period of the X.509 certificate used for
      *    signing, as the number of milliseconds since the Unix epoch. If you supply this you must also supply
-     *    rawX509Signer.
+     *    `x509Signer`.
      *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
      *
      * @returns a Promise which will resolve when the crypto layer has been

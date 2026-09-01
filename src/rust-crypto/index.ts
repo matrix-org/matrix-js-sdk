@@ -108,7 +108,7 @@ export interface InitRustCryptoArgs {
      * Optional async function for signing some data with an X.509 certificate.
      * Used to sign the user's identity so compatible clients will recognise
      * this user as verified without manual verification taking place. If you
-     * supply this you must also supply rawX509Validity.
+     * supply this you must also supply {@link InitRustCryptoArgs#x509Validity}.
      */
     x509Signer?: (item: Uint8Array) => Promise<{
         signature_bytes: Uint8Array;
@@ -119,7 +119,7 @@ export interface InitRustCryptoArgs {
     /**
      * Optional function returning the validity period of the X.509 certificate
      * used for signing, as the number of milliseconds since the Unix epoch. If
-     * you supply this you must also supply rawX509Signer.
+     * you supply this you must also supply {@link InitRustCryptoArgs#x509Signer}.
      */
     x509Validity?: () => number;
 }
