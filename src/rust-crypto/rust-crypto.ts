@@ -19,7 +19,7 @@ import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import type { IMegolmSessionData } from "../@types/crypto.ts";
 import { KnownMembership } from "../@types/membership.ts";
-import { type IDeviceLists, type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
+import { type IToDeviceEvent, type ReceivedToDeviceMessage } from "../sync-accumulator.ts";
 import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { type MatrixEvent, MatrixEventEvent } from "../models/event.ts";
 import { type Room } from "../models/room.ts";
@@ -30,6 +30,7 @@ import {
     DecryptionError,
     type EventDecryptionResult,
     type OnSyncCompletedData,
+    type SyncCryptoChanges,
 } from "../common-crypto/CryptoBackend.ts";
 import { type Logger, LogSpan } from "../logger.ts";
 import { type IHttpOpts, type MatrixHttpApi, Method } from "../http-api/index.ts";
@@ -292,12 +293,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async decryptEvent(event: MatrixEvent): Promise<EventDecryptionResult> {
         const roomId = event.getRoomId();
         if (!roomId) {
-            // presumably, a to-device message. These are normally decrypted in preprocessToDeviceMessages
+            // presumably, a to-device message. These are normally decrypted in processSyncChanges
             // so the fact it has come back here suggests that decryption failed.
             //
             // once we drop support for the libolm crypto implementation, we can stop passing to-device messages
             // through decryptEvent and hence get rid of this case.
-            throw new Error("to-device event was not decrypted in preprocessToDeviceMessages");
+            throw new Error("to-device event was not decrypted in processSyncChanges");
         }
         return await this.eventDecryptor.attemptEventDecryption(event, this.deviceIsolationMode);
     }
@@ -1691,41 +1692,31 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     /**
-     * Apply sync changes to the olm machine
-     * @param events - the received to-device messages
-     * @param oneTimeKeysCounts - the received one time key counts
-     * @param unusedFallbackKeys - the received unused fallback keys
-     * @param devices - the received device list updates
-     * @returns A list of processed to-device messages.
-     */
-    private async receiveSyncChanges({
-        events,
-        oneTimeKeysCounts = new Map<string, number>(),
-        unusedFallbackKeys,
-        devices = new RustSdkCryptoJs.DeviceLists(),
-    }: {
-        events?: IToDeviceEvent[];
-        oneTimeKeysCounts?: Map<string, number>;
-        unusedFallbackKeys?: Set<string>;
-        devices?: RustSdkCryptoJs.DeviceLists;
-    }): Promise<RustSdkCryptoJs.ProcessedToDeviceEvent[]> {
-        return await this.olmMachine.receiveSyncChanges(
-            events ? JSON.stringify(events) : "[]",
-            devices,
-            oneTimeKeysCounts,
-            unusedFallbackKeys,
-        );
-    }
-
-    /** called by the sync loop to preprocess incoming to-device messages
+     * Implementation of {@link SyncCryptoCallbacks.processSyncChanges}.
      *
-     * @param events - the received to-device messages
-     * @returns A list of preprocessed to-device messages.
+     * Passes all of the encryption-relevant data from a sync response to the OlmMachine in a single call, and
+     * post-processes the resulting to-device messages.
      */
-    public async preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<ReceivedToDeviceMessage[]> {
-        // send the received to-device messages into receiveSyncChanges. We have no info on device-list changes,
-        // one-time-keys, or fallback keys, so just pass empty data.
-        const processed = await this.receiveSyncChanges({ events });
+    public async processSyncChanges({
+        toDeviceEvents,
+        deviceLists,
+        oneTimeKeysCounts,
+        unusedFallbackKeys,
+        useMsc4186 = false,
+    }: SyncCryptoChanges): Promise<ReceivedToDeviceMessage[]> {
+        const events = JSON.stringify(toDeviceEvents);
+        const devices = new RustSdkCryptoJs.DeviceLists(
+            deviceLists?.changed?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
+            deviceLists?.left?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
+        );
+        const counts = new Map(Object.entries(oneTimeKeysCounts ?? {}));
+        const fallbackKeys = unusedFallbackKeys && new Set(unusedFallbackKeys);
+
+        // The two variants differ only in how they treat a missing one-time key count: zero keys on the server (sync
+        // v2) versus unchanged (sliding sync).
+        const processed = useMsc4186
+            ? await this.olmMachine.receiveSyncChangesMsc4186(events, devices, counts, fallbackKeys)
+            : await this.olmMachine.receiveSyncChanges(events, devices, counts, fallbackKeys);
 
         const received: ReceivedToDeviceMessage[] = [];
 
@@ -1806,39 +1797,6 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         }
 
         return received;
-    }
-
-    /** called by the sync loop to process one time key counts and unused fallback keys
-     *
-     * @param oneTimeKeysCounts - the received one time key counts
-     * @param unusedFallbackKeys - the received unused fallback keys
-     */
-    public async processKeyCounts(
-        oneTimeKeysCounts?: Record<string, number>,
-        unusedFallbackKeys?: string[],
-    ): Promise<void> {
-        const mapOneTimeKeysCount = oneTimeKeysCounts && new Map<string, number>(Object.entries(oneTimeKeysCounts));
-        const setUnusedFallbackKeys = unusedFallbackKeys && new Set<string>(unusedFallbackKeys);
-
-        if (mapOneTimeKeysCount !== undefined || setUnusedFallbackKeys !== undefined) {
-            await this.receiveSyncChanges({
-                oneTimeKeysCounts: mapOneTimeKeysCount,
-                unusedFallbackKeys: setUnusedFallbackKeys,
-            });
-        }
-    }
-
-    /** called by the sync loop to process the notification that device lists have
-     * been changed.
-     *
-     * @param deviceLists - device_lists field from /sync
-     */
-    public async processDeviceLists(deviceLists: IDeviceLists): Promise<void> {
-        const devices = new RustSdkCryptoJs.DeviceLists(
-            deviceLists.changed?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
-            deviceLists.left?.map((userId) => new RustSdkCryptoJs.UserId(userId)),
-        );
-        await this.receiveSyncChanges({ devices });
     }
 
     /** called by the sync loop on m.room.encryption events

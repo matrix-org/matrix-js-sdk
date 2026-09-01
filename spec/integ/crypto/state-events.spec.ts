@@ -90,7 +90,7 @@ describe("Encrypted State Events", () => {
         });
 
         keyReceiver = new E2EKeyReceiver(homeserverUrl);
-        syncResponder = new SyncResponder(homeserverUrl);
+        syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver: keyReceiver });
 
         await aliceClient.initRustCrypto();
 

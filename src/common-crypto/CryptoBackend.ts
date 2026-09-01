@@ -118,42 +118,64 @@ export interface CryptoBackend extends SyncCryptoCallbacks, CryptoApi {
     markRoomAsPendingKeyBundle(roomId: string, inviterId: string): Promise<void>;
 }
 
+/**
+ * The parts of a sync response which are relevant to encryption, as passed to
+ * {@link SyncCryptoCallbacks.processSyncChanges}.
+ *
+ * @internal
+ */
+export interface SyncCryptoChanges {
+    /** The to-device events from the sync response (`to_device.events`), or an empty list if there were none. */
+    toDeviceEvents: IToDeviceEvent[];
+
+    /** The `device_lists` field from the sync response, if any. */
+    deviceLists?: IDeviceLists;
+
+    /**
+     * The `device_one_time_keys_count` field from the sync response, if any.
+     *
+     * The meaning of an algorithm missing from the map (or of an absent field) depends on {@link useMsc4186}: in
+     * sync v2 it means that there are no one-time keys of that algorithm on the server; in sliding sync it means that
+     * the count is unchanged since the previous response.
+     */
+    oneTimeKeysCounts?: Record<string, number>;
+
+    /**
+     * The `device_unused_fallback_key_types` field from the sync response, or `undefined` if the response did not
+     * include it (which means that the server does not support fallback keys).
+     */
+    unusedFallbackKeys?: string[];
+
+    /**
+     * Whether to interpret the response with MSC4186 (simplified sliding sync) semantics rather than sync v2. This
+     * selects the meaning of missing one-time key counts: see {@link oneTimeKeysCounts}. Defaults to `false`.
+     */
+    useMsc4186?: boolean;
+}
+
 /** The methods which crypto implementations should expose to the Sync api
  *
  * @internal
  */
 export interface SyncCryptoCallbacks {
     /**
-     * Called by the /sync loop whenever there are incoming to-device messages.
+     * Called by the sync loop once per sync response, with the parts of the response which are relevant to
+     * encryption: to-device messages, device list changes, one-time key counts and unused fallback key types.
      *
-     * The implementation may preprocess the received messages (eg, decrypt them) and return an
-     * updated list of messages for dispatch to the rest of the system.
+     * All of this data must be passed together, in a single call per sync response, because the OlmMachine
+     * interprets it as the complete E2EE state from a sync response. In particular, per the sync v2 specification,
+     * an absent `device_one_time_keys_count` means that there are no one-time keys on the server, so calling this
+     * without the counts from the response would trigger a spurious one-time key upload. (Sliding sync responses
+     * omit the count when it is unchanged; {@link SyncCryptoChanges.useMsc4186} selects that interpretation.)
      *
-     * Note that, unlike {@link ClientEvent.ToDeviceEvent} events, this is called on the raw to-device
-     * messages, rather than the results of any decryption attempts.
+     * This must be called before the room events in the sync response are processed, so that any room keys received
+     * in to-device messages are available when decrypting room events.
      *
-     * @param events - the received to-device messages
-     * @returns A list of preprocessed to-device messages. This will not map 1:1 to the input list, as some messages may be invalid or
-     * failed to decrypt, and so will be omitted from the output list.
-     *
+     * @param changes - the E2EE-relevant parts of the sync response
+     * @returns A list of processed to-device messages. This will not map 1:1 to the input list, as some messages may
+     *    be invalid or fail to decrypt, and so will be omitted from the output list.
      */
-    preprocessToDeviceMessages(events: IToDeviceEvent[]): Promise<ReceivedToDeviceMessage[]>;
-
-    /**
-     * Called by the /sync loop when one time key counts and unused fallback key details are received.
-     *
-     * @param oneTimeKeysCounts - the received one time key counts
-     * @param unusedFallbackKeys - the received unused fallback keys
-     */
-    processKeyCounts(oneTimeKeysCounts?: Record<string, number>, unusedFallbackKeys?: string[]): Promise<void>;
-
-    /**
-     * Handle the notification from /sync that device lists have
-     * been changed.
-     *
-     * @param deviceLists - device_lists field from /sync
-     */
-    processDeviceLists(deviceLists: IDeviceLists): Promise<void>;
+    processSyncChanges(changes: SyncCryptoChanges): Promise<ReceivedToDeviceMessage[]>;
 
     /**
      * Called by the /sync loop whenever an m.room.encryption event is received.
