@@ -1,9 +1,3 @@
-Changes in next release
-=======================
-## ✨ Features
-
-* Allow passing a signing function when setting up Rust crypto ([#5483](https://github.com/matrix-org/matrix-js-sdk/pull/5483)). Contributed by @andybalaam.
-
 Changes in [42.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.2.0) (2026-08-18)
 ==================================================================================================
 ## 🐛 Bug Fixes
