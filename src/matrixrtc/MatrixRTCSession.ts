@@ -65,6 +65,8 @@ export enum MatrixRTCSessionEvent {
     MembershipManagerError = "membership_manager_error",
     /** The RTCSession did send a call notification caused by joining the call as the first member */
     DidSendCallNotification = "did_send_call_notification",
+    /** Whether the session is too large for the media key to be rotated has changed */
+    KeyRotationSuppressedChanged = "key_rotation_suppressed_changed",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -83,6 +85,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
         notificationContentNew: { event_id: string } & IRTCNotificationContent,
     ) => void;
+    [MatrixRTCSessionEvent.KeyRotationSuppressedChanged]: (isKeyRotationSuppressed: boolean) => void;
 };
 
 export interface SessionConfig {
@@ -205,6 +208,17 @@ export interface EncryptionConfig {
     keyRotationGracePeriodMs?: number;
 
     /**
+     * The number of participants in the session at which the media key will no longer be rotated.
+     *
+     * Rotating a key requires sending it to every participant device, so in large sessions the cost of rotating
+     * on every join/leave becomes prohibitive. At this limit the current key is kept and
+     * distributed to new joiners. No new keys are generated for joiners/leavers.
+     *
+     * Defaults to undefined.
+     */
+    keyRotationParticipantLimit?: number;
+
+    /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
      * tend to leave calls at the same time.
      * @deprecated - Not used by the new encryption manager.
@@ -294,6 +308,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
     public get delayId(): string | undefined {
         return this.membershipManager?.delayId;
+    }
+
+    /**
+     * Whether the key rotation is currently halted.
+     * mirror of: EncryptionConfig.keyRotationParticipantLimit
+     */
+    public get isKeyRotationSuppressed(): boolean {
+        return this.encryptionManager?.isKeyRotationSuppressed ?? false;
     }
 
     /**
@@ -810,6 +832,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // Clear the flag.
         this.membershipNeedsRecalculation = false;
         const oldMemberships = this.memberships;
+        // Needs to be computed before `this.memberships` is updated below, since it is derived from it.
+        const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
@@ -854,6 +878,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
         this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        if (this.isKeyRotationSuppressed !== wasKeyRotationSuppressed) {
+            this.logger.info(
+                `Key rotation is now ${this.isKeyRotationSuppressed ? "suppressed" : "active again"} (${this.memberships.length} members)`,
+            );
+            this.emit(MatrixRTCSessionEvent.KeyRotationSuppressedChanged, this.isKeyRotationSuppressed);
+        }
 
         this.setExpiryTimer();
     };
