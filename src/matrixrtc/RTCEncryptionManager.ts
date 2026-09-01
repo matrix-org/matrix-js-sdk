@@ -144,7 +144,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * This will ensure that a new round is started after the current one.
      * @private
      */
-    private needToEnsureKeyAgain = false;
+    private needToEnsureKeyAgain: { scheduled: boolean } | undefined = undefined;
 
     /**
      * There is a possibility that keys arrive in the wrong order.
@@ -316,18 +316,19 @@ export class RTCEncryptionManager implements IEncryptionManager {
             this.currentKeyDistributionPromise = this.rolloutOutboundKey(scheduled).then(() => {
                 this.logger?.debug(`Rollout completed`);
                 this.currentKeyDistributionPromise = null;
-                if (this.needToEnsureKeyAgain) {
+                if (this.needToEnsureKeyAgain !== undefined) {
                     this.logger?.debug(`New Rollout needed`);
-                    this.needToEnsureKeyAgain = false;
+                    const againWithScheduled = this.needToEnsureKeyAgain?.scheduled;
+                    this.needToEnsureKeyAgain = undefined;
                     // rollout a new one
-                    this.ensureKeyDistribution(scheduled);
+                    this.ensureKeyDistribution(againWithScheduled);
                 }
             });
         } else {
             // There is a rollout in progress, but a key rotation is requested (could be caused by a ownMembership change)
             // Remember that a new rotation is needed after the current one.
             this.logger?.debug(`Rollout in progress, a new rollout will be started after the current one`);
-            this.needToEnsureKeyAgain = true;
+            this.needToEnsureKeyAgain = { scheduled };
         }
     }
 
@@ -476,18 +477,21 @@ export class RTCEncryptionManager implements IEncryptionManager {
             // Only if there was a memship change until rotationBlockedUntilTs.
             this.rotationBlockedUntilTs = now + this.keyRotationGracePeriodMs;
         } else if (this.rotationBlockedUntilTs <= now) {
-            // Currently Not-Blocked! But we dont distribute immediatly prohibit bursts.
+            // Currently Not-Blocked! But we dont rotate immediatly prohibit bursts.
             // We apply jitter -> dont rotate now -> toDistributeTo = [];
             const blockTime = this.keyRotationGracePeriodMs * rotationJitter;
             this.rotationBlockedUntilTs = blockTime + now;
             this.scheduleEnsureKeyDistributionIfNotYetScheduled(blockTime);
-            return;
+            //still distribute to new joiners
+            toDistributeTo = anyJoined;
         } else if (now < this.rotationBlockedUntilTs) {
             // Currently Blocked! We prohibit rotation (toDistributeTo = []). But we schedule ensureKeyDistribution.
             // If already scheduled we dont reschedule to prohibit the `if(scheduled)` case to be fire multiple times.
             this.scheduleEnsureKeyDistributionIfNotYetScheduled(this.rotationBlockedUntilTs - now);
-            return;
+            //still distribute to new joiners
+            toDistributeTo = anyJoined;
         }
+        if (toDistributeTo.length === 0) return;
 
         try {
             this.logger?.trace(`Sending key...`);
