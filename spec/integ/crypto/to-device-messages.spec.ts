@@ -69,7 +69,7 @@ describe("to-device-messages", () => {
 
             e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
             e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
-            syncResponder = new SyncResponder(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver });
 
             // add bob as known user
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([testData.BOB_TEST_USER_ID]));

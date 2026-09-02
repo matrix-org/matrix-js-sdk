@@ -28,7 +28,7 @@ import {
     defaultClientOpts,
     defaultSyncApiOpts,
     type SetPresence,
-    processToDeviceMessages,
+    processSyncCryptoChanges,
 } from "./sync.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import {
@@ -39,7 +39,7 @@ import {
     type IStickyStateEvent,
     type IStrippedState,
     type ISyncResponse,
-    type ReceivedToDeviceMessage,
+    type IToDeviceEvent,
 } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -74,8 +74,63 @@ type ExtensionE2EEResponse = Pick<
     | "org.matrix.msc2732.device_unused_fallback_key_types"
 >;
 
+/**
+ * Collects the encryption-relevant parts of a sliding sync response, which arrive via two separate extensions
+ * (`e2ee` and `to_device`), so that they can be passed to the crypto layer in a single call once the whole response
+ * has been processed. See {@link SyncCryptoCallbacks.processSyncChanges} for why this matters.
+ */
+class E2EESyncChangesCollector {
+    private toDeviceEvents: IToDeviceEvent[] = [];
+    private e2ee?: ExtensionE2EEResponse;
+    private hasChanges = false;
+
+    public constructor(
+        private readonly client: MatrixClient,
+        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
+    ) {}
+
+    public onToDeviceEvents(events: IToDeviceEvent[]): void {
+        this.toDeviceEvents = events;
+        this.hasChanges = true;
+    }
+
+    public onE2EEChanges(data: ExtensionE2EEResponse): void {
+        this.e2ee = data;
+        this.hasChanges = true;
+    }
+
+    /**
+     * Pass the collected changes to the crypto layer, and emit the resulting to-device messages on the client.
+     *
+     * A no-op if nothing has been collected since the last flush, so it is safe to call once per extension.
+     */
+    public async flush(): Promise<void> {
+        if (!this.hasChanges) return;
+        const toDeviceEvents = this.toDeviceEvents;
+        const e2ee = this.e2ee;
+        this.toDeviceEvents = [];
+        this.e2ee = undefined;
+        this.hasChanges = false;
+
+        // Fields omitted from the `e2ee` extension are unchanged since the last response; the crypto layer knows to
+        // interpret them that way given `useMsc4186`.
+        await processSyncCryptoChanges(this.client, this.cryptoCallbacks, {
+            toDeviceEvents,
+            deviceLists: e2ee?.device_lists,
+            oneTimeKeysCounts: e2ee?.device_one_time_keys_count,
+            unusedFallbackKeys:
+                e2ee?.device_unused_fallback_key_types ?? e2ee?.["org.matrix.msc2732.device_unused_fallback_key_types"],
+            useMsc4186: true,
+        });
+        this.cryptoCallbacks?.onSyncCompleted({});
+    }
+}
+
 class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
-    public constructor(private readonly crypto: SyncCryptoCallbacks) {}
+    public constructor(
+        private readonly crypto: SyncCryptoCallbacks,
+        private readonly collector: E2EESyncChangesCollector,
+    ) {}
 
     public name(): string {
         return "e2ee";
@@ -102,18 +157,11 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
     }
 
     public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
-        // Handle device list updates
-        if (data.device_lists) {
-            await this.crypto.processDeviceLists(data.device_lists);
-        }
+        this.collector.onE2EEChanges(data);
+    }
 
-        // Handle one_time_keys_count and unused_fallback_key_types
-        await this.crypto.processKeyCounts(
-            data.device_one_time_keys_count,
-            data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"],
-        );
-
-        this.crypto.onSyncCompleted({});
+    public async onResponseComplete(): Promise<void> {
+        await this.collector.flush();
     }
 }
 
@@ -131,10 +179,7 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(
-        private readonly client: MatrixClient,
-        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
-    ) {}
+    public constructor(private readonly collector: E2EESyncChangesCollector) {}
 
     public name(): string {
         return "to_device";
@@ -153,20 +198,12 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
     }
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
-        const events = data["events"] || [];
-        let receivedToDeviceMessages: ReceivedToDeviceMessage[];
-        if (this.cryptoCallbacks) {
-            receivedToDeviceMessages = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
-        } else {
-            // Crypto is not enabled, so we just return the events.
-            receivedToDeviceMessages = events.map((rawEvent) => ({
-                message: rawEvent,
-                encryptionInfo: null,
-            }));
-        }
-        processToDeviceMessages(receivedToDeviceMessages, this.client);
-
+        this.collector.onToDeviceEvents(data["events"] || []);
         this.nextBatch = data.next_batch;
+    }
+
+    public async onResponseComplete(): Promise<void> {
+        await this.collector.flush();
     }
 }
 
@@ -408,15 +445,18 @@ export class SlidingSyncSdk {
 
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
+        // The `e2ee` and `to_device` extensions feed a shared collector, so that the crypto layer sees all the
+        // encryption-relevant data from a response in a single call.
+        const e2eeCollector = new E2EESyncChangesCollector(this.client, this.syncOpts.cryptoCallbacks);
         const extensions: Extension<any, any>[] = [
-            new ExtensionToDevice(this.client, this.syncOpts.cryptoCallbacks),
+            new ExtensionToDevice(e2eeCollector),
             new ExtensionAccountData(this.client),
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
             new ExtensionStickyEvents(this.client),
         ];
         if (this.syncOpts.cryptoCallbacks) {
-            extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks));
+            extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks, e2eeCollector));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);

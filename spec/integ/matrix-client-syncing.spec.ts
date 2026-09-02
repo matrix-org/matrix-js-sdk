@@ -227,7 +227,8 @@ describe("MatrixClient syncing", () => {
 
             // noinspection ES6MissingAwait
             client!.startClient();
-            await httpBackend!.flushAllExpected();
+            // wait for all three syncs to be processed, not just for their responses to be delivered
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(3)]);
 
             expect(fires).toBe(3);
         });
@@ -342,7 +343,8 @@ describe("MatrixClient syncing", () => {
 
             // noinspection ES6MissingAwait
             client!.startClient();
-            await httpBackend!.flushAllExpected();
+            // wait for all three syncs to be processed, not just for their responses to be delivered
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(3)]);
 
             expect(fires).toBe(3);
         });
@@ -506,6 +508,65 @@ describe("MatrixClient syncing", () => {
             client!.startClient({ initialSyncLimit: 1 });
 
             return httpBackend!.flushAllExpected();
+        });
+
+        it("should not pass a cached sync to the crypto layer", async () => {
+            // A cached sync carries no E2EE data. In particular it has no `device_one_time_keys_count`, which the
+            // crypto layer would interpret as "no one-time keys on the server" and upload a fresh batch on every
+            // restart (https://github.com/matrix-org/matrix-js-sdk/issues/5501).
+            const cryptoCallbacks = {
+                processSyncChanges: vi.fn().mockResolvedValue([]),
+                onSyncCompleted: vi.fn(),
+                stop: vi.fn(),
+            };
+            // @ts-ignore private field
+            client!.cryptoBackend = cryptoCallbacks;
+            client!.store.getSavedSync = vi.fn().mockResolvedValue({
+                nextBatch: "cached_token",
+                roomsData: { join: {}, invite: {}, leave: {}, knock: {} },
+                accountData: [],
+            });
+            httpBackend!
+                .when("GET", "/sync")
+                .respond(200, { ...syncData, device_one_time_keys_count: { signed_curve25519: 50 } });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            // only the live sync should have reached the crypto layer
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledWith(
+                expect.objectContaining({ oneTimeKeysCounts: { signed_curve25519: 50 } }),
+            );
+        });
+
+        it("should still process room data if the crypto layer fails to process the sync", async () => {
+            const cryptoCallbacks = {
+                processSyncChanges: vi.fn().mockRejectedValue(new Error("crypto store is broken")),
+                onSyncCompleted: vi.fn(),
+                stop: vi.fn(),
+            };
+            // @ts-ignore private field
+            client!.cryptoBackend = cryptoCallbacks;
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: {
+                    join: {
+                        [roomOne]: {
+                            timeline: { events: [], prev_batch: "prev" },
+                            state: { events: [] },
+                            ephemeral: { events: [] },
+                            account_data: { events: [] },
+                        },
+                    },
+                },
+            });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), emitPromise(client!, ClientEvent.Sync)]);
+
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(client!.getRoom(roomOne)).toBeTruthy();
         });
     });
 
@@ -2670,7 +2731,8 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
 
         // noinspection ES6MissingAwait
         idbClient.startClient();
-        await idbHttpBackend.flushAllExpected();
+        // wait for the sync to be processed, not just for its response to be delivered
+        await Promise.all([idbHttpBackend.flushAllExpected(), utils.syncPromise(idbClient)]);
 
         expect(fires).toBe(1);
 

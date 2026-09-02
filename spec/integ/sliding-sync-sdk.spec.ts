@@ -656,31 +656,74 @@ describe("SlidingSyncSdk", () => {
             });
         });
 
-        it("can update device lists", () => {
-            syncCryptoCallback!.processDeviceLists = vi.fn();
-            ext.onResponse({
+        it("passes device lists, OTK counts and fallback keys to crypto in a single call once the response is complete", async () => {
+            syncCryptoCallback!.processSyncChanges = vi.fn().mockResolvedValue([]);
+            syncCryptoCallback!.onSyncCompleted = vi.fn();
+            await ext.onResponse({
                 device_lists: {
                     changed: ["@alice:localhost"],
                     left: ["@bob:localhost"],
                 },
-            });
-            expect(syncCryptoCallback!.processDeviceLists).toHaveBeenCalledWith({
-                changed: ["@alice:localhost"],
-                left: ["@bob:localhost"],
-            });
-        });
-
-        it("can update OTK counts and unused fallback keys", () => {
-            syncCryptoCallback!.processKeyCounts = vi.fn();
-            ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },
                 device_unused_fallback_key_types: ["signed_curve25519"],
             });
-            expect(syncCryptoCallback!.processKeyCounts).toHaveBeenCalledWith({ signed_curve25519: 42 }, [
-                "signed_curve25519",
-            ]);
+            // nothing should happen until all extensions in this response have been processed
+            expect(syncCryptoCallback!.processSyncChanges).not.toHaveBeenCalled();
+
+            await ext.onResponseComplete!();
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledWith({
+                toDeviceEvents: [],
+                deviceLists: { changed: ["@alice:localhost"], left: ["@bob:localhost"] },
+                oneTimeKeysCounts: { signed_curve25519: 42 },
+                unusedFallbackKeys: ["signed_curve25519"],
+                useMsc4186: true,
+            });
+            expect(syncCryptoCallback!.onSyncCompleted).toHaveBeenCalledTimes(1);
+        });
+
+        it("passes omitted OTK counts and fallback keys through as undefined", async () => {
+            // In sliding sync, omitted counts mean "unchanged since the last response". That is for the crypto layer
+            // to interpret (via `useMsc4186`): we must not replay stale values ourselves.
+            syncCryptoCallback!.processSyncChanges = vi.fn().mockResolvedValue([]);
+            syncCryptoCallback!.onSyncCompleted = vi.fn();
+            await ext.onResponse({
+                device_one_time_keys_count: { signed_curve25519: 7 },
+                device_unused_fallback_key_types: [],
+            });
+            await ext.onResponseComplete!();
+
+            await ext.onResponse({ device_lists: { changed: ["@carol:localhost"] } });
+            await ext.onResponseComplete!();
+
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledTimes(2);
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenLastCalledWith({
+                toDeviceEvents: [],
+                deviceLists: { changed: ["@carol:localhost"] },
+                oneTimeKeysCounts: undefined,
+                unusedFallbackKeys: undefined,
+                useMsc4186: true,
+            });
+        });
+
+        it("combines to-device events with the e2ee extension data into a single call", async () => {
+            const toDeviceExt = findExtension("to_device");
+            syncCryptoCallback!.processSyncChanges = vi.fn().mockResolvedValue([]);
+            syncCryptoCallback!.onSyncCompleted = vi.fn();
+            const events = [{ type: "m.dummy", sender: "@alice:localhost", content: {} }];
+
+            await toDeviceExt.onResponse({ next_batch: "tdb", events });
+            await ext.onResponse({ device_one_time_keys_count: { signed_curve25519: 3 } });
+            await toDeviceExt.onResponseComplete!();
+            await ext.onResponseComplete!();
+
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledWith(
+                expect.objectContaining({ toDeviceEvents: events, oneTimeKeysCounts: { signed_curve25519: 3 } }),
+            );
+            expect(syncCryptoCallback!.onSyncCompleted).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -837,10 +880,11 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("updates the since value", async () => {
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "12345",
                 events: [],
             });
+            await ext.onResponseComplete!();
             expect(await ext.onRequest(false)).toMatchObject({
                 since: "12345",
             });
@@ -848,10 +892,11 @@ describe("SlidingSyncSdk", () => {
 
         // eslint-disable-next-line @vitest/expect-expect
         it("can handle missing fields", async () => {
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "23456",
                 // no events array
             });
+            await ext.onResponseComplete!();
         });
 
         it("emits to-device events on the client", async () => {
@@ -865,7 +910,7 @@ describe("SlidingSyncSdk", () => {
                 expect(ev.getType()).toEqual(toDeviceType);
                 called = true;
             });
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "34567",
                 events: [
                     {
@@ -874,7 +919,26 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
+            await ext.onResponseComplete!();
             expect(called).toBe(true);
+        });
+
+        it("drops to-device events with unsafe properties", async () => {
+            const received: string[] = [];
+            const listener = (ev: MatrixEvent): void => {
+                received.push(ev.getType());
+            };
+            client!.on(ClientEvent.ToDeviceEvent, listener);
+            await ext.onResponse({
+                next_batch: "34568",
+                events: [
+                    { type: "safe", sender: "@alice:localhost", content: {} },
+                    { type: "unsafe", sender: "__proto__", content: {} },
+                ],
+            });
+            await ext.onResponseComplete!();
+            client!.off(ClientEvent.ToDeviceEvent, listener);
+            expect(received).toEqual(["safe"]);
         });
 
         it("can cancel key verification requests", async () => {
@@ -887,7 +951,7 @@ describe("SlidingSyncSdk", () => {
                     evType === "m.key.verification.start" || evType === "m.key.verification.request",
                 );
             });
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "45678",
                 events: [
                     // someone tries to verify keys
@@ -912,6 +976,12 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
+            await ext.onResponseComplete!();
+            expect(Object.keys(seen).sort()).toEqual([
+                "m.key.verification.cancel",
+                "m.key.verification.request",
+                "m.key.verification.start",
+            ]);
         });
     });
 

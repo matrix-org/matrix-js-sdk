@@ -235,7 +235,7 @@ async function initializeSecretStorage(
     await matrixClient.initRustCrypto();
     const crypto = matrixClient.getCrypto()! as RustCrypto;
     // we need to process a sync so that the OlmMachine will upload keys
-    await crypto.preprocessToDeviceMessages([]);
+    await crypto.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
     crypto.onSyncCompleted({});
 
     // create initial secret storage

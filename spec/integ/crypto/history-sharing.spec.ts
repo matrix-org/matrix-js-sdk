@@ -82,6 +82,7 @@ async function setupClients(n: number, options = { setupNewCrossSigning: true })
         const userId = TEST_USER_IDS[i];
         const routePrefix = `${userId.split(":")[0].slice(1)}-`; // e.g. @alice:example.com -> alice-
         const homeserverUrl = `https://${routePrefix}server.com`; // e.g. @alice:example.com -> https://alice-homeserver.com
+        const keyReceiver = new E2EKeyReceiver(homeserverUrl, routePrefix);
 
         return {
             client: createClient({
@@ -93,10 +94,10 @@ async function setupClients(n: number, options = { setupNewCrossSigning: true })
             }),
             userId,
             homeserverUrl,
-            keyReceiver: new E2EKeyReceiver(homeserverUrl, routePrefix),
+            keyReceiver,
             keyResponder: new E2EKeyResponder(homeserverUrl),
             keyClaimResponder: new E2EOTKClaimResponder(homeserverUrl),
-            syncResponder: new SyncResponder(homeserverUrl),
+            syncResponder: new SyncResponder(homeserverUrl, { e2eKeyReceiver: keyReceiver }),
         };
     });
 
