@@ -110,7 +110,19 @@ export class RTCEncryptionManager implements IEncryptionManager {
      *  - 3000: 50 users: 0.8min, 100 users: 3.3min, 200: users: 13.2min
      *  - 5000: 50 users: 0.5min, 100 users: 1.9min, 200: users: 7.9min
      */
-    private sharedPerMinuteToDeviceContingent = 3000;
+    private sharedPerMinuteToDeviceContingent = 6000;
+
+    /**
+     * 15 minutes force key rotation.
+     *
+     * This is a stop gap until we have ratcheting.
+     * On join we want/need to share the current key with any participatns in the call.
+     * This is particularly important in larger calls, where the jitter can span multiple minutes.
+     * Hence we can end up with media delays on join of multiple minutes.
+     *
+     * As a workaround we share immediatlye but make sure we never use a key that is older than 15min + jitter.
+     */
+    private maxKeyTTL: number | undefined = 60 * 15 * 1000;
 
     /**
      * We want to avoid rolling out a new outbound key when the previous one was created less than `keyRotationGracePeriodMs` milliseconds ago.
@@ -144,7 +156,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * This will ensure that a new round is started after the current one.
      * @private
      */
-    private needToEnsureKeyAgain: { scheduled: boolean } | undefined = undefined;
+    private needToEnsureKeyAgain: { scheduled: boolean; fakeMemberChange: boolean } | undefined = undefined;
 
     /**
      * There is a possibility that keys arrive in the wrong order.
@@ -305,7 +317,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * If this function is called repeatedly while a distribution is in progress,
      * the calls will be coalesced to a single new distribution (that will start just after the current one has completed).
      */
-    private ensureKeyDistribution(scheduled: boolean = false): void {
+    private ensureKeyDistribution(scheduled = false, fakeMemberChange = false): void {
         // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
         // to create a NoOpEncryptionManager that does nothing and use it for the session.
         // This will be done when removing the legacy EncryptionManager.
@@ -313,22 +325,22 @@ export class RTCEncryptionManager implements IEncryptionManager {
         if (this.currentKeyDistributionPromise == null) {
             this.logger?.debug(`No active rollout, start a new one`);
             // start a rollout
-            this.currentKeyDistributionPromise = this.rolloutOutboundKey(scheduled).then(() => {
+            this.currentKeyDistributionPromise = this.rolloutOutboundKey(scheduled, fakeMemberChange).then(() => {
                 this.logger?.debug(`Rollout completed`);
                 this.currentKeyDistributionPromise = null;
                 if (this.needToEnsureKeyAgain !== undefined) {
                     this.logger?.debug(`New Rollout needed`);
-                    const againWithScheduled = this.needToEnsureKeyAgain?.scheduled;
+                    const againWith = this.needToEnsureKeyAgain;
                     this.needToEnsureKeyAgain = undefined;
                     // rollout a new one
-                    this.ensureKeyDistribution(againWithScheduled);
+                    this.ensureKeyDistribution(againWith.scheduled, againWith.fakeMemberChange);
                 }
             });
         } else {
             // There is a rollout in progress, but a key rotation is requested (could be caused by a ownMembership change)
             // Remember that a new rotation is needed after the current one.
             this.logger?.debug(`Rollout in progress, a new rollout will be started after the current one`);
-            this.needToEnsureKeyAgain = { scheduled };
+            this.needToEnsureKeyAgain = { scheduled, fakeMemberChange };
         }
     }
 
@@ -384,7 +396,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private rotationBlockedUntilTs: number = 0;
     private scheduledForBlockTs: number | undefined = undefined;
-    private async rolloutOutboundKey(scheduled: boolean = false): Promise<void> {
+    private async rolloutOutboundKey(scheduled: boolean = false, fakeMemberChange: boolean = false): Promise<void> {
         const isFirstKey = this.outboundSession === null;
         if (isFirstKey) {
             // create the first key
@@ -449,7 +461,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         let hasKeyChanged = false;
         let toDistributeTo: ParticipantDeviceInfo[] = [];
 
-        if (!membershipChanged && !scheduled) {
+        if (!membershipChanged && !scheduled && !fakeMemberChange) {
             // Nothing changed and there is no rotation that we postponed earlier: nothing to do.
             return;
         }
@@ -482,13 +494,15 @@ export class RTCEncryptionManager implements IEncryptionManager {
             const blockTime = this.keyRotationGracePeriodMs * rotationJitter;
             this.rotationBlockedUntilTs = blockTime + now;
             this.scheduleEnsureKeyDistributionIfNotYetScheduled(blockTime);
-            //still distribute to new joiners
+            // still distribute to new joiners. This is possible due to maxKeyTTL.
+            // (we leak at most the last maxKeyTTL of the call for new joiners)
             toDistributeTo = anyJoined;
         } else if (now < this.rotationBlockedUntilTs) {
             // Currently Blocked! We prohibit rotation (toDistributeTo = []). But we schedule ensureKeyDistribution.
             // If already scheduled we dont reschedule to prohibit the `if(scheduled)` case to be fire multiple times.
             this.scheduleEnsureKeyDistributionIfNotYetScheduled(this.rotationBlockedUntilTs - now);
-            //still distribute to new joiners
+            // still distribute to new joiners. This is possible due to maxKeyTTL.
+            // (we leak at most the last maxKeyTTL of the call for new joiners)
             toDistributeTo = anyJoined;
         }
         if (toDistributeTo.length === 0) return;
@@ -537,6 +551,15 @@ export class RTCEncryptionManager implements IEncryptionManager {
             sharedWith: [],
             keyId: this.nextKeyIndex(),
         };
+
+        if (this.maxKeyTTL !== undefined) {
+            const fakeMemberChange = true;
+            // trick the key rollout system to execute the rollout as if there was a member change.
+            setTimeout(
+                () => this.ensureKeyDistribution(false, fakeMemberChange),
+                Math.max(this.maxKeyTTL, this.keyRotationGracePeriodMs),
+            );
+        }
 
         this.logger?.info(`creating new outbound key index:${newOutboundKey.keyId}`);
         // Set this new key as the current one
