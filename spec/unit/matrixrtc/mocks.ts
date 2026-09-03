@@ -17,7 +17,7 @@ limitations under the License.
 import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
+import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
 import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
@@ -108,6 +108,7 @@ export type MockClient = MockedObject<
         | "cancelPendingEvent"
     >
 >;
+
 /**
  * Mocks a object that has all required methods for a MatrixRTC session client.
  */
@@ -230,6 +231,24 @@ export function makeMockEvent(
         getStateKey: vi.fn().mockReturnValue(stateKey),
         isDecryptionFailure: vi.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
+}
+
+export function makeMatrixEvent(
+    type: string,
+    sender: string,
+    roomId: string | undefined,
+    content: any,
+    timestamp?: number,
+    stateKey?: string,
+): MatrixEvent {
+    return new MatrixEvent({
+        type,
+        sender,
+        room_id: roomId,
+        content,
+        state_key: stateKey,
+        origin_server_ts: timestamp,
+    });
 }
 
 export function mockRTCEvent(
