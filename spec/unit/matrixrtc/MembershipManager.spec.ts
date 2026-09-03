@@ -866,6 +866,28 @@ describe("MembershipManager", () => {
             );
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
+        it("does not give up when delayed event restarts keep hitting the local timeout", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager({ maximumNetworkErrorRetryCount: 3 }, room, client, callSession);
+            const { promise: stuckPromise, reject: rejectStuckPromise } = Promise.withResolvers<EmptyObject>();
+            const probablyLeftEmit = vi.fn();
+            manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
+            manager.join([focus], focusActive, onError);
+            try {
+                await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
+                // The server never answers restarts: each hits the 2s local timeout and is retried immediately.
+                client._unstable_restartScheduledDelayedEvent = vi.fn((_) => stuckPromise);
+                await vi.advanceTimersByTimeAsync(60000);
+                // Way past `maximumNetworkErrorRetryCount` timeouts, but the server-side delayed leave bounds this
+                // failure mode, so we keep retrying (and report probablyLeft) instead of shutting down.
+                expect(client._unstable_restartScheduledDelayedEvent).toHaveBeenCalledTimes(29);
+                expect(probablyLeftEmit).toHaveBeenCalledWith(true);
+                expect(onError).not.toHaveBeenCalled();
+                expect(manager.status).toBe(Status.Connected);
+            } finally {
+                rejectStuckPromise();
+            }
+        });
         it("falls back to using pure state events when UnsupportedDelayedEventsEndpointError encountered for delayed events", async () => {
             const unrecoverableError = vi.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
