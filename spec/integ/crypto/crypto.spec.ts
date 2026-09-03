@@ -139,6 +139,19 @@ describe("crypto", () => {
         logger.log(aliceClient.getUserId() + ": started");
     }
 
+    /** Return a promise which resolves the next time `CryptoEvent.UserTrustStatusChanged` is emitted for `userId`. */
+    function awaitUserTrustStatusChanged(userId: string): Promise<void> {
+        return new Promise((resolve) => {
+            const listener = (changedUserId: string): void => {
+                if (changedUserId === userId) {
+                    aliceClient.off(CryptoEvent.UserTrustStatusChanged, listener);
+                    resolve();
+                }
+            };
+            aliceClient.on(CryptoEvent.UserTrustStatusChanged, listener);
+        });
+    }
+
     /**
      * Set up expectations that the client will query device keys.
      *
@@ -256,7 +269,7 @@ describe("crypto", () => {
 
             /* set up listeners for /keys/upload and /sync */
             keyReceiver = new E2EKeyReceiver(homeserverUrl);
-            syncResponder = new SyncResponder(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver: keyReceiver });
 
             await aliceClient.initRustCrypto();
 
@@ -2097,12 +2110,15 @@ describe("crypto", () => {
         });
 
         it("An unverified user changes identity", async () => {
-            // We have to be tracking Bob's keys, which means we need to share a room with him
+            // We have to be tracking Bob's keys, which means we need to share a room with him. Joining the room makes
+            // Bob a tracked user, which triggers a `/keys/query` for him: wait for his identity to arrive.
+            const bobIdentityReceived = awaitUserTrustStatusChanged(BOB_TEST_USER_ID);
             syncResponder.sendOrQueueSyncResponse({
                 ...getSyncResponse([BOB_TEST_USER_ID]),
                 device_lists: { changed: [BOB_TEST_USER_ID] },
             });
             await syncPromise(aliceClient);
+            await bobIdentityReceived;
 
             const hasCrossSigningKeysForUser = await aliceClient.getCrypto()!.userHasCrossSigningKeys(BOB_TEST_USER_ID);
             expect(hasCrossSigningKeysForUser).toBe(true);

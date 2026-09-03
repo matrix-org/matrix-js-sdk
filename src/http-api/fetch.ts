@@ -31,6 +31,7 @@ import {
     type Body,
 } from "./interface.ts";
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
+import { sanitizeUrlForLogs } from "./logging.ts";
 import { type QueryDict } from "../utils.ts";
 import { TokenRefresher, TokenRefreshOutcome } from "./refresh.ts";
 
@@ -241,7 +242,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             throw new Error("Invalid call to `FetchHttpApi` sets both `opts.json` and `opts.rawResponseBody`");
         }
 
-        const urlForLogs = this.sanitizeUrlForLogs(url);
+        const urlForLogs = sanitizeUrlForLogs(url);
 
         this.opts.logger?.debug(`FetchHttpApi: --> ${method} ${urlForLogs}`);
 
@@ -330,28 +331,6 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
     }
 
-    private sanitizeUrlForLogs(url: URL | string): string {
-        try {
-            let asUrl: URL;
-            if (typeof url === "string") {
-                asUrl = new URL(url);
-            } else {
-                asUrl = url;
-            }
-            // Remove the values of any URL params that could contain potential secrets
-            const sanitizedQs = new URLSearchParams();
-            for (const key of asUrl.searchParams.keys()) {
-                sanitizedQs.append(key, "xxx");
-            }
-            const sanitizedQsString = sanitizedQs.toString();
-            const sanitizedQsUrlPiece = sanitizedQsString ? `?${sanitizedQsString}` : "";
-
-            return asUrl.origin + asUrl.pathname + sanitizedQsUrlPiece;
-        } catch {
-            // defensive coding for malformed url
-            return "??";
-        }
-    }
     /**
      * Form and return a homeserver request URL based on the given path params and prefix.
      * @param path - The HTTP path <b>after</b> the supplied prefix e.g. "/createRoom".

@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "42.2.0",
+    "version": "42.3.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -56,7 +56,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^8.0.0",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^18.4.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^18.7.0",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^3.0.0",
@@ -97,7 +97,7 @@
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
-        "oxfmt": "^0.64.0",
+        "oxfmt": "^0.65.0",
         "oxlint": "^1.70.0",
         "oxlint-tsgolint": "^7.0.0",
         "typedoc": "^0.28.1",

@@ -129,8 +129,8 @@ describe("megolm-keys backup", () => {
         fetchMock.catch(404);
 
         mockInitialApiRequests(TEST_HOMESERVER_URL);
-        syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
         e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
+        syncResponder = new SyncResponder(TEST_HOMESERVER_URL, { e2eKeyReceiver });
         e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
         e2eKeyResponder.addDeviceKeys(testData.SIGNED_TEST_DEVICE_DATA);
         e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
