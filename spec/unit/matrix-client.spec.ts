@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import fetchMock from "@fetch-mock/vitest";
-import { type MockedObject, type Mocked } from "vitest";
+import { type MockedObject, type Mocked, type MockInstance } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
@@ -46,6 +46,7 @@ import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
@@ -4061,25 +4062,54 @@ describe("MatrixClient", function () {
     });
 
     describe("Well-known", () => {
+        const A_WELLKNOWN: IClientWellKnown = {
+            "m.homeserver": {
+                base_url: "https://hs.org",
+            },
+            "m.identity_server": {
+                base_url: "https://is.org",
+            },
+        };
+
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
         it("caches the well-known value", async () => {
-            const A_WELLKNOWN: IClientWellKnown = {
-                "m.homeserver": {
-                    base_url: "https://hs.org",
-                },
-                "m.identity_server": {
-                    base_url: "https://is.org",
-                },
-            };
-
             void client.startClient();
-
-            vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
 
             const value = await client.waitForClientWellKnown();
             expect(value).toStrictEqual(A_WELLKNOWN);
 
             const cached = client.getClientWellKnown();
             expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await client.startClient();
+            await flushPromises();
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known on startup and polls it when clientWellKnownPollPeriod is set", async () => {
+            await client.startClient({ clientWellKnownPollPeriod: 3600 });
+            await flushPromises();
+
+            expect(getRawClientConfig).toHaveBeenCalledTimes(1);
+            expect(client.getClientWellKnown()).toStrictEqual(A_WELLKNOWN);
+
+            await vi.advanceTimersByTimeAsync(3600 * 1000);
+            expect(getRawClientConfig).toHaveBeenCalledTimes(2);
+
+            client.stopClient();
         });
     });
 
