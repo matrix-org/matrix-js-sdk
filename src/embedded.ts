@@ -32,7 +32,12 @@ import {
     UnstableApiVersion,
 } from "matrix-widget-api";
 
-import { type Transport } from "./matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "./matrixrtc/index.ts";
 import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
 import {
     type ISendEventResponse,
@@ -145,6 +150,21 @@ export interface ICapabilities {
      * @defaultValue false
      */
     rtcTransports?: boolean;
+
+    /**
+     * Whether this client needs to be able to obtain LiveKit SFU tokens through the host.
+     * @experimental Part of MSC4195 & MSC4533
+     * @defaultValue false
+     */
+    rtcLivekitGetToken?: boolean;
+
+    /**
+     * Whether this client needs to be able to hand delayed MatrixRTC leave events over to the
+     * homeserver through the host.
+     * @experimental Part of MSC4195 & MSC4533
+     * @defaultValue false
+     */
+    rtcLivekitDelegateDelayedLeave?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -295,6 +315,12 @@ export class RoomWidgetClient extends MatrixClient {
         }
         if (capabilities.rtcTransports) {
             this.widgetApi.requestCapability(MatrixCapabilities.MSC4515RtcTransports);
+        }
+        if (capabilities.rtcLivekitGetToken) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        }
+        if (capabilities.rtcLivekitDelegateDelayedLeave) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
         }
     }
 
@@ -643,6 +669,41 @@ export class RoomWidgetClient extends MatrixClient {
             .getRtcTransports()
             .catch(timeoutToConnectionError);
         return rtcTransports;
+    }
+
+    /**
+     * Requests a token to authenticate against a LiveKit SFU with.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_getLivekitToken} (MSC4195): a widget
+     * cannot make authenticated homeserver calls itself, so we ask the host to make the call on our
+     * behalf over the widget API instead (MSC4533). Requires the `rtcLivekitGetToken` capability and a
+     * host that advertises the `org.matrix.msc4533` API version (otherwise the request throws).
+     *
+     * `server_name` defaults to our own homeserver, matching what the endpoint would do server-side.
+     */
+    public override async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        const serverName = body.server_name ?? this.getDomain();
+        if (serverName === null) throw new Error("Cannot determine the server name to request a token from");
+        const { jwt } = await this.widgetApi
+            .getRtcLivekitToken({ ...body, server_name: serverName })
+            .catch(timeoutToConnectionError);
+        return { jwt };
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_delegateDelayedLeave} (MSC4195): a
+     * widget cannot make authenticated homeserver calls itself, so we ask the host to make the call on
+     * our behalf over the widget API instead (MSC4533). Requires the `rtcLivekitDelegateDelayedLeave`
+     * capability and a host that advertises the `org.matrix.msc4533` API version (otherwise the request
+     * throws).
+     */
+    public override async _unstable_delegateDelayedLeave(
+        body: LivekitDelegateDelayedLeaveRequest,
+    ): Promise<EmptyObject> {
+        await this.widgetApi.delegateRtcLivekitDelayedLeave(body).catch(timeoutToConnectionError);
+        return {};
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
