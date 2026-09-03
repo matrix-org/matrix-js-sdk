@@ -74,7 +74,6 @@ import {
     Method,
     retryNetworkOperation,
     type onTokenRefreshCallback,
-    type OAuth2ClientConfig,
     type Upload,
     type UploadOpts,
     type UploadResponse,
@@ -331,12 +330,10 @@ export interface ICreateClientOpts {
     onTokenRefresh?: onTokenRefreshCallback;
 
     /**
-     * If this is an OAuth2-native session (as per MSC2965/MSC3861), the client ID and redirect URI this
-     * application is registered with the delegated auth server under. Required for the SDK to be able to
-     * refresh (given `refreshToken`) and revoke (e.g. on logout) tokens for the session; the auth server's
-     * metadata will be discovered lazily, and the OAuth2 client constructed, the first time this is needed.
+     * If this is an OAuth2-native session (as per MSC2965/MSC3861), the OAuth client ID this
+     * application is registered with the delegated auth server under.
      */
-    oauth2ClientConfig?: Pick<OAuth2ClientConfig, "clientId" | "redirectUri">;
+    oauthClientId?: string;
 
     /**
      * Identity server provider to retrieve the user's access token when accessing
@@ -1364,11 +1361,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             accessToken: opts.accessToken,
             refreshToken: opts.refreshToken,
             onTokenRefresh: opts.onTokenRefresh,
-            oauth2ClientConfig: opts.oauth2ClientConfig && {
-                ...opts.oauth2ClientConfig,
-                deviceId: this.deviceId ?? undefined,
-                getAuthMetadata: (): Promise<ValidatedAuthMetadata> => this.getAuthMetadata(),
-            },
+            oauth2ClientConfig: opts.oauthClientId
+                ? {
+                      clientId: opts.oauthClientId,
+                      deviceId: this.deviceId ?? undefined,
+                      getAuthMetadata: (): Promise<ValidatedAuthMetadata> => this.getAuthMetadata(),
+                  }
+                : undefined,
             prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,

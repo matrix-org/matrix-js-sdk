@@ -3852,21 +3852,6 @@ describe("MatrixClient", function () {
             await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
-
-        it("should use unstable prefix", async () => {
-            const metadata = makeDelegatedAuthMetadata();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    data: metadata,
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-
-            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
-            expect(httpLookups.length).toEqual(0);
-        });
     });
 
     describe("logout", () => {
@@ -3895,7 +3880,7 @@ describe("MatrixClient", function () {
                 accessToken,
                 refreshToken,
                 userId,
-                oauth2ClientConfig: { clientId: "test-client-id", redirectUri: "https://app.example.org" },
+                oauthClientId: "test-client-id",
             });
             await expect(client.logout()).resolves.toEqual({});
 

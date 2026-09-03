@@ -29,7 +29,6 @@ describe("TokenRefresher", () => {
         issuer: "https://issuer.org/",
     };
     const clientId = "test-client-id";
-    const redirectUri = "https://test.org";
     const deviceId = "abc123";
     // used to mock a valid token response
     const scope = `urn:matrix:client:api:* urn:matrix:client:device:${deviceId}`;
@@ -37,7 +36,7 @@ describe("TokenRefresher", () => {
     // auth config used in mocked calls to OP .well-known
     const config = makeDelegatedAuthMetadata(authConfig.issuer);
 
-    const auth = new OAuth2(config, { clientId, redirectUri, deviceId });
+    const auth = new OAuth2(config, { clientId, deviceId });
 
     const makeTokenResponse = (accessToken: string, refreshToken?: string) => ({
         access_token: accessToken,

@@ -56,8 +56,6 @@ type Context = {
     deviceId?: string;
     /** The seed used to generate the challenge code */
     codeVerifier?: string;
-    /** The URI to redirect the user to with credentials after auth */
-    redirectUri: string;
 };
 
 export class OAuth2 {
@@ -148,7 +146,6 @@ export class OAuth2 {
     ) {
         this.context = {
             clientId: context.clientId,
-            redirectUri: context.redirectUri,
             deviceId: context.deviceId ?? secureRandomString(10),
             codeVerifier: context.codeVerifier ?? secureRandomString(96),
         };
@@ -161,12 +158,14 @@ export class OAuth2 {
      *     that will allow the client to maintain state between the authorization request and the callback.
      *     The app should use this to key the storage for where the rest of the auth context is saved.
      * @param responseMode - The manner in which the IdP should send the secrets back to the app. Defaults to `fragment` for privacy.
+     * @param redirectUri - The redirect URI this application is registered with the delegated auth server under.
      * @param prompt - Optional prompt parameter to pass to the IdP to signal intent, e.g. `create` for User registration.
      * @param scope - The OAuth2 scope to request, will be generated based on the device ID if omitted.
      * @returns a Promise with the url as a string
      */
     public async generateAuthorizationCodeGrantUrl(
         state: string,
+        redirectUri: string,
         responseMode: "fragment" | "query" = "fragment",
         prompt?: string,
         scope?: string,
@@ -177,7 +176,7 @@ export class OAuth2 {
         url.searchParams.set("response_type", "code");
         url.searchParams.set("response_mode", responseMode);
         url.searchParams.set("client_id", this.context.clientId);
-        url.searchParams.set("redirect_uri", this.context.redirectUri);
+        url.searchParams.set("redirect_uri", redirectUri);
         url.searchParams.set("scope", scope ?? generateScope(this.context.deviceId));
         url.searchParams.set("state", state);
         url.searchParams.set("code_challenge_method", "S256");
@@ -201,12 +200,12 @@ export class OAuth2 {
      * @throws An `Error` with `message` set to an entry in {@link OAuth2Error},
      *      when the request fails, or the returned token response is invalid.
      */
-    public async completeAuthorizationCodeGrant(code: string): Promise<BearerTokenResponse> {
+    public async completeAuthorizationCodeGrant(code: string, redirectUri: string): Promise<BearerTokenResponse> {
         const params = new URLSearchParams();
         params.append("grant_type", "authorization_code");
         params.append("client_id", this.context.clientId);
         params.append("code_verifier", this.context.codeVerifier);
-        params.append("redirect_uri", this.context.redirectUri);
+        params.append("redirect_uri", redirectUri);
         params.append("code", code);
 
         const res = await this.fetch("token", params, OAuth2Error.CodeExchangeFailed);

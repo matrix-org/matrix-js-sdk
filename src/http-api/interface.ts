@@ -56,8 +56,6 @@ export type onTokenRefreshCallback = (newTokens: AccessTokens) => void;
 export interface OAuth2ClientConfig {
     /** The OAuth2 client ID this application is registered with the delegated auth server under. */
     clientId: string;
-    /** The redirect URI this application is registered with the delegated auth server under. */
-    redirectUri: string;
     /** The device ID of the current session, used to scope refreshed/revoked tokens to this session. */
     deviceId?: string;
     /**

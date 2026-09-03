@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ConnectionError, MatrixError, TokenRefreshLogoutError } from "./errors.ts";
+import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
 import { type AccessTokens, type IHttpOpts, type OAuth2ClientConfig } from "./interface.ts";
 import { sleep } from "../utils.ts";
 import { TokenRefresher } from "../oauth/tokenRefresher.ts";
@@ -35,10 +35,6 @@ const REFRESH_IF_TOKEN_EXPIRES_WITHIN_MS = 500;
 // If we get an unknown token error and the token expires in less than this time amount of time, we will refresh it before making the intended request.
 // Otherwise, we will error as the token should not have expired yet and we need to avoid retrying indefinitely.
 const REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS = 60 * 1000;
-
-// How many times to retry discovering the OAuth2 auth server metadata if it fails due to a connectivity
-// problem, e.g. if the client starts up with no network connection at all.
-const MAX_AUTH_METADATA_DISCOVERY_ATTEMPTS = 5;
 
 type Opts = Pick<IHttpOpts, "onTokenRefresh" | "logger" | "refreshToken" | "accessToken" | "oauth2ClientConfig">;
 
@@ -236,7 +232,6 @@ export class TokenManager {
 
         const oauth2 = new OAuth2(metadata, {
             clientId: config.clientId,
-            redirectUri: config.redirectUri,
             deviceId: config.deviceId,
         });
 
