@@ -693,6 +693,9 @@ export class MembershipManager
                 this.state.expireUpdateIterations = 1;
                 this.state.hasMemberStateEvent = true;
                 this.resetRateLimitCounter(MembershipActionType.SendJoinEvent);
+                // A successful (re-)join is a fresh membership: failures accumulated by the previous one
+                // (e.g. delayed event restarts that timed out before the server sent our leave) must not carry over.
+                this.state.networkErrorRetries.clear();
                 // An UpdateExpiry action might be left over from a previous join event.
                 // We can reach sendJoinEvent when the delayed leave event gets send by the HS.
                 // The branch where we might have a leftover UpdateExpiry action is:

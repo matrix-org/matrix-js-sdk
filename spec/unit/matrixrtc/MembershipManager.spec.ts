@@ -866,6 +866,37 @@ describe("MembershipManager", () => {
             );
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
+        it("does not carry network error retries over to a new membership after re-joining", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager(
+                { delayedLeaveEventDelayMs: 10000, maximumNetworkErrorRetryCount: 6 },
+                room,
+                client,
+                callSession,
+            );
+            const { promise: stuckPromise, reject: rejectStuckPromise } = Promise.withResolvers<EmptyObject>();
+            manager.join([focus], focusActive, onError);
+            try {
+                await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
+                // The server stops answering restarts: each hits the 2s local timeout and is retried immediately.
+                client._unstable_restartScheduledDelayedEvent = vi.fn((_) => stuckPromise);
+                await vi.advanceTimersByTimeAsync(10000);
+                expect(onError).not.toHaveBeenCalled();
+                // The server sent our delayed leave; we notice via sync and re-join successfully.
+                await manager.onRTCSessionMemberUpdate([]);
+                // The in-flight restart has to hit its local timeout before the re-join actions run.
+                await vi.advanceTimersByTimeAsync(2000);
+                expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+                // Restarts of the new delayed event keep timing out. The new membership gets the full retry budget
+                // rather than the remainder left over from the previous one (which would give up after ~9s here).
+                await vi.advanceTimersByTimeAsync(12000);
+                expect(onError).not.toHaveBeenCalled();
+                await vi.advanceTimersByTimeAsync(8000);
+                expect(onError).toHaveBeenCalled();
+            } finally {
+                rejectStuckPromise();
+            }
+        });
         it("falls back to using pure state events when UnsupportedDelayedEventsEndpointError encountered for delayed events", async () => {
             const unrecoverableError = vi.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
