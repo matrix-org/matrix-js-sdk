@@ -14,9 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
-import { type IHttpOpts } from "./interface.ts";
+import { ConnectionError, MatrixError, TokenRefreshLogoutError } from "./errors.ts";
+import { type AccessTokens, type IHttpOpts, type OAuth2ClientConfig } from "./interface.ts";
 import { sleep } from "../utils.ts";
+import { TokenRefresher } from "../oauth/tokenRefresher.ts";
+import { OAuth2 } from "../oauth/index.ts";
 
 /**
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
@@ -28,25 +30,26 @@ export const enum TokenRefreshOutcome {
     Logout = "logout",
 }
 
-interface Snapshot {
-    accessToken: string;
-    refreshToken?: string;
-    expiry?: Date;
-}
-
 // If the token expires in less than this time amount of time, we will eagerly refresh it before making the intended request.
 const REFRESH_IF_TOKEN_EXPIRES_WITHIN_MS = 500;
 // If we get an unknown token error and the token expires in less than this time amount of time, we will refresh it before making the intended request.
 // Otherwise, we will error as the token should not have expired yet and we need to avoid retrying indefinitely.
 const REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS = 60 * 1000;
 
-type Opts = Pick<IHttpOpts, "tokenRefreshFunction" | "logger" | "refreshToken" | "accessToken">;
+// How many times to retry discovering the OAuth2 auth server metadata if it fails due to a connectivity
+// problem, e.g. if the client starts up with no network connection at all.
+const MAX_AUTH_METADATA_DISCOVERY_ATTEMPTS = 5;
+
+type Opts = Pick<IHttpOpts, "onTokenRefresh" | "logger" | "refreshToken" | "accessToken" | "oauth2ClientConfig">;
 
 /**
  * This class is responsible for managing the access token and refresh token for authenticated requests.
- * It will automatically refresh the access token when it is about to expire, and will handle unknown token errors.
+ * It will automatically refresh the tokens when the access token is about to expire and can handle
+ * Unknown Token errors (via @{link handleUnknownToken})
+ *
+ * It will update the @{link opts} object with new tokens as they are refreshed, and also call the onTokenRefresh callback if provided.
  */
-export class TokenRefresher {
+export class TokenManager {
     public constructor(private readonly opts: Opts) {}
 
     /**
@@ -57,12 +60,22 @@ export class TokenRefresher {
 
     private latestTokenRefreshExpiry?: Date;
 
+    // The object at the OAuth API layer that actually does the refreshing
+    // This needs OAuth params to be fetched before it can be constructed so it starts
+    // off as undefined and is constructed once we are able to do so.
+    private tokenRefresher?: TokenRefresher;
+
+    // Tracks an in-progress attempt to discover the OAuth2 auth server metadata and construct
+    // `tokenRefresher`, so that concurrent callers wait for (and share the result of) the same attempt
+    // rather than racing to discover it independently.
+    private tokenRefresherPromise?: Promise<TokenRefresher>;
+
     /**
      * This function is called before every request to ensure that the access token is valid.
      * @returns a snapshot containing the access token and other properties which must be passed to the handleUnknownToken
      *     handler if an M_UNKNOWN_TOKEN error is encountered.
      */
-    public async prepareForRequest(): Promise<Snapshot> {
+    public async prepareForRequest(): Promise<AccessTokens> {
         // Ensure our token is refreshed before we build the headers/params
         await this.refreshIfNeeded();
 
@@ -93,13 +106,13 @@ export class TokenRefresher {
      * @param attempt - the number of attempts made for this request so far
      * @returns a TokenRefreshOutcome indicating the result of the refresh attempt
      */
-    public async handleUnknownToken(snapshot: Snapshot, attempt: number): Promise<TokenRefreshOutcome> {
+    public async handleUnknownToken(snapshot: AccessTokens, attempt: number): Promise<TokenRefreshOutcome> {
         return this._handleUnknownToken(snapshot, attempt);
     }
 
     private async _handleUnknownToken(): Promise<TokenRefreshOutcome>;
-    private async _handleUnknownToken(snapshot: Snapshot, attempt: number): Promise<TokenRefreshOutcome>;
-    private async _handleUnknownToken(snapshot?: Snapshot, attempt?: number): Promise<TokenRefreshOutcome> {
+    private async _handleUnknownToken(snapshot: AccessTokens, attempt: number): Promise<TokenRefreshOutcome>;
+    private async _handleUnknownToken(snapshot?: AccessTokens, attempt?: number): Promise<TokenRefreshOutcome> {
         if (snapshot?.expiry) {
             // If our token is unknown, but it should not have expired yet, then we should not refresh
             const expiresIn = snapshot.expiry.getTime() - Date.now();
@@ -132,8 +145,8 @@ export class TokenRefresher {
      * @returns Promise that resolves to a boolean - true when token was refreshed successfully
      */
     private async doTokenRefresh(attempt?: number): Promise<TokenRefreshOutcome> {
-        if (!this.opts.refreshToken || !this.opts.tokenRefreshFunction) {
-            this.opts.logger?.error("Unable to refresh token - no refresh token or refresh function");
+        if (!this.opts.refreshToken || !this.opts.oauth2ClientConfig) {
+            this.opts.logger?.error("Unable to refresh token - no refresh token or OAuth2 client config");
             return TokenRefreshOutcome.Logout;
         }
 
@@ -144,7 +157,13 @@ export class TokenRefresher {
 
         try {
             this.opts.logger?.debug("Attempting to refresh token");
-            const { accessToken, refreshToken, expiry } = await this.opts.tokenRefreshFunction(this.opts.refreshToken);
+            const tokenRefresher = await this.ensureTokenRefresher();
+            if (!tokenRefresher) {
+                // We already checked `oauth2ClientConfig` is set above, so this should be unreachable.
+                return TokenRefreshOutcome.Logout;
+            }
+
+            const { accessToken, refreshToken, expiry } = await tokenRefresher.doRefresh(this.opts.refreshToken);
             this.opts.accessToken = accessToken;
             this.opts.refreshToken = refreshToken;
             this.latestTokenRefreshExpiry = expiry;
@@ -162,5 +181,65 @@ export class TokenRefresher {
             this.opts.logger?.warn("Failed to refresh token", error);
             return TokenRefreshOutcome.Failure;
         }
+    }
+
+    /**
+     * Attempt to revoke the current access and refresh tokens with the OAuth2 authorization server, e.g. as
+     * part of logging out. Does nothing if this is not an OAuth2-native session (ie. no `oauth2ClientConfig`
+     * was supplied).
+     * @throws when discovery of the auth server metadata, or revocation of either token, fails
+     */
+    public async revokeTokens(): Promise<void> {
+        const tokenRefresher = await this.ensureTokenRefresher();
+        if (!tokenRefresher) return;
+
+        await Promise.all(
+            [
+                this.opts.accessToken ? tokenRefresher.revokeToken(this.opts.accessToken, "access_token") : undefined,
+                this.opts.refreshToken
+                    ? tokenRefresher.revokeToken(this.opts.refreshToken, "refresh_token")
+                    : undefined,
+            ].filter((p): p is Promise<void> => p !== undefined),
+        );
+    }
+
+    /**
+     * Lazily constructs (and caches) the {@link TokenRefresher} used to talk to the OAuth2 authorization
+     * server, discovering its metadata first if this is the first time it's needed.
+     * @returns the token refresher, or undefined if no `oauth2ClientConfig` was supplied
+     * @throws when discovery of the auth server metadata fails in a way that isn't worth retrying
+     */
+    private async ensureTokenRefresher(): Promise<TokenRefresher | undefined> {
+        if (this.tokenRefresher) return this.tokenRefresher;
+        if (!this.opts.oauth2ClientConfig) return undefined;
+
+        if (!this.tokenRefresherPromise) {
+            this.tokenRefresherPromise = this.discoverTokenRefresher(this.opts.oauth2ClientConfig);
+        }
+
+        try {
+            this.tokenRefresher = await this.tokenRefresherPromise;
+            return this.tokenRefresher;
+        } finally {
+            // Either we now have `tokenRefresher` cached and won't need this again, or discovery
+            // failed and a future call should be free to retry from scratch.
+            this.tokenRefresherPromise = undefined;
+        }
+    }
+
+    /**
+     * Discovers the OAuth2 auth server metadata and constructs the OAuth2 client and token refresher from it.
+     * Throws if the request fails.
+     */
+    private async discoverTokenRefresher(config: OAuth2ClientConfig, attempt: number = 1): Promise<TokenRefresher> {
+        const metadata = await config.getAuthMetadata();
+
+        const oauth2 = new OAuth2(metadata, {
+            clientId: config.clientId,
+            redirectUri: config.redirectUri,
+            deviceId: config.deviceId,
+        });
+
+        return new TokenRefresher(oauth2, (tokens) => this.opts.onTokenRefresh?.(tokens));
     }
 }

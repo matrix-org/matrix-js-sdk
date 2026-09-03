@@ -14,13 +14,13 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import fetchMock from "@fetch-mock/vitest";
 import { type Mocked, type MockedFunction } from "vitest";
 
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
     ClientPrefix,
-    ConnectionError,
     HttpApiEvent,
     type HttpApiEventHandlerMap,
     IdentityPrefix,
@@ -32,6 +32,20 @@ import {
 import { emitPromise } from "../../test-utils/test-utils";
 import { type QueryDict, sleep } from "../../../src/utils";
 import { type Logger } from "../../../src/logger";
+import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
+
+function makeTokenResponse(
+    accessToken: string,
+    refreshToken?: string,
+    expiresIn?: number,
+): { access_token: string; refresh_token?: string; token_type: string; expires_in?: number } {
+    return {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_type: "Bearer",
+        expires_in: expiresIn,
+    };
+}
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -317,6 +331,14 @@ describe("FetchHttpApi", () => {
         describe("with refresh token", () => {
             const accessToken = "test-access-token";
             const refreshToken = "test-refresh-token";
+            const clientId = "test-client-id";
+            const redirectUri = "https://test.org";
+            const authMetadata = makeDelegatedAuthMetadata("https://issuer.org/");
+            const oauth2ClientConfig = {
+                clientId,
+                redirectUri,
+                getAuthMetadata: () => Promise.resolve(authMetadata),
+            };
 
             describe("when an unknown token error is encountered", () => {
                 const unknownTokenErrBody = {
@@ -347,7 +369,7 @@ describe("FetchHttpApi", () => {
                     json: vi.fn().mockResolvedValue({ x: 1 }),
                 };
 
-                describe("without a tokenRefreshFunction", () => {
+                describe("without an oauth2ClientConfig", () => {
                     it("should emit logout and throw", async () => {
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
@@ -367,10 +389,12 @@ describe("FetchHttpApi", () => {
                     });
                 });
 
-                describe("with a tokenRefreshFunction", () => {
+                describe("with an oauth2ClientConfig", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
-                        const error = new MatrixError();
-                        const tokenRefreshFunction = vi.fn().mockRejectedValue(error);
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 400,
+                            body: { errcode: "M_UNKNOWN", error: "failed" },
+                        });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                         vi.spyOn(emitter, "emit");
@@ -378,7 +402,7 @@ describe("FetchHttpApi", () => {
                             baseUrl,
                             prefix,
                             fetchFn,
-                            tokenRefreshFunction,
+                            oauth2ClientConfig,
                             accessToken,
                             refreshToken,
                             onlyData: true,
@@ -386,13 +410,12 @@ describe("FetchHttpApi", () => {
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
-                        const error = new ConnectionError("transitive fault");
-                        const tokenRefreshFunction = vi.fn().mockRejectedValue(error);
+                        fetchMock.post(authMetadata.token_endpoint, { throws: new Error("transitive fault") });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                         vi.spyOn(emitter, "emit");
@@ -400,7 +423,7 @@ describe("FetchHttpApi", () => {
                             baseUrl,
                             prefix,
                             fetchFn,
-                            tokenRefreshFunction,
+                            oauth2ClientConfig,
                             accessToken,
                             refreshToken,
                             onlyData: true,
@@ -408,16 +431,17 @@ describe("FetchHttpApi", () => {
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             new TokenRefreshError(unknownTokenErr),
                         );
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
                         expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should refresh token and retry request", async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = vi.fn().mockResolvedValue({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 200,
+                            headers: { "Content-Type": "application/json" },
+                            body: makeTokenResponse(newAccessToken, newRefreshToken),
                         });
                         const fetchFn = vi
                             .fn()
@@ -429,7 +453,7 @@ describe("FetchHttpApi", () => {
                             baseUrl,
                             prefix,
                             fetchFn,
-                            tokenRefreshFunction,
+                            oauth2ClientConfig,
                             accessToken,
                             refreshToken,
                             onlyData: true,
@@ -438,7 +462,7 @@ describe("FetchHttpApi", () => {
                             headers: {},
                         });
                         expect(result).toEqual({ x: 1 });
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
 
                         expect(fetchFn).toHaveBeenCalledTimes(2);
                         // uses new access token
@@ -456,12 +480,12 @@ describe("FetchHttpApi", () => {
                         // count because it's only to get a token with an expiry)
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = vi.fn().mockReturnValue({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 200,
+                            headers: { "Content-Type": "application/json" },
                             // This needs to be sufficiently high that it's over the threshold for
                             // 'plenty of time' (which is a minute in practice).
-                            expiry: new Date(Date.now() + 5 * 60 * 1000),
+                            body: makeTokenResponse(newAccessToken, newRefreshToken, 5 * 60),
                         });
 
                         // fetch doesn't like our new or old tokens
@@ -473,7 +497,7 @@ describe("FetchHttpApi", () => {
                             baseUrl,
                             prefix,
                             fetchFn,
-                            tokenRefreshFunction,
+                            oauth2ClientConfig,
                             accessToken,
                             refreshToken,
                             onlyData: true,
@@ -483,8 +507,7 @@ describe("FetchHttpApi", () => {
                         );
 
                         // tried to refresh the token once (to get the one with an expiry)
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
-                        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+                        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
 
                         expect(fetchFn).toHaveBeenCalledTimes(2);
                         // uses new access token on retry
@@ -494,32 +517,28 @@ describe("FetchHttpApi", () => {
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
-                    it("should try to refresh the token if it will expire soon", async () => {
+                    it("should try to refresh the token if it will expire soon", { timeout: 20_000 }, async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
 
-                        // first refresh is to get a token with an expiry at all, because we
-                        // can't specify an expiry on the token we inject
-                        const tokenRefreshFunction = vi.fn().mockResolvedValueOnce({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 1000),
-                        });
-
-                        // next refresh is to return a token that will expire 'soon'
-                        tokenRefreshFunction.mockResolvedValueOnce({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 1000),
-                        });
-
-                        // ...and finally we return a token that has adequate time left
-                        // so that it will cease retrying and fail the request.
-                        tokenRefreshFunction.mockResolvedValueOnce({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 5 * 60 * 1000),
-                        });
+                        // first two refreshes return a token that will expire 'soon'; the third
+                        // returns one with adequate time left so it stops retrying and fails the request.
+                        fetchMock
+                            .postOnce(authMetadata.token_endpoint, {
+                                status: 200,
+                                headers: { "Content-Type": "application/json" },
+                                body: makeTokenResponse(newAccessToken, newRefreshToken, 1),
+                            })
+                            .postOnce(authMetadata.token_endpoint, {
+                                status: 200,
+                                headers: { "Content-Type": "application/json" },
+                                body: makeTokenResponse(newAccessToken, newRefreshToken, 1),
+                            })
+                            .postOnce(authMetadata.token_endpoint, {
+                                status: 200,
+                                headers: { "Content-Type": "application/json" },
+                                body: makeTokenResponse(newAccessToken, newRefreshToken, 5 * 60),
+                            });
 
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
@@ -529,7 +548,7 @@ describe("FetchHttpApi", () => {
                             baseUrl,
                             prefix,
                             fetchFn,
-                            tokenRefreshFunction,
+                            oauth2ClientConfig,
                             accessToken,
                             refreshToken,
                             onlyData: true,
@@ -539,8 +558,7 @@ describe("FetchHttpApi", () => {
                         );
 
                         // We should have seen the 3 token refreshes, as above.
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
-                        expect(tokenRefreshFunction).toHaveBeenCalledTimes(3);
+                        expect(fetchMock).toHaveFetchedTimes(3, authMetadata.token_endpoint);
                     });
                 });
             });
@@ -721,7 +739,15 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not make multiple concurrent refresh token requests", async () => {
-        const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
+        const authMetadata = makeDelegatedAuthMetadata("https://issuer-concurrent.org/");
+        const oauth2ClientConfig = {
+            clientId: "test-client-id",
+            redirectUri: "https://test.org",
+            getAuthMetadata: () => Promise.resolve(authMetadata),
+        };
+        const deferredTokenRefresh = Promise.withResolvers<Parameters<typeof fetchMock.post>[1]>();
+        fetchMock.post(authMetadata.token_endpoint, () => deferredTokenRefresh.promise);
+
         const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,
@@ -735,14 +761,12 @@ describe("FetchHttpApi", () => {
                 get: vi.fn().mockReturnValue("application/json"),
             },
         });
-        const tokenRefreshFunction = vi.fn().mockReturnValue(deferredTokenRefresh.promise);
 
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
-            doNotAttemptTokenRefresh: false,
-            tokenRefreshFunction,
+            oauth2ClientConfig,
             accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
             onlyData: true,
@@ -766,18 +790,30 @@ describe("FetchHttpApi", () => {
                 get: vi.fn().mockReturnValue("application/json"),
             },
         });
-        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
+        deferredTokenRefresh.resolve({
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+            body: makeTokenResponse("NEW_ACCESS_TOKEN", "NEW_REFRESH_TOKEN"),
+        });
 
         await prom1;
         await prom2;
         expect(fetchFn).toHaveBeenCalledTimes(4); // 2 original calls + 2 retries
-        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
         expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
         expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });
 
     it("should use newly refreshed token if request starts mid-refresh", async () => {
-        const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
+        const authMetadata = makeDelegatedAuthMetadata("https://issuer-midrefresh.org/");
+        const oauth2ClientConfig = {
+            clientId: "test-client-id",
+            redirectUri: "https://test.org",
+            getAuthMetadata: () => Promise.resolve(authMetadata),
+        };
+        const deferredTokenRefresh = Promise.withResolvers<Parameters<typeof fetchMock.post>[1]>();
+        fetchMock.post(authMetadata.token_endpoint, () => deferredTokenRefresh.promise);
+
         const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,
@@ -791,14 +827,12 @@ describe("FetchHttpApi", () => {
                 get: vi.fn().mockReturnValue("application/json"),
             },
         });
-        const tokenRefreshFunction = vi.fn().mockReturnValue(deferredTokenRefresh.promise);
 
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
-            doNotAttemptTokenRefresh: false,
-            tokenRefreshFunction,
+            oauth2ClientConfig,
             accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
             onlyData: true,
@@ -810,7 +844,11 @@ describe("FetchHttpApi", () => {
         const prom2 = api.authedRequest(Method.Get, "/path2");
         await sleep(0); // wait for request to fire
 
-        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
+        deferredTokenRefresh.resolve({
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+            body: makeTokenResponse("NEW_ACCESS_TOKEN", "NEW_REFRESH_TOKEN"),
+        });
         fetchFn.mockResolvedValue({
             ok: true,
             status: 200,
@@ -834,7 +872,7 @@ describe("FetchHttpApi", () => {
         expect(fetchFn.mock.calls[2][1]).toEqual(
             expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer NEW_ACCESS_TOKEN" }) }),
         );
-        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
         expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
         expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });

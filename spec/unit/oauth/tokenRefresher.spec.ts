@@ -20,12 +20,11 @@ limitations under the License.
 
 import fetchMock from "@fetch-mock/vitest";
 
-import { OAuth2, TokenRefresher, TokenRefreshLogoutError } from "../../../src";
+import { OAuth2, TokenRefreshLogoutError } from "../../../src";
+import { TokenRefresher } from "../../../src/oauth/tokenRefresher";
 import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
 
-describe("OidcTokenRefresher", () => {
-    // OidcTokenRefresher props
-    // see class declaration for info
+describe("TokenRefresher", () => {
     const authConfig = {
         issuer: "https://issuer.org/",
     };
@@ -66,12 +65,12 @@ describe("OidcTokenRefresher", () => {
         vi.restoreAllMocks();
     });
 
-    describe("doRefreshAccessToken()", () => {
+    describe("doRefresh()", () => {
         it("should refresh the tokens", async () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            const result = await refresher.tokenRefreshFunction("refresh-token");
+            const result = await refresher.doRefresh("refresh-token");
 
             expect(fetchMock).toHaveFetched(config.token_endpoint, {
                 method: "POST",
@@ -89,7 +88,7 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await refresher.tokenRefreshFunction("refresh-token");
+            await refresher.doRefresh("refresh-token");
 
             expect(fn).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -123,8 +122,8 @@ describe("OidcTokenRefresher", () => {
             fetchMock.clearHistory();
 
             const refreshToken = "refresh-token";
-            const first = refresher.tokenRefreshFunction(refreshToken);
-            const second = refresher.tokenRefreshFunction(refreshToken);
+            const first = refresher.doRefresh(refreshToken);
+            const second = refresher.doRefresh(refreshToken);
 
             const result1 = await second;
             const result2 = await first;
@@ -141,7 +140,7 @@ describe("OidcTokenRefresher", () => {
             expect(result1).toEqual(result2);
 
             // call again after first request resolves
-            const third = await refresher.tokenRefreshFunction("first-new-refresh-token");
+            const third = await refresher.doRefresh("first-new-refresh-token");
 
             // called token endpoint, got new tokens
             expect(third).toEqual(
@@ -165,7 +164,7 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.toThrow();
+            await expect(refresher.doRefresh("refresh-token")).rejects.toThrow();
         });
 
         it("should make fresh request after a failed request", async () => {
@@ -192,10 +191,10 @@ describe("OidcTokenRefresher", () => {
             fetchMock.clearHistory();
 
             // first call fails
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.toThrow();
+            await expect(refresher.doRefresh("refresh-token")).rejects.toThrow();
 
             // call again after first request resolves
-            const result = await refresher.tokenRefreshFunction("first-new-refresh-token");
+            const result = await refresher.doRefresh("first-new-refresh-token");
 
             // called token endpoint, got new tokens
             expect(result).toEqual(
@@ -223,7 +222,7 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.doRefresh("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError when hitting temporal http error", async () => {
@@ -236,7 +235,7 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError on a 4xx without a JSON body", async () => {
@@ -253,7 +252,7 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError on a 4xx with a JSON body which is not an OAuth 2.0 error", async () => {
@@ -272,7 +271,7 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError on a 4xx Matrix API error code which looks like an OAuth 2.0 error", async () => {
@@ -295,7 +294,29 @@ describe("OidcTokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+        });
+    });
+
+    describe("revokeToken()", () => {
+        it("should revoke the given token", async () => {
+            fetchMock.post(config.revocation_endpoint, { status: 200 }, { name: "revocation-endpoint" });
+
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
+
+            await refresher.revokeToken("access-token", "access_token");
+
+            expect(fetchMock).toHaveFetched("revocation-endpoint", { method: "POST" });
+        });
+
+        it("should throw when revocation fails", async () => {
+            fetchMock.post(config.revocation_endpoint, { status: 500 }, { name: "revocation-endpoint" });
+
+            const fn = vi.fn();
+            const refresher = new TokenRefresher(auth, fn);
+
+            await expect(refresher.revokeToken("access-token", "access_token")).rejects.toThrow();
         });
     });
 });

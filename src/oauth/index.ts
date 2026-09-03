@@ -44,7 +44,6 @@ import { type NonEmptyArray } from "../@types/common.ts";
 export * from "./authorize.ts";
 export * from "./error.ts";
 export * from "./register.ts";
-export * from "./tokenRefresher.ts";
 export * from "./discover.ts";
 
 /**
