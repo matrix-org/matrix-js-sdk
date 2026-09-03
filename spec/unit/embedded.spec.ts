@@ -17,7 +17,7 @@ limitations under the License.
 // We have to use EventEmitter here to mock part of the matrix-widget-api
 // project, which doesn't know about our TypeEventEmitter implementation at all
 import { EventEmitter } from "node:events";
-import { type MockedObject } from "vitest";
+import { type MockedObject, type MockInstance } from "vitest";
 import {
     type WidgetApi,
     WidgetApiToWidgetAction,
@@ -38,7 +38,13 @@ import {
     MsgType,
     UpdateDelayedEventAction,
 } from "../../src/matrix";
-import { MatrixClient, ClientEvent, type ITurnServer as IClientTurnServer } from "../../src/client";
+import {
+    MatrixClient,
+    ClientEvent,
+    type IStartClientOpts,
+    type ITurnServer as IClientTurnServer,
+} from "../../src/client";
+import { AutoDiscovery } from "../../src/autodiscovery";
 import { SyncState } from "../../src/sync";
 import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
@@ -1377,6 +1383,42 @@ describe("RoomWidgetClient", () => {
 
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
             await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
+        });
+    });
+
+    describe("well-known", () => {
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue({});
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
+        const startClient = async (opts: IStartClientOpts): Promise<void> => {
+            client = createRoomWidgetClient(widgetApi, {}, "!1:example.org", {
+                baseUrl: "https://example.org",
+                userId: "@alice:example.org",
+            });
+            widgetApi.emit("ready");
+            await client.startClient(opts);
+            await flushPromises();
+        };
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await startClient({});
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known when clientWellKnownPollPeriod is set", async () => {
+            await startClient({ clientWellKnownPollPeriod: 3600 });
+
+            expect(getRawClientConfig).toHaveBeenCalledWith("example.org");
+            expect(client.getClientWellKnown()).toStrictEqual({});
         });
     });
 });
