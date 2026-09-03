@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import type { CallMembership } from "./CallMembership.ts";
-import type { RTCCallIntent, Status, Transport } from "./types.ts";
+import type { LeaveReason, RTCCallIntent, Status, Transport } from "./types.ts";
 import { type TypedEventEmitter } from "../models/typed-event-emitter.ts";
 
 export enum MembershipManagerEvent {
@@ -103,10 +103,11 @@ export interface IMembershipManager extends TypedEventEmitter<
     /**
      * Send all necessary events to make this user leave the RTC session.
      * @param timeout the maximum duration in ms until the promise is forced to resolve.
+     * @param leaveReason the reason to send in the leave event. If `undefined`, no reason is sent.
      * @returns It resolves with true in case the leave was sent successfully.
      * It resolves with false in case we hit the timeout before sending successfully.
      */
-    leave(timeout?: number): Promise<boolean>;
+    leave(timeout?: number, leaveReason?: LeaveReason): Promise<boolean>;
     /**
      * Call this if the MatrixRTC session members have changed.
      */

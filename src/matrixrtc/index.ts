@@ -20,5 +20,13 @@ export * from "./MatrixRTCSession.ts";
 export * from "./MatrixRTCSessionManager.ts";
 export type * from "./types.ts";
 export { type SessionMembershipData, type RtcMembershipData } from "./membershipData/index.ts";
-export { Status, parseCallNotificationContent, isMyMembership, RTC_SLOT_ENCRYPTION_PER_MEMBER } from "./types.ts";
+export {
+    Status,
+    parseCallNotificationContent,
+    isMyMembership,
+    LEAVE_REASON_DELAYED,
+    LEAVE_REASON_HANGUP,
+    LEAVE_REASON_SLOT_CLOSED,
+    RTC_SLOT_ENCRYPTION_PER_MEMBER,
+} from "./types.ts";
 export { MembershipManagerEvent } from "./IMembershipManager.ts";
