@@ -1337,6 +1337,7 @@ describe("RoomWidgetClient", () => {
 
     describe("delegated delayed leave", () => {
         const body = {
+            url: "wss://livekit.example.org",
             room_id: "!1:example.org",
             slot_id: "m.call#ROOM",
             member: { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" },

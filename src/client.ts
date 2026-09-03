@@ -6222,9 +6222,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * large timeouts are recommended for delayed delegation (in the range of hours)
      * Requires homeserver support for MSC4195.
      *
-     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate.
-     * @throws A M_NOT_FOUND error if not supported by the homeserver, or a M_BAD_JSON error if the delayed
-     * event's timeout is below one hour.
+     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate, and the SFU
+     * we are connected to.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
+     * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
      */
     public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
         // There is no /versions flag to check for support, so we just have to attempt a request.

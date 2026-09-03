@@ -4003,6 +4003,7 @@ describe("MatrixClient", function () {
         describe("_unstable_delegateDelayedLeave", () => {
             it("makes a well-formed request", async () => {
                 const body = {
+                    url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
                     member,
@@ -4032,6 +4033,7 @@ describe("MatrixClient", function () {
                 ];
                 await expect(
                     client._unstable_delegateDelayedLeave({
+                        url: "wss://livekit.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
                         member,

@@ -110,6 +110,10 @@ export interface LivekitGetTokenResponse {
  */
 export type LivekitDelegateDelayedLeaveRequest = {
     /**
+     * The WebSocket URL of the LiveKit SFU that we are connected to.
+     */
+    url: string;
+    /**
      * The room ID of the Matrix room the `m.rtc.member` event is in.
      */
     room_id: string;
