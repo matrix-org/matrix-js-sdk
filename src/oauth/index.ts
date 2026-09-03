@@ -34,7 +34,8 @@ import {
 } from "./register.ts";
 import { encodeUnpaddedBase64Url } from "../base64.ts";
 import { sha256 } from "../digest.ts";
-import { HTTPError, isMatrixErrorResponse, MatrixError, Method } from "../http-api/index.ts";
+import { HTTPError, isMatrixErrorResponse, MatrixError } from "../http-api/errors.ts";
+import { Method } from "../http-api/method.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { fetchWithLogging } from "./fetch.ts";
 import { isOAuth2ErrorResponse, OAuth2Error, OAuth2HTTPError } from "./error.ts";
