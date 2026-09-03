@@ -197,15 +197,22 @@ export interface EncryptionConfig {
     updateEncryptionKeyThrottle?: number;
 
     /**
-     * Sometimes it is necessary to rotate the encryption key after a membership update.
-     * For performance reasons we might not want to rotate the key immediately but allow future memberships to use the same key.
-     * If 5 people join in a row in less than 5 seconds, we don't want to rotate the key for each of them.
-     * If 5 people leave in a row in less than 5 seconds, we don't want to rotate the key for each of them.
-     * So we do share the key which was already used live for <5s to new joiners.
-     * This does result in a potential leak up to the configured time of call media.
-     * This has to be considered when choosing a value for this property.
+     * The amount of keys that can be shared per minute.
+     * This is a shared contingent so it scales quadratically with the amount of users.
+     * Each additional user increases
+     *  - the amount of to-device messages per rotation
+     *  - the amount of all rotations (whole call) per leave/join event
+     *
+     * The client can only share sharedPerMinuteKeyRotationContingent/N keys per minute where N is the number of call participants.
+     * As each rotation sends N-1 to-device messages, the client can only do sharedPerMinuteKeyRotationContingent/(N*(N-1)) = clientRotationsPerMinute.
+     * This implies that each key share has to be at least 60s / clientRotationsPerMinute apart.
+     *
+     * This implies the following rotation interval:
+     *  - 2000: 50 users: 1.2min, 100 users: 4.9min, 200: users: 19.9min
+     *  - 3000: 50 users: 0.8min, 100 users: 3.3min, 200: users: 13.2min
+     *  - 5000: 50 users: 0.5min, 100 users: 1.9min, 200: users: 7.9min
      */
-    keyRotationGracePeriodMs?: number;
+    sharedPerMinuteToDeviceContingent?: number;
 
     /**
      * The number of participants in the session at which the media key will no longer be rotated.
