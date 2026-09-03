@@ -16,7 +16,12 @@ limitations under the License.
 
 import { type Mock, type Mocked } from "vitest";
 
-import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
+import {
+    DEFAULT_MAX_KEY_TTL,
+    DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT,
+    DEFAULT_USE_KEY_DELAY,
+    RTCEncryptionManager,
+} from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 import { type CallMembership } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
@@ -32,7 +37,7 @@ import { flushPromises } from "../../test-utils/flushPromises.ts";
  * `60_000 * N * (N - 1) / sharedPerMinuteToDeviceContingent`.
  *
  * With this contingent the grace period is a comfortable `1_000 * N * (N - 1)` ms, see {@link gracePeriodMsFor}.
- * The default contingent (3000) would give 40ms for 2 participants and 240ms for 4, which is impractical to test with.
+ * The default contingent would give 20ms for 2 participants and 120ms for 4, which is impractical to test with.
  */
 const TEST_CONTINGENT = 60;
 
@@ -294,11 +299,11 @@ describe("RTCEncryptionManager", () => {
         });
 
         // Test an edge case where the use key delay is higher than the grace period. That is the case for any small
-        // session with the default contingent (the grace period is 240ms for 4 participants).
+        // session with the default contingent (the grace period is 120ms for 4 participants).
         // This means that a membership change can arrive while the previous key is still being rolled out, and that
         // the key once rolled out is always too old to be considered "recent enough" for the next joiner.
         // So we expect another rotation to happen in all cases where a new member joins.
-        it("test grace period lower than delay period", async () => {
+        it("test rotation interval lower than delay period", async () => {
             vi.useFakeTimers();
             // Make the jitter deterministic: half of the grace period
             vi.spyOn(Math, "random").mockReturnValue(0.5);
@@ -310,9 +315,9 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue([bob, bob2]);
 
             const useKeyDelay = 5_000;
-            // The default contingent gives a grace period of 120ms for 3 and 240ms for 4 participants,
+            // The default contingent gives a grace period of 60ms for 3 and 120ms for 4 participants,
             // both far below the `useKeyDelay`.
-            expect(gracePeriodMsFor(4, 3000)).toBeLessThan(useKeyDelay);
+            expect(gracePeriodMsFor(4, DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT)).toBeLessThan(useKeyDelay);
 
             // initial rollout
             encryptionManager.join({ useKeyDelay });
@@ -325,10 +330,10 @@ describe("RTCEncryptionManager", () => {
             // The existing members have been talking for 5mn
             await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
-            // A new member joins, that should trigger a key rotation (jittered by 120ms/2).
+            // A new member joins, that should trigger a key rotation (jittered by 60ms/2).
             getMembershipMock.mockReturnValue([bob, bob2, carl]);
             encryptionManager.onMembershipsUpdate();
-            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3, 3000) / 2);
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3, DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT) / 2);
 
             // A new member joins while the rotated key is still in its `useKeyDelay` window
             await vi.advanceTimersByTimeAsync(1_000);
@@ -336,7 +341,9 @@ describe("RTCEncryptionManager", () => {
             encryptionManager.onMembershipsUpdate();
 
             // Wait past the delay period of the ongoing rollout and the jitter of the rotation it triggers...
-            await vi.advanceTimersByTimeAsync(useKeyDelay + gracePeriodMsFor(4, 3000));
+            await vi.advanceTimersByTimeAsync(
+                useKeyDelay + gracePeriodMsFor(4, DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT),
+            );
             // ...and past the delay period of that second rotation
             await vi.advanceTimersByTimeAsync(useKeyDelay);
 
@@ -933,7 +940,7 @@ describe("RTCEncryptionManager", () => {
          * {@link RTCEncryptionManager.maxKeyTTL}: the manager never keeps using a key for longer than this.
          * It is not part of the join config, so these tests run against the real 15 minutes.
          */
-        const MAX_KEY_TTL = 15 * 60 * 1_000;
+        const MAX_KEY_TTL = DEFAULT_MAX_KEY_TTL;
 
         it("Should rotate the key every maxKeyTTL even if nobody joins or leaves", async () => {
             vi.useFakeTimers();
@@ -1079,14 +1086,14 @@ describe("RTCEncryptionManager", () => {
          * The simulation runs on the contingent a client gets when it configures nothing, so that what it
          * measures is what a deployment would really see. The rotation intervals it implies
          * (`60_000 * N * (N - 1) / contingent`) are:
-         *  - 100 participants: 3.3min
-         *  - 300 participants: 29.9min
+         *  - 100 participants: 1.7min
+         *  - 300 participants: 15.0min
          * None of that costs anything to simulate, the fake timers jump straight from one scheduled wake up
          * to the next.
          */
-        // Mirrors the default of `EncryptionConfig.sharedPerMinuteToDeviceContingent`. It would be better
-        // for the manager to export this, so that the two cannot drift apart.
-        const SIMULATION_CONTINGENT = 3000;
+        // The default of `EncryptionConfig.sharedPerMinuteToDeviceContingent`, which is what the managers
+        // of the simulation run on.
+        const SIMULATION_CONTINGENT = DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT;
         const graceFor = (participantCount: number): number =>
             gracePeriodMsFor(participantCount, SIMULATION_CONTINGENT);
 
@@ -1113,7 +1120,7 @@ describe("RTCEncryptionManager", () => {
         /**
          * Everything after the ramp up is measured in multiples of the rotation interval of the call being
          * simulated, because with the real contingent that interval spans three orders of magnitude
-         * (1.8s for 10 participants, 3.3min for 100, 29.9min for 300). A phase that is long enough to see a
+         * (0.9s for 10 participants, 1.7min for 100, 15.0min for 300). A phase that is long enough to see a
          * 300 participant call rotate would need hundreds of thousands of membership changes at a rate that
          * makes sense for a 10 participant one.
          */
@@ -1358,10 +1365,10 @@ describe("RTCEncryptionManager", () => {
 
         it("Should stay inside the contingent and stop rotating once the memberships settle", async () => {
             vi.useFakeTimers();
-            // Every run explores a different set of jitter draws, but through a seeded PRNG whose seed is
-            // logged, so that a failing draw can be replayed by hard coding the seed here.
-            let seed = 1 + Math.floor(Math.random() * 0x7fff_fffd);
-            console.log(`jitter seed: ${seed}`);
+            // The jitter draws come from a seeded PRNG rather than from `Math.random`, so that every run of
+            // the simulation explores the same draws and a failure reproduces. Change the seed to explore
+            // another set of them.
+            let seed = 1_073_741_823;
             vi.spyOn(Math, "random").mockImplementation(() => {
                 seed = (seed * 48271) % 0x7fff_ffff;
                 return seed / 0x7fff_ffff;
@@ -1400,9 +1407,11 @@ describe("RTCEncryptionManager", () => {
                 // `Date.now()` is whole milliseconds, the interval usually is not, so allow the rounding.
                 const intervals = rotationIntervals(result);
                 expect(Math.min(...intervals.flat(), Infinity)).toBeGreaterThanOrEqual(Math.floor(rotationIntervalMs));
-                // ...and does not sit idle for much longer than that either, once it owes a rotation.
+                // ...and does not sit idle for much longer than that either, once it owes a rotation. A
+                // rotation also holds the rollout for `useKeyDelay` before the next one can start, which is
+                // nothing next to the interval of a big call but is most of it in a small one.
                 const mean = intervals.flat().reduce((a, b) => a + b, 0) / intervals.flat().length;
-                expect(mean).toBeLessThanOrEqual(graceFor(participantCount + 1) * 1.5);
+                expect(mean).toBeLessThanOrEqual(graceFor(participantCount + 1) * 1.5 + DEFAULT_USE_KEY_DELAY);
 
                 // The clients do not rotate in lockstep. Every one of them rotates on its own schedule, so
                 // the rotations land on their own moments in time rather than on a handful of shared ones.
@@ -1413,9 +1422,18 @@ describe("RTCEncryptionManager", () => {
                 expect(distinctMoments).toBeGreaterThan(rotations.length * 0.5);
 
                 // Once the memberships stop changing, the postponed rotation is caught up on and then
-                // everything goes quiet: nothing is sent for the rest of the phase.
+                // everything goes quiet. The one thing that still fires is the forced rotation of a key that
+                // reached `maxKeyTTL`, which a quiet phase of a big call is long enough to see: the interval
+                // of a 300 participant call is a quarter of an hour on its own.
                 expect(activeWindowMs).toBeLessThan(phaseMs);
-                expect(result.shares.filter((share) => share.time > activeWindowMs)).toEqual([]);
+                for (const share of result.shares.filter((share) => share.time > activeWindowMs)) {
+                    const previous = result.shares.filter((o) => o.sender === share.sender && o.time < share.time);
+                    expect(previous).not.toEqual([]);
+                    expect({
+                        isRotation: share.isRotation,
+                        sinceLastShare: share.time - previous[previous.length - 1].time >= DEFAULT_MAX_KEY_TTL,
+                    }).toEqual({ isRotation: true, sinceLastShare: true });
+                }
             }
 
             // The whole point of the contingent: the bigger the call, the further apart the rotations of a
@@ -1736,7 +1754,7 @@ describe("RTCEncryptionManager", () => {
         getMembershipMock.mockReturnValue(members);
 
         // The rotation this triggers is blocked until the end of the first key's rotation interval
-        // (120ms for the 3 participants the key was created for)
+        // (60ms for the 3 participants the key was created for)
         encryptionManager.onMembershipsUpdate();
         await vi.advanceTimersByTimeAsync(10);
 

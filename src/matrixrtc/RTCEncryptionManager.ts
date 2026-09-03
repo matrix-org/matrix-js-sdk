@@ -46,6 +46,20 @@ import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
 const DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT: number | undefined = undefined;
 
 /**
+ * Default for {@link EncryptionConfig.sharedPerMinuteToDeviceContingent}.
+ *
+ * With this contingent the rotation interval (`60_000 * N * (N - 1) / contingent`) is:
+ * 50 users: 0.4min, 100 users: 1.7min, 200 users: 6.6min.
+ */
+export const DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT = 6000;
+
+/** Default for {@link EncryptionConfig.useKeyDelay}. @see RTCEncryptionManager.useKeyDelay */
+export const DEFAULT_USE_KEY_DELAY = 1000;
+
+/** Default for the maximum age of an outbound key. @see RTCEncryptionManager.maxKeyTTL */
+export const DEFAULT_MAX_KEY_TTL = 15 * 60 * 1000;
+
+/**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
  *
  * It is responsible for distributing the keys to the other participants and rotating the keys if needed.
@@ -92,7 +106,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * This is to ensure that the key is delivered to all participants before it is used.
      * When creating the first key, this is set to 0 so that the key can be used immediately.
      */
-    private useKeyDelay = 5000;
+    private useKeyDelay = DEFAULT_USE_KEY_DELAY;
 
     /**
      * The amount of keys that can be shared per minute.
@@ -110,7 +124,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      *  - 3000: 50 users: 0.8min, 100 users: 3.3min, 200: users: 13.2min
      *  - 5000: 50 users: 0.5min, 100 users: 1.9min, 200: users: 7.9min
      */
-    private sharedPerMinuteToDeviceContingent = 6000;
+    private sharedPerMinuteToDeviceContingent = DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT;
 
     /**
      * 15 minutes force key rotation.
@@ -122,10 +136,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
      *
      * As a workaround we share immediatlye but make sure we never use a key that is older than 15min + jitter.
      */
-    private maxKeyTTL: number | undefined = 60 * 15 * 1000;
+    private maxKeyTTL: number | undefined = DEFAULT_MAX_KEY_TTL;
 
     /**
-     * We want to avoid rolling out a new outbound key when the previous one was created less than `keyRotationGracePeriodMs` milliseconds ago.
+     * We want to avoid rolling out a new outbound key when the previous one was created less than `minKeyRotationInterval` milliseconds ago.
+     * This makes our max key rotation frequency 1/minKeyRotationInterval kHz.
      * This is a computed property. With more users in a call each roation implies more to-device messages.
      * This value increases quadratically with more users.
      *
@@ -138,7 +153,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * If it is lower, the current key will always be older than the grace period.
      * @private
      */
-    private get keyRotationGracePeriodMs(): number {
+    private get minKeyRotationInterval(): number {
         const participantCount = this.getMemberships().length;
         return (60_000 * participantCount * (participantCount - 1)) / this.sharedPerMinuteToDeviceContingent;
     }
@@ -292,7 +307,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     public join(joinConfig: (EncryptionConfig & MembershipConfig) | undefined): void {
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
         this.useHashedRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
-        this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
+        this.useKeyDelay = joinConfig?.useKeyDelay ?? DEFAULT_USE_KEY_DELAY;
         this.sharedPerMinuteToDeviceContingent =
             joinConfig?.sharedPerMinuteToDeviceContingent ?? this.sharedPerMinuteToDeviceContingent;
         this.keyRotationParticipantLimit =
@@ -306,6 +321,10 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     public leave(): void {
+        clearTimeout(this.maxKeyTTLTimeout);
+        this.maxKeyTTLTimeout = undefined;
+        clearTimeout(this.scheduledRotationTimeout);
+        this.scheduledRotationTimeout = undefined;
         this.transport.off(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         this.transport.stop();
         this.participantKeyRings.clear();
@@ -316,6 +335,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * If there is already a key distribution in progress, it will schedule a new distribution round just after the current one is completed.
      * If this function is called repeatedly while a distribution is in progress,
      * the calls will be coalesced to a single new distribution (that will start just after the current one has completed).
+     *
+     * scheduled - the ensure distribution was scheduled. This means, that we will do a rotation in any case.
+     *   We only reach the scheduled case if we should rotate, but are currently blocked.
+     * fakeMemberChange - rolloutOutboundKey is a noop if it gets called but the key is already distributed to all member (no recent member changes)
+     *   This flag will still let rolloutOutboundKey schedule a new rotation even though there is no diff in members (used for do the TTL on the keys.)
      */
     private ensureKeyDistribution(scheduled = false, fakeMemberChange = false): void {
         // `manageMediaKeys` is a stop-gap solution for now. The preferred way to handle this case would be instead
@@ -339,8 +363,12 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } else {
             // There is a rollout in progress, but a key rotation is requested (could be caused by a ownMembership change)
             // Remember that a new rotation is needed after the current one.
+            // If there are multiple ones collect all flags.
             this.logger?.debug(`Rollout in progress, a new rollout will be started after the current one`);
-            this.needToEnsureKeyAgain = { scheduled, fakeMemberChange };
+            this.needToEnsureKeyAgain = {
+                scheduled: this.needToEnsureKeyAgain?.scheduled || scheduled,
+                fakeMemberChange: this.needToEnsureKeyAgain?.fakeMemberChange || fakeMemberChange,
+            };
         }
     }
 
@@ -396,11 +424,20 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private rotationBlockedUntilTs: number = 0;
     private scheduledForBlockTs: number | undefined = undefined;
+
+    /**
+     * Send new keys to call members. + schedule using the new key for the current media.
+     *
+     * scheduled - the ensure distribution was scheduled. This means, that we will do a rotation in any case.
+     *   We only reach the scheduled case if we should rotate, but are currently blocked.
+     * fakeMemberChange - rolloutOutboundKey is a noop if it gets called but the key is already distributed to all member (no recent member changes)
+     *   This flag will still let rolloutOutboundKey schedule a new rotation even though there is no diff in members (used for do the TTL on the keys.)
+     */
     private async rolloutOutboundKey(scheduled: boolean = false, fakeMemberChange: boolean = false): Promise<void> {
         const isFirstKey = this.outboundSession === null;
         if (isFirstKey) {
             // create the first key
-            const firstKey = this.createNewOutboundSession(0)
+            const firstKey = this.createNewOutboundSession(0);
             // Immediatly start using first key for media. Skipping: await sleep(this.useKeyDelay);
             this.addKeyToParticipantWithBackendIdentity(
                 firstKey.key,
@@ -474,7 +511,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         } else if (isFirstKey) {
             // key is shared with everyone toDistributeTo = anyJoined = toShareWith (because alreadySharedWith=[])
             toDistributeTo = anyJoined;
-            this.rotationBlockedUntilTs = now + this.keyRotationGracePeriodMs * rotationJitter;
+            this.rotationBlockedUntilTs = now + this.minKeyRotationInterval * rotationJitter;
         } else if (scheduled) {
             // This is caused by a scheduled sleep(blockTime) -> we rotate right away
             newOutboundEncryptionSession = this.createNewOutboundSession();
@@ -482,11 +519,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
             toDistributeTo = toShareWith;
             // We set a blockTs but do not schedule a ensureKeyDistribution. Reason: We might not need to rotate after the block.
             // Only if there was a memship change until rotationBlockedUntilTs.
-            this.rotationBlockedUntilTs = now + this.keyRotationGracePeriodMs;
+            this.rotationBlockedUntilTs = now + this.minKeyRotationInterval;
         } else if (this.rotationBlockedUntilTs <= now) {
             // Currently Not-Blocked! But we dont rotate immediatly prohibit bursts.
             // We apply jitter -> dont rotate now -> toDistributeTo = [];
-            const blockTime = this.keyRotationGracePeriodMs * rotationJitter;
+            const blockTime = this.minKeyRotationInterval * rotationJitter;
             this.rotationBlockedUntilTs = blockTime + now;
             this.scheduleEnsureKeyDistributionIfNotYetScheduled(blockTime);
             // still distribute to new joiners. This is possible due to maxKeyTTL.
@@ -535,9 +572,20 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private scheduleEnsureKeyDistributionIfNotYetScheduled(blockTime: number): void {
         if (this.scheduledForBlockTs !== this.rotationBlockedUntilTs) {
             this.scheduledForBlockTs = this.rotationBlockedUntilTs;
-            void sleep(blockTime).then(() => this.ensureKeyDistribution(true));
+            // There is at most one rotation we owe, so there must be at most one wake up pending for it.
+            // The block we are scheduling for now is the one that counts: any earlier wake up is for a block
+            // that has since been replaced, and letting it fire would rotate the key a second time (the
+            // `scheduled` case above rotates unconditionally) way inside the interval we are rate limiting to.
+            clearTimeout(this.scheduledRotationTimeout);
+            this.scheduledRotationTimeout = setTimeout(() => {
+                this.scheduledRotationTimeout = undefined;
+                this.ensureKeyDistribution(true);
+            }, blockTime);
         }
     }
+
+    /** The pending wake up of {@link RTCEncryptionManager.scheduleEnsureKeyDistributionIfNotYetScheduled}. */
+    private scheduledRotationTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
 
     /**
      * Schedule the rotation of the key when it reaches its maximum age.
@@ -545,16 +593,27 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * @see RTCEncryptionManager.maxKeyTTL
      */
     private scheduleMaxKeyTTLRotation(): void {
+        // Only the current key has a TTL. Any rotation that happens before it expires (a member change, most
+        // likely) starts a new one, so the pending timer of the key we are replacing has to go: leaving them
+        // to pile up would make every rotation of a busy call come back as a forced rotation `maxKeyTTL` later.
+        clearTimeout(this.maxKeyTTLTimeout);
+        this.maxKeyTTLTimeout = undefined;
         if (this.maxKeyTTL === undefined) return;
         const fakeMemberChange = true;
         // trick the key rollout system to execute the rollout as if there was a member change.
-        setTimeout(
-            () => this.ensureKeyDistribution(false, fakeMemberChange),
-            Math.max(this.maxKeyTTL, this.keyRotationGracePeriodMs),
+        this.maxKeyTTLTimeout = setTimeout(
+            () => {
+                this.maxKeyTTLTimeout = undefined;
+                this.ensureKeyDistribution(false, fakeMemberChange);
+            },
+            Math.max(this.maxKeyTTL, this.minKeyRotationInterval),
         );
     }
 
-    private createNewOutboundSession(index:number|undefined = undefined): OutboundEncryptionSession {
+    /** The pending forced rotation of the current outbound key. @see RTCEncryptionManager.maxKeyTTL */
+    private maxKeyTTLTimeout: ReturnType<typeof setTimeout> | undefined = undefined;
+
+    private createNewOutboundSession(index: number | undefined = undefined): OutboundEncryptionSession {
         const newOutboundKey: OutboundEncryptionSession = {
             key: this.generateRandomKey(),
             creationTS: Date.now(),
