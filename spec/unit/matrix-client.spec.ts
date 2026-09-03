@@ -823,6 +823,7 @@ describe("MatrixClient", function () {
             ).rejects.toThrow(errorMessage);
 
             await expect(client._unstable_getDelayedEvents()).rejects.toThrow(errorMessage);
+            await expect(client._unstable_getDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
 
             await expect(
                 client._unstable_updateDelayedEvent("anyDelayId", UpdateDelayedEventAction.Send),
@@ -1110,6 +1111,20 @@ describe("MatrixClient", function () {
                 ];
 
                 await client._unstable_getDelayedEvents(status, delayId);
+            });
+
+            // eslint-disable-next-line @vitest/expect-expect
+            it("can look up a single delayed event", async () => {
+                const delayId = "id";
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    },
+                ];
+
+                await client._unstable_getDelayedEvent(delayId);
             });
         });
 
