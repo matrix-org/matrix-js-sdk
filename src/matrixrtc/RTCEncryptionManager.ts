@@ -400,13 +400,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
         const isFirstKey = this.outboundSession === null;
         if (isFirstKey) {
             // create the first key
-            const firstKey = {
-                key: this.generateRandomKey(),
-                creationTS: Date.now(),
-                sharedWith: [],
-                keyId: 0,
-            };
-            this.outboundSession = firstKey;
+            const firstKey = this.createNewOutboundSession(0)
+            // Immediatly start using first key for media. Skipping: await sleep(this.useKeyDelay);
             this.addKeyToParticipantWithBackendIdentity(
                 firstKey.key,
                 firstKey.keyId,
@@ -544,22 +539,30 @@ export class RTCEncryptionManager implements IEncryptionManager {
         }
     }
 
-    private createNewOutboundSession(): OutboundEncryptionSession {
+    /**
+     * Schedule the rotation of the key when it reaches its maximum age.
+     * This has to be called for every new outbound key: the TTL of a key starts
+     * @see RTCEncryptionManager.maxKeyTTL
+     */
+    private scheduleMaxKeyTTLRotation(): void {
+        if (this.maxKeyTTL === undefined) return;
+        const fakeMemberChange = true;
+        // trick the key rollout system to execute the rollout as if there was a member change.
+        setTimeout(
+            () => this.ensureKeyDistribution(false, fakeMemberChange),
+            Math.max(this.maxKeyTTL, this.keyRotationGracePeriodMs),
+        );
+    }
+
+    private createNewOutboundSession(index:number|undefined = undefined): OutboundEncryptionSession {
         const newOutboundKey: OutboundEncryptionSession = {
             key: this.generateRandomKey(),
             creationTS: Date.now(),
             sharedWith: [],
-            keyId: this.nextKeyIndex(),
+            keyId: index ?? this.nextKeyIndex(),
         };
 
-        if (this.maxKeyTTL !== undefined) {
-            const fakeMemberChange = true;
-            // trick the key rollout system to execute the rollout as if there was a member change.
-            setTimeout(
-                () => this.ensureKeyDistribution(false, fakeMemberChange),
-                Math.max(this.maxKeyTTL, this.keyRotationGracePeriodMs),
-            );
-        }
+        this.scheduleMaxKeyTTLRotation();
 
         this.logger?.info(`creating new outbound key index:${newOutboundKey.keyId}`);
         // Set this new key as the current one

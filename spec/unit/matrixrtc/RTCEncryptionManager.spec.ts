@@ -165,7 +165,7 @@ describe("RTCEncryptionManager", () => {
 
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await vi.runOnlyPendingTimersAsync();
+            await vi.advanceTimersByTimeAsync(1);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -211,7 +211,7 @@ describe("RTCEncryptionManager", () => {
 
             // And, as for any other joiner, the key is rotated afterwards.
             // With a single other participant the rotation interval is 0ms, so the block expires immediately.
-            await vi.runOnlyPendingTimersAsync();
+            await vi.advanceTimersByTimeAsync(1);
             expect(mockTransport.sendKey).toHaveBeenNthCalledWith(
                 2,
                 expect.any(String),
@@ -919,6 +919,158 @@ describe("RTCEncryptionManager", () => {
                 OWN_MEMBERSHIP,
                 OWN_RTC_BACKEND_IDENTITY,
             );
+        });
+    });
+
+    describe("Max key age (maxKeyTTL)", () => {
+        const bob = aStateBaseMembership("@bob:example.org", "BOBDEVICE");
+        const bob2 = aStateBaseMembership("@bob:example.org", "BOBDEVICE2");
+        const carl = aStateBaseMembership("@carl:example.org", "CARLDEVICE");
+
+        const useKeyDelay = 1_000;
+
+        /**
+         * {@link RTCEncryptionManager.maxKeyTTL}: the manager never keeps using a key for longer than this.
+         * It is not part of the join config, so these tests run against the real 15 minutes.
+         */
+        const MAX_KEY_TTL = 15 * 60 * 1_000;
+
+        it("Should rotate the key every maxKeyTTL even if nobody joins or leaves", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 0, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+            mockTransport.sendKey.mockClear();
+            onEncryptionKeysChanged.mockClear();
+
+            // The membership does not change for the rest of this test. The key is rotated regardless, but
+            // not before its TTL has expired. The expiry is treated like a membership change, so it goes
+            // through the same jittered block: the rotation lands one rotation interval after the TTL
+            // (the jitter draw is pinned in `beforeEach`).
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL + gracePeriodMsFor(2) - 1);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+
+            // The new key is only used locally after the `useKeyDelay`, as for any other rotation.
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+            mockTransport.sendKey.mockClear();
+
+            // The TTL of key 1 starts when key 1 was created, so the next rotation happens one TTL (plus
+            // the block) after that one. This keeps repeating for as long as the call lasts.
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL + gracePeriodMsFor(2) - useKeyDelay - 1);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 2, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+        });
+
+        it("Should only rotate once when a user joins after the maxKeyTTL has expired", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // The TTL of key 0 expires at T+15min. It does not rotate right away: it blocks the rotation
+            // for one jittered rotation interval first, exactly like a membership change would.
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // Carl joins 100ms into that block. He gets the current key right away...
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 0, [participantInfo(carl)]);
+
+            // ... and his join does not earn a rotation of its own. The block started by the TTL expiry is
+            // neither moved nor doubled up on: a single rotation to key 1 happens at the end of it.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(2) - 100);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+            ]);
+
+            // No second rotation follows the first one: key 2 is never created, and the only keys we ever
+            // used locally are 0 and 1.
+            await vi.advanceTimersByTimeAsync(10 * gracePeriodMsFor(3));
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+        });
+
+        it("Should only rotate once when a user joins just before the maxKeyTTL expires", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // Carl joins 100ms before the TTL of key 0 expires. He gets the current key right away, and his
+            // join blocks the rotation for one rotation interval of the now 3 participant session.
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL - 100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 0, [participantInfo(carl)]);
+
+            // The TTL expires 100ms later, inside that block. It does not start a rotation of its own.
+            await vi.advanceTimersByTimeAsync(100);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+
+            // A single rotation to key 1 happens at the end of the block started by carl's join, and nothing
+            // rotates after it.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3) - 100);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+            ]);
+
+            await vi.advanceTimersByTimeAsync(10 * gracePeriodMsFor(3));
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
         });
     });
 
