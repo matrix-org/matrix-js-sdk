@@ -159,7 +159,7 @@ export class TokenManager {
                 return TokenRefreshOutcome.Logout;
             }
 
-            const { accessToken, refreshToken, expiry } = await tokenRefresher.doRefresh(this.opts.refreshToken);
+            const { accessToken, refreshToken, expiry } = await tokenRefresher.refreshTokens(this.opts.refreshToken);
             this.opts.accessToken = accessToken;
             this.opts.refreshToken = refreshToken;
             this.latestTokenRefreshExpiry = expiry;

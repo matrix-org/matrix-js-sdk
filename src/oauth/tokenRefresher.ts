@@ -35,7 +35,7 @@ export class TokenRefresher {
      * @param refreshToken - refresh token to use in request with token issuer
      * @throws when token refresh fails
      */
-    public async doRefresh(refreshToken: string): Promise<AccessTokens> {
+    public async refreshTokens(refreshToken: string): Promise<AccessTokens> {
         if (!this.inflightRefreshRequest) {
             this.inflightRefreshRequest = this.getNewTokens(refreshToken);
         }

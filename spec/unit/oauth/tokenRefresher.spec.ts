@@ -69,7 +69,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            const result = await refresher.doRefresh("refresh-token");
+            const result = await refresher.refreshTokens("refresh-token");
 
             expect(fetchMock).toHaveFetched(config.token_endpoint, {
                 method: "POST",
@@ -87,7 +87,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await refresher.doRefresh("refresh-token");
+            await refresher.refreshTokens("refresh-token");
 
             expect(fn).toHaveBeenCalledWith(
                 expect.objectContaining({
@@ -121,8 +121,8 @@ describe("TokenRefresher", () => {
             fetchMock.clearHistory();
 
             const refreshToken = "refresh-token";
-            const first = refresher.doRefresh(refreshToken);
-            const second = refresher.doRefresh(refreshToken);
+            const first = refresher.refreshTokens(refreshToken);
+            const second = refresher.refreshTokens(refreshToken);
 
             const result1 = await second;
             const result2 = await first;
@@ -139,7 +139,7 @@ describe("TokenRefresher", () => {
             expect(result1).toEqual(result2);
 
             // call again after first request resolves
-            const third = await refresher.doRefresh("first-new-refresh-token");
+            const third = await refresher.refreshTokens("first-new-refresh-token");
 
             // called token endpoint, got new tokens
             expect(third).toEqual(
@@ -163,7 +163,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefresh("refresh-token")).rejects.toThrow();
+            await expect(refresher.refreshTokens("refresh-token")).rejects.toThrow();
         });
 
         it("should make fresh request after a failed request", async () => {
@@ -190,10 +190,10 @@ describe("TokenRefresher", () => {
             fetchMock.clearHistory();
 
             // first call fails
-            await expect(refresher.doRefresh("refresh-token")).rejects.toThrow();
+            await expect(refresher.refreshTokens("refresh-token")).rejects.toThrow();
 
             // call again after first request resolves
-            const result = await refresher.doRefresh("first-new-refresh-token");
+            const result = await refresher.refreshTokens("first-new-refresh-token");
 
             // called token endpoint, got new tokens
             expect(result).toEqual(
@@ -221,7 +221,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefresh("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.refreshTokens("refresh-token")).rejects.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError when hitting temporal http error", async () => {
@@ -234,7 +234,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.refreshTokens("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError on a 4xx without a JSON body", async () => {
@@ -251,7 +251,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.refreshTokens("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError on a 4xx with a JSON body which is not an OAuth 2.0 error", async () => {
@@ -270,7 +270,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.refreshTokens("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
 
         it("should not throw TokenRefreshLogoutError on a 4xx Matrix API error code which looks like an OAuth 2.0 error", async () => {
@@ -293,7 +293,7 @@ describe("TokenRefresher", () => {
             const fn = vi.fn();
             const refresher = new TokenRefresher(auth, fn);
 
-            await expect(refresher.doRefresh("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
+            await expect(refresher.refreshTokens("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
     });
 
