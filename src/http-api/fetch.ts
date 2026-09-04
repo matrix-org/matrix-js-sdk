@@ -33,11 +33,11 @@ import {
 import { anySignal, parseErrorResponse, timeoutSignal } from "./utils.ts";
 import { sanitizeUrlForLogs } from "./logging.ts";
 import { type QueryDict } from "../utils.ts";
-import { TokenRefresher, TokenRefreshOutcome } from "./refresh.ts";
+import { TokenManager, TokenRefreshOutcome } from "./refresh.ts";
 
 export class FetchHttpApi<O extends IHttpOpts> {
     private abortController = new AbortController();
-    private readonly tokenRefresher: TokenRefresher;
+    private readonly tokenManager: TokenManager;
 
     public constructor(
         private eventEmitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>,
@@ -49,12 +49,21 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
 
-        this.tokenRefresher = new TokenRefresher(opts);
+        this.tokenManager = new TokenManager(opts);
     }
 
     public abort(): void {
         this.abortController.abort();
         this.abortController = new AbortController();
+    }
+
+    /**
+     * Attempt to revoke the current access and refresh tokens with the OAuth2 authorization server, e.g. as
+     * part of logging out an OAuth2-native session. Does nothing if `opts.oauth2ClientConfig` was not supplied.
+     * @throws when discovery of the auth server metadata, or revocation of either token, fails
+     */
+    public async revokeOAuthTokens(): Promise<void> {
+        return this.tokenManager.revokeTokens();
     }
 
     public fetch(resource: URL | string, options?: RequestInit): ReturnType<typeof globalThis.fetch> {
@@ -147,7 +156,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
         opts.abortSignal = paramOpts.abortSignal;
 
         // Take a snapshot of the current token state before we start the request so we can reference it if we error
-        const requestSnapshot = await this.tokenRefresher.prepareForRequest();
+        const requestSnapshot = await this.tokenManager.prepareForRequest();
         if (requestSnapshot.accessToken) {
             if (this.opts.useAuthorizationHeader) {
                 if (!opts.headers) {
@@ -173,7 +182,7 @@ export class FetchHttpApi<O extends IHttpOpts> {
             }
 
             if (error.errcode === "M_UNKNOWN_TOKEN") {
-                const outcome = await this.tokenRefresher.handleUnknownToken(requestSnapshot, attempt);
+                const outcome = await this.tokenManager.handleUnknownToken(requestSnapshot, attempt);
                 if (outcome === TokenRefreshOutcome.Success) {
                     // if we got a new token retry the request
                     return this.doAuthedRequest(attempt + 1, method, path, queryParams, body, paramOpts);

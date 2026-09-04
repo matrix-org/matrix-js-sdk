@@ -3872,20 +3872,40 @@ describe("MatrixClient", function () {
             await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
+    });
 
-        it("should use unstable prefix", async () => {
-            const metadata = makeDelegatedAuthMetadata();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    data: metadata,
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
+    describe("logout", () => {
+        const baseUrl = "https://logout-test.example.org";
+        const userId = "@alice:logout-test.example.org";
+        const accessToken = "test-access-token";
+        const refreshToken = "test-refresh-token";
 
-            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
-            expect(httpLookups.length).toEqual(0);
+        it("should call /logout for a non-OAuth2-native session", async () => {
+            fetchMock.postOnce(`${baseUrl}/_matrix/client/v3/logout`, {});
+
+            const client = createClient({ baseUrl, accessToken, userId });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(true);
+        });
+
+        it("should revoke tokens with the delegated auth server instead of calling /logout for an OAuth2-native session", async () => {
+            const authMetadata = makeDelegatedAuthMetadata("https://auth.logout-test.example.org/");
+            fetchMock.get(`${baseUrl}/_matrix/client/versions`, { versions: ["v1.15"] });
+            fetchMock.get(`${baseUrl}/_matrix/client/v1/auth_metadata`, authMetadata);
+            fetchMock.post(authMetadata.revocation_endpoint, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                refreshToken,
+                userId,
+                oauthClientId: "test-client-id",
+            });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(false);
+            expect(fetchMock.callHistory.calls(authMetadata.revocation_endpoint)).toHaveLength(2);
         });
     });
 

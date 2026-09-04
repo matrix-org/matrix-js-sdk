@@ -22,11 +22,10 @@ import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
 describe("tokenRevocation", () => {
     const issuer = "https://issuer.org/";
     const clientId = "test-client-id";
-    const redirectUri = "https://test.org";
     const deviceId = "abc123";
 
     const metadata = makeDelegatedAuthMetadata(issuer);
-    const auth = new OAuth2(metadata, { clientId, redirectUri, deviceId });
+    const auth = new OAuth2(metadata, { clientId, deviceId });
 
     beforeEach(() => {
         // A successful revocation response as described by RFC 7009 § 2.2: the authorization server

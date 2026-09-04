@@ -17,6 +17,7 @@ limitations under the License.
 import { type MatrixError } from "./errors.ts";
 import { type Logger } from "../logger.ts";
 import { type QueryDict } from "../utils.ts";
+import { type ValidatedAuthMetadata } from "../oauth/discover.ts";
 
 export type Body = Record<string, any> | BodyInit;
 
@@ -39,12 +40,31 @@ export type AccessTokens = {
 };
 
 /**
- * Function that performs token refresh using the given refreshToken.
- * Returns a promise that resolves to the refreshed access and (optional) refresh tokens.
- *
- * Can be passed to HttpApi instance as {@link IHttpOpts.tokenRefreshFunction} during client creation {@link ICreateClientOpts}
+ * A callback function called when tokens are refreshed such that stored tokens can be updated with
+ * the refreshed ones.
  */
-export type TokenRefreshFunction = (refreshToken: string) => Promise<AccessTokens>;
+export type onTokenRefreshCallback = (newTokens: AccessTokens) => void;
+
+/**
+ * Configuration required for {@link IHttpOpts} to allow the SDK to manage the full lifecycle of tokens for an
+ * OAuth2-native session (as per MSC2965/MSC3861): discovering the delegated auth server's metadata, refreshing
+ * access/refresh tokens, and revoking them (e.g. on logout).
+ *
+ * The SDK constructs the underlying OAuth2 client itself, lazily, the first time it is actually needed (so that,
+ * for example, a client started with no network connection does not fail to ever set up token refresh).
+ */
+export interface OAuth2ClientConfig {
+    /** The OAuth2 client ID this application is registered with the delegated auth server under. */
+    clientId: string;
+    /** The device ID of the current session, used to scope refreshed/revoked tokens to this session. */
+    deviceId?: string;
+    /**
+     * Discovers and validates the delegated auth server's metadata for the current homeserver.
+     * @returns validated authentication metadata
+     * @throws when delegated auth config is invalid or unreachable
+     */
+    getAuthMetadata: () => Promise<ValidatedAuthMetadata>;
+}
 
 /** Options object for `FetchHttpApi` and {@link MatrixHttpApi}. */
 export interface IHttpOpts {
@@ -57,14 +77,18 @@ export interface IHttpOpts {
 
     accessToken?: string;
     /**
-     * Used in conjunction with tokenRefreshFunction to attempt token refresh
+     * Used in conjunction with oauth2ClientConfig to attempt token refresh
      */
     refreshToken?: string;
     /**
-     * Function to attempt token refresh when a possibly expired token is encountered
-     * Optional, only called when a refreshToken is present
+     * Callback called when tokens are refreshed. Must be supplied if refreshToken is supplied.
      */
-    tokenRefreshFunction?: TokenRefreshFunction;
+    onTokenRefresh?: onTokenRefreshCallback;
+    /**
+     * Configuration needed to refresh (given refreshToken) and revoke (e.g. on logout) tokens for an
+     * OAuth2-native session. Optional; if omitted, tokens will not be refreshed or revoked by the SDK.
+     */
+    oauth2ClientConfig?: OAuth2ClientConfig;
 
     /**
      * Whether to use the HTTP Authorization header over the `access_token` query parameter
