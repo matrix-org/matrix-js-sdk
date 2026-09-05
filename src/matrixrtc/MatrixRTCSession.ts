@@ -801,6 +801,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     // helper variables to make sure we do not have parallel running recalculations.
     private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
+    // Incremented by each recalculation, so one that has been overtaken can tell.
+    private recalculationGeneration = 0;
+    private latestRecalculation: Promise<void> = Promise.resolve();
 
     /**
      * Ensures that membership is recalculated when the state of the session may have changed.
@@ -828,18 +831,37 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    private readonly recalculateSessionMembers = async (): Promise<void> => {
+    private readonly recalculateSessionMembers = (): Promise<void> => {
+        const recalculation = this.doRecalculateSessionMembers();
+        this.latestRecalculation = recalculation;
+        return recalculation;
+    };
+
+    private readonly doRecalculateSessionMembers = async (): Promise<void> => {
         // Clear the flag.
         this.membershipNeedsRecalculation = false;
+        const generation = ++this.recalculationGeneration;
         const oldMemberships = this.memberships;
         // Needs to be computed before `this.memberships` is updated below, since it is derived from it.
         const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
 
-        this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
+        const memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
             this.slotDescription,
             this.calculateMembershipsOpts,
         );
+        // Recalculations are async and can overlap: `_onRTCSessionMemberUpdate` is called once per
+        // membership state event, so a batch of them starts several at once. Each reads the room
+        // state when it starts, and parsing takes longer the more memberships there are, so an
+        // older one can finish last. Its result is stale: drop it and let the newest one win,
+        // otherwise members who have since left linger until the next state change.
+        if (generation !== this.recalculationGeneration) {
+            this.logger.debug("Discarding superseded membership recalculation");
+            // Still let our caller see the final state before continuing.
+            await this.latestRecalculation;
+            return;
+        }
+        this.memberships = memberships;
 
         const changed =
             oldMemberships.length != this.memberships.length ||
