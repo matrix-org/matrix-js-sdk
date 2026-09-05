@@ -833,6 +833,27 @@ describe("MatrixRTCSession", () => {
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
 
+        it("does not let an older recalculation overwrite a newer one", async () => {
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:example.org", device_id: "BBBBBBB" };
+            const mockRoom = makeMockRoom([sessionMembershipTemplate, bob]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(2);
+
+            // Two membership state events land in one sync batch, so two updates are
+            // requested back to back before either recalculation has finished: Bob leaves,
+            // then Alice leaves. Parsing memberships is async and takes longer the more
+            // there are, so the stale (larger) result would otherwise finish last and win.
+            mockRoomState(mockRoom, [sessionMembershipTemplate]);
+            const first = sess._onRTCSessionMemberUpdate();
+            mockRoomState(mockRoom, []);
+            const second = sess._onRTCSessionMemberUpdate();
+            await Promise.all([first, second]);
+            await flushPromises();
+
+            expect(sess.memberships).toHaveLength(0);
+        });
+
         // TODO: re-enable this test when expiry is implemented
         it.skip("emits an event at the time a membership event expires", () => {
             vi.useFakeTimers();
