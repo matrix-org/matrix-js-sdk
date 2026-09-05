@@ -724,6 +724,36 @@ export class MembershipManager
     }
 
     private async updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
+        // Re-sending our membership is only safe while our delayed leave event is still scheduled: if the server has
+        // already sent it (e.g. because the device was asleep and no restarts reached the server), the membership we
+        // would send here would come back to life without any delayed leave event to clean it up, and stay until
+        // `expires` runs out. So restart the delayed event first. A success guarantees it will outlive the membership
+        // update; a 404 tells us it is gone, and we need to fully rejoin instead.
+        if (this.state.delayId) {
+            try {
+                await this.client._unstable_restartScheduledDelayedEvent(this.state.delayId);
+                this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
+            } catch (e) {
+                if (this.isNotFoundError(e)) {
+                    // The delayed leave event has been sent, which also means our membership is gone.
+                    this.logger.warn(
+                        "Delayed leave event was already sent by the server, rejoining instead of updating expiry",
+                    );
+                    this.setAndEmitDelayId(undefined);
+                    this.state.hasMemberStateEvent = false;
+                    return createReplaceActionUpdate(MembershipActionType.SendDelayedEvent);
+                }
+                if (!this.isUnsupportedDelayedEndpoint(e)) {
+                    const update = this.actionUpdateFromErrors(
+                        e,
+                        MembershipActionType.UpdateExpiry,
+                        "restartScheduledDelayedEvent",
+                    );
+                    if (update) return update;
+                    throw e;
+                }
+            }
+        }
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;
         return await this.clientSendMembership(
             this.makeMyMembership(this.membershipEventExpiryMs * nextExpireUpdateIteration),
