@@ -530,6 +530,10 @@ export interface IStartClientOpts {
     /**
      * The number of seconds between polls to /.well-known/matrix/client, undefined to disable.
      * This should be in the order of hours. Default: undefined.
+     *
+     * When disabled, the client never requests the well-known on its own: nothing is fetched on
+     * startup and {@link MatrixClient.getClientWellKnown} stays undefined. Callers that still need
+     * it can fetch it on demand via {@link MatrixClient.waitForClientWellKnown}.
      */
     clientWellKnownPollPeriod?: number;
 
@@ -1523,11 +1527,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
 
-        this.cachedWellKnown.start(
-            this.clientOpts.clientWellKnownPollPeriod !== undefined
-                ? 1000 * this.clientOpts.clientWellKnownPollPeriod
-                : undefined,
-        );
+        // Only poll the client well-known when a poll period was configured: leaving
+        // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
+        if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
+            this.cachedWellKnown.start(1000 * this.clientOpts.clientWellKnownPollPeriod);
+        }
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
