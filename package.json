@@ -28,7 +28,10 @@
         "test": "vitest run",
         "test:watch": "vitest watch",
         "coverage": "pnpm test --coverage",
-        "coverage:diff": "diff-cover --config-file diff-cover.toml coverage/lcov.info"
+        "coverage:diff": "diff-cover --config-file diff-cover.toml coverage/lcov.info",
+        "bench": "vitest run --config benchmark/vitest.config.ts",
+        "bench:use": "node scripts/bench/use-wasm-build.mjs",
+        "bench:compare": "node scripts/bench/compare.mjs"
     },
     "repository": {
         "type": "git",
@@ -56,7 +59,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^8.0.0",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^18.4.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "file:/Users/element/GitHub/element-hq/matrix-js-sdk/matrix-org-matrix-sdk-crypto-wasm-18.4.0-os-all.tgz",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^2.0.0",
@@ -86,8 +89,10 @@
         "@types/node": "22",
         "@types/sdp-transform": "^3.0.0",
         "@typescript/native": "npm:typescript@7.0.2",
-        "@vitest/coverage-v8": "^4.0.17",
-        "@vitest/ui": "^4.0.17",
+        "@vitest/browser": "^4.1.11",
+        "@vitest/browser-playwright": "^4.1.11",
+        "@vitest/coverage-v8": "^4.1.11",
+        "@vitest/ui": "^4.1.11",
         "concurrently": "^10.0.0",
         "debug": "^4.3.4",
         "fake-indexeddb": "^6.0.0",
@@ -97,14 +102,17 @@
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
+        "mitata": "^1.0.34",
         "oxfmt": "^0.63.0",
         "oxlint": "^1.70.0",
         "oxlint-tsgolint": "^7.0.0",
+        "playwright": "^1.62.1",
         "typedoc": "^0.28.1",
         "typedoc-plugin-coverage": "^4.0.0",
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "npm:@typescript/typescript6@6.0.2",
-        "vitest": "^4.0.17"
+        "vite": "8.2.1",
+        "vitest": "^4.1.11"
     }
 }

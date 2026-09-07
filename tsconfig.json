@@ -16,5 +16,5 @@
             "#types/*": ["./node_modules/vite/types/*"]
         }
     },
-    "include": ["./src/**/*.ts", "./spec/**/*.ts"]
+    "include": ["./src/**/*.ts", "./spec/**/*.ts", "./benchmark/**/*.ts"]
 }

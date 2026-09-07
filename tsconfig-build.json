@@ -8,5 +8,5 @@
         "outDir": "./lib",
         "rootDir": "src"
     },
-    "exclude": ["./spec/**/*.ts"]
+    "exclude": ["./spec/**/*.ts", "./benchmark/**/*.ts"]
 }
