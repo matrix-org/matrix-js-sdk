@@ -41,9 +41,9 @@ type Opts = Pick<IHttpOpts, "onTokenRefresh" | "logger" | "refreshToken" | "acce
 /**
  * This class is responsible for managing the access token and refresh token for authenticated requests.
  * It will automatically refresh the tokens when the access token is about to expire and can handle
- * Unknown Token errors (via @{link handleUnknownToken})
+ * Unknown Token errors (via {@link TokenManager.handleUnknownToken})
  *
- * It will update the @{link opts} object with new tokens as they are refreshed, and also call the {@link opts.onTokenRefresh} callback if provided.
+ * It will update the {@link Opts} object with new tokens as they are refreshed, and also call the {@link IHttpOpts.onTokenRefresh} callback if provided.
  */
 export class TokenManager {
     public constructor(private readonly opts: Opts) {}
