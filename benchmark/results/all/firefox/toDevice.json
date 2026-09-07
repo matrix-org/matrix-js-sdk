@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T16:58:45.542Z",
+  "build": {
+    "label": "all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7781677,
+    "wasmSha256": "c1acff3d9708399e3988bc33ed9fcbe3bba092430f86666727b27bc4be16631a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 22820000,
+        "min": 22240000,
+        "max": 23880000,
+        "p25": 22400000,
+        "p50": 22500000,
+        "p75": 23300000,
+        "p99": 23760000,
+        "p999": 23760000,
+        "samples": 24,
+        "ticks": 24
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 37570769.23076923,
+        "min": 37000000,
+        "max": 38260000,
+        "p25": 37280000,
+        "p50": 37560000,
+        "p75": 37760000,
+        "p99": 38240000,
+        "p999": 38240000,
+        "samples": 13,
+        "ticks": 13
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 99565000.00000007,
+        "min": 94560000,
+        "max": 123400000,
+        "p25": 95580000,
+        "p50": 96280000,
+        "p75": 99320000,
+        "p99": 102920000,
+        "p999": 102920000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

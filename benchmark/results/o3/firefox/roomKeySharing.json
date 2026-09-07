@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T16:44:05.283Z",
+  "build": {
+    "label": "o3",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10636846,
+    "wasmSha256": "4208302abe4ebb3edf54572b6201831b877eb837942a104fd59d0a0249f4ff46"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.999999527063,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 2293333.3333333335,
+        "min": 1960000,
+        "max": 3380000,
+        "p25": 2080000,
+        "p50": 2180000,
+        "p75": 2420000,
+        "p99": 3220000,
+        "p999": 3320000,
+        "samples": 276,
+        "ticks": 276
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 13013043.47826087,
+        "min": 12360000,
+        "max": 14220000,
+        "p25": 12620000,
+        "p50": 12840000,
+        "p75": 13280000,
+        "p99": 14120000,
+        "p999": 14120000,
+        "samples": 46,
+        "ticks": 46
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 61301666.666666664,
+        "min": 58400000,
+        "max": 67580000,
+        "p25": 59140000,
+        "p50": 60040000,
+        "p75": 61880000,
+        "p99": 65820000,
+        "p999": 65820000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

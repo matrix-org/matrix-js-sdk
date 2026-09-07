@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T16:59:46.688Z",
+  "build": {
+    "label": "o2-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o2-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10377689,
+    "wasmSha256": "70953fef5ccc6d6d54d5ff847b8526106d0229aa60a4e05e5ce826f5b975826a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 2152627.986348123,
+        "min": 1960000,
+        "max": 3780000,
+        "p25": 2080000,
+        "p50": 2120000,
+        "p75": 2200000,
+        "p99": 2480000,
+        "p999": 3320000,
+        "samples": 293,
+        "ticks": 293
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 3643837.2093023257,
+        "min": 3320000,
+        "max": 4240000,
+        "p25": 3500000,
+        "p50": 3600000,
+        "p75": 3720000,
+        "p99": 4160000,
+        "p999": 4160000,
+        "samples": 172,
+        "ticks": 172
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 9394769.23076923,
+        "min": 8740000,
+        "max": 10820000,
+        "p25": 9000000,
+        "p50": 9280000,
+        "p75": 9720000,
+        "p99": 10620000,
+        "p999": 10620000,
+        "samples": 65,
+        "ticks": 65
+      },
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "suite": "decrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T16:59:53.580Z",
+  "build": {
+    "label": "o2-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o2-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10377689,
+    "wasmSha256": "70953fef5ccc6d6d54d5ff847b8526106d0229aa60a4e05e5ce826f5b975826a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 139075.29722589167,
+        "min": 120000,
+        "max": 460000,
+        "p25": 140000,
+        "p50": 140000,
+        "p75": 140000,
+        "p99": 220000,
+        "p999": 260000,
+        "samples": 4542,
+        "ticks": 4542
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 226512.9478538489,
+        "min": 200000,
+        "max": 380000,
+        "p25": 220000,
+        "p50": 220000,
+        "p75": 220000,
+        "p99": 320000,
+        "p999": 360000,
+        "samples": 2819,
+        "ticks": 2819
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 1608911.3924050634,
+        "min": 1500000,
+        "max": 1800000,
+        "p25": 1560000,
+        "p50": 1600000,
+        "p75": 1640000,
+        "p99": 1760000,
+        "p999": 1780000,
+        "samples": 395,
+        "ticks": 395
+      },
+      "error": null
+    }
+  ]
+}

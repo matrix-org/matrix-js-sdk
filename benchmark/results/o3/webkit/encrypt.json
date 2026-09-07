@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T16:44:00.106Z",
+  "build": {
+    "label": "o3",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10636846,
+    "wasmSha256": "4208302abe4ebb3edf54572b6201831b877eb837942a104fd59d0a0249f4ff46"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 55417.887369791664,
+        "min": 54472.65625,
+        "max": 56435.546875,
+        "p25": 54609.375,
+        "p50": 55332.03125,
+        "p75": 55908.203125,
+        "p99": 56171.875,
+        "p999": 56171.875,
+        "samples": 12,
+        "ticks": 49152
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 184493.92712550663,
+        "min": 159999.99999904633,
+        "max": 320000,
+        "p25": 180000,
+        "p50": 180000,
+        "p75": 180000.00000095367,
+        "p99": 240000,
+        "p999": 280000.0000009537,
+        "samples": 3458,
+        "ticks": 3458
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 2231378.091872795,
+        "min": 2120000,
+        "max": 2660000,
+        "p25": 2200000,
+        "p50": 2220000,
+        "p75": 2260000,
+        "p99": 2420000,
+        "p999": 2540000,
+        "samples": 283,
+        "ticks": 283
+      },
+      "error": null
+    }
+  ]
+}

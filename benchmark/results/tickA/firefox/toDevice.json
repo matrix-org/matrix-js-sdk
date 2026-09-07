@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T15:08:38.148Z",
+  "build": {
+    "label": "tickA",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@18.4.0/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7820736,
+    "wasmSha256": "d037effb9aaaeec957b3b137c6aaed6a61e821545d7afbd23a5579109051f8d4"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 22524000,
+        "min": 22020000,
+        "max": 23040000,
+        "p25": 22380000,
+        "p50": 22520000,
+        "p75": 22720000,
+        "p99": 23000000,
+        "p999": 23000000,
+        "samples": 25,
+        "ticks": 25
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 37713846.15384615,
+        "min": 37160000,
+        "max": 38300000,
+        "p25": 37420000,
+        "p50": 37720000,
+        "p75": 37960000,
+        "p99": 38240000,
+        "p999": 38240000,
+        "samples": 13,
+        "ticks": 13
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 104033333.33333325,
+        "min": 95180000,
+        "max": 136399999.99999905,
+        "p25": 97060000,
+        "p50": 98540000,
+        "p75": 102380000,
+        "p99": 122540000,
+        "p999": 122540000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

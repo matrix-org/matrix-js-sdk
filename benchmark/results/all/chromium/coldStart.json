@@ -1,0 +1,54 @@
+{
+  "suite": "coldStart",
+  "browser": "chromium",
+  "recordedAt": "2026-08-25T09:51:30.094Z",
+  "build": {
+    "label": "all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7781677,
+    "wasmSha256": "c1acff3d9708399e3988bc33ed9fcbe3bba092430f86666727b27bc4be16631a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 4999.995231628418,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "WebAssembly.compile",
+      "args": {},
+      "stats": {
+        "avg": 6689456.521816876,
+        "min": 5634999.990463257,
+        "max": 8384999.990463257,
+        "p25": 6199999.988079071,
+        "p50": 6585000.038146973,
+        "p75": 7009999.990463257,
+        "p99": 8209999.978542328,
+        "p999": 8209999.978542328,
+        "samples": 92,
+        "ticks": 92
+      },
+      "error": null
+    },
+    {
+      "name": "WebAssembly.instantiate (precompiled)",
+      "args": {},
+      "stats": {
+        "avg": 693036.3222229359,
+        "min": 435000.0023841858,
+        "max": 14795000.0166893,
+        "p25": 489999.9499320984,
+        "p50": 559999.942779541,
+        "p75": 740000.0095367432,
+        "p99": 1784999.966621399,
+        "p999": 9920000.0166893,
+        "samples": 881,
+        "ticks": 881
+      },
+      "error": null
+    }
+  ]
+}

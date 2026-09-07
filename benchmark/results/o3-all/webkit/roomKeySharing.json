@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T16:43:01.032Z",
+  "build": {
+    "label": "o3-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10506001,
+    "wasmSha256": "b04504800d2ac2a8e0c1a0722fe04801f26b0b8bdbffeb1935674f19f75f7535"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 211969.44536698773,
+        "min": 160000,
+        "max": 1640000,
+        "p25": 180000,
+        "p50": 200000,
+        "p75": 200000,
+        "p99": 360000,
+        "p999": 1280000,
+        "samples": 3011,
+        "ticks": 3011
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 1278028.1690140846,
+        "min": 1140000,
+        "max": 2080000,
+        "p25": 1200000,
+        "p50": 1240000,
+        "p75": 1340000,
+        "p99": 1620000,
+        "p999": 2060000,
+        "samples": 497,
+        "ticks": 497
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 6066078.431372549,
+        "min": 5760000,
+        "max": 6460000,
+        "p25": 5920000,
+        "p50": 6080000,
+        "p75": 6200000,
+        "p99": 6440000,
+        "p999": 6460000,
+        "samples": 102,
+        "ticks": 102
+      },
+      "error": null
+    }
+  ]
+}

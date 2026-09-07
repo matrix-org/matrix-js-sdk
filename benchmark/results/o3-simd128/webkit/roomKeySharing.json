@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "webkit",
+  "recordedAt": "2026-08-25T10:28:17.668Z",
+  "build": {
+    "label": "o3-simd128",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-simd128.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10505892,
+    "wasmSha256": "e3ea87466cf053a573ca37356f85477170e7c974ce52676e41e663d3cff895fe"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 208847.2906403941,
+        "min": 180000,
+        "max": 2020000,
+        "p25": 180000,
+        "p50": 200000,
+        "p75": 200000,
+        "p99": 360000,
+        "p999": 1020000,
+        "samples": 3045,
+        "ticks": 3045
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 1297942.3868312757,
+        "min": 1180000,
+        "max": 3540000,
+        "p25": 1220000,
+        "p50": 1240000,
+        "p75": 1340000,
+        "p99": 1620000,
+        "p999": 3140000,
+        "samples": 486,
+        "ticks": 486
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 6003333.333333333,
+        "min": 5720000,
+        "max": 6720000,
+        "p25": 5840000,
+        "p50": 5940000,
+        "p75": 6060000,
+        "p99": 6540000,
+        "p999": 6640000,
+        "samples": 102,
+        "ticks": 102
+      },
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "firefox",
+  "recordedAt": "2026-08-25T09:38:29.909Z",
+  "build": {
+    "label": "os-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-os-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7720372,
+    "wasmSha256": "1f1be29517b4542b8d8f73da5a42fe59b090aeb0fe3e7a18dad741278416aafe"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 693101.9522776572,
+        "min": 580000,
+        "max": 1040000,
+        "p25": 600000,
+        "p50": 620000,
+        "p75": 820000,
+        "p99": 980000,
+        "p999": 1040000,
+        "samples": 922,
+        "ticks": 922
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 2092945.2054794522,
+        "min": 1980000,
+        "max": 3820000,
+        "p25": 2020000,
+        "p50": 2080000,
+        "p75": 2100000,
+        "p99": 3280000,
+        "p999": 3800000,
+        "samples": 292,
+        "ticks": 292
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 25371818.181818184,
+        "min": 25040000,
+        "max": 25900000,
+        "p25": 25160000,
+        "p50": 25280000,
+        "p75": 25480000,
+        "p99": 25840000,
+        "p999": 25840000,
+        "samples": 22,
+        "ticks": 22
+      },
+      "error": null
+    }
+  ]
+}

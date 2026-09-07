@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "webkit",
+  "recordedAt": "2026-08-25T11:53:45.494Z",
+  "build": {
+    "label": "o3-tailcall",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-tailcall.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10668277,
+    "wasmSha256": "d4f1a7517ad6b9b1c23b15bb522d5e935f0cb641997401170558782465e2678e"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 224063.38028169013,
+        "min": 180000,
+        "max": 2140000,
+        "p25": 200000,
+        "p50": 220000,
+        "p75": 220000,
+        "p99": 420000,
+        "p999": 1420000,
+        "samples": 2840,
+        "ticks": 2840
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 1390219.298245614,
+        "min": 1220000,
+        "max": 2380000,
+        "p25": 1300000,
+        "p50": 1340000,
+        "p75": 1440000,
+        "p99": 1820000,
+        "p999": 2080000,
+        "samples": 456,
+        "ticks": 456
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 6514105.263157895,
+        "min": 6020000,
+        "max": 8200000,
+        "p25": 6300000,
+        "p50": 6440000,
+        "p75": 6600000,
+        "p99": 7920000,
+        "p999": 7920000,
+        "samples": 95,
+        "ticks": 95
+      },
+      "error": null
+    }
+  ]
+}

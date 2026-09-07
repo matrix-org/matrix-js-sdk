@@ -1,0 +1,54 @@
+{
+  "suite": "coldStart",
+  "browser": "firefox",
+  "recordedAt": "2026-08-25T09:52:53.030Z",
+  "build": {
+    "label": "o3",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10636846,
+    "wasmSha256": "4208302abe4ebb3edf54572b6201831b877eb837942a104fd59d0a0249f4ff46"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "WebAssembly.compile",
+      "args": {},
+      "stats": {
+        "avg": 147515000,
+        "min": 143480000,
+        "max": 152780000,
+        "p25": 144780000,
+        "p50": 146060000,
+        "p75": 148860000,
+        "p99": 151380000,
+        "p999": 151380000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    },
+    {
+      "name": "WebAssembly.instantiate (precompiled)",
+      "args": {},
+      "stats": {
+        "avg": 394937.5,
+        "min": 300000,
+        "max": 4080000,
+        "p25": 320000,
+        "p50": 320000,
+        "p75": 360000,
+        "p99": 3840000,
+        "p999": 4020000,
+        "samples": 1600,
+        "ticks": 1600
+      },
+      "error": null
+    }
+  ]
+}

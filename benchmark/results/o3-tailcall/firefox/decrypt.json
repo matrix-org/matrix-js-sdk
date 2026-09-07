@@ -1,0 +1,77 @@
+{
+  "suite": "decrypt",
+  "browser": "firefox",
+  "recordedAt": "2026-08-25T11:54:08.215Z",
+  "build": {
+    "label": "o3-tailcall",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-tailcall.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10668277,
+    "wasmSha256": "d4f1a7517ad6b9b1c23b15bb522d5e935f0cb641997401170558782465e2678e"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 1285195.8762886599,
+        "min": 1180000,
+        "max": 2080000,
+        "p25": 1200000,
+        "p50": 1240000,
+        "p75": 1340000,
+        "p99": 1640000,
+        "p999": 2020000,
+        "samples": 485,
+        "ticks": 485
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 2201468.5314685316,
+        "min": 2020000,
+        "max": 3400000,
+        "p25": 2080000,
+        "p50": 2140000,
+        "p75": 2300000,
+        "p99": 2860000,
+        "p999": 3180000,
+        "samples": 286,
+        "ticks": 286
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 15800540.54054054,
+        "min": 15260000,
+        "max": 16420000,
+        "p25": 15540000,
+        "p50": 15760000,
+        "p75": 16020000,
+        "p99": 16420000,
+        "p999": 16420000,
+        "samples": 37,
+        "ticks": 37
+      },
+      "error": null
+    }
+  ]
+}

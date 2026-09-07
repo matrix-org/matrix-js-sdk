@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T15:08:28.263Z",
+  "build": {
+    "label": "tickA",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@18.4.0/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7820736,
+    "wasmSha256": "d037effb9aaaeec957b3b137c6aaed6a61e821545d7afbd23a5579109051f8d4"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 2381893.9393939395,
+        "min": 2160000,
+        "max": 4560000,
+        "p25": 2260000,
+        "p50": 2340000,
+        "p75": 2440000,
+        "p99": 3000000,
+        "p999": 3880000,
+        "samples": 264,
+        "ticks": 264
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 4081558.4415584416,
+        "min": 3760000,
+        "max": 4680000,
+        "p25": 3940000,
+        "p50": 4040000,
+        "p75": 4200000,
+        "p99": 4600000,
+        "p999": 4660000,
+        "samples": 154,
+        "ticks": 154
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 10824727.272727273,
+        "min": 10240000,
+        "max": 11740000,
+        "p25": 10600000,
+        "p50": 10760000,
+        "p75": 11020000,
+        "p99": 11580000,
+        "p999": 11580000,
+        "samples": 55,
+        "ticks": 55
+      },
+      "error": null
+    }
+  ]
+}

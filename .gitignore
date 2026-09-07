@@ -16,7 +16,6 @@ out
 # tarball created by `npm pack` / `yarn pack`
 /matrix-js-sdk-*.tgz
 
-/benchmark/results
 /benchmark/.wasm-spec-backup.json
 
 .vscode

@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T15:09:04.615Z",
+  "build": {
+    "label": "tickB",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@18.4.0/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7820736,
+    "wasmSha256": "d037effb9aaaeec957b3b137c6aaed6a61e821545d7afbd23a5579109051f8d4"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 66049.8046875,
+        "min": 64736.328125,
+        "max": 67153.3203125,
+        "p25": 65429.6875,
+        "p50": 65996.09375,
+        "p75": 66494.140625,
+        "p99": 67080.078125,
+        "p999": 67080.078125,
+        "samples": 12,
+        "ticks": 49152
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 226725.97864768785,
+        "min": 199999.99999809265,
+        "max": 340000.0000009537,
+        "p25": 220000,
+        "p50": 220000,
+        "p75": 239999.99999904633,
+        "p99": 280000.0000009537,
+        "p999": 340000,
+        "samples": 2810,
+        "ticks": 2810
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 2743913.0434782607,
+        "min": 2620000,
+        "max": 2920000,
+        "p25": 2700000,
+        "p50": 2740000,
+        "p75": 2800000,
+        "p99": 2900000,
+        "p999": 2900000,
+        "samples": 230,
+        "ticks": 230
+      },
+      "error": null
+    }
+  ]
+}

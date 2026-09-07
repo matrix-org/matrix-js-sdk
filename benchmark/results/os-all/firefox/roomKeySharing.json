@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "firefox",
+  "recordedAt": "2026-08-25T09:38:06.895Z",
+  "build": {
+    "label": "os-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-os-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7720372,
+    "wasmSha256": "1f1be29517b4542b8d8f73da5a42fe59b090aeb0fe3e7a18dad741278416aafe"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.999998617568,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 2741600,
+        "min": 2180000,
+        "max": 10280000,
+        "p25": 2320000,
+        "p50": 2460000,
+        "p75": 2780000,
+        "p99": 6680000,
+        "p999": 9600000,
+        "samples": 225,
+        "ticks": 225
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 14905128.205128206,
+        "min": 14000000,
+        "max": 16980000,
+        "p25": 14380000,
+        "p50": 14600000,
+        "p75": 15340000,
+        "p99": 16960000,
+        "p999": 16960000,
+        "samples": 39,
+        "ticks": 39
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 69458333.33333333,
+        "min": 65240000,
+        "max": 76320000,
+        "p25": 65840000,
+        "p50": 67460000,
+        "p75": 70760000,
+        "p99": 76060000,
+        "p999": 76060000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

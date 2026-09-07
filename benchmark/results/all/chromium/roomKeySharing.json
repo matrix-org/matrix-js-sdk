@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "chromium",
+  "recordedAt": "2026-08-24T16:58:28.492Z",
+  "build": {
+    "label": "all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7781677,
+    "wasmSha256": "c1acff3d9708399e3988bc33ed9fcbe3bba092430f86666727b27bc4be16631a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 4999.995231628418,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 290380.9521473995,
+        "min": 259999.99046325684,
+        "max": 550000.011920929,
+        "p25": 270000.04053115845,
+        "p50": 275000.03576278687,
+        "p75": 284999.9666213989,
+        "p99": 490000.00953674316,
+        "p999": 545000.0166893005,
+        "samples": 2205,
+        "ticks": 2205
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 1738553.7195796808,
+        "min": 1605000.0190734863,
+        "max": 2209999.978542328,
+        "p25": 1660000.0262260437,
+        "p50": 1685000.0023841858,
+        "p75": 1740000.0095367432,
+        "p99": 2144999.9809265137,
+        "p999": 2160000.0262260437,
+        "samples": 363,
+        "ticks": 363
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 8140666.66841507,
+        "min": 7710000.038146973,
+        "max": 8870000.004768372,
+        "p25": 7940000.057220459,
+        "p50": 8034999.966621399,
+        "p75": 8279999.9713897705,
+        "p99": 8844999.969005585,
+        "p999": 8844999.969005585,
+        "samples": 75,
+        "ticks": 75
+      },
+      "error": null
+    }
+  ]
+}

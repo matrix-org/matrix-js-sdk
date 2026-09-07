@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "chromium",
+  "recordedAt": "2026-08-25T11:53:51.492Z",
+  "build": {
+    "label": "o3-tailcall",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-tailcall.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10668277,
+    "wasmSha256": "d4f1a7517ad6b9b1c23b15bb522d5e935f0cb641997401170558782465e2678e"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 4999.995231628418,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 2044193.5489254612,
+        "min": 1924999.9523162842,
+        "max": 2235000.0143051147,
+        "p25": 2000000,
+        "p50": 2029999.9713897705,
+        "p75": 2079999.9833106995,
+        "p99": 2204999.9833106995,
+        "p999": 2224999.964237213,
+        "samples": 310,
+        "ticks": 310
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 3376631.0151248053,
+        "min": 3185000.002384186,
+        "max": 3609999.95470047,
+        "p25": 3314999.997615814,
+        "p50": 3359999.95470047,
+        "p75": 3435000.002384186,
+        "p99": 3579999.9833106995,
+        "p999": 3580000.0429153442,
+        "samples": 187,
+        "ticks": 187
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 8898382.356938194,
+        "min": 8509999.990463257,
+        "max": 9449999.988079071,
+        "p25": 8775000.035762787,
+        "p50": 8879999.995231628,
+        "p75": 9020000.040531158,
+        "p99": 9359999.95470047,
+        "p999": 9359999.95470047,
+        "samples": 68,
+        "ticks": 68
+      },
+      "error": null
+    }
+  ]
+}

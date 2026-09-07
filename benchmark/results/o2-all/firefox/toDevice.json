@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T16:59:54.273Z",
+  "build": {
+    "label": "o2-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o2-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10377689,
+    "wasmSha256": "70953fef5ccc6d6d54d5ff847b8526106d0229aa60a4e05e5ce826f5b975826a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 19350666.666666668,
+        "min": 18900000,
+        "max": 20420000,
+        "p25": 19140000,
+        "p50": 19280000,
+        "p75": 19420000,
+        "p99": 19900000,
+        "p999": 19900000,
+        "samples": 30,
+        "ticks": 30
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 32361250,
+        "min": 31160000,
+        "max": 34260000,
+        "p25": 31700000,
+        "p50": 32140000,
+        "p75": 32460000,
+        "p99": 33880000,
+        "p999": 33880000,
+        "samples": 16,
+        "ticks": 16
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 89503333.33333349,
+        "min": 81320000.0000019,
+        "max": 121160000,
+        "p25": 82620000,
+        "p50": 83780000,
+        "p75": 86260000,
+        "p99": 112060000,
+        "p999": 112060000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

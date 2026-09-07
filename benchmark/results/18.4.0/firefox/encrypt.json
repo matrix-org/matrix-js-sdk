@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T16:34:53.984Z",
+  "build": {
+    "label": "18.4.0",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@18.4.0/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7820736,
+    "wasmSha256": "d037effb9aaaeec957b3b137c6aaed6a61e821545d7afbd23a5579109051f8d4"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 705287.6106194691,
+        "min": 620000,
+        "max": 1340000,
+        "p25": 660000,
+        "p50": 680000,
+        "p75": 720000,
+        "p99": 1020000,
+        "p999": 1160000,
+        "samples": 904,
+        "ticks": 904
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 2226526.3157894737,
+        "min": 2100000,
+        "max": 2540000,
+        "p25": 2160000,
+        "p50": 2220000,
+        "p75": 2280000,
+        "p99": 2460000,
+        "p999": 2500000,
+        "samples": 285,
+        "ticks": 285
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 26944000,
+        "min": 26700000,
+        "max": 27180000,
+        "p25": 26800000,
+        "p50": 26880000,
+        "p75": 27080000,
+        "p99": 27180000,
+        "p999": 27180000,
+        "samples": 20,
+        "ticks": 20
+      },
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "suite": "decrypt",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T16:58:52.757Z",
+  "build": {
+    "label": "all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7781677,
+    "wasmSha256": "c1acff3d9708399e3988bc33ed9fcbe3bba092430f86666727b27bc4be16631a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 1624654.7314578006,
+        "min": 1400000,
+        "max": 2220000,
+        "p25": 1500000,
+        "p50": 1580000,
+        "p75": 1720000,
+        "p99": 2140000,
+        "p999": 2200000,
+        "samples": 391,
+        "ticks": 391
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 2683644.0677966103,
+        "min": 2440000,
+        "max": 3100000,
+        "p25": 2540000,
+        "p50": 2660000,
+        "p75": 2800000,
+        "p99": 3080000,
+        "p999": 3100000,
+        "samples": 236,
+        "ticks": 236
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 20188571.42857143,
+        "min": 19920000,
+        "max": 20680000,
+        "p25": 20040000,
+        "p50": 20140000,
+        "p75": 20280000,
+        "p99": 20560000,
+        "p999": 20560000,
+        "samples": 28,
+        "ticks": 28
+      },
+      "error": null
+    }
+  ]
+}

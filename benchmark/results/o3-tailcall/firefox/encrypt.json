@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "firefox",
+  "recordedAt": "2026-08-25T11:54:00.936Z",
+  "build": {
+    "label": "o3-tailcall",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-tailcall.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10668277,
+    "wasmSha256": "d4f1a7517ad6b9b1c23b15bb522d5e935f0cb641997401170558782465e2678e"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 612131.1475409836,
+        "min": 540000,
+        "max": 2120000,
+        "p25": 560000,
+        "p50": 580000,
+        "p75": 620000,
+        "p99": 1060000,
+        "p999": 1840000,
+        "samples": 1037,
+        "ticks": 1037
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 2171500,
+        "min": 1760000,
+        "max": 6900000,
+        "p25": 1860000,
+        "p50": 1980000,
+        "p75": 2160000,
+        "p99": 5140000,
+        "p999": 5980000,
+        "samples": 280,
+        "ticks": 280
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 23766086.95652174,
+        "min": 22100000,
+        "max": 28660000,
+        "p25": 22580000,
+        "p50": 22880000,
+        "p75": 23280000,
+        "p99": 28400000,
+        "p999": 28400000,
+        "samples": 23,
+        "ticks": 23
+      },
+      "error": null
+    }
+  ]
+}

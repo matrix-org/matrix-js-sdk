@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T17:00:02.576Z",
+  "build": {
+    "label": "o2-all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o2-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10377689,
+    "wasmSha256": "70953fef5ccc6d6d54d5ff847b8526106d0229aa60a4e05e5ce826f5b975826a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 56111.653645833336,
+        "min": 55209.9609375,
+        "max": 57343.75,
+        "p25": 55424.8046875,
+        "p50": 55771.484375,
+        "p75": 56708.984375,
+        "p99": 57319.3359375,
+        "p999": 57319.3359375,
+        "samples": 12,
+        "ticks": 49152
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 191698.34087481175,
+        "min": 159999.99999904633,
+        "max": 900000,
+        "p25": 180000,
+        "p50": 180000,
+        "p75": 200000,
+        "p99": 280000,
+        "p999": 380000,
+        "samples": 3315,
+        "ticks": 3315
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 2261000.000000017,
+        "min": 2100000,
+        "max": 2800000,
+        "p25": 2200000,
+        "p50": 2260000,
+        "p75": 2319999.9999990463,
+        "p99": 2420000,
+        "p999": 2440000,
+        "samples": 280,
+        "ticks": 280
+      },
+      "error": null
+    }
+  ]
+}

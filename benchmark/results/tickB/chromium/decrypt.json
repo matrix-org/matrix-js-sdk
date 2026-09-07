@@ -1,0 +1,77 @@
+{
+  "suite": "decrypt",
+  "browser": "chromium",
+  "recordedAt": "2026-08-24T15:09:22.844Z",
+  "build": {
+    "label": "tickB",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@18.4.0/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7820736,
+    "wasmSha256": "d037effb9aaaeec957b3b137c6aaed6a61e821545d7afbd23a5579109051f8d4"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 4999.995231628418,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 175162.56846039672,
+        "min": 154999.9713897705,
+        "max": 314999.9976158142,
+        "p25": 165000.02145767212,
+        "p50": 169999.95708465576,
+        "p75": 174999.95231628418,
+        "p99": 269999.9809265137,
+        "p999": 310000.0023841858,
+        "samples": 3660,
+        "ticks": 3660
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 303261.48750430765,
+        "min": 269999.9809265137,
+        "max": 595000.0286102295,
+        "p25": 284999.9666213989,
+        "p50": 289999.96185302734,
+        "p75": 300000.01192092896,
+        "p99": 425000.01192092896,
+        "p999": 464999.9737739563,
+        "samples": 2111,
+        "ticks": 2111
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 2266093.1893574293,
+        "min": 2099999.964237213,
+        "max": 2480000.0190734863,
+        "p25": 2210000.0381469727,
+        "p50": 2264999.9856948853,
+        "p75": 2310000.002384186,
+        "p99": 2435000.002384186,
+        "p999": 2450000.047683716,
+        "samples": 279,
+        "ticks": 279
+      },
+      "error": null
+    }
+  ]
+}

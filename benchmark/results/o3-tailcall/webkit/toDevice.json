@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "webkit",
+  "recordedAt": "2026-08-25T11:53:53.003Z",
+  "build": {
+    "label": "o3-tailcall",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-tailcall.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10668277,
+    "wasmSha256": "d4f1a7517ad6b9b1c23b15bb522d5e935f0cb641997401170558782465e2678e"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 2095511.5511551155,
+        "min": 1920000,
+        "max": 2360000,
+        "p25": 2040000,
+        "p50": 2100000,
+        "p75": 2160000,
+        "p99": 2260000,
+        "p999": 2340000,
+        "samples": 303,
+        "ticks": 303
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 3519662.9213483147,
+        "min": 3260000,
+        "max": 4260000,
+        "p25": 3420000,
+        "p50": 3500000,
+        "p75": 3580000,
+        "p99": 3920000,
+        "p999": 4060000,
+        "samples": 178,
+        "ticks": 178
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 9181212.121212121,
+        "min": 8760000,
+        "max": 10380000,
+        "p25": 9020000,
+        "p50": 9140000,
+        "p75": 9300000,
+        "p99": 9680000,
+        "p999": 9680000,
+        "samples": 66,
+        "ticks": 66
+      },
+      "error": null
+    }
+  ]
+}

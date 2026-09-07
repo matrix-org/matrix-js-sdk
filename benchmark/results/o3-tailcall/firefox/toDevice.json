@@ -1,0 +1,77 @@
+{
+  "suite": "toDevice",
+  "browser": "firefox",
+  "recordedAt": "2026-08-25T11:53:53.656Z",
+  "build": {
+    "label": "o3-tailcall",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-tailcall.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10668277,
+    "wasmSha256": "d4f1a7517ad6b9b1c23b15bb522d5e935f0cb641997401170558782465e2678e"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 1
+      },
+      "stats": {
+        "avg": 19956551.724137932,
+        "min": 19260000,
+        "max": 20860000,
+        "p25": 19540000,
+        "p50": 19980000,
+        "p75": 20220000,
+        "p99": 20640000,
+        "p999": 20640000,
+        "samples": 29,
+        "ticks": 29
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 4
+      },
+      "stats": {
+        "avg": 34775714.28571428,
+        "min": 31780000,
+        "max": 45220000,
+        "p25": 33200000,
+        "p50": 33460000,
+        "p75": 34780000,
+        "p99": 38060000,
+        "p999": 38060000,
+        "samples": 14,
+        "ticks": 14
+      },
+      "error": null
+    },
+    {
+      "name": "receiveSyncChanges ($keys room keys)",
+      "args": {
+        "keys": 16
+      },
+      "stats": {
+        "avg": 91103333.33333333,
+        "min": 81360000,
+        "max": 112080000,
+        "p25": 82740000,
+        "p50": 88440000.00000095,
+        "p75": 92980000,
+        "p99": 104820000,
+        "p999": 104820000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

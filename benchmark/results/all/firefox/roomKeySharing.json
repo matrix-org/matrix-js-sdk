@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "firefox",
+  "recordedAt": "2026-08-24T16:58:36.847Z",
+  "build": {
+    "label": "all",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-all.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7781677,
+    "wasmSha256": "c1acff3d9708399e3988bc33ed9fcbe3bba092430f86666727b27bc4be16631a"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:153.0) Gecko/20100101 Firefox/153.0",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.999998617568,
+    "hardwareConcurrency": 10
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 2690512.8205128205,
+        "min": 2340000,
+        "max": 3880000,
+        "p25": 2520000,
+        "p50": 2640000,
+        "p75": 2800000,
+        "p99": 3480000,
+        "p999": 3600000,
+        "samples": 234,
+        "ticks": 234
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 16461714.285714285,
+        "min": 15240000,
+        "max": 18820000,
+        "p25": 15600000,
+        "p50": 16120000,
+        "p75": 17080000,
+        "p99": 18440000,
+        "p999": 18440000,
+        "samples": 35,
+        "ticks": 35
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 76778333.33333333,
+        "min": 73340000,
+        "max": 81280000,
+        "p25": 74020000,
+        "p50": 75440000,
+        "p75": 78620000,
+        "p99": 80760000,
+        "p999": 80760000,
+        "samples": 12,
+        "ticks": 12
+      },
+      "error": null
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "suite": "decrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-25T10:28:32.124Z",
+  "build": {
+    "label": "o3-simd128",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-o3-simd128.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 10505892,
+    "wasmSha256": "e3ea87466cf053a573ca37356f85477170e7c974ce52676e41e663d3cff895fe"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 140175.01640778824,
+        "min": 120000,
+        "max": 500000,
+        "p25": 140000,
+        "p50": 140000,
+        "p75": 140000,
+        "p99": 220000,
+        "p999": 400000,
+        "samples": 4571,
+        "ticks": 4571
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 233426.06149341143,
+        "min": 200000,
+        "max": 660000,
+        "p25": 220000,
+        "p50": 220000,
+        "p75": 240000,
+        "p99": 340000,
+        "p999": 460000,
+        "samples": 2732,
+        "ticks": 2732
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 1647046.6321243523,
+        "min": 1600000,
+        "max": 1880000,
+        "p25": 1620000,
+        "p50": 1620000,
+        "p75": 1660000,
+        "p99": 1800000,
+        "p999": 1880000,
+        "samples": 386,
+        "ticks": 386
+      },
+      "error": null
+    }
+  ]
+}

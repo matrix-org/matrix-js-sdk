@@ -1,0 +1,77 @@
+{
+  "suite": "encrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T16:45:03.464Z",
+  "build": {
+    "label": "simd128",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-simd128.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7781025,
+    "wasmSha256": "f2b9930c93a64ed32214b977a46063bc9de8ad2732be68fcc5aa7f33266e6a55"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 66884.59112886272,
+        "min": 60000,
+        "max": 360000,
+        "p25": 60000,
+        "p50": 60000,
+        "p75": 80000,
+        "p99": 100000,
+        "p999": 160000,
+        "samples": 9514,
+        "ticks": 9514
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 228949.2494639028,
+        "min": 200000,
+        "max": 440000,
+        "p25": 220000,
+        "p50": 220000,
+        "p75": 240000,
+        "p99": 300000,
+        "p999": 340000,
+        "samples": 2798,
+        "ticks": 2798
+      },
+      "error": null
+    },
+    {
+      "name": "encryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 2781057.268722467,
+        "min": 2640000,
+        "max": 3320000,
+        "p25": 2740000,
+        "p50": 2780000,
+        "p75": 2820000,
+        "p99": 2980000,
+        "p999": 3020000,
+        "samples": 227,
+        "ticks": 227
+      },
+      "error": null
+    }
+  ]
+}

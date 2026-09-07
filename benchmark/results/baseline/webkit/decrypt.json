@@ -1,0 +1,77 @@
+{
+  "suite": "decrypt",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T16:41:57.726Z",
+  "build": {
+    "label": "baseline",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@file+matrix-org-matrix-sdk-crypto-wasm-18.4.0-baseline.tgz/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7831412,
+    "wasmSha256": "b155a52d82932d94e10bb227db129b563cd3c1d0844db87c391bf6dca7b787d8"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 256
+      },
+      "stats": {
+        "avg": 165619.02300336005,
+        "min": 140000,
+        "max": 340000,
+        "p25": 160000,
+        "p50": 160000,
+        "p75": 160000,
+        "p99": 240000,
+        "p999": 300000,
+        "samples": 3869,
+        "ticks": 3869
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 4096
+      },
+      "stats": {
+        "avg": 282173.1448763251,
+        "min": 240000,
+        "max": 420000,
+        "p25": 260000,
+        "p50": 280000,
+        "p75": 280000,
+        "p99": 380000,
+        "p999": 420000,
+        "samples": 2264,
+        "ticks": 2264
+      },
+      "error": null
+    },
+    {
+      "name": "decryptRoomEvent ($bytes B)",
+      "args": {
+        "bytes": 65536
+      },
+      "stats": {
+        "avg": 2084092.409240924,
+        "min": 1920000,
+        "max": 2400000,
+        "p25": 2020000,
+        "p50": 2080000,
+        "p75": 2140000,
+        "p99": 2280000,
+        "p999": 2380000,
+        "samples": 303,
+        "ticks": 303
+      },
+      "error": null
+    }
+  ]
+}

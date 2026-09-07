@@ -1,0 +1,77 @@
+{
+  "suite": "roomKeySharing",
+  "browser": "webkit",
+  "recordedAt": "2026-08-24T15:08:20.627Z",
+  "build": {
+    "label": "tickA",
+    "version": "18.4.0",
+    "resolvedPath": "/Users/element/GitHub/element-hq/matrix-js-sdk/node_modules/.pnpm/@matrix-org+matrix-sdk-crypto-wasm@18.4.0/node_modules/@matrix-org/matrix-sdk-crypto-wasm",
+    "wasmBytes": 7820736,
+    "wasmSha256": "d037effb9aaaeec957b3b137c6aaed6a61e821545d7afbd23a5579109051f8d4"
+  },
+  "environment": {
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Safari/605.1.15",
+    "crossOriginIsolated": true,
+    "clockResolutionNs": 19999.99999998181,
+    "hardwareConcurrency": 8
+  },
+  "benchmarks": [
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 1
+      },
+      "stats": {
+        "avg": 274192.43986254296,
+        "min": 220000,
+        "max": 1440000,
+        "p25": 240000,
+        "p50": 240000,
+        "p75": 260000,
+        "p99": 500000,
+        "p999": 1300000,
+        "samples": 2328,
+        "ticks": 2328
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 10
+      },
+      "stats": {
+        "avg": 1637731.9587628867,
+        "min": 1460000,
+        "max": 2320000,
+        "p25": 1540000,
+        "p50": 1600000,
+        "p75": 1720000,
+        "p99": 2000000,
+        "p999": 2280000,
+        "samples": 388,
+        "ticks": 388
+      },
+      "error": null
+    },
+    {
+      "name": "shareRoomKey ($devices devices)",
+      "args": {
+        "devices": 50
+      },
+      "stats": {
+        "avg": 7684000,
+        "min": 7360000,
+        "max": 8380000,
+        "p25": 7500000,
+        "p50": 7700000,
+        "p75": 7820000,
+        "p99": 8300000,
+        "p999": 8300000,
+        "samples": 80,
+        "ticks": 80
+      },
+      "error": null
+    }
+  ]
+}
