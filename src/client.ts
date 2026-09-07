@@ -319,7 +319,16 @@ export interface ICreateClientOpts {
      */
     deviceId?: string;
 
+    /**
+     * The access token to use. Can be omitted if to call only unauthenticated APIs, or provided to
+     * create an authenticated client.
+     */
     accessToken?: string;
+
+    /**
+     * The current refresh token, or omit if the session has no refresh token in which case the tokens
+     * will not be refreshed.
+     */
     refreshToken?: string;
 
     /**
@@ -327,10 +336,7 @@ export interface ICreateClientOpts {
      * The client must replace the tokens it had stored previously which will no
      * longer be valid.
      *
-     * Required if a {@link IHttpOpts.onTokenRefresh} is provided.
-     *
-     * @param newAccessToken The new access token.
-     * @param newRefreshToken The new refresh token.
+     * Required if a {@link refreshToken} is provided.
      */
     onTokenRefresh?: onTokenRefreshCallback;
 
