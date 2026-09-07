@@ -705,8 +705,8 @@ describe("FetchHttpApi", () => {
         `);
     });
 
-    it("should not make multiple concurrent refresh token requests", async () => {
-        const authMetadata = makeDelegatedAuthMetadata("https://issuer-concurrent.org/");
+    const makeUnknownTokenRefreshSetup = (issuer: string) => {
+        const authMetadata = makeDelegatedAuthMetadata(issuer);
         const oauth2ClientConfig = {
             clientId: "test-client-id",
             redirectUri: "https://test.org",
@@ -739,24 +739,34 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
 
+        return { authMetadata, deferredTokenRefresh, fetchFn, api };
+    };
+
+    const makeSuccessFetchResponse = () => ({
+        ok: true,
+        status: 200,
+        async text() {
+            return "{}";
+        },
+        async json() {
+            return {};
+        },
+        headers: {
+            get: vi.fn().mockReturnValue("application/json"),
+        },
+    });
+
+    it("should not make multiple concurrent refresh token requests", async () => {
+        const { authMetadata, deferredTokenRefresh, fetchFn, api } = makeUnknownTokenRefreshSetup(
+            "https://issuer-concurrent.org/",
+        );
+
         const prom1 = api.authedRequest(Method.Get, "/path1");
         const prom2 = api.authedRequest(Method.Get, "/path2");
 
         await sleep(0); // wait for requests to fire
         expect(fetchFn).toHaveBeenCalledTimes(2);
-        fetchFn.mockResolvedValue({
-            ok: true,
-            status: 200,
-            async text() {
-                return "{}";
-            },
-            async json() {
-                return {};
-            },
-            headers: {
-                get: vi.fn().mockReturnValue("application/json"),
-            },
-        });
+        fetchFn.mockResolvedValue(makeSuccessFetchResponse());
         deferredTokenRefresh.resolve({
             status: 200,
             headers: { "Content-Type": "application/json" },
@@ -772,38 +782,9 @@ describe("FetchHttpApi", () => {
     });
 
     it("should use newly refreshed token if request starts mid-refresh", async () => {
-        const authMetadata = makeDelegatedAuthMetadata("https://issuer-midrefresh.org/");
-        const oauth2ClientConfig = {
-            clientId: "test-client-id",
-            redirectUri: "https://test.org",
-            getAuthMetadata: () => Promise.resolve(authMetadata),
-        };
-        const deferredTokenRefresh = Promise.withResolvers<Parameters<typeof fetchMock.post>[1]>();
-        fetchMock.post(authMetadata.token_endpoint, () => deferredTokenRefresh.promise);
-
-        const fetchFn = vi.fn().mockResolvedValue({
-            ok: false,
-            status: tokenInactiveError.httpStatus,
-            async text() {
-                return JSON.stringify(tokenInactiveError.data);
-            },
-            async json() {
-                return tokenInactiveError.data;
-            },
-            headers: {
-                get: vi.fn().mockReturnValue("application/json"),
-            },
-        });
-
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
-            baseUrl,
-            prefix,
-            fetchFn,
-            oauth2ClientConfig,
-            accessToken: "ACCESS_TOKEN",
-            refreshToken: "REFRESH_TOKEN",
-            onlyData: true,
-        });
+        const { authMetadata, deferredTokenRefresh, fetchFn, api } = makeUnknownTokenRefreshSetup(
+            "https://issuer-midrefresh.org/",
+        );
 
         const prom1 = api.authedRequest(Method.Get, "/path1");
         await sleep(0); // wait for request to fire
@@ -816,19 +797,7 @@ describe("FetchHttpApi", () => {
             headers: { "Content-Type": "application/json" },
             body: makeTokenResponse("NEW_ACCESS_TOKEN", "NEW_REFRESH_TOKEN"),
         });
-        fetchFn.mockResolvedValue({
-            ok: true,
-            status: 200,
-            async text() {
-                return "{}";
-            },
-            async json() {
-                return {};
-            },
-            headers: {
-                get: vi.fn().mockReturnValue("application/json"),
-            },
-        });
+        fetchFn.mockResolvedValue(makeSuccessFetchResponse());
 
         await prom1;
         await prom2;
