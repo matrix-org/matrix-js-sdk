@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import fetchMock from "@fetch-mock/vitest";
-import { type MockedObject, type Mocked } from "vitest";
+import { type MockedObject, type Mocked, type MockInstance } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
@@ -46,6 +46,7 @@ import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
@@ -89,7 +90,12 @@ import { makeDelegatedAuthMetadata } from "../test-utils/auth.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
-import { type Transport } from "../../src/matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "../../src/matrixrtc/index.ts";
 import { type IStore } from "../../src/store/index.ts";
 
 vi.useFakeTimers();
@@ -818,6 +824,7 @@ describe("MatrixClient", function () {
             ).rejects.toThrow(errorMessage);
 
             await expect(client._unstable_getDelayedEvents()).rejects.toThrow(errorMessage);
+            await expect(client._unstable_getDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
 
             await expect(
                 client._unstable_updateDelayedEvent("anyDelayId", UpdateDelayedEventAction.Send),
@@ -1105,6 +1112,20 @@ describe("MatrixClient", function () {
                 ];
 
                 await client._unstable_getDelayedEvents(status, delayId);
+            });
+
+            // eslint-disable-next-line @vitest/expect-expect
+            it("can look up a single delayed event", async () => {
+                const delayId = "id";
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    },
+                ];
+
+                await client._unstable_getDelayedEvent(delayId);
             });
         });
 
@@ -3949,26 +3970,166 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("MSC4195 LiveKit endpoints", () => {
+        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
+
+        describe("_unstable_getLivekitToken", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "thejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("passes on the server name of a remote homeserver", async () => {
+                const body = {
+                    url: "wss://livekit.remote.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    server_name: "remote.example.com",
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "theremotejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "theremotejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
+                    },
+                ];
+                await expect(
+                    client._unstable_getLivekitToken({
+                        url: "wss://not-an-sfu.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+
+        describe("_unstable_delegateDelayedLeave", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    delay_id: "1234567890",
+                } satisfies LivekitDelegateDelayedLeaveRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: {},
+                    },
+                ];
+                expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
+                    },
+                ];
+                await expect(
+                    client._unstable_delegateDelayedLeave({
+                        url: "wss://livekit.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                        delay_id: "1234567890",
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+    });
+
     describe("Well-known", () => {
+        const A_WELLKNOWN: IClientWellKnown = {
+            "m.homeserver": {
+                base_url: "https://hs.org",
+            },
+            "m.identity_server": {
+                base_url: "https://is.org",
+            },
+        };
+
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
         it("caches the well-known value", async () => {
-            const A_WELLKNOWN: IClientWellKnown = {
-                "m.homeserver": {
-                    base_url: "https://hs.org",
-                },
-                "m.identity_server": {
-                    base_url: "https://is.org",
-                },
-            };
-
             void client.startClient();
-
-            vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
 
             const value = await client.waitForClientWellKnown();
             expect(value).toStrictEqual(A_WELLKNOWN);
 
             const cached = client.getClientWellKnown();
             expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await client.startClient();
+            await flushPromises();
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known on startup and polls it when clientWellKnownPollPeriod is set", async () => {
+            await client.startClient({ clientWellKnownPollPeriod: 3600 });
+            await flushPromises();
+
+            expect(getRawClientConfig).toHaveBeenCalledTimes(1);
+            expect(client.getClientWellKnown()).toStrictEqual(A_WELLKNOWN);
+
+            await vi.advanceTimersByTimeAsync(3600 * 1000);
+            expect(getRawClientConfig).toHaveBeenCalledTimes(2);
+
+            client.stopClient();
         });
     });
 

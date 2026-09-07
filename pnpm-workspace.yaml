@@ -19,3 +19,4 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
     - "@matrix-org/*"
+    - matrix-widget-api@1.19.0
