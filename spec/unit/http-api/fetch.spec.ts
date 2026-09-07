@@ -390,12 +390,9 @@ describe("FetchHttpApi", () => {
                 });
 
                 describe("with an oauth2ClientConfig", () => {
-                    it("should emit logout and throw when token refresh fails", async () => {
-                        fetchMock.post(authMetadata.token_endpoint, {
-                            status: 400,
-                            body: { errcode: "M_UNKNOWN", error: "failed" },
-                        });
-                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
+                    const makeOAuthApi = (
+                        fetchFn: MockedFunction<Window["fetch"]>,
+                    ): { api: FetchHttpApi<any>; emitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap> } => {
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                         vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
@@ -407,6 +404,16 @@ describe("FetchHttpApi", () => {
                             refreshToken,
                             onlyData: true,
                         });
+                        return { api, emitter };
+                    };
+
+                    it("should emit logout and throw when token refresh fails", async () => {
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 400,
+                            body: { errcode: "M_UNKNOWN", error: "failed" },
+                        });
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(fetchFn);
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
@@ -417,17 +424,7 @@ describe("FetchHttpApi", () => {
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
                         fetchMock.post(authMetadata.token_endpoint, { throws: new Error("transitive fault") });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        vi.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            oauth2ClientConfig,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
+                        const { api, emitter } = makeOAuthApi(fetchFn);
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             new TokenRefreshError(unknownTokenErr),
                         );
@@ -447,17 +444,7 @@ describe("FetchHttpApi", () => {
                             .fn()
                             .mockResolvedValueOnce(unknownTokenResponse)
                             .mockResolvedValueOnce(okayResponse);
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        vi.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            oauth2ClientConfig,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
+                        const { api, emitter } = makeOAuthApi(fetchFn);
                         const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
                             headers: {},
                         });
@@ -491,17 +478,7 @@ describe("FetchHttpApi", () => {
                         // fetch doesn't like our new or old tokens
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        vi.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            oauth2ClientConfig,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
+                        const { api, emitter } = makeOAuthApi(fetchFn);
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
@@ -542,17 +519,7 @@ describe("FetchHttpApi", () => {
 
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        vi.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            oauth2ClientConfig,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
+                        const { api } = makeOAuthApi(fetchFn);
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
