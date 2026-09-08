@@ -31,6 +31,7 @@ import {
     type IPushRules,
     type IRoomMemberCountCondition,
     type ISenderNotificationPermissionCondition,
+    type IThreadSubscriptionCondition,
     type PushRuleAction,
     PushRuleActionName,
     type PushRuleCondition,
@@ -482,6 +483,9 @@ export class PushProcessor {
             case ConditionKind.CallStarted:
             case ConditionKind.CallStartedPrefix:
                 return this.eventFulfillsCallStartedCondition(cond, ev);
+            case ConditionKind.ThreadSubscription:
+            case ConditionKind.ThreadSubscriptionUnstable:
+                return this.eventFulfillsThreadSubscriptionCondition(cond, ev);
         }
 
         // unknown conditions: we previously matched all unknown conditions,
@@ -635,6 +639,26 @@ export class PushProcessor {
             return false;
         }
         return val.includes(cond.value);
+    }
+
+    private eventFulfillsThreadSubscriptionCondition(
+        cond: IThreadSubscriptionCondition,
+        ev: MatrixEvent,
+    ): boolean {
+        const roomId = ev.getRoomId();
+        const rootId = ev.threadRootId;
+        if (!roomId || !rootId) {
+            // The condition only applies to thread events.
+            return false;
+        }
+        const cached = this.client.getCachedThreadSubscription(roomId, rootId);
+        if (cached === undefined) {
+            // Unknown subscription state — fail the condition. The server is
+            // authoritative for delivered notifications; missing the local
+            // suppression is preferable to spurious matches.
+            return false;
+        }
+        return cached === cond.subscribed;
     }
 
     private eventFulfillsCallStartedCondition(

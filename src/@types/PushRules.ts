@@ -66,6 +66,10 @@ export enum ConditionKind {
     SenderNotificationPermission = "sender_notification_permission",
     CallStarted = "call_started",
     CallStartedPrefix = "org.matrix.msc3914.call_started",
+    /** MSC4306 stable name. */
+    ThreadSubscription = "thread_subscription",
+    /** MSC4306 unstable name; servers using the unstable prefix send this kind. */
+    ThreadSubscriptionUnstable = "io.element.msc4306.thread_subscription",
 }
 
 export interface IPushRuleCondition<N extends ConditionKind | string> {
@@ -111,6 +115,12 @@ export interface ICallStartedPrefixCondition extends IPushRuleCondition<Conditio
     // no additional fields
 }
 
+/** MSC4306: matches when the event is in a thread the user is (or isn't) subscribed to. */
+export interface IThreadSubscriptionCondition
+    extends IPushRuleCondition<ConditionKind.ThreadSubscription | ConditionKind.ThreadSubscriptionUnstable> {
+    subscribed: boolean;
+}
+
 // XXX: custom conditions are possible but always fail, and break the typescript discriminated union so ignore them here
 // IPushRuleCondition<Exclude<string, ConditionKind>> unfortunately does not resolve this at the time of writing.
 export type PushRuleCondition =
@@ -121,7 +131,8 @@ export type PushRuleCondition =
     | IRoomMemberCountCondition
     | ISenderNotificationPermissionCondition
     | ICallStartedCondition
-    | ICallStartedPrefixCondition;
+    | ICallStartedPrefixCondition
+    | IThreadSubscriptionCondition;
 
 export enum PushRuleKind {
     Override = "override",
