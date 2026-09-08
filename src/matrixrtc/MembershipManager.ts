@@ -919,15 +919,15 @@ export class MembershipManager
         const retryCounterString = "(" + retries + "/" + this.maximumNetworkErrorRetryCount + ")";
 
         // Variables for scheduling the new event
-        let retryDuration = this.networkErrorRetryMs;
+        const retryDuration = this.networkErrorRetryMs;
 
         if (error instanceof Error && error.name === "AbortError") {
-            // We do not wait for the timeout on local timeouts.
-            retryDuration = 0;
-            this.logger.warn(
-                "Network local timeout error while sending event, immediate retry (" + retryCounterString + ")",
-                error,
-            );
+            // A local timeout means the server accepted the request but is slow to answer. Retry immediately and
+            // do not count it towards the fatal retry limit: the server's delayed leave already bounds how long a
+            // stalled restart can go unnoticed, and the resulting forced re-join recovers the membership. Giving
+            // up here would only replace a temporary media pause with a "connection lost" error for the user.
+            this.logger.warn("Network local timeout error while sending event, immediate retry", error);
+            return createInsertActionUpdate(type, 0);
         } else if (error instanceof Error && error.message.includes("updating delayed event")) {
             // TODO: We do not want error message matching here but instead the error should be a typed HTTPError
             // and be handled below automatically (the same as in the SPA case).
