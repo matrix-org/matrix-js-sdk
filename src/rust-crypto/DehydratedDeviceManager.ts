@@ -167,6 +167,39 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
     }
 
     /**
+     * Backs {@link CryptoApi#isDehydratedDeviceKeyMissing}: returns whether the server has a dehydrated
+     * device whose dehydration key is not cached locally (false if we hold the key, there is no such
+     * device, or dehydration is unsupported).
+     */
+    public async isDehydratedDeviceKeyMissing(): Promise<boolean> {
+        // First, do we already hold the key? If so, nothing is missing.
+        const cachedKey = await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey();
+        if (cachedKey) return false;
+
+        // Otherwise, check whether the server actually has a dehydrated device that we'd need the key for.
+        try {
+            await this.http.authedRequest<DehydratedDeviceResp>(
+                Method.Get,
+                "/dehydrated_device",
+                undefined,
+                undefined,
+                {
+                    prefix: UnstablePrefix,
+                },
+            );
+        } catch (error) {
+            const err = error as MatrixError;
+            // No dehydrated device (M_NOT_FOUND) or dehydration unsupported (M_UNRECOGNIZED): nothing missing.
+            if (err.errcode === "M_NOT_FOUND" || err.errcode === "M_UNRECOGNIZED") {
+                return false;
+            }
+            throw err;
+        }
+        // A dehydrated device exists on the server and we don't have its key.
+        return true;
+    }
+
+    /**
      * Reset the dehydration key.
      *
      * Creates a new key and stores it in secret storage.
