@@ -55,14 +55,8 @@ export class TokenRefresher {
     };
 
     private shouldLogoutOnError(error: HTTPError): boolean {
-        // Treat as logout as per https://spec.matrix.org/v1.18/client-server-api/#refresh-token-grant
-        // after making sure it is an RFC 6749 section 5.2 error response
-        return (
-            error instanceof OAuth2HTTPError &&
-            typeof error.httpStatus === "number" &&
-            error.httpStatus < 500 &&
-            error.httpStatus >= 400
-        );
+        // Treat as logout using logic from [MSC4526](https://github.com/matrix-org/matrix-spec-proposals/pull/4526)
+        return error instanceof OAuth2HTTPError && error.error === "invalid_grant";
     }
 
     private async getNewTokens(refreshToken: string): Promise<AccessTokens> {

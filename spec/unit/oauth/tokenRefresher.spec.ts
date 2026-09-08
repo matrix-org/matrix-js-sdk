@@ -297,5 +297,33 @@ describe("OidcTokenRefresher", () => {
 
             await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(TokenRefreshLogoutError);
         });
+
+        // [MSC4526](https://github.com/matrix-org/matrix-spec-proposals/pull/4526) narrowed the list of errors which
+        // should cause a logout to only include `invalid_grant`. This test asserts that the other RFC 6749 error codes
+        // (that are expected from the token endpoint) do not cause a logout.
+        ["invalid_request", "unauthorized_client", "invalid_scope", "invalid_client", "unsupported_grant_type"].forEach(
+            (error) => {
+                it(`should not throw TokenRefreshLogoutError for an OAuth 2.0 ${error} error`, async () => {
+                    fetchMock.modifyRoute("token-endpoint", {
+                        response: {
+                            status: 401,
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: {
+                                error,
+                            },
+                        },
+                    });
+
+                    const fn = vi.fn();
+                    const refresher = new TokenRefresher(auth, fn);
+
+                    await expect(refresher.tokenRefreshFunction("refresh-token")).rejects.not.toThrow(
+                        TokenRefreshLogoutError,
+                    );
+                });
+            },
+        );
     });
 });
