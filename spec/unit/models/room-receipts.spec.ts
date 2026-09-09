@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import {
+    EventStatus,
     FeatureSupport,
     type MatrixClient,
     MatrixEvent,
@@ -294,6 +295,77 @@ describe("RoomReceipts", () => {
         expect(room.hasUserReadEvent(readerId, thread1Id)).toBe(false);
     });
 
+    it("reports read for an event in a thread if we sent a later one, even if we didn't send the last", () => {
+        // Given a thread where we replied and someone else replied after us,
+        // and we have no receipt for the thread (e.g. because we paginated the
+        // thread in rather than seeing it live)
+        const room = createRoom();
+        const [root] = createEvent();
+        const [theirEvent, theirEventId] = createThreadedEvent(root);
+        const [myEvent] = createThreadedEventSentBy(root, readerId);
+        const [laterEvent] = createThreadedEvent(root);
+        setupPaginatedThread(room, root, [theirEvent, myEvent, laterEvent]);
+
+        // Then the event we replied after is read, even though our reply is not
+        // the last event in the thread
+        expect(room.hasUserReadEvent(readerId, theirEventId)).toBe(true);
+    });
+
+    it("reports unread for an event in a thread that arrived after the last one we sent", () => {
+        // Given a thread where we replied and someone else replied after us
+        const room = createRoom();
+        const [root] = createEvent();
+        const [myEvent] = createThreadedEventSentBy(root, readerId);
+        const [laterEvent, laterEventId] = createThreadedEvent(root);
+        setupPaginatedThread(room, root, [myEvent, laterEvent]);
+
+        // Then their reply is unread, since we sent nothing after it
+        expect(room.hasUserReadEvent(readerId, laterEventId)).toBe(false);
+    });
+
+    it("ignores events that are still being sent when deciding what we have read", () => {
+        // Given a thread where our reply failed to send
+        const room = createRoom();
+        const [root] = createEvent();
+        const [theirEvent, theirEventId] = createThreadedEvent(root);
+        const [myEvent] = createThreadedEventSentBy(root, readerId);
+        myEvent.setStatus(EventStatus.NOT_SENT);
+        setupPaginatedThread(room, root, [theirEvent, myEvent]);
+
+        // Then their event is still unread: a send that never landed tells us
+        // nothing about what we have seen
+        expect(room.hasUserReadEvent(readerId, theirEventId)).toBe(false);
+    });
+
+    it("reports a thread root as read if we replied in its thread", () => {
+        // Given a thread rooted at someone else's event, where we replied and
+        // someone else's event arrived after our reply
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [myEvent] = createThreadedEventSentBy(root, readerId);
+        const [laterEvent] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, myEvent, laterEvent], { addToState: false });
+
+        // Then the root is read: we can't have replied without seeing it.
+        // (Note: our reply is in the thread, but the root is in the main
+        // timeline, so no receipt of ours covers it.)
+        expect(room.hasUserReadEvent(readerId, rootId)).toBe(true);
+    });
+
+    it("reports a thread root as unread if we did not reply in its thread", () => {
+        // Given a thread rooted at someone else's event, where only other
+        // people replied
+        const room = createRoom();
+        const [root, rootId] = createEvent();
+        const [theirEvent] = createThreadedEvent(root);
+        setupThread(room, root);
+        room.addLiveEvents([root, theirEvent], { addToState: false });
+
+        // Then the root is unread
+        expect(room.hasUserReadEvent(readerId, rootId)).toBe(false);
+    });
+
     it("correctly reports readness even when threaded receipts arrive out of order", () => {
         // Given we have 3 events
         const room = createRoom();
@@ -478,9 +550,17 @@ function createEventSentBy(customSenderId: string): [MatrixEvent, string] {
  * Create an event in the thread of the supplied root and return it and its ID.
  */
 function createThreadedEvent(root: MatrixEvent): [MatrixEvent, string] {
+    return createThreadedEventSentBy(root, senderId);
+}
+
+/**
+ * Create an event in the thread of the supplied root, with the supplied sender,
+ * and return it and its ID.
+ */
+function createThreadedEventSentBy(root: MatrixEvent, customSenderId: string): [MatrixEvent, string] {
     const rootEventId = root.getId()!;
     const event = new MatrixEvent({
-        sender: senderId,
+        sender: customSenderId,
         event_id: nextId(),
         content: {
             "m.relates_to": {
@@ -545,4 +625,18 @@ function createOldTimeline(room: Room, events: MatrixEvent[]) {
 function setupThread(room: Room, root: MatrixEvent) {
     const thread = room.createThread(root.getId()!, root, [root], false);
     thread.initialEventsFetched = true;
+}
+
+/**
+ * Create a thread whose events were paginated in rather than received live, so
+ * no synthetic receipts are created for their senders. The events must be
+ * supplied in chronological order.
+ */
+function setupPaginatedThread(room: Room, root: MatrixEvent, events: MatrixEvent[]) {
+    room.addLiveEvents([root], { addToState: false });
+    const thread = room.createThread(root.getId()!, root, [], false);
+    thread.initialEventsFetched = true;
+    // Back-pagination adds events to the start of the timeline one at a time,
+    // so supply them newest-first for them to end up in chronological order.
+    thread.addEvents([root, ...events].reverse(), true);
 }
