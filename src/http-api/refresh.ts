@@ -18,7 +18,7 @@ import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
 import { type AccessTokens, type IHttpOpts, type OAuth2ClientConfig } from "./interface.ts";
 import { sleep } from "../utils.ts";
 import { TokenRefresher } from "../oauth/tokenRefresher.ts";
-import { OAuth2 } from "../oauth/index.ts";
+import { OAuth2, type ValidatedAuthMetadata } from "../oauth/index.ts";
 
 /**
  * This is an internal module. See {@link MatrixHttpApi} for the public class.
@@ -36,7 +36,10 @@ const REFRESH_IF_TOKEN_EXPIRES_WITHIN_MS = 500;
 // Otherwise, we will error as the token should not have expired yet and we need to avoid retrying indefinitely.
 const REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS = 60 * 1000;
 
-type Opts = Pick<IHttpOpts, "onTokenRefresh" | "logger" | "refreshToken" | "accessToken" | "oauth2ClientConfig">;
+type Opts = Pick<
+    IHttpOpts,
+    "onTokenRefresh" | "logger" | "refreshToken" | "accessToken" | "oauth2ClientConfig" | "authMetadataCallback"
+>;
 
 /**
  * This class is responsible for managing the access token and refresh token for authenticated requests.
@@ -208,9 +211,13 @@ export class TokenManager {
     private async ensureTokenRefresher(): Promise<TokenRefresher | undefined> {
         if (this.tokenRefresher) return this.tokenRefresher;
         if (!this.opts.oauth2ClientConfig) return undefined;
+        if (!this.opts.authMetadataCallback) return undefined;
 
         if (!this.tokenRefresherPromise) {
-            this.tokenRefresherPromise = this.discoverTokenRefresher(this.opts.oauth2ClientConfig);
+            this.tokenRefresherPromise = this.discoverTokenRefresher(
+                this.opts.oauth2ClientConfig,
+                this.opts.authMetadataCallback,
+            );
         }
 
         try {
@@ -227,8 +234,11 @@ export class TokenManager {
      * Discovers the OAuth2 auth server metadata and constructs the OAuth2 client and token refresher from it.
      * Throws if the request fails.
      */
-    private async discoverTokenRefresher(config: OAuth2ClientConfig): Promise<TokenRefresher> {
-        const metadata = await config.getAuthMetadata();
+    private async discoverTokenRefresher(
+        config: OAuth2ClientConfig,
+        authMetaDataCallback: () => Promise<ValidatedAuthMetadata>,
+    ): Promise<TokenRefresher> {
+        const metadata = await authMetaDataCallback();
 
         const oauth2 = new OAuth2(metadata, {
             clientId: config.clientId,

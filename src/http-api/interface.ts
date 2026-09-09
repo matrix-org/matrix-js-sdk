@@ -58,12 +58,6 @@ export interface OAuth2ClientConfig {
     clientId: string;
     /** The device ID of the current session, used to scope refreshed/revoked tokens to this session. */
     deviceId?: string;
-    /**
-     * Discovers and validates the delegated auth server's metadata for the current homeserver.
-     * @returns validated authentication metadata
-     * @throws when delegated auth config is invalid or unreachable
-     */
-    getAuthMetadata: () => Promise<ValidatedAuthMetadata>;
 }
 
 /** Options object for `FetchHttpApi` and {@link MatrixHttpApi}. */
@@ -87,8 +81,18 @@ export interface IHttpOpts {
     /**
      * Configuration needed to refresh (given refreshToken) and revoke (e.g. on logout) tokens for an
      * OAuth2-native session. Optional; if omitted, tokens will not be refreshed or revoked by the SDK.
+     * authMetadataCallback must also be supplied to refresh tokens.
      */
     oauth2ClientConfig?: OAuth2ClientConfig;
+
+    /**
+     * Discovers and validates the delegated auth server's metadata for the current homeserver.
+     * Must be supplied along with oauth2ClientConfig in order to refresh tokens.
+     *
+     * @returns validated authentication metadata
+     * @throws when delegated auth config is invalid or unreachable
+     */
+    authMetadataCallback?: () => Promise<ValidatedAuthMetadata>;
 
     /**
      * Whether to use the HTTP Authorization header over the `access_token` query parameter

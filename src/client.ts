@@ -1380,9 +1380,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 ? {
                       clientId: opts.oauthClientId,
                       deviceId: this.deviceId ?? undefined,
-                      getAuthMetadata: (): Promise<ValidatedAuthMetadata> => this.getAuthMetadata(),
                   }
                 : undefined,
+            authMetadataCallback: this.getAuthMetadata.bind(this),
             prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
