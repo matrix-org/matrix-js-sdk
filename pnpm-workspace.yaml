@@ -1,22 +1,11 @@
-peerDependencyRules:
-    allowedVersions:
-        eslint: "8"
-
-allowedDeprecatedVersions:
-    eslint: "8"
-
 overrides:
     expect: 30.5.0
-    # https://github.com/advisories/GHSA-fx2h-pf6j-xcff
-    # https://github.com/advisories/GHSA-v6wh-96g9-6wx3
-    vite: 8.2.2
-    # https://github.com/advisories/GHSA-mh99-v99m-4gvg
-    # https://github.com/advisories/GHSA-rgw5-rvv9-x895
-    brace-expansion: 5.0.9
+    # https://github.com/advisories/GHSA-c83g-rgw3-j3cx
+    # https://github.com/advisories/GHSA-73wf-gq98-2v4g
+    browserslist: 4.28.7
 
 allowBuilds:
     unrs-resolver: false
 
 minimumReleaseAgeExclude:
     - "@matrix-org/*"
-    - matrix-widget-api@1.19.0
