@@ -1,5 +1,5 @@
 overrides:
-    expect: 30.5.0
+    expect: 30.5.1
     # https://github.com/advisories/GHSA-c83g-rgw3-j3cx
     # https://github.com/advisories/GHSA-73wf-gq98-2v4g
     browserslist: 4.28.7
