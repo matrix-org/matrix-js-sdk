@@ -337,7 +337,6 @@ describe("FetchHttpApi", () => {
             const oauth2ClientConfig = {
                 clientId,
                 redirectUri,
-                getAuthMetadata: () => Promise.resolve(authMetadata),
             };
 
             describe("when an unknown token error is encountered", () => {
@@ -400,6 +399,7 @@ describe("FetchHttpApi", () => {
                             prefix,
                             fetchFn,
                             oauth2ClientConfig,
+                            authMetadataCallback: () => Promise.resolve(authMetadata),
                             accessToken,
                             refreshToken,
                             onlyData: true,
@@ -710,7 +710,6 @@ describe("FetchHttpApi", () => {
         const oauth2ClientConfig = {
             clientId: "test-client-id",
             redirectUri: "https://test.org",
-            getAuthMetadata: () => Promise.resolve(authMetadata),
         };
         const deferredTokenRefresh = Promise.withResolvers<Parameters<typeof fetchMock.post>[1]>();
         fetchMock.post(authMetadata.token_endpoint, () => deferredTokenRefresh.promise);
@@ -734,6 +733,7 @@ describe("FetchHttpApi", () => {
             prefix,
             fetchFn,
             oauth2ClientConfig,
+            authMetadataCallback: () => Promise.resolve(authMetadata),
             accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
             onlyData: true,
