@@ -14,7 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { SecretsBundle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import type { IMegolmSessionData } from "../@types/crypto.ts";
 import type { ToDeviceBatch, ToDevicePayload } from "../models/ToDeviceMessage.ts";
 import { type Room } from "../models/room.ts";
@@ -31,6 +30,7 @@ import {
 } from "./keybackup.ts";
 import { type ISignatures } from "../@types/signed.ts";
 import { type MatrixEvent } from "../models/event.ts";
+import { type SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm";
 
 /**
  * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.
@@ -723,13 +723,13 @@ export interface CryptoApi {
     /**
      * Export secrets bundle for transmitting to another device as part of OAuth2 QR login
      */
-    exportSecretsBundle?(): Promise<Awaited<ReturnType<SecretsBundle["to_json"]>>>;
+    exportSecretsBundle?(): Promise<SecretsBundleJson>;
 
     /**
      * Import secrets bundle transmitted from another device.
      * @param secrets - The secrets bundle received from the other device
      */
-    importSecretsBundle?(secrets: Awaited<ReturnType<SecretsBundle["to_json"]>>): Promise<void>;
+    importSecretsBundle?(secrets: SecretsBundleJson): Promise<void>;
 }
 
 /** A reason code for a failure to decrypt an event. */
