@@ -43,7 +43,7 @@ export type AccessTokens = {
  * A callback function called when tokens are refreshed such that stored tokens can be updated with
  * the refreshed ones.
  */
-export type onTokenRefreshCallback = (newTokens: AccessTokens) => void;
+export type TokenRefreshCallback = (newTokens: AccessTokens) => void;
 
 /**
  * Configuration required for {@link IHttpOpts} to allow the SDK to manage the full lifecycle of tokens for an
@@ -83,7 +83,7 @@ export interface IHttpOpts {
     /**
      * Callback called when tokens are refreshed. Must be supplied if refreshToken is supplied.
      */
-    onTokenRefresh?: onTokenRefreshCallback;
+    onTokenRefresh?: TokenRefreshCallback;
     /**
      * Configuration needed to refresh (given refreshToken) and revoke (e.g. on logout) tokens for an
      * OAuth2-native session. Optional; if omitted, tokens will not be refreshed or revoked by the SDK.
