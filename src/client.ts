@@ -73,7 +73,7 @@ import {
     MediaPrefix,
     Method,
     retryNetworkOperation,
-    type onTokenRefreshCallback,
+    type TokenRefreshCallback,
     type Upload,
     type UploadOpts,
     type UploadResponse,
@@ -338,7 +338,7 @@ export interface ICreateClientOpts {
      *
      * Required if a {@link refreshToken} is provided.
      */
-    onTokenRefresh?: onTokenRefreshCallback;
+    onTokenRefresh?: TokenRefreshCallback;
 
     /**
      * If this is an OAuth2-native session (as per MSC2965/MSC3861), the OAuth client ID this

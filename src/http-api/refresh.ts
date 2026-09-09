@@ -227,7 +227,7 @@ export class TokenManager {
      * Discovers the OAuth2 auth server metadata and constructs the OAuth2 client and token refresher from it.
      * Throws if the request fails.
      */
-    private async discoverTokenRefresher(config: OAuth2ClientConfig, attempt: number = 1): Promise<TokenRefresher> {
+    private async discoverTokenRefresher(config: OAuth2ClientConfig): Promise<TokenRefresher> {
         const metadata = await config.getAuthMetadata();
 
         const oauth2 = new OAuth2(metadata, {
