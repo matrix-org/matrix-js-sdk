@@ -30,7 +30,7 @@ import {
 } from "./keybackup.ts";
 import { type ISignatures } from "../@types/signed.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { type SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm";
+import type { SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm.d.ts";
 
 /**
  * `matrix-js-sdk/lib/crypto-api`: End-to-end encryption support.
