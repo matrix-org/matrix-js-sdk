@@ -86,8 +86,8 @@
         "@types/node": "22",
         "@types/sdp-transform": "^3.0.0",
         "@typescript/native": "npm:typescript@7.0.2",
-        "@vitest/coverage-v8": "^4.0.17",
-        "@vitest/ui": "^4.0.17",
+        "@vitest/coverage-v8": "^5.0.0",
+        "@vitest/ui": "^5.0.0",
         "concurrently": "^10.0.0",
         "debug": "^4.3.4",
         "fake-indexeddb": "^6.0.0",
@@ -105,6 +105,6 @@
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "npm:@typescript/typescript6@6.0.2",
-        "vitest": "^4.0.17"
+        "vitest": "^5.0.0"
     }
 }
