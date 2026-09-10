@@ -6111,6 +6111,101 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Gets a set of room IDs in common with another user, using the unstable
+     * Mutual Rooms API. Doesn't check for server support.
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    private async getMutualRoomsUnstable(userId: string): Promise<string[]> {
+        // Accumulated rooms
+        const rooms: string[] = [];
+
+        // Newer variant that renamed shared rooms to mutual rooms
+        const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
+
+        // Latest unstable variant that changed from path elements to query elements
+        const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
+            UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
+        );
+
+        let path;
+        let query;
+
+        if (queryMutualRoomsSupport) {
+            path = "/uk.half-shot.msc2666/user/mutual_rooms";
+            query = { user_id: userId };
+        } else {
+            path = utils.encodeUri(
+                `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
+                { $userId: userId },
+            );
+            query = {};
+        }
+
+        let token = null;
+        do {
+            const tokenQuery: Record<string, string> = {};
+            if (token != null && queryMutualRoomsSupport) {
+                tokenQuery["batch_token"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch_token?: string;
+            }>(Method.Get, path, { ...query, ...tokenQuery }, undefined, {
+                prefix: ClientPrefix.Unstable,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch_token !== undefined) {
+                token = res.next_batch_token;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user, using the stable
+     * Mutual Rooms API. Doesn't check for server support.
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    private async getMutualRoomsStable(userId: string): Promise<string[]> {
+        const rooms: string[] = [];
+
+        let token = null;
+        do {
+            const query: Record<string, string> = { user_id: userId };
+            if (token != null) {
+                query["from"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch?: string;
+            }>(Method.Get, "/mutual_rooms", query, undefined, {
+                prefix: ClientPrefix.V1,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch !== undefined) {
+                token = res.next_batch;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
+    }
+
+    /**
      * Gets a set of room IDs in common with another user.
      *
      * @param userId - The userId to check.
@@ -6127,84 +6222,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             (await this.isVersionSupported("v1.19")) ||
             (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS));
 
-        // Accumulated rooms
-        const rooms: string[] = [];
-
-        if (stableMutualRoomsSupport) {
-            let token = null;
-            do {
-                const query: Record<string, string> = { user_id: userId };
-                if (token != null) {
-                    query["from"] = token;
-                }
-
-                const res = await this.http.authedRequest<{
-                    joined: string[];
-                    next_batch?: string;
-                }>(Method.Get, "/mutual_rooms", query, undefined, {
-                    prefix: ClientPrefix.V1,
-                });
-
-                rooms.push(...res.joined);
-
-                if (res.next_batch !== undefined) {
-                    token = res.next_batch;
-                } else {
-                    token = null;
-                }
-            } while (token != null);
-        }
-        // Handle unstable support in its own block since it's different in
-        // enough ways to be annoying to do in one (token names are different,
-        // different prefix, no pagination in some versions)
-        else {
-            // Newer variant that renamed shared rooms to mutual rooms
-            const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
-
-            // Latest unstable variant that changed from path elements to query elements
-            const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
-                UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
-            );
-
-            let path;
-            let query;
-
-            if (queryMutualRoomsSupport) {
-                path = "/uk.half-shot.msc2666/user/mutual_rooms";
-                query = { user_id: userId };
-            } else {
-                path = utils.encodeUri(
-                    `/uk.half-shot.msc2666/user/${mutualRoomsSupport ? "mutual_rooms" : "shared_rooms"}/$userId`,
-                    { $userId: userId },
-                );
-                query = {};
-            }
-
-            let token = null;
-            do {
-                const tokenQuery: Record<string, string> = {};
-                if (token != null && queryMutualRoomsSupport) {
-                    tokenQuery["batch_token"] = token;
-                }
-
-                const res = await this.http.authedRequest<{
-                    joined: string[];
-                    next_batch_token?: string;
-                }>(Method.Get, path, { ...query, ...tokenQuery }, undefined, {
-                    prefix: ClientPrefix.Unstable,
-                });
-
-                rooms.push(...res.joined);
-
-                if (res.next_batch_token !== undefined) {
-                    token = res.next_batch_token;
-                } else {
-                    token = null;
-                }
-            } while (token != null);
-        }
-
-        return rooms;
+        // Handle unstable and stable support in separate functions since
+        // since they are different in enough ways to be annoying to do in one
+        // (token names are different, different prefix, no pagination in some
+        // versions, etc)
+        if (stableMutualRoomsSupport) return this.getMutualRoomsStable(userId);
+        else return this.getMutualRoomsUnstable(userId);
     }
 
     /**
