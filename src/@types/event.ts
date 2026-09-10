@@ -30,6 +30,7 @@ import {
     type RoomNameEventContent,
     type RoomPinnedEventsEventContent,
     type RoomPolicyContent,
+    type UnstableRoomPolicyContent,
     type RoomPowerLevelsEventContent,
     type RoomServerAclEventContent,
     type RoomThirdPartyInviteEventContent,
@@ -164,7 +165,13 @@ export enum EventType {
     RTCDecline = "org.matrix.msc4310.rtc.decline",
 
     // Policy servers
-    RoomPolicy = "org.matrix.msc4284.policy",
+    RoomPolicy = "m.room.policy",
+    /**
+     * The unstable identifier for `m.room.policy` used before MSC4284 was stabilised in Matrix v1.18.
+     * Only present so that rooms configured with the unstable event can still be read and migrated.
+     * @deprecated Use {@link EventType.RoomPolicy} instead.
+     */
+    RoomPolicyUnstable = "org.matrix.msc4284.policy",
 
     // Retention
     RetentionPolicy = "m.room.retention",
@@ -391,8 +398,9 @@ export interface StateEvents {
     [EventType.PolicyRuleRoom]: PolicyRuleEventContent | EmptyObject;
     [EventType.PolicyRuleServer]: PolicyRuleEventContent | EmptyObject;
 
-    // MSC4284: Policy servers
+    // Policy servers
     [EventType.RoomPolicy]: RoomPolicyContent | EmptyObject;
+    [EventType.RoomPolicyUnstable]: UnstableRoomPolicyContent | EmptyObject;
 
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
