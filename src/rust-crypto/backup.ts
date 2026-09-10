@@ -61,6 +61,14 @@ interface KeyBackupCreationInfo {
  * @internal
  */
 export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents, RustBackupCryptoEventMap> {
+    /**
+     * When the backup upload loop starts, we delay the first request by a random amount to avoid backup
+     * requests from different clients hitting the server all at the same time when a new key is sent.
+     *
+     * This defines the maximum delay. It can be reduced in tests to make the test run faster.
+     */
+    public static readonly maxBackupLoopStartDelayMillis: number = 10000;
+
     /** Have we checked if there is a backup on the server which we can use */
     private checkedForBackup = false;
 
@@ -418,7 +426,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         this.emit(CryptoEvent.KeyBackupStatus, false);
     }
 
-    private async backupKeysLoop(maxDelay = 10000): Promise<void> {
+    private async backupKeysLoop(): Promise<void> {
         if (this.backupKeysLoopRunning) {
             this.logger.debug(`Backup loop already running`);
             return;
@@ -427,10 +435,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         this.logger.debug(`Backup: Starting keys upload loop for backup version:${this.activeBackupVersion}.`);
 
-        // wait between 0 and `maxDelay` seconds, to avoid backup
-        // requests from different clients hitting the server all at
-        // the same time when a new key is sent
-        const delay = Math.random() * maxDelay;
+        // Wait between 0 and `maxBackupLoopStartDelayMillis` milliseconds, to avoid backup requests from different
+        // clients hitting the server all at the same time when a new key is sent.
+        const delay = Math.random() * RustBackupManager.maxBackupLoopStartDelayMillis;
         await sleep(delay);
 
         try {
