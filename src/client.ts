@@ -565,6 +565,7 @@ export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
+export const STABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms.stable";
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
@@ -6158,36 +6159,42 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets a set of room IDs in common with another user.
+     * Determine if the server supports finding mutual rooms, as described by MSC2666.
      *
-     * Note: This endpoint is unstable, and can throw an `Error`.
-     *   Check progress on [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) for more details.
-     *
+     * @returns `true` if supported, otherwise `false`
+     */
+    public async doesServerSupportMutualRooms(): Promise<boolean> {
+        return (
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS))
+        );
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user, using the unstable
+     * Mutual Rooms API. Doesn't check for server support.
      * @param userId - The userId to check.
-     * @returns Promise which resolves to an array of rooms
+     * @returns Promise which resolves to an array of room IDs
      * @returns Rejects: with an error response.
      */
-    // TODO: on spec release, rename this to getMutualRooms
-    public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
-        // Initial variant of the MSC
-        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
+    private async getMutualRoomsUnstable(userId: string): Promise<string[]> {
+        // Accumulated rooms
+        const rooms: string[] = [];
 
         // Newer variant that renamed shared rooms to mutual rooms
         const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
-        // Latest variant that changed from path elements to query elements
+        // Latest unstable variant that changed from path elements to query elements
         const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
             UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
         );
 
-        if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
-            throw Error("Server does not support the Mutual Rooms API");
-        }
-
         let path;
         let query;
 
-        // Cascading unstable support switching.
         if (queryMutualRoomsSupport) {
             path = "/uk.half-shot.msc2666/user/mutual_rooms";
             query = { user_id: userId };
@@ -6199,10 +6206,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             query = {};
         }
 
-        // Accumulated rooms
-        const rooms: string[] = [];
         let token = null;
-
         do {
             const tokenQuery: Record<string, string> = {};
             if (token != null && queryMutualRoomsSupport) {
@@ -6226,6 +6230,67 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } while (token != null);
 
         return rooms;
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user, using the stable
+     * Mutual Rooms API. Doesn't check for server support.
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    private async getMutualRoomsStable(userId: string): Promise<string[]> {
+        const rooms: string[] = [];
+
+        let token = null;
+        do {
+            const query: Record<string, string> = { user_id: userId };
+            if (token != null) {
+                query["from"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch?: string;
+            }>(Method.Get, "/mutual_rooms", query, undefined, {
+                prefix: ClientPrefix.V1,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch !== undefined) {
+                token = res.next_batch;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user.
+     *
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    public async getMutualRooms(userId: string): Promise<string[]> {
+        if (!(await this.doesServerSupportMutualRooms())) {
+            throw Error("Server does not support the Mutual Rooms API");
+        }
+
+        // Stable version found in the spec
+        const stableMutualRoomsSupport =
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS));
+
+        // Handle unstable and stable support in separate functions since
+        // since they are different in enough ways to be annoying to do in one
+        // (token names are different, different prefix, no pagination in some
+        // versions, etc)
+        if (stableMutualRoomsSupport) return this.getMutualRoomsStable(userId);
+        else return this.getMutualRoomsUnstable(userId);
     }
 
     /**

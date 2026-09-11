@@ -26,6 +26,7 @@ import {
     UNSTABLE_MSC2666_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
     UNSTABLE_MSC2666_SHARED_ROOMS,
+    STABLE_MSC2666_QUERY_MUTUAL_ROOMS,
 } from "../../src";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -485,7 +486,7 @@ describe("MutualRooms", () => {
             };
         });
 
-        const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+        const rooms = await client.getMutualRooms(QUERIED_USER);
 
         expect(rooms).toEqual(["!test:example.com"]);
     });
@@ -504,12 +505,12 @@ describe("MutualRooms", () => {
             };
         });
 
-        const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+        const rooms = await client.getMutualRooms(QUERIED_USER);
 
         expect(rooms).toEqual(["!test2:example.com"]);
     });
 
-    describe("can work the latest MSC version (query mutual rooms)", () => {
+    describe("can work with the latest MSC version (query mutual rooms)", () => {
         beforeEach(() => {
             enableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS);
         });
@@ -525,7 +526,7 @@ describe("MutualRooms", () => {
                 };
             });
 
-            const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+            const rooms = await client.getMutualRooms(QUERIED_USER);
 
             expect(rooms).toEqual(["!test3:example.com"]);
         });
@@ -550,7 +551,54 @@ describe("MutualRooms", () => {
                 }
             });
 
-            const rooms = await client._unstable_getSharedRooms(QUERIED_USER);
+            const rooms = await client.getMutualRooms(QUERIED_USER);
+
+            expect(rooms).toEqual(["!rock:example.com", "!korok:example.com"]);
+        });
+    });
+
+    describe("can work with the stable spec version", () => {
+        beforeEach(() => {
+            enableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS);
+        });
+
+        it("works with a simple response", async () => {
+            fetchMock.get("express:/_matrix/client/v1/mutual_rooms", (callLog) => {
+                const url = new URL(callLog.url);
+
+                expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
+
+                return {
+                    joined: ["!test4:example.com"],
+                };
+            });
+
+            const rooms = await client.getMutualRooms(QUERIED_USER);
+
+            expect(rooms).toEqual(["!test4:example.com"]);
+        });
+
+        it("works with a paginated response", async () => {
+            fetchMock.get("express:/_matrix/client/v1/mutual_rooms", (callLog) => {
+                const url = new URL(callLog.url);
+
+                expect(url.searchParams.get("user_id")).toEqual(QUERIED_USER);
+
+                const token = url.searchParams.get("from");
+
+                if (token == "yahaha") {
+                    return {
+                        joined: ["!korok:example.com"],
+                    };
+                } else {
+                    return {
+                        joined: ["!rock:example.com"],
+                        next_batch: "yahaha",
+                    };
+                }
+            });
+
+            const rooms = await client.getMutualRooms(QUERIED_USER);
 
             expect(rooms).toEqual(["!rock:example.com", "!korok:example.com"]);
         });
