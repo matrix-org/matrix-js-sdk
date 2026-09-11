@@ -16,7 +16,12 @@ limitations under the License.
 
 import { type Mock, type Mocked } from "vitest";
 
-import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
+import {
+    DEFAULT_MAX_KEY_TTL,
+    DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT,
+    DEFAULT_USE_KEY_DELAY,
+    RTCEncryptionManager,
+} from "../../../src/matrixrtc/RTCEncryptionManager.ts";
 import { type CallMembership } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
@@ -24,7 +29,37 @@ import { sessionMembershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { logger } from "../../../src/logger.ts";
 import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
+import { type ParticipantDeviceInfo } from "../../../src/matrixrtc/types.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
+
+/**
+ * The rotation grace period is not configured directly, it is derived from the number of participants:
+ * `60_000 * N * (N - 1) / sharedPerMinuteToDeviceContingent`.
+ *
+ * With this contingent the grace period is a comfortable `1_000 * N * (N - 1)` ms, see {@link gracePeriodMsFor}.
+ * The default contingent would give 20ms for 2 participants and 120ms for 4, which is impractical to test with.
+ */
+const TEST_CONTINGENT = 60;
+
+/**
+ * The grace period the encryption manager will use for a session with `participantCount` **other** participants.
+ * (`getMemberships()` is mocked to return the other members only in this spec, our own membership is not part of it)
+ */
+function gracePeriodMsFor(participantCount: number, contingent: number = TEST_CONTINGENT): number {
+    return (60_000 * participantCount * (participantCount - 1)) / contingent;
+}
+
+/** The shape in which a membership is handed to {@link IKeyTransport.sendKey} */
+function participantInfo(membership: CallMembership) {
+    return { userId: membership.sender, deviceId: membership.deviceId, membershipTs: membership.createdTs() };
+}
+
+const OWN_MEMBERSHIP = {
+    userId: "@alice:example.org",
+    deviceId: "DEVICE01",
+    memberId: "@alice:example.org:DEVICE01",
+};
+const OWN_RTC_BACKEND_IDENTITY = "@alice:example.org:DEVICE01";
 
 describe("RTCEncryptionManager", () => {
     // The manager being tested
@@ -57,6 +92,15 @@ describe("RTCEncryptionManager", () => {
             logger,
             rtcIdentifierProvider,
         );
+
+        // The manager blocks every rotation for `rotationInterval * Math.random() * 2` to spread the clients
+        // of a session out. Pin the draw to 0.5, so that rotations are blocked for exactly one rotation
+        // interval; tests that are about the jitter itself override this.
+        vi.spyOn(Math, "random").mockReturnValue(0.5);
+    });
+
+    afterEach(() => {
+        vi.restoreAllMocks();
     });
 
     it("should start and stop the transport properly", () => {
@@ -120,12 +164,13 @@ describe("RTCEncryptionManager", () => {
         });
 
         it("Should re-distribute keys to members whom callMemberhsip ts has changed", async () => {
+            vi.useFakeTimers();
             let members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE", 1000)];
             getMembershipMock.mockReturnValue(members);
 
             encryptionManager.join(undefined);
             encryptionManager.onMembershipsUpdate();
-            await vi.runOnlyPendingTimersAsync();
+            await vi.advanceTimersByTimeAsync(1);
 
             expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -151,15 +196,32 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // There are no membership change but the callMembership ts has changed (reset?)
-            // Resend the key
+            // That member counts as a new joiner: resend the key
             encryptionManager.onMembershipsUpdate();
-            await vi.runOnlyPendingTimersAsync();
+            await flushPromises();
 
-            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
-            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(
+                1,
                 expect.any(String),
                 // Re send the same key to that user
                 0,
+                [
+                    {
+                        userId: "@bob:example.org",
+                        deviceId: "BOBDEVICE",
+                        membershipTs: 2000,
+                    },
+                ],
+            );
+
+            // And, as for any other joiner, the key is rotated afterwards.
+            // With a single other participant the rotation interval is 0ms, so the block expires immediately.
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(
+                2,
+                expect.any(String),
+                // The key index has been incremented
+                1,
                 [
                     {
                         userId: "@bob:example.org",
@@ -179,9 +241,11 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 15_000; // 15 seconds
+            // The first key blocks rotations for one rotation interval (the jitter draw is pinned in
+            // `beforeEach`) of the 2 participant session it is created in: 2s with this contingent.
+            const blockMs = gracePeriodMsFor(2);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -195,14 +259,13 @@ describe("RTCEncryptionManager", () => {
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            // Carl joins, within the grace period
+            // Carl joins, while the rotation is still blocked
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
-            await vi.advanceTimersByTimeAsync(gracePeriod / 2);
+            await vi.advanceTimersByTimeAsync(blockMs / 2 - 1);
             encryptionManager.onMembershipsUpdate();
+            await flushPromises();
 
-            await vi.runOnlyPendingTimersAsync();
-
-            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(
                 expect.any(String),
                 // It should not have incremented the key index
                 0,
@@ -210,31 +273,54 @@ describe("RTCEncryptionManager", () => {
                 [{ userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1000 }],
             );
 
+            // The rotation is deferred to the end of the block, not skipped: nothing happens before that.
+            await vi.advanceTimersByTimeAsync(blockMs / 2 - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+
+            // Now the block started by the first key is over, the key is rotated for everyone.
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(
+                expect.any(String),
+                1,
+                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+            );
+
+            // And is used locally after the `useKeyDelay`
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
             await vi.advanceTimersByTimeAsync(1000);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
         });
 
-        // Test an edge case where the use key delay is higher than the grace period.
-        // This means that no matter what, the key once rolled out will be too old to be re-used for the new member that
-        // joined within the grace period.
+        // Test an edge case where the use key delay is higher than the grace period. That is the case for any small
+        // session with the default contingent (the grace period is 120ms for 4 participants).
+        // This means that a membership change can arrive while the previous key is still being rolled out, and that
+        // the key once rolled out is always too old to be considered "recent enough" for the next joiner.
         // So we expect another rotation to happen in all cases where a new member joins.
-        // eslint-disable-next-line @vitest/expect-expect
-        it("test grace period lower than delay period", async () => {
+        it("test rotation interval lower than delay period", async () => {
             vi.useFakeTimers();
+            // Make the jitter deterministic: half of the grace period
+            vi.spyOn(Math, "random").mockReturnValue(0.5);
 
-            const members = [
-                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
-                aStateBaseMembership("@bob:example.org", "BOBDEVICE2"),
-            ];
-            getMembershipMock.mockReturnValue(members);
+            const bob = aStateBaseMembership("@bob:example.org", "BOBDEVICE");
+            const bob2 = aStateBaseMembership("@bob:example.org", "BOBDEVICE2");
+            const carl = aStateBaseMembership("@carl:example.org", "CARLDEVICE");
+            const david = aStateBaseMembership("@david:example.org", "DAVDEVICE");
+            getMembershipMock.mockReturnValue([bob, bob2]);
 
-            const gracePeriod = 3_000; // 3 seconds
-            const useKeyDelay = gracePeriod + 2_000; // 5 seconds
+            const useKeyDelay = 5_000;
+            // The default contingent gives a grace period of 60ms for 3 and 120ms for 4 participants,
+            // both far below the `useKeyDelay`.
+            expect(gracePeriodMsFor(4, DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT)).toBeLessThan(useKeyDelay);
+
             // initial rollout
-            encryptionManager.join({
-                useKeyDelay,
-                keyRotationGracePeriodMs: gracePeriod,
-            });
+            encryptionManager.join({ useKeyDelay });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -244,31 +330,50 @@ describe("RTCEncryptionManager", () => {
             // The existing members have been talking for 5mn
             await vi.advanceTimersByTimeAsync(5 * 60 * 1000);
 
-            // A new member joins, that should trigger a key rotation.
-            members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
+            // A new member joins, that should trigger a key rotation (jittered by 60ms/2).
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
             encryptionManager.onMembershipsUpdate();
-            await vi.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3, DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT) / 2);
 
-            // A new member joins, within the grace period, but under the delay period
-            members.push(aStateBaseMembership("@david:example.org", "DAVDEVICE"));
-            await vi.advanceTimersByTimeAsync((useKeyDelay - gracePeriod) / 2);
+            // A new member joins while the rotated key is still in its `useKeyDelay` window
+            await vi.advanceTimersByTimeAsync(1_000);
+            getMembershipMock.mockReturnValue([bob, bob2, carl, david]);
             encryptionManager.onMembershipsUpdate();
 
-            // Wait past the delay period
-            await vi.advanceTimersByTimeAsync(5_000);
+            // Wait past the delay period of the ongoing rollout and the jitter of the rotation it triggers...
+            await vi.advanceTimersByTimeAsync(
+                useKeyDelay + gracePeriodMsFor(4, DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT),
+            );
+            // ...and past the delay period of that second rotation
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
 
-            // Even though the new member joined within the grace period, the key should be rotated because once the delay period has passed
-            // also the grace period is exceeded/the key is too old to be reshared.
-
-            // CARLDEVICE should have received a key with index 1 and another one with index 2
+            // CARLDEVICE joined while key 0 was in use: it gets that key right away so that it can decrypt,
+            // then the rotation to key 1 and the one triggered by DAVDEVICE (key 2).
+            expectKeyAtIndexToHaveBeenSentTo(mockTransport, 0, "@carl:example.org", "CARLDEVICE");
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 1, "@carl:example.org", "CARLDEVICE");
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 2, "@carl:example.org", "CARLDEVICE");
-            // Of course, should not have received the first key
-            expectKeyAtIndexNotToHaveBeenSentTo(mockTransport, 0, "@carl:example.org", "CARLDEVICE");
 
-            // DAVDEVICE should only have received a key with index 2
+            // DAVDEVICE joined while key 1 was in use, so it never sees key 0
+            expectKeyAtIndexNotToHaveBeenSentTo(mockTransport, 0, "@david:example.org", "DAVDEVICE");
+            expectKeyAtIndexToHaveBeenSentTo(mockTransport, 1, "@david:example.org", "DAVDEVICE");
             expectKeyAtIndexToHaveBeenSentTo(mockTransport, 2, "@david:example.org", "DAVDEVICE");
-            expectKeyAtIndexNotToHaveBeenSentTo(mockTransport, 1, "@david:example.org", "DAVDEVICE");
+
+            // Both rotations have been rolled out locally, in order
+            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+            expect(onEncryptionKeysChanged).toHaveBeenNthCalledWith(
+                1,
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+            expect(onEncryptionKeysChanged).toHaveBeenNthCalledWith(
+                2,
+                expect.any(Uint8Array<ArrayBufferLike>),
+                2,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
         });
 
         it("Should rotate key when a user join past the rotation grace period", async () => {
@@ -280,20 +385,34 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 15_000; // 15 seconds
+            // With 3 participants and this contingent the grace period is 6s
+            const gracePeriod = gracePeriodMsFor(3);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            await vi.advanceTimersByTimeAsync(gracePeriod + 1000);
+            // Wait until the block started by the first key has long expired
+            await vi.advanceTimersByTimeAsync(gracePeriod);
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
+            await flushPromises();
 
-            expect(mockTransport.sendKey).toHaveBeenCalledWith(
+            // The current key is shared with the new joiner right away, so that they can decrypt our media
+            // while the rotation is blocked for one more rotation interval (of the now 3 participant session).
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 0, [
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1000 },
+            ]);
+
+            await vi.advanceTimersByTimeAsync(gracePeriod - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(
                 expect.any(String),
                 // It should have incremented the key index
                 1,
@@ -306,9 +425,15 @@ describe("RTCEncryptionManager", () => {
             );
 
             // Wait for useKeyDelay to pass
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
             await vi.advanceTimersByTimeAsync(5000);
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalled();
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
         });
 
         it("Should not rotate key when several users join within the rotation grace period", async () => {
@@ -320,8 +445,9 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            // initial rollout
-            encryptionManager.join(undefined);
+            // initial rollout. The first key blocks rotations for one rotation interval of the 2 participant
+            // session it is created in (2s), and all the joins below land inside that block.
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -339,7 +465,7 @@ describe("RTCEncryptionManager", () => {
             for (const newJoiner of newJoiners) {
                 members.push(newJoiner);
                 getMembershipMock.mockReturnValue(members);
-                await vi.advanceTimersByTimeAsync(1_000);
+                await vi.advanceTimersByTimeAsync(300);
                 encryptionManager.onMembershipsUpdate();
                 await vi.advanceTimersByTimeAsync(1);
             }
@@ -461,9 +587,13 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 1_000;
+            // With 4 participants and this contingent the grace period is 12s
+            const gracePeriod = gracePeriodMsFor(4);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.join({
+                sharedPerMinuteToDeviceContingent: TEST_CONTINGENT,
+                keyRotationParticipantLimit: 4,
+            });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -499,19 +629,24 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            const gracePeriod = 1_000;
+            // With 3 participants and this contingent the grace period is 6s
+            const gracePeriod = gracePeriodMsFor(3);
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.join({
+                sharedPerMinuteToDeviceContingent: TEST_CONTINGENT,
+                keyRotationParticipantLimit: 4,
+            });
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
 
-            await vi.advanceTimersByTimeAsync(gracePeriod + 5_000);
+            await vi.advanceTimersByTimeAsync(gracePeriod);
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
             encryptionManager.onMembershipsUpdate();
-            await vi.advanceTimersByTimeAsync(1);
+            // Wait out the rotation block: with the pinned jitter draw it ends one rotation interval after the join
+            await vi.advanceTimersByTimeAsync(gracePeriod);
 
             // 3 participants is still below the limit of 4, so this rotates as usual
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
@@ -636,6 +771,683 @@ describe("RTCEncryptionManager", () => {
             expect(mockTransport.sendKey).not.toHaveBeenCalled();
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
         });
+    });
+
+    describe("Rotation delays", () => {
+        const bob = aStateBaseMembership("@bob:example.org", "BOBDEVICE");
+        const bob2 = aStateBaseMembership("@bob:example.org", "BOBDEVICE2");
+        const carl = aStateBaseMembership("@carl:example.org", "CARLDEVICE");
+        const dave = aStateBaseMembership("@dave:example.org", "DAVEDEVICE");
+        const eve = aStateBaseMembership("@eve:example.org", "EVEDEVICE");
+
+        const useKeyDelay = 1_000;
+
+        it("Should do a full rotation after a jitter delay when a user leaves", async () => {
+            vi.useFakeTimers();
+            // A rotation is blocked for `rotationInterval * Math.random() * 2`: a draw of 0.9 blocks for
+            // 1.8 rotation intervals.
+            vi.spyOn(Math, "random").mockReturnValue(0.9);
+            const jitterFactor = 0.9 * 2;
+
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout: the first key is distributed as is, there is nothing to rotate away from.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 0, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+            ]);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                0,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+            mockTransport.sendKey.mockClear();
+            onEncryptionKeysChanged.mockClear();
+
+            // Nothing happens until the block started by the first key (1.8 rotation intervals of the
+            // 3 participant session) has expired.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3) * jitterFactor);
+
+            // Carl leaves. Every other participant sees that at the same moment and would rotate at the same
+            // moment, so instead of rotating right away the rotation is blocked for another jittered delay
+            // (1.8 rotation intervals of the now 2 participant session: 3.6s).
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            // Nothing is sent in the meantime: there is no joiner to share the current key with.
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(2) * jitterFactor - 1);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            // The jitter delay has elapsed: a new key is created and sent to the remaining participants only.
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+
+            // It is only used locally after the `useKeyDelay`, to give the other participants time to receive it.
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+        });
+
+        it("Should rotate consecutively without any extra delay when the membership keeps changing inside the grace period", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0. It blocks rotations for one rotation interval of the
+            // 2 participant session it is created in: 2s (the jitter draw is pinned in `beforeEach`).
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // Carl joins 100ms later, well inside the block
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            // Dave joins 100ms after that, still inside the block
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl, dave]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            // Both of them only got the current key, no rotation happened yet...
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(2, expect.any(String), 0, [participantInfo(carl)]);
+            expect(mockTransport.sendKey).toHaveBeenNthCalledWith(3, expect.any(String), 0, [participantInfo(dave)]);
+
+            // The rotation happens when the block started by key 0 ends, and not before. Neither of the two
+            // joins moved that deadline, and neither of them earned a second delay of its own.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(2) - 200 - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(4);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+                participantInfo(dave),
+            ]);
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+
+            // Eve joins 100ms after the rollout of key 1 has finished. The same thing happens again: she gets
+            // the current key right away, and the rotation is deferred to the end of the block started by the
+            // rotation to key 1 (one rotation interval of the 4 participant session: 12s after that rotation).
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl, dave, eve]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(5);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [participantInfo(eve)]);
+
+            // Key 1 was created at T+2000, so its block ends at T+2000+12000. We are at T+3100.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(4) - useKeyDelay - 100 - 1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(5);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(6);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 2, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+                participantInfo(dave),
+                participantInfo(eve),
+            ]);
+
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                2,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+        });
+    });
+
+    describe("Max key age (maxKeyTTL)", () => {
+        const bob = aStateBaseMembership("@bob:example.org", "BOBDEVICE");
+        const bob2 = aStateBaseMembership("@bob:example.org", "BOBDEVICE2");
+        const carl = aStateBaseMembership("@carl:example.org", "CARLDEVICE");
+
+        const useKeyDelay = 1_000;
+
+        /**
+         * {@link RTCEncryptionManager.maxKeyTTL}: the manager never keeps using a key for longer than this.
+         * It is not part of the join config, so these tests run against the real 15 minutes.
+         */
+        const MAX_KEY_TTL = DEFAULT_MAX_KEY_TTL;
+
+        it("Should rotate the key every maxKeyTTL even if nobody joins or leaves", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 0, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+            mockTransport.sendKey.mockClear();
+            onEncryptionKeysChanged.mockClear();
+
+            // The membership does not change for the rest of this test. The key is rotated regardless, but
+            // not before its TTL has expired. The expiry is treated like a membership change, so it goes
+            // through the same jittered block: the rotation lands one rotation interval after the TTL
+            // (the jitter draw is pinned in `beforeEach`).
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL + gracePeriodMsFor(2) - 1);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+
+            // The new key is only used locally after the `useKeyDelay`, as for any other rotation.
+            expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(useKeyDelay);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledExactlyOnceWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+            mockTransport.sendKey.mockClear();
+
+            // The TTL of key 1 starts when key 1 was created, so the next rotation happens one TTL (plus
+            // the block) after that one. This keeps repeating for as long as the call lasts.
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL + gracePeriodMsFor(2) - useKeyDelay - 1);
+            expect(mockTransport.sendKey).not.toHaveBeenCalled();
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledExactlyOnceWith(expect.any(String), 2, [
+                participantInfo(bob),
+                participantInfo(bob2),
+            ]);
+        });
+
+        it("Should only rotate once when a user joins after the maxKeyTTL has expired", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // The TTL of key 0 expires at T+15min. It does not rotate right away: it blocks the rotation
+            // for one jittered rotation interval first, exactly like a membership change would.
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // Carl joins 100ms into that block. He gets the current key right away...
+            await vi.advanceTimersByTimeAsync(100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 0, [participantInfo(carl)]);
+
+            // ... and his join does not earn a rotation of its own. The block started by the TTL expiry is
+            // neither moved nor doubled up on: a single rotation to key 1 happens at the end of it.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(2) - 100);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+            ]);
+
+            // No second rotation follows the first one: key 2 is never created, and the only keys we ever
+            // used locally are 0 and 1.
+            await vi.advanceTimersByTimeAsync(10 * gracePeriodMsFor(3));
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+            expect(onEncryptionKeysChanged).toHaveBeenLastCalledWith(
+                expect.any(Uint8Array<ArrayBufferLike>),
+                1,
+                OWN_MEMBERSHIP,
+                OWN_RTC_BACKEND_IDENTITY,
+            );
+        });
+
+        it("Should only rotate once when a user joins just before the maxKeyTTL expires", async () => {
+            vi.useFakeTimers();
+
+            getMembershipMock.mockReturnValue([bob, bob2]);
+            encryptionManager.join({ sharedPerMinuteToDeviceContingent: TEST_CONTINGENT, useKeyDelay });
+
+            // Initial rollout of key 0 at T+0.
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+
+            // Carl joins 100ms before the TTL of key 0 expires. He gets the current key right away, and his
+            // join blocks the rotation for one rotation interval of the now 3 participant session.
+            await vi.advanceTimersByTimeAsync(MAX_KEY_TTL - 100);
+            getMembershipMock.mockReturnValue([bob, bob2, carl]);
+            encryptionManager.onMembershipsUpdate();
+            await flushPromises();
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 0, [participantInfo(carl)]);
+
+            // The TTL expires 100ms later, inside that block. It does not start a rotation of its own.
+            await vi.advanceTimersByTimeAsync(100);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(2);
+
+            // A single rotation to key 1 happens at the end of the block started by carl's join, and nothing
+            // rotates after it.
+            await vi.advanceTimersByTimeAsync(gracePeriodMsFor(3) - 100);
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+                participantInfo(bob),
+                participantInfo(bob2),
+                participantInfo(carl),
+            ]);
+
+            await vi.advanceTimersByTimeAsync(10 * gracePeriodMsFor(3));
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(3);
+            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+        });
+    });
+
+    describe("To-device rate in a simulated call", () => {
+        /**
+         * The simulation runs on the contingent a client gets when it configures nothing, so that what it
+         * measures is what a deployment would really see. The rotation intervals it implies
+         * (`60_000 * N * (N - 1) / contingent`) are:
+         *  - 100 participants: 1.7min
+         *  - 300 participants: 15.0min
+         * None of that costs anything to simulate, the fake timers jump straight from one scheduled wake up
+         * to the next.
+         */
+        // The default of `EncryptionConfig.sharedPerMinuteToDeviceContingent`, which is what the managers
+        // of the simulation run on.
+        const SIMULATION_CONTINGENT = DEFAULT_SHARED_PER_MINUTE_TO_DEVICE_CONTINGENT;
+        const graceFor = (participantCount: number): number =>
+            gracePeriodMsFor(participantCount, SIMULATION_CONTINGENT);
+
+        /** The call sizes we simulate, one after the other. */
+        const CALL_SIZES = [10, 100, 300];
+
+        /**
+         * How many participants of a call actually get their own encryption manager.
+         *
+         * Every client runs the same algorithm on the same view of the memberships, so a sample of them
+         * characterises the whole call; the recorded traffic is scaled up by `participants / simulated clients`
+         * to get the numbers the homeserver would really see. Running all 300 managers of the biggest call
+         * takes more than a minute, this keeps the test at a few seconds.
+         */
+        const SIMULATED_CLIENTS = 25;
+
+        /**
+         * The call fills up in {@link RAMP_UP_STEPS} steps of this length, rather than everybody joining at
+         * once. Sync delivers membership updates in batches, so a step adds a few participants at a time.
+         */
+        const JOIN_INTERVAL_MS = 50;
+        const RAMP_UP_STEPS = 50;
+
+        /**
+         * Everything after the ramp up is measured in multiples of the rotation interval of the call being
+         * simulated, because with the real contingent that interval spans three orders of magnitude
+         * (0.9s for 10 participants, 1.7min for 100, 15.0min for 300). A phase that is long enough to see a
+         * 300 participant call rotate would need hundreds of thousands of membership changes at a rate that
+         * makes sense for a 10 participant one.
+         */
+        /** Membership changes arrive four times as fast as a client is allowed to rotate. */
+        const CHANGES_PER_INTERVAL = 4;
+        /** How many rotation intervals the memberships keep changing for. */
+        const TOGGLING_INTERVALS = 6;
+        /**
+         * How many rotation intervals the memberships are then left alone for. Has to exceed the worst case
+         * for the last postponed rotation, which is two intervals, so that "nothing happens any more" is
+         * actually asserted over a meaningful stretch of time.
+         */
+        const QUIET_INTERVALS = 3;
+        /** How long the ramp up is given to play out before the measurement starts. */
+        const SETTLE_INTERVALS = 3;
+
+        /** The timings a call of `participantCount` participants is simulated with. */
+        function timingsFor(participantCount: number) {
+            // The call oscillates between `participantCount` and one more, so its rotation interval does too.
+            // Everything is derived from the smaller one, the shortest interval the call can use.
+            const rotationIntervalMs = graceFor(participantCount);
+            return {
+                rotationIntervalMs,
+                toggleIntervalMs: rotationIntervalMs / CHANGES_PER_INTERVAL,
+                togglingMs: rotationIntervalMs * TOGGLING_INTERVALS,
+                quietMs: rotationIntervalMs * QUIET_INTERVALS,
+                phaseMs: rotationIntervalMs * (TOGGLING_INTERVALS + QUIET_INTERVALS),
+            };
+        }
+
+        /** One `sendKey` call of one simulated client. */
+        interface KeyShare {
+            /** When the key was sent, relative to the start of the measured phase. */
+            time: number;
+            /** Device id of the client that sent it. */
+            sender: string;
+            /** How many to-device messages this share produces (the transport does not send one to ourselves). */
+            toDeviceMessages: number;
+            /**
+             * Whether this is a rotation (a brand new key, sent to everyone) or just the current key being
+             * handed to a new joiner.
+             */
+            isRotation: boolean;
+        }
+
+        interface SimulationResult {
+            participantCount: number;
+            simulatedClients: number;
+            timings: ReturnType<typeof timingsFor>;
+            /** Every key share of every simulated client, in the order they were sent. */
+            shares: KeyShare[];
+        }
+
+        /**
+         * Runs a call of `participantCount` participants and records every to-device message the simulated
+         * clients send.
+         *
+         * The participants join one after the other, and only once they are all in and the rotations that
+         * caused have run out does the measurement start.
+         *
+         * On top of the participants that stay for the whole simulation there is one extra participant that
+         * joins and leaves {@link CHANGES_PER_INTERVAL} times per rotation interval for
+         * {@link TOGGLING_INTERVALS} intervals, and is then gone for {@link QUIET_INTERVALS} of them. That
+         * flapping participant has no manager of its own, we only care about how the others react to it.
+         *
+         * Only what happens after everybody has joined is recorded: filling up the call is not something the
+         * contingent is meant to limit.
+         */
+        async function simulateCall(participantCount: number): Promise<SimulationResult> {
+            const timings = timingsFor(participantCount);
+            const participants = Array.from({ length: participantCount }, (_, i) =>
+                aStateBaseMembership(`@user${i}:example.org`, `DEVICE${i}`),
+            );
+            const flappingParticipant = aStateBaseMembership("@flapping:example.org", "FLAPPINGDEVICE");
+
+            let memberships: CallMembership[] = [];
+            let shares: KeyShare[] = [];
+            let phaseStart = 0;
+            const lastKeyIndex = new Map<string, number>();
+
+            const simulatedClients = Math.min(participantCount, SIMULATED_CLIENTS);
+            // Spread the clients we simulate evenly over the joining order, so that the sample covers the
+            // whole ramp up and not just the participants that were there first.
+            const simulatedIndices = new Set(
+                Array.from({ length: simulatedClients }, (_, i) =>
+                    Math.floor((i * participantCount) / simulatedClients),
+                ),
+            );
+
+            const managers: RTCEncryptionManager[] = [];
+            const addManagerFor = (own: CallMembership): void => {
+                const transport = {
+                    start: vi.fn(),
+                    stop: vi.fn(),
+                    on: vi.fn(),
+                    off: vi.fn(),
+                    sendKey: vi.fn((_key: string, keyIndex: number, targets: ParticipantDeviceInfo[]) => {
+                        const previousKeyIndex = lastKeyIndex.get(own.deviceId);
+                        lastKeyIndex.set(own.deviceId, keyIndex);
+                        shares.push({
+                            time: Date.now() - phaseStart,
+                            sender: own.deviceId,
+                            // `ToDeviceKeyTransport.sendKey` filters ourselves out of the targets
+                            toDeviceMessages: targets.filter((t) => t.deviceId !== own.deviceId).length,
+                            isRotation: previousKeyIndex !== undefined && previousKeyIndex !== keyIndex,
+                        });
+                        return Promise.resolve();
+                    }),
+                } as unknown as Mocked<ToDeviceKeyTransport>;
+
+                const manager = new RTCEncryptionManager(
+                    { userId: own.sender, deviceId: own.deviceId, memberId: `${own.sender}:${own.deviceId}` },
+                    // Like `MatrixRTCSession` does it, this includes our own membership
+                    () => memberships,
+                    transport,
+                    () => {},
+                    // No logger on purpose: this runs thousands of rollouts and assembling the log lines
+                    // (some of which list every participant) would dominate the runtime of this test.
+                    undefined,
+                    (userId, deviceId) => Promise.resolve(`${userId}|${deviceId}`),
+                );
+                manager.join({
+                    // Neither `sharedPerMinuteToDeviceContingent` nor `useKeyDelay`: with fake timers there
+                    // is no reason not to run the simulation on the defaults a real client would use.
+                    // No hard rotation limit: we want to observe the slow down, not the suppression.
+                    keyRotationParticipantLimit: undefined,
+                });
+                managers.push(manager);
+            };
+
+            const membershipsChanged = async (): Promise<void> => {
+                for (const manager of managers) manager.onMembershipsUpdate();
+                await flushPromises();
+            };
+
+            // The participants trickle in a few at a time rather than all at once, which is what a call
+            // really looks like. A client creates its first key when it joins, so this leaves the clients
+            // with keys of different ages to start with. Note that this on its own is *not* enough to keep
+            // their rotations apart: rotating is driven by membership changes, which every client observes
+            // at the same moment, and two clients that once rotate in the same round share the age of their
+            // key from then on and stay locked together for good.
+            memberships = [];
+            const joinersPerStep = Math.ceil(participantCount / RAMP_UP_STEPS);
+            for (let joined = 0; joined < participantCount; joined += joinersPerStep) {
+                for (const [index, participant] of participants.slice(joined, joined + joinersPerStep).entries()) {
+                    memberships = [...memberships, participant];
+                    if (simulatedIndices.has(joined + index)) addManagerFor(participant);
+                }
+                await membershipsChanged();
+                await vi.advanceTimersByTimeAsync(JOIN_INTERVAL_MS);
+            }
+
+            // Let the rotations that the ramp up owes run out...
+            await vi.advanceTimersByTimeAsync(SETTLE_INTERVALS * graceFor(participantCount + 1));
+            // ...and only start recording from here on.
+            phaseStart = Date.now();
+            shares = [];
+
+            // One participant joins and leaves over and over again.
+            for (let elapsed = 0; elapsed < timings.togglingMs; elapsed += timings.toggleIntervalMs) {
+                memberships = memberships.includes(flappingParticipant)
+                    ? participants
+                    : [...participants, flappingParticipant];
+                await membershipsChanged();
+                await vi.advanceTimersByTimeAsync(timings.toggleIntervalMs);
+            }
+
+            // Nothing changes anymore.
+            await vi.advanceTimersByTimeAsync(timings.quietMs);
+
+            managers.forEach((manager) => manager.leave());
+            vi.clearAllTimers();
+            return { participantCount, simulatedClients, timings, shares };
+        }
+
+        /** The to-device messages the whole call sent, extrapolated from the simulated clients. */
+        function totalToDeviceMessages({ participantCount, simulatedClients, shares }: SimulationResult): number {
+            const sampled = shares.reduce((sum, share) => sum + share.toDeviceMessages, 0);
+            return (sampled * participantCount) / simulatedClients;
+        }
+
+        /** How often a single client rotated its key during the phase. */
+        function rotationsPerClient({ simulatedClients, shares }: SimulationResult): number {
+            return shares.filter((share) => share.isRotation).length / simulatedClients;
+        }
+
+        /** Formats a duration the way a human reads the rotation intervals of a call. */
+        function humanMs(ms: number): string {
+            if (ms >= 60_000) return `${(ms / 60_000).toFixed(1)}min`;
+            return `${(ms / 1000).toFixed(1)}s`;
+        }
+
+        /**
+         * Buckets the whole call's to-device traffic into a histogram, half a rotation interval per bucket:
+         * a client rotates at most once per interval, so an evenly spread call puts about half of the
+         * clients in each bucket, and a call that rotates in lockstep puts all of them in one.
+         */
+        function distribution(result: SimulationResult): Array<{ messages: number; rotations: number }> {
+            const scale = result.participantCount / result.simulatedClients;
+            const bucketMs = result.timings.rotationIntervalMs / 2;
+            const buckets = Array.from({ length: Math.ceil(result.timings.phaseMs / bucketMs) }, () => ({
+                messages: 0,
+                rotations: 0,
+            }));
+            for (const share of result.shares) {
+                const bucket = buckets[Math.floor(share.time / bucketMs)];
+                if (!bucket) continue;
+                bucket.messages += share.toDeviceMessages * scale;
+                if (share.isRotation) bucket.rotations += scale;
+            }
+            return buckets;
+        }
+
+        function logDistribution(result: SimulationResult): void {
+            const { rotationIntervalMs, phaseMs, togglingMs } = result.timings;
+            const buckets = distribution(result);
+            const bucketMs = rotationIntervalMs / 2;
+            const peak = Math.max(...buckets.map((b) => b.messages), 1);
+            const total = totalToDeviceMessages(result);
+            const perMinute = (total / phaseMs) * 60_000;
+            const rotations = result.shares.filter((share) => share.isRotation);
+            const distinct = new Set(rotations.map((share) => share.time)).size;
+            console.log(
+                `\n${result.participantCount} participants (${result.simulatedClients} simulated), ` +
+                    `rotation interval ${humanMs(rotationIntervalMs)}, ` +
+                    `${rotationsPerClient(result).toFixed(1)} rotations per client over ${humanMs(phaseMs)}\n` +
+                    `${total} to-device messages ` +
+                    `= ${perMinute.toFixed(0)}/min of the ${SIMULATION_CONTINGENT}/min contingent\n` +
+                    `${distinct} of ${rotations.length} rotations happen at a moment of their own ` +
+                    `(1 of ${result.simulatedClients} would mean the whole call rotates in lockstep)`,
+            );
+            for (const [index, bucket] of buckets.entries()) {
+                const bar = "#".repeat(Math.round((bucket.messages / peak) * 40));
+                const phase = index * bucketMs < togglingMs ? "toggling" : "quiet   ";
+                console.log(
+                    `  ${humanMs(index * bucketMs).padStart(7)} ${phase} ${bar.padEnd(40)} ` +
+                        `${String(Math.round(bucket.messages)).padStart(8)} msgs ` +
+                        `${String(Math.round(bucket.rotations)).padStart(4)} rot`,
+                );
+            }
+        }
+
+        it("Should stay inside the contingent and stop rotating once the memberships settle", async () => {
+            vi.useFakeTimers();
+            // The jitter draws come from a seeded PRNG rather than from `Math.random`, so that every run of
+            // the simulation explores the same draws and a failure reproduces. Change the seed to explore
+            // another set of them.
+            let seed = 1_073_741_823;
+            vi.spyOn(Math, "random").mockImplementation(() => {
+                seed = (seed * 48271) % 0x7fff_ffff;
+                return seed / 0x7fff_ffff;
+            });
+
+            const results = new Map<number, SimulationResult>();
+            for (const participantCount of CALL_SIZES) {
+                results.set(participantCount, await simulateCall(participantCount));
+            }
+
+            /** The gaps between one client's consecutive rotations, for every simulated client. */
+            const rotationIntervals = (result: SimulationResult): number[][] =>
+                [...new Set(result.shares.map((share) => share.sender))].map((client) => {
+                    const times = result.shares
+                        .filter((share) => share.isRotation && share.sender === client)
+                        .map((share) => share.time);
+                    return times.slice(1).map((time, i) => time - times[i]);
+                });
+
+            for (const [participantCount, result] of results) {
+                logDistribution(result);
+                const { rotationIntervalMs, toggleIntervalMs, togglingMs, phaseMs } = result.timings;
+
+                // Every message of a phase falls into this window: the toggling, plus at the very worst two
+                // rotation intervals for the last postponed rotation (see QUIET_INTERVALS).
+                const lastMembershipChange = togglingMs - toggleIntervalMs;
+                const activeWindowMs = lastMembershipChange + 2 * graceFor(participantCount + 1) + 1;
+
+                // The contingent is the number of to-device messages the whole call may send per minute.
+                const perMinute = (totalToDeviceMessages(result) / activeWindowMs) * 60_000;
+                expect(perMinute).toBeLessThanOrEqual(SIMULATION_CONTINGENT);
+
+                // Every single client keeps to the rotation interval that the contingent implies. The call
+                // oscillates between `participantCount` and `participantCount + 1` members, so the shortest
+                // interval it can ever use is the one of the smaller session.
+                // `Date.now()` is whole milliseconds, the interval usually is not, so allow the rounding.
+                const intervals = rotationIntervals(result);
+                expect(Math.min(...intervals.flat(), Infinity)).toBeGreaterThanOrEqual(Math.floor(rotationIntervalMs));
+                // ...and does not sit idle for much longer than that either, once it owes a rotation. A
+                // rotation also holds the rollout for `useKeyDelay` before the next one can start, which is
+                // nothing next to the interval of a big call but is most of it in a small one.
+                const mean = intervals.flat().reduce((a, b) => a + b, 0) / intervals.flat().length;
+                expect(mean).toBeLessThanOrEqual(graceFor(participantCount + 1) * 1.5 + DEFAULT_USE_KEY_DELAY);
+
+                // The clients do not rotate in lockstep. Every one of them rotates on its own schedule, so
+                // the rotations land on their own moments in time rather than on a handful of shared ones.
+                // (Before the rotations were spread out, all clients of a call shared the same timestamps and
+                // this ratio was about 1/25 rather than about 1.)
+                const rotations = result.shares.filter((share) => share.isRotation);
+                const distinctMoments = new Set(rotations.map((share) => share.time)).size;
+                expect(distinctMoments).toBeGreaterThan(rotations.length * 0.5);
+
+                // Once the memberships stop changing, the postponed rotation is caught up on and then
+                // everything goes quiet. The one thing that still fires is the forced rotation of a key that
+                // reached `maxKeyTTL`, which a quiet phase of a big call is long enough to see: the interval
+                // of a 300 participant call is a quarter of an hour on its own.
+                expect(activeWindowMs).toBeLessThan(phaseMs);
+                for (const share of result.shares.filter((share) => share.time > activeWindowMs)) {
+                    const previous = result.shares.filter((o) => o.sender === share.sender && o.time < share.time);
+                    expect(previous).not.toEqual([]);
+                    expect({
+                        isRotation: share.isRotation,
+                        sinceLastShare: share.time - previous[previous.length - 1].time >= DEFAULT_MAX_KEY_TTL,
+                    }).toEqual({ isRotation: true, sinceLastShare: true });
+                }
+            }
+
+            // The whole point of the contingent: the bigger the call, the further apart the rotations of a
+            // single client are, because each of them costs `N - 1` to-device messages.
+            const measuredInterval = (participantCount: number): number => {
+                const flat = rotationIntervals(results.get(participantCount)!).flat();
+                return flat.reduce((a, b) => a + b, 0) / flat.length;
+            };
+            expect(measuredInterval(100)).toBeGreaterThan(measuredInterval(10) * 10);
+            expect(measuredInterval(300)).toBeGreaterThan(measuredInterval(100) * 5);
+            // ...but a call this size never stops rotating altogether, that is what the hard participant
+            // limit ({@link EncryptionConfig.keyRotationParticipantLimit}) is for.
+            expect(rotationsPerClient(results.get(300)!)).toBeGreaterThan(0);
+        }, 30_000);
     });
 
     describe("Receiving Keys", () => {
@@ -906,7 +1718,7 @@ describe("RTCEncryptionManager", () => {
         });
     });
 
-    it("Should only rotate once again if several membership changes during a rollout", async () => {
+    it("Should only rotate once when several membership changes happen while the rotation is blocked", async () => {
         vi.useFakeTimers();
 
         let members = [
@@ -941,7 +1753,8 @@ describe("RTCEncryptionManager", () => {
         ];
         getMembershipMock.mockReturnValue(members);
 
-        // This should start a new key rollout
+        // The rotation this triggers is blocked until the end of the first key's rotation interval
+        // (60ms for the 3 participants the key was created for)
         encryptionManager.onMembershipsUpdate();
         await vi.advanceTimersByTimeAsync(10);
 
@@ -949,23 +1762,22 @@ describe("RTCEncryptionManager", () => {
         members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE")];
         getMembershipMock.mockReturnValue(members);
 
-        // The key `1` rollout is in progress
+        // The rotation is still blocked
         encryptionManager.onMembershipsUpdate();
         await vi.advanceTimersByTimeAsync(10);
 
-        // And another one ( plus a joiner)
+        // And another change (a leaver plus a joiner), still inside the block
         const lastMembership = [aStateBaseMembership("@bob:example.org", "BOBDEVICE3")];
         getMembershipMock.mockReturnValue(lastMembership);
-        // The key `1` rollout is still in progress
         encryptionManager.onMembershipsUpdate();
         await vi.advanceTimersByTimeAsync(10);
 
-        // Let all rollouts finish
+        // Let the block expire and the rollout finish
         await vi.advanceTimersByTimeAsync(2000);
 
-        // There should 2 rollout. The `1` rollout, then just one additional one
-        // that has "buffered" the 2 membership changes with leavers
-        expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+        // All three membership changes are coalesced into a single rotation at the end of the block,
+        // based on the memberships at that point.
+        expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(1);
         expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
             expect.any(Uint8Array<ArrayBufferLike>),
             1,
@@ -976,30 +1788,15 @@ describe("RTCEncryptionManager", () => {
             },
             "@alice:example.org:DEVICE01",
         );
-        expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-            expect.any(Uint8Array<ArrayBufferLike>),
-            2,
-            {
-                deviceId: "DEVICE01",
-                memberId: "@alice:example.org:DEVICE01",
-                userId: "@alice:example.org",
-            },
-            "@alice:example.org:DEVICE01",
-        );
 
-        // Key `2` should only be distributed to the last membership
-        expect(mockTransport.sendKey).toHaveBeenLastCalledWith(
-            expect.any(String),
-            2,
-            // And send only to the last membership
-            [
-                {
-                    userId: "@bob:example.org",
-                    deviceId: "BOBDEVICE3",
-                    membershipTs: 1000,
-                },
-            ],
-        );
+        // Key `1` should only be distributed to the last membership
+        expect(mockTransport.sendKey).toHaveBeenLastCalledWith(expect.any(String), 1, [
+            {
+                userId: "@bob:example.org",
+                deviceId: "BOBDEVICE3",
+                membershipTs: 1000,
+            },
+        ]);
     });
 
     describe("RTC backend pseudonymous id", () => {
