@@ -73,7 +73,7 @@ import {
     MediaPrefix,
     Method,
     retryNetworkOperation,
-    type TokenRefreshFunction,
+    type TokenRefreshCallback,
     type Upload,
     type UploadOpts,
     type UploadResponse,
@@ -319,15 +319,32 @@ export interface ICreateClientOpts {
      */
     deviceId?: string;
 
+    /**
+     * The access token to use. Can be omitted if to call only unauthenticated APIs, or provided to
+     * create an authenticated client.
+     */
     accessToken?: string;
+
+    /**
+     * The current refresh token, or omit if the session has no refresh token in which case the tokens
+     * will not be refreshed.
+     */
     refreshToken?: string;
 
     /**
-     * Function used to attempt refreshing access and refresh tokens
-     * Called by http-api when a possibly expired token is encountered
-     * and a refreshToken is found
+     * Called when the access tokens are refreshed.
+     * The client must replace the tokens it had stored previously which will no
+     * longer be valid.
+     *
+     * Required if a {@link refreshToken} is provided.
      */
-    tokenRefreshFunction?: TokenRefreshFunction;
+    onTokenRefresh?: TokenRefreshCallback;
+
+    /**
+     * If this is an OAuth2-native session (as per MSC2965/MSC3861), the OAuth client ID this
+     * application is registered with the delegated auth server under.
+     */
+    oauthClientId?: string;
 
     /**
      * Identity server provider to retrieve the user's access token when accessing
@@ -1358,7 +1375,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
             refreshToken: opts.refreshToken,
-            tokenRefreshFunction: opts.tokenRefreshFunction,
+            onTokenRefresh: opts.onTokenRefresh,
+            oauth2ClientConfig: opts.oauthClientId
+                ? {
+                      clientId: opts.oauthClientId,
+                      deviceId: this.deviceId ?? undefined,
+                  }
+                : undefined,
+            authMetadataCallback: this.getAuthMetadata.bind(this),
             prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
@@ -6299,6 +6323,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Get the API versions supported by the server, along with any
      * unstable APIs it supports
+     *
      * @returns The server /versions response
      */
     public async getVersions(): Promise<IServerVersions> {
@@ -6847,13 +6872,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * method is called. The state of the MatrixClient object is not affected:
      * it is up to the caller to either reset or destroy the MatrixClient after
      * this method succeeds.
-     * @param stopClient - whether to stop the client before calling /logout to prevent invalid token errors.
+     *
+     * For an OAuth2-native session (ie. one created with `oauth2ClientConfig`), this revokes the access
+     * and refresh tokens directly with the delegated auth server instead of calling the `/logout` API,
+     * since the homeserver does not own the tokens in that case.
+     *
+     * @param stopClient - whether to stop the client before logging out to prevent invalid token errors.
      * @returns Promise which resolves: On success, the empty object `{}`
      */
     public async logout(stopClient = false): Promise<EmptyObject> {
         if (stopClient) {
             this.stopClient();
             this.http.abort();
+        }
+
+        if (this.http.opts.oauth2ClientConfig) {
+            await this.http.revokeOAuthTokens();
+            return {};
         }
 
         return this.http.authedRequest(Method.Post, "/logout");
@@ -8982,9 +9017,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws when delegated auth config is invalid or unreachable
      */
     public async getAuthMetadata(): Promise<ValidatedAuthMetadata> {
-        const useStable = await this.isVersionSupported("v1.15");
         const authMetadata = await this.http.request(Method.Get, "/auth_metadata", undefined, undefined, {
-            prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
+            prefix: ClientPrefix.V1,
         });
 
         if (isValidAuthMetadata(authMetadata)) {

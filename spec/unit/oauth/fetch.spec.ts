@@ -94,12 +94,8 @@ describe("fetchWithLogging()", () => {
                 body: { access_token: "abc123", token_type: "Bearer", expires_in: 300 },
             });
 
-            const auth = new OAuth2(
-                delegatedAuthConfig,
-                { clientId: "test-client-id", redirectUri: "https://test.com" },
-                mockLogger,
-            );
-            await auth.completeAuthorizationCodeGrant("code123");
+            const auth = new OAuth2(delegatedAuthConfig, { clientId: "test-client-id" }, mockLogger);
+            await auth.completeAuthorizationCodeGrant("code123", "https://test.com");
 
             expect(mockLogger.debug.mock.calls).toEqual([
                 ["OAuth2: --> POST https://auth.org/token"],
@@ -110,11 +106,7 @@ describe("fetchWithLogging()", () => {
         it("should log revocation endpoint requests made by OAuth2", async () => {
             fetchMock.post(delegatedAuthConfig.revocation_endpoint, { status: 200, body: "{}" });
 
-            const auth = new OAuth2(
-                delegatedAuthConfig,
-                { clientId: "test-client-id", redirectUri: "https://test.com" },
-                mockLogger,
-            );
+            const auth = new OAuth2(delegatedAuthConfig, { clientId: "test-client-id" }, mockLogger);
             await auth.revokeToken("abc123", "access_token");
 
             expect(mockLogger.debug.mock.calls[0]).toEqual(["OAuth2: --> POST https://auth.org/revoke"]);
