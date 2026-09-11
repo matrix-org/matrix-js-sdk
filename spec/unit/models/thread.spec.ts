@@ -714,6 +714,60 @@ describe("Thread", () => {
         });
     });
 
+    describe("hasCurrentUserParticipated", () => {
+        const myUserId = "@bob:example.org";
+        const otherUserId = "@alice:example.org";
+        const roomId = "!room:example.org";
+
+        let previousThreadHasServerSideSupport: FeatureSupport;
+
+        beforeAll(() => {
+            previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+        });
+
+        afterAll(() => {
+            Thread.setServerSideSupport(previousThreadHasServerSideSupport);
+        });
+
+        /**
+         * Create a client whose user is `myUserId`, plus a thread rooted by someone else which
+         * the current user has not participated in (the root carries no bundled relation, so the
+         * server's `current_user_participated` flag is absent).
+         */
+        async function createThreadWithoutMe(): Promise<{ client: MatrixClient; thread: Thread }> {
+            const client = createClient();
+            vi.spyOn(client, "getUserId").mockReturnValue(myUserId);
+            const thread = await createThread(client, otherUserId, roomId);
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+            return { client, thread };
+        }
+
+        it("is set when the current user replies in the thread", async () => {
+            const { thread } = await createThreadWithoutMe();
+
+            thread.addEvent(createThreadMessage(thread.id, myUserId, roomId, "my reply"), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(true);
+        });
+
+        it("is not set when another user replies in the thread", async () => {
+            const { thread } = await createThreadWithoutMe();
+
+            thread.addEvent(createThreadMessage(thread.id, otherUserId, roomId, "their reply"), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+        });
+
+        it("is not set by the current user's reaction to a thread event", async () => {
+            const { client, thread } = await createThreadWithoutMe();
+
+            thread.addEvent(mkReaction(thread.rootEvent!, client, myUserId, roomId), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+        });
+    });
+
     describe("addEvent", () => {
         describe("Given server support for threads", () => {
             let previousThreadHasServerSideSupport: FeatureSupport;
