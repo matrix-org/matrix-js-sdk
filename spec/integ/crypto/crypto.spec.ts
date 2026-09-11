@@ -96,7 +96,7 @@ import {
 import { AccountDataAccumulator } from "../../test-utils/AccountDataAccumulator";
 import { UNSIGNED_MEMBERSHIP_FIELD } from "../../../src/@types/event";
 import { KnownMembership } from "../../../src/@types/membership";
-import { type KeyBackup } from "../../../src/rust-crypto/backup.ts";
+import { RustBackupManager, type KeyBackup } from "../../../src/rust-crypto/backup.ts";
 import { CryptoEvent } from "../../../src/crypto-api";
 
 afterEach(() => {
@@ -1914,6 +1914,10 @@ describe("crypto", () => {
 
         describe("Manage Key Backup", () => {
             it("Should be able to restore from 4S after bootstrap", async () => {
+                // Since we wait for the backup upload loop to run, make sure it doesn't sit around for 10 seconds
+                // doing random backoff.
+                vi.spyOn(RustBackupManager, "maxBackupLoopStartDelayMillis", "get").mockReturnValue(100);
+
                 const backupVersion = "1";
                 await bootstrapSecurity(backupVersion);
 
@@ -1953,7 +1957,7 @@ describe("crypto", () => {
                 await aliceClient.getCrypto()!.loadSessionBackupPrivateKeyFromSecretStorage();
                 const importResult = await aliceClient.getCrypto()!.restoreKeyBackup();
                 expect(importResult.imported).toStrictEqual(1);
-            }, 10000);
+            });
 
             it("Reset key backup should create a new backup and update 4S", async () => {
                 // First set up 4S and key backup
