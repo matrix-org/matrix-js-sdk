@@ -68,6 +68,28 @@ export function determineFeatureSupport(stable: boolean, unstable: boolean): Fea
     }
 }
 
+/**
+ * Cap on how many threads fetch their initial events at the same time. Each fetch is a (recursive) `/relations`
+ * request, and opening a thread list creates every thread in the room at once; without a cap a room with dozens
+ * of threads fires dozens of concurrent heavy requests, which can starve everything else the homeserver worker is doing.
+ */
+const MAX_CONCURRENT_INITIAL_FETCHES = 3;
+let runningInitialFetches = 0;
+const waitingInitialFetches: (() => void)[] = [];
+
+async function withInitialFetchSlot<T>(fn: () => Promise<T>): Promise<T> {
+    if (runningInitialFetches >= MAX_CONCURRENT_INITIAL_FETCHES) {
+        await new Promise<void>((resolve) => waitingInitialFetches.push(resolve));
+    }
+    runningInitialFetches++;
+    try {
+        return await fn();
+    } finally {
+        runningInitialFetches--;
+        waitingInitialFetches.shift()?.();
+    }
+}
+
 export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerMap> {
     public static hasServerSideSupport = FeatureSupport.None;
     public static hasServerSideListSupport = FeatureSupport.None;
@@ -670,9 +692,9 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                         this.timelineSet.addEventsToTimeline([this.rootEvent], true, false, this.liveTimeline, null);
                         this.liveTimeline.setPaginationToken(null, Direction.Backward);
                     } else {
-                        this.initalEventFetchProm = this.client.paginateEventTimeline(this.liveTimeline, {
-                            backwards: true,
-                        });
+                        this.initalEventFetchProm = withInitialFetchSlot(() =>
+                            this.client.paginateEventTimeline(this.liveTimeline, { backwards: true }),
+                        );
                         await this.initalEventFetchProm;
                     }
                     // We have now fetched the initial events, so set the flag. We need to do this before
