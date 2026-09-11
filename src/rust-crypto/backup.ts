@@ -31,7 +31,7 @@ import {
 import { type Logger } from "../logger.ts";
 import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "../http-api/index.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
-import { encodeUri, logDuration } from "../utils.ts";
+import { encodeUri } from "../utils.ts";
 import { type OutgoingRequestProcessor } from "./OutgoingRequestProcessor.ts";
 import { sleep } from "../utils.ts";
 import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
@@ -427,17 +427,20 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     private async backupKeysLoop(): Promise<void> {
+        const logger = this.logger.getChild("[backupKeysLoop]");
+
         if (this.backupKeysLoopRunning) {
-            this.logger.debug(`Backup loop already running`);
+            logger.debug(`Backup loop already running`);
             return;
         }
         this.backupKeysLoopRunning = true;
 
-        this.logger.debug(`Backup: Starting keys upload loop for backup version:${this.activeBackupVersion}.`);
-
         // Wait between 0 and `maxBackupLoopStartDelayMillis` milliseconds, to avoid backup requests from different
         // clients hitting the server all at the same time when a new key is sent.
         const delay = Math.random() * RustBackupManager.maxBackupLoopStartDelayMillis;
+        logger.debug(
+            `Starting keys upload loop for backup version ${this.activeBackupVersion}, but delaying startup by ${delay}ms`,
+        );
         await sleep(delay);
 
         try {
@@ -451,25 +454,28 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
             while (!this.stopped) {
                 // Get a batch of room keys to upload
-                let request: RustSdkCryptoJs.KeysBackupRequest | undefined = undefined;
+                let request;
                 try {
-                    request = await logDuration(
-                        this.logger,
-                        "BackupRoomKeys: Get keys to backup from rust crypto-sdk",
-                        async () => {
-                            return await this.olmMachine.backupRoomKeys();
-                        },
-                    );
+                    request = await this.olmMachine.backupRoomKeys();
+                    if (request) {
+                        logger.debug("Got keys to back up from crypto-sdk");
+                    } else {
+                        logger.debug(`No more keys to back up: ending loop for version ${this.activeBackupVersion}.`);
+                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
+                        return;
+                    }
                 } catch (err) {
-                    this.logger.error("Backup: Failed to get keys to backup from rust crypto-sdk", err);
+                    logger.error("Failed to get keys to backup from rust crypto-sdk: ending backup loop", err);
+                    return;
                 }
 
-                if (!request || this.stopped || !this.activeBackupVersion) {
-                    this.logger.debug(`Backup: Ending loop for version ${this.activeBackupVersion}.`);
-                    if (!request) {
-                        // nothing more to upload
-                        this.emit(CryptoEvent.KeyBackupSessionsRemaining, 0);
-                    }
+                if (this.stopped) {
+                    logger.debug(`Client stopping: ending loop for version ${this.activeBackupVersion}.`);
+                    return;
+                }
+
+                if (!this.activeBackupVersion) {
+                    logger.debug(`Backup no longer active: ending loop.`);
                     return;
                 }
 
@@ -492,7 +498,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             const keyCount = await this.olmMachine.roomKeyCounts();
                             remainingToUploadCount = keyCount.total - keyCount.backedUp;
                         } catch (err) {
-                            this.logger.error("Backup: Failed to get key counts from rust crypto-sdk", err);
+                            logger.error("Failed to get key counts from rust crypto-sdk", err);
                         }
                     }
 
@@ -508,15 +514,15 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     }
                 } catch (err) {
                     numFailures++;
-                    this.logger.error("Backup: Error processing backup request for rust crypto-sdk", err);
+                    logger.error("Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
                         const errCode = err.data.errcode;
                         if (errCode == "M_NOT_FOUND" || errCode == "M_WRONG_ROOM_KEYS_VERSION") {
-                            this.logger.debug(`Backup: Failed to upload keys to current vesion: ${errCode}.`);
+                            logger.debug(`Failed to upload keys to current version: ${errCode}.`);
                             try {
                                 await this.disableKeyBackup();
                             } catch (error) {
-                                this.logger.error("Backup: An error occurred while disabling key backup:", error);
+                                logger.error("An error occurred while disabling key backup:", error);
                             }
                             this.emit(CryptoEvent.KeyBackupFailed, err.data.errcode!);
                             // There was an active backup and we are out of sync with the server
@@ -529,21 +535,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             try {
                                 const waitTime = err.getRetryAfterMs();
                                 if (waitTime && waitTime > 0) {
+                                    logger.debug(`Sleeping ${waitTime}ms after ratelimit`);
                                     await sleep(waitTime);
                                     continue;
                                 }
                             } catch (error) {
-                                this.logger.warn(
-                                    "Backup: An error occurred while retrieving a rate-limit retry delay",
-                                    error,
-                                );
+                                logger.warn("An error occurred while retrieving a rate-limit retry delay", error);
                             } // else go to the normal backoff
                         }
                     }
 
                     // Some other errors (mx, network, or CORS or invalid urls?) anyhow backoff
                     // exponential backoff if we have failures
-                    await sleep(1000 * Math.pow(2, Math.min(numFailures - 1, 4)));
+                    const waitTime = 1000 * Math.pow(2, Math.min(numFailures - 1, 4));
+                    logger.debug(`Sleeping ${waitTime}ms after failure #${numFailures}`);
+                    await sleep(waitTime);
                 }
                 isFirstIteration = false;
             }
