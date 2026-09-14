@@ -2794,7 +2794,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * If we expect that an event is part of a thread but is missing the relation
      * we need to add it manually, as well as the reply fallback
      */
-    private addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
+    protected addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
         if (threadId && !content["m.relates_to"]?.rel_type) {
             const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
             content["m.relates_to"] = {
@@ -2819,12 +2819,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     * Sends an event, adding it to the local echo and encrypting it if the room requires it.
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the sent event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2833,13 +2839,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }): Promise<ISendEventResponse>;
     /**
      * Sends a delayed event (MSC4140).
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param delayOpts - Properties of the delay for this event.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.delayOpts - Properties of the delay for this event.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the scheduled delayed event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2847,7 +2858,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict;
         txnId?: string;
     }): Promise<SendDelayedEventResponse>;
-    private sendCompleteEvent({
+    protected sendCompleteEvent({
         roomId,
         threadId,
         eventObject,
