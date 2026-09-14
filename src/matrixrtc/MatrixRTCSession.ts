@@ -39,6 +39,7 @@ import type {
     RtcSlotEncryptionContent,
 } from "./types.ts";
 import { RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS } from "./types.ts";
+import { isLeftMembershipContent } from "./membershipData/index.ts";
 import { UnsupportedStickyEventsEndpointError } from "../errors.ts";
 import {
     MembershipManagerEvent,
@@ -979,7 +980,7 @@ async function computeBackendIdentityAndVerifyMemberEvents(
         const content = memberEvent.getContent();
 
         // Quick filter to avoid unneeded processing of invalid events or left events.
-        if (!quickFilterNonRelevantContents(content, logger)) {
+        if (!quickFilterNonRelevantContents(content)) {
             continue;
         }
 
@@ -997,11 +998,12 @@ async function computeBackendIdentityAndVerifyMemberEvents(
     return callMemberships;
 }
 
-function quickFilterNonRelevantContents(content: IContent, logger: Logger): boolean {
+function quickFilterNonRelevantContents(content: IContent): boolean {
+    // Don't even bother about left memberships (saves us from costly type/"key in" checks in bigger rooms)
+    if (isLeftMembershipContent(content)) return false;
+
     // Ignore sticky keys for the count
     const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
-    // Don't even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-    if (eventKeysCount === 0) return false;
 
     // We first decide if it's a MSC4143 event (per device state key)
     if (eventKeysCount > 1 && "application" in content) {
