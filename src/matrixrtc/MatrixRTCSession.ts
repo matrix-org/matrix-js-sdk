@@ -38,6 +38,8 @@ import type {
     RtcSlotEventContent,
     RtcSlotEncryptionContent,
 } from "./types.ts";
+import { RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS } from "./types.ts";
+import { UnsupportedStickyEventsEndpointError } from "../errors.ts";
 import {
     MembershipManagerEvent,
     type MembershipManagerEventHandlerMap,
@@ -265,7 +267,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
-    private joinConfig?: SessionConfig;
+    private joinConfig?: JoinSessionConfig;
     private logger: Logger;
 
     private pendingNotificationToSend: undefined | RTCNotificationType;
@@ -776,11 +778,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         callIntent?: RTCCallIntent,
     ): void {
         const lifetime = this.joinConfig?.notificationLifetimeMs ?? 90_000;
+        const slotId = computeSlotId(this.slotDescription);
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
         }> => {
             const content: IRTCNotificationContent = {
+                "slot_id": slotId,
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": notificationType,
                 "m.relates_to": {
@@ -789,12 +793,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 },
                 "sender_ts": Date.now(),
                 "lifetime": lifetime,
+                "msc4354_sticky_key": slotId,
             };
             if (callIntent) {
                 content["m.call.intent"] = callIntent;
             }
-            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);
-            return { response, content };
+            return { response: await this.sendNotificationEvent(content), content };
         };
 
         void sendNotificationEvent()
@@ -806,6 +810,29 @@ export class MatrixRTCSession extends TypedEventEmitter<
             .catch(([errorLegacy, errorNew]) =>
                 this.logger.error("Failed to send call notification", errorLegacy, errorNew),
             );
+    }
+
+    /**
+     * Sends a notification event, as a sticky event (MSC4354) where the server supports it.
+     */
+    private async sendNotificationEvent(content: IRTCNotificationContent): Promise<ISendEventResponse> {
+        const roomId = this.roomSubset.roomId;
+        try {
+            // Stay sticky slightly longer than the lifetime, since the server measures the sticky duration
+            // from `origin_server_ts` while receivers measure the lifetime from `sender_ts`.
+            const stickyDurationMs = content.lifetime + RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS;
+            return await this.client._unstable_sendStickyEvent(
+                roomId,
+                stickyDurationMs,
+                null,
+                EventType.RTCNotification,
+                content,
+            );
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending notification as a regular event");
+            return await this.client.sendEvent(roomId, EventType.RTCNotification, content);
+        }
     }
 
     /**

@@ -37,6 +37,7 @@ import {
 } from "../../../src/matrixrtc/types.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
+import { UnsupportedStickyEventsEndpointError } from "../../../src/errors.ts";
 import {
     computeRtcIdentityRaw,
     type RtcMembershipData,
@@ -648,6 +649,7 @@ describe("MatrixRTCSession", () => {
     describe("joining", () => {
         let mockRoom: Room;
         let sendEventMock: Mock;
+        let sendStickyEventMock: Mock;
         let sendStateEventMock: Mock;
 
         let sentStateEvent: Promise<void>;
@@ -656,8 +658,10 @@ describe("MatrixRTCSession", () => {
                 sendStateEventMock = vi.fn(resolve);
             });
             sendEventMock = vi.fn().mockResolvedValue(undefined);
+            sendStickyEventMock = vi.fn().mockResolvedValue(undefined);
             client.sendStateEvent = sendStateEventMock;
             client.sendEvent = sendEventMock;
+            client._unstable_sendStickyEvent = sendStickyEventMock;
 
             client._unstable_updateDelayedEvent = vi.fn();
             client._unstable_cancelScheduledDelayedEvent = vi.fn();
@@ -696,7 +700,7 @@ describe("MatrixRTCSession", () => {
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -710,21 +714,31 @@ describe("MatrixRTCSession", () => {
             await sess!._onRTCSessionMemberUpdate();
             const ownMembershipId = sess?.memberships[0].eventId;
 
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
-                "m.mentions": { user_ids: [], room: true },
-                "notification_type": "ring",
-                "m.relates_to": {
-                    event_id: ownMembershipId,
-                    rel_type: "m.reference",
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                {
+                    "slot_id": "m.call#ROOM",
+                    "msc4354_sticky_key": "m.call#ROOM",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": "ring",
+                    "m.relates_to": {
+                        event_id: ownMembershipId,
+                        rel_type: "m.reference",
+                    },
+                    "lifetime": 90000,
+                    "sender_ts": expect.any(Number),
                 },
-                "lifetime": 90000,
-                "sender_ts": expect.any(Number),
-            });
+            );
 
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
                 "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
@@ -736,10 +750,74 @@ describe("MatrixRTCSession", () => {
             });
         });
 
+        it("falls back to a regular event when the server doesn't support sticky events", async () => {
+            sendStickyEventMock.mockRejectedValueOnce(
+                new UnsupportedStickyEventsEndpointError("nope", "sendStickyEvent"),
+            );
+            sendEventMock.mockResolvedValueOnce({ event_id: "regular-evt" });
+            const didSendNotification = new Promise((resolve) => {
+                sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
+            });
+
+            sess!["joinConfig"] = { notificationType: "ring", notificationLifetimeMs: 30_000 };
+            sess!["sendCallNotify"]("$membership", "ring");
+
+            await didSendNotification;
+            const expectedContent = {
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": "ring",
+                "m.relates_to": {
+                    event_id: "$membership",
+                    rel_type: "m.reference",
+                },
+                "lifetime": 30_000,
+                "sender_ts": expect.any(Number),
+            };
+            // The sticky duration exceeds the lifetime, to absorb clock skew between sender and server.
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                50_000,
+                null,
+                EventType.RTCNotification,
+                expectedContent,
+            );
+            expect(sendEventMock).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, expectedContent);
+        });
+
+        it("does not fall back when sending the sticky notification fails for another reason", async () => {
+            const error = new Error("network go boom");
+            sendStickyEventMock.mockRejectedValueOnce(error);
+            const logError = vi.spyOn(sess!["logger"], "error");
+
+            sess!["joinConfig"] = { notificationType: "ring" };
+            sess!["sendCallNotify"]("$membership", "ring");
+            await flushPromises();
+
+            expect(sendEventMock).not.toHaveBeenCalled();
+            expect(logError).toHaveBeenCalledWith("Failed to send call notification", error);
+        });
+
+        it("logs an error when sending the notification fails", async () => {
+            const error = new Error("no notifications for you");
+            sendStickyEventMock.mockRejectedValueOnce(
+                new UnsupportedStickyEventsEndpointError("nope", "sendStickyEvent"),
+            );
+            sendEventMock.mockRejectedValueOnce(error);
+            const logError = vi.spyOn(sess!["logger"], "error");
+
+            sess!["joinConfig"] = { notificationType: "ring" };
+            sess!["sendCallNotify"]("$membership", "ring");
+            await flushPromises();
+
+            expect(logError).toHaveBeenCalledWith("Failed to send call notification", error);
+        });
+
         it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -766,22 +844,32 @@ describe("MatrixRTCSession", () => {
             const ownMembershipEventId = sess?.memberships[0].eventId;
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
-                "m.mentions": { user_ids: [], room: true },
-                "notification_type": "ring",
-                "m.call.intent": "audio",
-                "m.relates_to": {
-                    event_id: ownMembershipEventId,
-                    rel_type: "m.reference",
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                {
+                    "slot_id": "m.call#ROOM",
+                    "msc4354_sticky_key": "m.call#ROOM",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": "ring",
+                    "m.call.intent": "audio",
+                    "m.relates_to": {
+                        event_id: ownMembershipEventId,
+                        rel_type: "m.reference",
+                    },
+                    "lifetime": 90000,
+                    "sender_ts": expect.any(Number),
                 },
-                "lifetime": 90000,
-                "sender_ts": expect.any(Number),
-            });
+            );
 
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
                 "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {

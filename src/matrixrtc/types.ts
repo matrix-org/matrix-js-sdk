@@ -106,6 +106,15 @@ export type RTCNotificationType = "ring" | "notification";
 export type RTCCallIntent = "audio" | "video" | string;
 
 /**
+ * The maximum amount by which a notification's `sender_ts` may lie ahead of its `origin_server_ts`
+ * before the `lifetime` is measured from `origin_server_ts` instead, as per MSC4075.
+ *
+ * Exported for use within the js-sdk only. Not re-exported from `matrixrtc/index.ts`.
+ * @internal
+ */
+export const RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS = 20 * 1000; // 20 seconds
+
+/**
  * This will check if the content has all the expected fields to be a valid IRTCNotificationContent.
  * It will also cap the lifetime to 90000ms (1.5 min) if a higher value is provided.
  * @param content
@@ -142,6 +151,10 @@ export function parseCallNotificationContent(content: IContent): IRTCNotificatio
  * Don't cast event content to this directly. Use `parseCallNotificationContent` instead to validate the content first.
  */
 export interface IRTCNotificationContent extends RelationEvent {
+    /**
+     * The `state_key` of the `m.rtc.slot` event that the notification refers to.
+     */
+    "slot_id": string;
     "m.mentions"?: IMentions;
     "notification_type": RTCNotificationType;
     /**
@@ -150,6 +163,10 @@ export interface IRTCNotificationContent extends RelationEvent {
     "m.call.intent"?: RTCCallIntent;
     "sender_ts": number;
     "lifetime": number;
+    /**
+     * The sticky key as per MSC4354. Must be equal to `slot_id`.
+     */
+    "msc4354_sticky_key": string;
 }
 
 /**
