@@ -100,6 +100,14 @@ describe("MatrixClient events", function () {
                 },
             },
         };
+        // MSC4222 state_after sync data
+        const SYNC_DATA_STATE_AFTER = (() => {
+            const data: any = structuredClone(SYNC_DATA);
+            const room = data.rooms.join["!erufh:bar"];
+            room["org.matrix.msc4222.state_after"] = room.state;
+            delete room.state;
+            return data;
+        })();
         const NEXT_SYNC_DATA = {
             next_batch: "e_6_7",
             rooms: {
@@ -135,8 +143,11 @@ describe("MatrixClient events", function () {
             },
         };
 
-        it("should emit events from both the first and subsequent /sync calls", function () {
-            httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
+        it.each([
+            ["sync data", SYNC_DATA],
+            ["msc4222 state_after sync data", SYNC_DATA_STATE_AFTER],
+        ])("should emit events from both the first and subsequent /sync calls for %s", function (_name, syncData) {
+            httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
             let expectedEvents: Partial<IEvent>[] = [];

@@ -1486,6 +1486,7 @@ export class SyncApi {
                 // this fires a couple of times for some events. (eg state events are in the timeline and the state)
                 // should this get a sync section as an additional event emission param (e, syncSection))?
                 stateEvents.forEach(emitEvent);
+                stateAfterEvents.forEach(emitEvent);
                 timelineEvents.forEach(emitEvent);
                 ephemeralEvents.forEach(emitEvent);
                 accountDataEvents.forEach(emitEvent);
