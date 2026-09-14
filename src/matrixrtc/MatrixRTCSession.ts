@@ -808,9 +808,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 const newResult = { ...notification.response, ...notification.content };
                 this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult);
             })
-            .catch(([errorLegacy, errorNew]) =>
-                this.logger.error("Failed to send call notification", errorLegacy, errorNew),
-            );
+            .catch((error) => this.logger.error("Failed to send call notification", error));
     }
 
     /**
