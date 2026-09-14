@@ -15,7 +15,10 @@ limitations under the License.
 */
 
 import { getEncryptionKeyMapKey, type CallMembershipIdentityParts } from "./EncryptionManager.ts";
-import type { InboundEncryptionSession, EncryptionKeyMapKey, SlotDescription } from "./types.ts";
+import type { InboundEncryptionSession, EncryptionKeyMapKey, RtcSlotEventContent, SlotDescription } from "./types.ts";
+import type { Room } from "../models/room.ts";
+import { EventTimeline } from "../models/event-timeline.ts";
+import { EventType } from "../@types/event.ts";
 
 /**
  * Detects when a key for a given index is outdated.
@@ -66,4 +69,43 @@ export function slotIdToDescription(slotId: string): SlotDescription {
  */
 export function computeSlotId(slotDescription: SlotDescription): string {
     return `${slotDescription.application}#${slotDescription.id}`;
+}
+
+/**
+ * Reads the slot state event's content for the given slot description.
+ *
+ * @returns The slot event's content, or `undefined` if no slot event exists for the given description.
+ */
+export function getSlotEventContent(
+    room: Pick<Room, "getLiveTimeline">,
+    slotDescription: SlotDescription,
+): RtcSlotEventContent | undefined {
+    const slotId = computeSlotId(slotDescription);
+    const slotEvent = room
+        .getLiveTimeline()
+        .getState(EventTimeline.FORWARDS)
+        ?.getStateEvents(EventType.RTCSlot, slotId);
+    if (!slotEvent) return undefined;
+
+    return slotEvent.getContent<RtcSlotEventContent>();
+}
+
+/**
+ * Whether the given slot is closed.
+ *
+ * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
+ * if no slot exists.
+ */
+export function isSlotClosed(
+    room: Pick<Room, "getLiveTimeline">,
+    slotDescription: SlotDescription,
+): boolean | undefined {
+    const content = getSlotEventContent(room, slotDescription) as Partial<RtcSlotEventContent> | undefined;
+    if (content === undefined) return undefined;
+
+    return (
+        content.status !== "open" ||
+        typeof content.application !== "object" ||
+        content.application?.type !== slotDescription.application
+    );
 }

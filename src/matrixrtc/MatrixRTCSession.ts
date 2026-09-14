@@ -50,7 +50,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { computeSlotId } from "./utils.ts";
+import { computeSlotId, getSlotEventContent, isSlotClosed } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -1041,42 +1041,6 @@ function isValidMembership(
     }
 
     return true;
-}
-
-/**
- * Reads the slot state event's content for the given slot description.
- *
- * @returns The slot event's content, or `undefined` if no slot event exists for the given description.
- */
-function getSlotEventContent(
-    room: Pick<Room, "getLiveTimeline">,
-    slotDescription: SlotDescription,
-): RtcSlotEventContent | undefined {
-    const slotId = computeSlotId(slotDescription);
-    const slotEvent = room
-        .getLiveTimeline()
-        .getState(EventTimeline.FORWARDS)
-        ?.getStateEvents(EventType.RTCSlot, slotId);
-    if (!slotEvent) return undefined;
-
-    return slotEvent.getContent<RtcSlotEventContent>();
-}
-
-/**
- * Whether the given slot is closed.
- *
- * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
- * if no slot exists.
- */
-function isSlotClosed(room: Pick<Room, "getLiveTimeline">, slotDescription: SlotDescription): boolean | undefined {
-    const content = getSlotEventContent(room, slotDescription) as Partial<RtcSlotEventContent> | undefined;
-    if (content === undefined) return undefined;
-
-    return (
-        content.status !== "open" ||
-        typeof content.application !== "object" ||
-        content.application?.type !== slotDescription.application
-    );
 }
 
 /**
