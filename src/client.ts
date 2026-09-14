@@ -251,6 +251,7 @@ import {
     type LivekitGetTokenResponse,
     type Transport,
 } from "./matrixrtc/index.ts";
+import { type IRTCDeclineContent, RTC_NOTIFICATION_MAX_LIFETIME_MS } from "./matrixrtc/types.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
 import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
@@ -3976,17 +3977,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Declines a MatrixRTC notification.
      *
-     * @param roomId
-     * @param notificationEventId
-     * @returns
+     * The decline is sent as a sticky event (MSC4354) keyed on the notification's event ID, so that the
+     * user's other devices stop notifying. If the server doesn't support sticky events, a regular event is
+     * sent instead. That one still counts as a decline for any device that receives it, but it isn't
+     * re-delivered after a gappy or initial sync the way a sticky event is, so a device that was offline
+     * when it was sent keeps notifying until the notification's lifetime elapses.
+     *
+     * @param roomId The room the notification was received in.
+     * @param notificationEventId The event ID of the notification being declined.
+     * @param stickyDurationMs How long (in milliseconds) the decline should stay sticky. Must not be smaller
+     * than the notification's `lifetime`, otherwise the notification can become valid again once the decline
+     * expires. Defaults to the maximum lifetime a notification may have.
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    public sendRtcDecline(roomId: string, notificationEventId: string): Promise<ISendEventResponse> {
-        return this.sendEvent(roomId, EventType.RTCDecline, {
+    public async sendRtcDecline(
+        roomId: string,
+        notificationEventId: string,
+        stickyDurationMs: number = RTC_NOTIFICATION_MAX_LIFETIME_MS,
+    ): Promise<ISendEventResponse> {
+        const content: IRTCDeclineContent = {
             "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
-        });
+            "msc4354_sticky_key": notificationEventId,
+        };
+        try {
+            return await this._unstable_sendStickyEvent(roomId, stickyDurationMs, null, EventType.RTCDecline, content);
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending decline as a regular event");
+            return await this.sendEvent(roomId, EventType.RTCDecline, content);
+        }
     }
 
     /**

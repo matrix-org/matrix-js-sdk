@@ -106,6 +106,14 @@ export type RTCNotificationType = "ring" | "notification";
 export type RTCCallIntent = "audio" | "video" | string;
 
 /**
+ * The maximum `lifetime` of an RTC notification as per MSC4075. Larger values are capped to this.
+ *
+ * Exported for use within the js-sdk only. Not re-exported from `matrixrtc/index.ts`.
+ * @internal
+ */
+export const RTC_NOTIFICATION_MAX_LIFETIME_MS = 2 * 60 * 1000; // 2 minutes
+
+/**
  * The maximum amount by which a notification's `sender_ts` may lie ahead of its `origin_server_ts`
  * before the `lifetime` is measured from `origin_server_ts` instead, as per MSC4075.
  *
@@ -173,7 +181,16 @@ export interface IRTCNotificationContent extends RelationEvent {
  * MSC4310 decline event content for `org.matrix.msc4310.rtc.decline`.
  * Sent as a standard m.reference relation to an `org.matrix.msc4075.rtc.notification` event.
  */
-export interface IRTCDeclineContent extends RelationEvent {}
+export interface IRTCDeclineContent extends RelationEvent {
+    /**
+     * The sticky key as per MSC4354. Must be equal to the event ID of the notification being declined.
+     *
+     * Optional because servers without MSC4354 support can't deliver the decline as a sticky event. Such a
+     * decline still counts, but only for devices that receive it directly, since it isn't re-delivered after
+     * a gappy or initial sync.
+     */
+    msc4354_sticky_key?: string;
+}
 
 export enum Status {
     Disconnected = "Disconnected",
