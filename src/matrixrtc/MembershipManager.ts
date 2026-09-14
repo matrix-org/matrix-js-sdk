@@ -1071,7 +1071,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             { delay: this.delayedLeaveEventDelayMs },
             null,
             EventType.RTCMembership,
-            { msc4354_sticky_key: this.memberId },
+            { slot_id: computeSlotId(this.slotDescription), msc4354_sticky_key: this.memberId },
         );
 
     protected clientSendMembership: (
@@ -1082,7 +1082,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             MEMBERSHIP_STICKY_DURATION_MS,
             null,
             EventType.RTCMembership,
-            { ...myMembership, msc4354_sticky_key: this.memberId },
+            { slot_id: computeSlotId(this.slotDescription), ...myMembership, msc4354_sticky_key: this.memberId },
         );
     };
 

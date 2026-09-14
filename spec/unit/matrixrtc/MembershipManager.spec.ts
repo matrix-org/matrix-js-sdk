@@ -1054,6 +1054,7 @@ describe("MembershipManager", () => {
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
+                            slot_id: "m.call#ROOM",
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
