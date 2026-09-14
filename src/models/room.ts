@@ -3132,7 +3132,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 threadId = "",
             } = this.eventShouldLiveIn(event, neighbouringEvents, threadRoots);
 
-            if (!shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
+            // Cached relations are aggregated below and attach when their parent is later hydrated.
+            // Avoid blocking offline startup on a parent fetch.
+            if (!fromCache && !shouldLiveInThread && !shouldLiveInRoom && event.isRelation()) {
                 try {
                     const parentEvent = new MatrixEvent(
                         await this.client.fetchRoomEvent(this.roomId, event.relationEventId!),
