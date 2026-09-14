@@ -56,133 +56,150 @@ describe("MatrixClient events", function () {
         return httpBackend?.stop();
     });
 
+    const presenceEvents = [
+        utils.mkPresence({
+            user: "@foo:bar",
+            name: "Foo Bar",
+            presence: "online",
+        }),
+    ];
+
+    const roomTimelineEvents = [
+        utils.mkMessage({
+            room: "!erufh:bar",
+            user: "@foo:bar",
+            msg: "hmmm",
+        }),
+    ];
+
+    const roomStateEvents = [
+        utils.mkMembership({
+            room: "!erufh:bar",
+            mship: KnownMembership.Join,
+            user: "@foo:bar",
+        }),
+        utils.mkEvent({
+            type: "m.room.create",
+            room: "!erufh:bar",
+            user: "@foo:bar",
+            content: {},
+        }),
+    ];
+
     describe("emissions", function () {
-        const SYNC_DATA = {
-            next_batch: "s_5_3",
-            presence: {
-                events: [
-                    utils.mkPresence({
-                        user: "@foo:bar",
-                        name: "Foo Bar",
-                        presence: "online",
-                    }),
-                ],
-            },
-            rooms: {
-                join: {
-                    "!erufh:bar": {
-                        timeline: {
-                            events: [
-                                utils.mkMessage({
-                                    room: "!erufh:bar",
-                                    user: "@foo:bar",
-                                    msg: "hmmm",
-                                }),
-                            ],
-                            prev_batch: "s",
-                        },
-                        state: {
-                            events: [
-                                utils.mkMembership({
-                                    room: "!erufh:bar",
-                                    mship: KnownMembership.Join,
-                                    user: "@foo:bar",
-                                }),
-                                utils.mkEvent({
-                                    type: "m.room.create",
-                                    room: "!erufh:bar",
-                                    user: "@foo:bar",
-                                    content: {},
-                                }),
-                            ],
-                        },
-                    },
+        const SYNC_DATA = mockSyncResponse({
+            presenceEvents,
+            timelineEvents: roomTimelineEvents,
+            stateEvents: roomStateEvents,
+        });
+        const stateMember1Event = utils.mkMembership({
+            room: "!erufh:bar",
+            mship: KnownMembership.Join,
+            user: "@foo1:bar",
+        });
+        const stateMember2Event = utils.mkMembership({
+            room: "!erufh:bar",
+            mship: KnownMembership.Join,
+            user: "@foo2:bar",
+        });
+        const stateMember3Event = utils.mkMembership({
+            room: "!erufh:bar",
+            mship: KnownMembership.Join,
+            user: "@foo3:bar",
+        });
+        // Sync data but with state event in timeline
+        const SYNC_DATA_1 = mockSyncResponse({
+            presenceEvents,
+            timelineEvents: [...roomTimelineEvents, stateMember2Event],
+            stateEvents: roomStateEvents,
+        });
+        // MSC4222 state_after sync data, contains state events in timeline, state and same state event in both
+        const SYNC_DATA_STATE_AFTER = mockSyncResponse({
+            presenceEvents,
+            timelineEvents: [...roomTimelineEvents, stateMember2Event, stateMember3Event],
+            msc4222StateEvents: [...roomStateEvents, stateMember1Event, stateMember2Event],
+        });
+        // MSC4222 state_after "outdated" state sync data
+        const SYNC_DATA_STATE_AFTER_OUTDATED = mockSyncResponse({
+            presenceEvents,
+            timelineEvents: [...roomTimelineEvents, stateMember2Event],
+            msc4222StateEvents: [],
+        });
+        const nextRoomTimelineEvents = [
+            utils.mkMessage({
+                room: "!erufh:bar",
+                user: "@foo:bar",
+                msg: "ello ello",
+            }),
+            utils.mkMessage({
+                room: "!erufh:bar",
+                user: "@foo:bar",
+                msg: ":D",
+            }),
+        ];
+        const ephemeralEvents = [
+            utils.mkEvent({
+                type: "m.typing",
+                room: "!erufh:bar",
+                content: {
+                    user_ids: ["@foo:bar"],
                 },
-            },
-        };
-        // MSC4222 state_after sync data
-        const SYNC_DATA_STATE_AFTER = (() => {
-            const data: any = structuredClone(SYNC_DATA);
-            const room = data.rooms.join["!erufh:bar"];
-            room["org.matrix.msc4222.state_after"] = room.state;
-            delete room.state;
-            return data;
-        })();
-        const NEXT_SYNC_DATA = {
+            }),
+        ];
+        const NEXT_SYNC_DATA = mockSyncResponse({
             next_batch: "e_6_7",
-            rooms: {
-                join: {
-                    "!erufh:bar": {
-                        timeline: {
-                            events: [
-                                utils.mkMessage({
-                                    room: "!erufh:bar",
-                                    user: "@foo:bar",
-                                    msg: "ello ello",
-                                }),
-                                utils.mkMessage({
-                                    room: "!erufh:bar",
-                                    user: "@foo:bar",
-                                    msg: ":D",
-                                }),
-                            ],
-                        },
-                        ephemeral: {
-                            events: [
-                                utils.mkEvent({
-                                    type: "m.typing",
-                                    room: "!erufh:bar",
-                                    content: {
-                                        user_ids: ["@foo:bar"],
-                                    },
-                                }),
-                            ],
-                        },
-                    },
-                },
-            },
-        };
+            timelineEvents: nextRoomTimelineEvents,
+            ephemeralEvents,
+        });
 
         it.each([
-            ["sync data", SYNC_DATA],
-            ["msc4222 state_after sync data", SYNC_DATA_STATE_AFTER],
-        ])("should emit events from both the first and subsequent /sync calls for %s", function (_name, syncData) {
-            httpBackend!.when("GET", "/sync").respond(200, syncData);
-            httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
+            ["sync data", SYNC_DATA, roomStateEvents],
+            ["sync data with state in timeline", SYNC_DATA_1, [...roomStateEvents, stateMember2Event]],
+            [
+                "msc4222 state_after sync data",
+                SYNC_DATA_STATE_AFTER,
+                [...roomStateEvents, stateMember1Event, stateMember2Event],
+            ],
+            ["msc4222 state_after with 'outdated' state sync data", SYNC_DATA_STATE_AFTER_OUTDATED, []],
+        ])(
+            "should emit events from both the first and subsequent /sync calls for %s",
+            async (_name: string, syncData: any, extraEventsExpected: Partial<IEvent>[]) => {
+                httpBackend!.when("GET", "/sync").respond(200, syncData);
+                httpBackend!.when("GET", "/sync").respond(200, NEXT_SYNC_DATA);
 
-            let expectedEvents: Partial<IEvent>[] = [];
-            expectedEvents = expectedEvents.concat(
-                SYNC_DATA.presence.events,
-                SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
-                SYNC_DATA.rooms.join["!erufh:bar"].state.events,
-                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].timeline.events,
-                NEXT_SYNC_DATA.rooms.join["!erufh:bar"].ephemeral.events,
-            );
+                const expectedEvents: Partial<IEvent>[] = [
+                    ...presenceEvents,
+                    ...roomTimelineEvents,
+                    ...nextRoomTimelineEvents,
+                    ...ephemeralEvents,
+                    ...extraEventsExpected,
+                ];
 
-            client!.on(ClientEvent.Event, function (event) {
-                let found = false;
-                for (let i = 0; i < expectedEvents.length; i++) {
-                    if (expectedEvents[i].event_id === event.getId()) {
-                        expectedEvents.splice(i, 1);
-                        found = true;
-                        break;
-                    }
-                }
-                expect(found).toBe(true);
-            });
+                const emittedEvents: Partial<IEvent>[] = [];
 
-            client!.startClient();
+                client!.on(ClientEvent.Event, function (event) {
+                    emittedEvents.push(event.getEffectiveEvent());
+                });
 
-            return Promise.all([
-                // wait for two SYNCING events
-                utils.syncPromise(client!).then(() => {
-                    return utils.syncPromise(client!);
-                }),
-                httpBackend!.flushAllExpected(),
-            ]).then(() => {
-                expect(expectedEvents.length).toEqual(0);
-            });
-        });
+                client!.startClient();
+
+                const compareEvent = (a: Partial<IEvent>, b: Partial<IEvent>): number => {
+                    const aEventId = a.event_id ?? "";
+                    const bEventId = b.event_id ?? "";
+                    return aEventId.localeCompare(bEventId);
+                };
+
+                return Promise.all([
+                    // wait for two SYNCING events
+                    utils.syncPromise(client!).then(() => {
+                        return utils.syncPromise(client!);
+                    }),
+                    httpBackend!.flushAllExpected(),
+                ]).then(() => {
+                    expect(emittedEvents.sort(compareEvent)).toEqual(expectedEvents.sort(compareEvent));
+                });
+            },
+        );
 
         it("should emit User events", async () => {
             httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
@@ -369,3 +386,45 @@ describe("MatrixClient events", function () {
         });
     });
 });
+
+function mockSyncResponse({
+    next_batch = "s_5_3",
+    roomId = "!erufh:bar",
+    presenceEvents = [],
+    timelineEvents = [],
+    stateEvents,
+    msc4222StateEvents,
+    ephemeralEvents = [],
+}: {
+    next_batch?: string;
+    roomId?: string;
+    presenceEvents?: Partial<IEvent>[];
+    timelineEvents?: Partial<IEvent>[];
+    stateEvents?: Partial<IEvent>[];
+    msc4222StateEvents?: Partial<IEvent>[];
+    ephemeralEvents?: Partial<IEvent>[];
+} = {}): any {
+    return {
+        next_batch,
+        presence: {
+            events: presenceEvents,
+        },
+        rooms: {
+            join: {
+                [roomId]: {
+                    timeline: {
+                        events: timelineEvents,
+                        prev_batch: "s",
+                    },
+                    ...(stateEvents ? { state: { events: stateEvents } } : undefined),
+                    ...(msc4222StateEvents
+                        ? { "org.matrix.msc4222.state_after": { events: msc4222StateEvents } }
+                        : undefined),
+                    ephemeral: {
+                        events: ephemeralEvents,
+                    },
+                },
+            },
+        },
+    };
+}

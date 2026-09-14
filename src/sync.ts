@@ -1487,7 +1487,11 @@ export class SyncApi {
                 // should this get a sync section as an additional event emission param (e, syncSection))?
                 stateEvents.forEach(emitEvent);
                 stateAfterEvents.forEach(emitEvent);
-                timelineEvents.forEach(emitEvent);
+                const filteredTimelineEvents =
+                    "org.matrix.msc4222.state_after" in joinObj
+                        ? timelineEvents.filter((timelineEvent) => !timelineEvent.isState())
+                        : timelineEvents;
+                filteredTimelineEvents.forEach(emitEvent);
                 ephemeralEvents.forEach(emitEvent);
                 accountDataEvents.forEach(emitEvent);
                 stickyEvents
