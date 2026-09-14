@@ -429,14 +429,19 @@ async function isJoinedToSlot(membershipEvent: MatrixEvent, slotId: string, now:
 /**
  * Whether the receiving user has declined the given notification.
  *
- * Declines are looked up through their `m.reference` relation rather than the sticky event map, so that a
- * decline still counts when it couldn't be sent as a sticky event.
+ * Declines are looked up both through their `m.reference` relation and in the sticky event map. Relations
+ * cover declines that couldn't be sent as sticky events, but only see events that reached the timeline. A
+ * sticky decline delivered after a gappy or initial sync arrives via the sticky section instead, so it is
+ * only in the map.
  */
 function hasDeclined(room: RTCNotificationValidationContext["room"], userId: string, eventId: string): boolean {
     const declines = room
         .getUnfilteredTimelineSet()
         .relations.getChildEventsForEvent(eventId, RelationType.Reference, EventType.RTCDecline);
-    return declines?.getRelations().some((decline) => decline.getSender() === userId) ?? false;
+    if (declines?.getRelations().some((decline) => decline.getSender() === userId)) return true;
+
+    // Declines are keyed on the event ID of the notification they decline.
+    return room._unstable_getKeyedStickyEvent(userId, EventType.RTCDecline, eventId) !== undefined;
 }
 
 /**

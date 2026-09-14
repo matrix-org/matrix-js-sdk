@@ -666,6 +666,23 @@ describe("parseCallNotificationContent", () => {
             addDecline("@carol:example.org", notification.getId()!);
             await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
         });
+
+        it("rejects notifications declined via a sticky event that never reached the timeline", async () => {
+            // After a gappy sync, sticky events arrive via the sticky section only, so the decline is in the
+            // sticky event map but has no relation aggregated for it.
+            const notification = addNotification();
+            store.addStickyEvents([
+                makeStickyEvent({
+                    type: EventType.RTCDecline,
+                    sender: userId,
+                    content: {
+                        "m.relates_to": { rel_type: "m.reference", event_id: notification.getId()! },
+                        "msc4354_sticky_key": notification.getId()!,
+                    },
+                }),
+            ]);
+            await expect(parse(notification)).rejects.toThrow();
+        });
     });
 });
 
