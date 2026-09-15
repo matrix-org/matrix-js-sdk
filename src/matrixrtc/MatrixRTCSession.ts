@@ -268,7 +268,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 > {
     private membershipManager?: IMembershipManager;
     private encryptionManager?: IEncryptionManager;
-    private joinConfig?: JoinSessionConfig;
+    private joinConfig?: SessionConfig;
     private logger: Logger;
 
     private pendingNotificationToSend: undefined | RTCNotificationType;
