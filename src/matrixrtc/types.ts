@@ -369,11 +369,7 @@ async function checkCallNotificationReceivingRules(
     for (const membershipEvent of ownMembershipEvents(room, userId)) {
         const membershipContent = membershipEvent.getContent();
         if (isLeftMembershipContent(membershipContent)) {
-            // Left memberships carry no application data, so the only slot they can be attributed to is the
-            // one in `slot_id`. Those predating that property are assumed to belong to this slot, to avoid
-            // re-notifying for a session that the user already left.
-            const isForSlot = membershipContent.slot_id === undefined || membershipContent.slot_id === slotId;
-            if (isForSlot && membershipEvent.getTs() >= originServerTs) {
+            if (membershipContent.slot_id === slotId && membershipEvent.getTs() >= originServerTs) {
                 throw new Error(`Receiving user left slot ${slotId} after the notification was sent`);
             }
         } else if (await isJoinedToSlot(membershipEvent, slotId, now)) {

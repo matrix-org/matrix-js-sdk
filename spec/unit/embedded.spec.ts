@@ -919,11 +919,12 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
                 doesServerSupportUnstableFeatureMock.mockClear();
                 await client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                    slot_id: "m.call#ROOM",
                     msc4354_sticky_key: "test",
                 });
                 expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
                     EventType.RTCMembership,
-                    { msc4354_sticky_key: "test" },
+                    { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                     "!1:example.org",
                     undefined,
                     undefined,
@@ -977,7 +978,7 @@ describe("RoomWidgetClient", () => {
                     room_id: "!1:example.org",
                     sender: "@alice:example.org",
                     msc4354_sticky: { duration_ms: 1200000 },
-                    content: { msc4354_sticky_key: "test" },
+                    content: { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                 }).getEffectiveEvent();
                 await sendAndExpectStickyUpdate(event1, [event1], [], []);
                 // It should remain cached in the sticky map
@@ -990,7 +991,7 @@ describe("RoomWidgetClient", () => {
                     room_id: "!1:example.org",
                     sender: "@alice:example.org",
                     msc4354_sticky: { duration_ms: 1200000 },
-                    content: { msc4354_sticky_key: "test" },
+                    content: { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                 }).getEffectiveEvent();
                 await sendAndExpectStickyUpdate(event2, [], [{ current: event2, previous: event1 }], []);
                 expectStickyEvents([event2]);
@@ -1030,6 +1031,7 @@ describe("RoomWidgetClient", () => {
                 widgetApi.hasCapability.mockReturnValue(false);
                 await expect(
                     client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                        slot_id: "m.call#ROOM",
                         msc4354_sticky_key: "test",
                     }),
                 ).rejects.toThrow(UnsupportedStickyEventsEndpointError);
@@ -1052,7 +1054,7 @@ describe("RoomWidgetClient", () => {
                     2000,
                     null,
                     EventType.RTCMembership,
-                    { msc4354_sticky_key: "test" },
+                    { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                 );
                 await expect(promise).rejects.toThrow(UnsupportedStickyEventsEndpointError);
                 await expect(promise).rejects.toMatchObject({ clientEndpoint: "sendStickyEvent", cause: hostError });
@@ -1098,6 +1100,7 @@ describe("RoomWidgetClient", () => {
 
                 await expect(
                     client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                        slot_id: "m.call#ROOM",
                         msc4354_sticky_key: "test",
                     }),
                 ).rejects.toStrictEqual(matrixError);

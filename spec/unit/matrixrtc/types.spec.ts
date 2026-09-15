@@ -548,18 +548,6 @@ describe("parseCallNotificationContent", () => {
             await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
         });
 
-        it("treats left memberships without slot_id as belonging to the slot", async () => {
-            const notification = addNotification();
-            addMembership({ msc4354_sticky_key: "MEMBER" }, notificationTs + 1);
-            await expect(parse(notification)).rejects.toThrow();
-        });
-
-        it("accepts notifications if a left membership without slot_id predates the notification", async () => {
-            const notification = addNotification();
-            addMembership({ msc4354_sticky_key: "MEMBER" }, notificationTs - 1);
-            await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
-        });
-
         describe("legacy member state events", () => {
             // Sessions without sticky events keep membership in `m.call.member` state instead, so those
             // events have to be consulted too. An empty `call_id` maps to the "ROOM" slot.
@@ -612,16 +600,11 @@ describe("parseCallNotificationContent", () => {
                 await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
             });
 
-            it("rejects notifications if the receiving user left the slot after the notification was sent", async () => {
+            it("ignores a left membership, which carries no slot to attribute it to", async () => {
+                // Leaving clears the state event's content entirely, and the event covers every slot the
+                // device was in, so there is nothing to tie it to this notification's slot.
                 const notification = addNotification();
-                // Leaving clears the state event's content.
                 addMemberStateEvent({}, userId, notificationTs + 1);
-                await expect(parse(notification)).rejects.toThrow();
-            });
-
-            it("accepts notifications if the receiving user left before the notification was sent", async () => {
-                const notification = addNotification();
-                addMemberStateEvent({}, userId, notificationTs - 1);
                 await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
             });
         });
