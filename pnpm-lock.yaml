@@ -127,7 +127,7 @@ importers:
         version: 6.0.0
       content-type:
         specifier: ^3.0.0
-        version: 3.0.0
+        version: 3.1.0
       loglevel:
         specifier: ^1.9.2
         version: 1.9.2
@@ -1864,8 +1864,8 @@ packages:
     engines: {node: '>=22'}
     hasBin: true
 
-  content-type@3.0.0:
-    resolution: {integrity: sha512-AIi5H6p0xk5uknXcN3/rmhP8jgp69OfSe/JuKiQAFprJ7UGw7mwj7m4XcmDzlrnJDG+cGpphAINGdU3g3g7kDw==}
+  content-type@3.1.0:
+    resolution: {integrity: sha512-z26wZR7iXahgpSK7XgnB4IbRVmUNSODvsX9qC9TAru7AcWGiqn5YKy+OH3PLRrwyAnewykKhCqnD+VV3a8uT8Q==}
     engines: {node: '>=22'}
 
   convert-source-map@2.0.0:
@@ -3971,7 +3971,7 @@ snapshots:
       tree-kill: 1.2.2
       yargs: 18.0.0
 
-  content-type@3.0.0: {}
+  content-type@3.1.0: {}
 
   convert-source-map@2.0.0: {}
 
