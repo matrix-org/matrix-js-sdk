@@ -1487,6 +1487,9 @@ export class SyncApi {
                 // should this get a sync section as an additional event emission param (e, syncSection))?
                 stateEvents.forEach(emitEvent);
                 stateAfterEvents.forEach(emitEvent);
+                // have to filter out all state events from the timeline when MSC4222 is enabled, in this case:
+                // all state events are emitted by "state_after"
+                // all state events in the timeline are either duplicates or are outdates and should be ignored
                 const filteredTimelineEvents =
                     "org.matrix.msc4222.state_after" in joinObj
                         ? timelineEvents.filter((timelineEvent) => !timelineEvent.isState())
