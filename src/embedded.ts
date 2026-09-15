@@ -550,6 +550,12 @@ export class RoomWidgetClient extends MatrixClient {
      * A widget can't probe the homeserver for MSC4354 support and doesn't need to: the host either granted it
      * the capability to send sticky events or it didn't. A missing capability is reported the same way a
      * missing server feature is, so that callers fall back to a regular event in both cases alike.
+     *
+     * The host may still refuse the request, typically because its own homeserver turns out not to support
+     * sticky events. Such a refusal reaches the widget without Matrix API error details, as those only accompany
+     * errors from requests the host actually made to the homeserver. It is therefore reported as unsupported too,
+     * with the host's error as `cause`. A refusal that does carry Matrix API error details came from the
+     * homeserver itself and is rethrown as is.
      */
     public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
         roomId: string,
@@ -567,13 +573,29 @@ export class RoomWidgetClient extends MatrixClient {
         }
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
-        return this.sendCompleteEvent({
-            roomId,
-            threadId,
-            eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-            txnId,
-        });
+        txnId ??= this.makeTxnId();
+        try {
+            return await this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                txnId,
+            });
+        } catch (error) {
+            if (!(error instanceof WidgetApiResponseError) || error.data.matrix_api_error !== undefined) throw error;
+
+            // Callers fall back to sending a regular event, so drop the local echo of the failed sticky one
+            // rather than leaving it in the timeline as unsent.
+            const localEvent = this.getRoom(roomId)?.getEventForTxnId(txnId);
+            if (localEvent?.status === EventStatus.NOT_SENT) this.cancelPendingEvent(localEvent);
+
+            throw new UnsupportedStickyEventsEndpointError(
+                `Host could not send the sticky event: ${error.message}`,
+                "sendStickyEvent",
+                { cause: error },
+            );
+        }
     }
 
     private validateSendDelayedEventResponse(response: ISendEventFromWidgetResponseData): SendDelayedEventResponse {

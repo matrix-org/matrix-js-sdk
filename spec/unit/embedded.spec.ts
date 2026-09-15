@@ -32,6 +32,7 @@ import {
 
 import {
     createRoomWidgetClient,
+    EventStatus,
     EventType,
     type IEvent,
     MatrixError,
@@ -1033,6 +1034,73 @@ describe("RoomWidgetClient", () => {
                     }),
                 ).rejects.toThrow(UnsupportedStickyEventsEndpointError);
                 expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
+            });
+
+            it("fails as unsupported when the host refuses without Matrix API error details", async () => {
+                // The host granted the capability but can't actually send sticky events, e.g. because its
+                // homeserver lacks MSC4354. No request reached the homeserver, so the error carries no
+                // Matrix API error details.
+                const hostError = new WidgetApiResponseError("Error sending event", {});
+                vi.mocked(widgetApi.transport.send).mockRejectedValue(hostError);
+
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
+                const cancelPendingEvent = vi.spyOn(client, "cancelPendingEvent");
+
+                const promise = client._unstable_sendStickyEvent(
+                    "!1:example.org",
+                    2000,
+                    null,
+                    EventType.RTCMembership,
+                    { msc4354_sticky_key: "test" },
+                );
+                await expect(promise).rejects.toThrow(UnsupportedStickyEventsEndpointError);
+                await expect(promise).rejects.toMatchObject({ clientEndpoint: "sendStickyEvent", cause: hostError });
+
+                // The local echo of the failed sticky event was dropped rather than left behind as unsent,
+                // since callers send a regular event in its place.
+                expect(cancelPendingEvent).toHaveBeenCalledTimes(1);
+                const room = client.getRoom("!1:example.org")!;
+                expect(
+                    room
+                        .getLiveTimeline()
+                        .getEvents()
+                        .filter((e) => e.status === EventStatus.NOT_SENT),
+                ).toEqual([]);
+            });
+
+            it("rethrows a refusal that carries Matrix API error details", async () => {
+                // Matrix API error details only accompany errors from requests the host made to the
+                // homeserver, so this one came from the homeserver rather than from a host unable to
+                // send sticky events. It must not trigger a fallback to a regular event.
+                const errorStatusCode = 403;
+                const errorUrl = "http://example.org";
+                const errorData = { errcode: "M_FORBIDDEN", error: "Forbidden" };
+                const widgetError = new WidgetApiResponseError("Error sending event", {
+                    matrix_api_error: {
+                        http_status: errorStatusCode,
+                        http_headers: {},
+                        url: errorUrl,
+                        response: errorData,
+                    },
+                });
+                const matrixError = new MatrixError(
+                    errorData,
+                    errorStatusCode,
+                    errorUrl,
+                    undefined,
+                    expect.any(Headers),
+                );
+                vi.mocked(widgetApi.transport.send).mockRejectedValue(widgetError);
+
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
+
+                await expect(
+                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                        msc4354_sticky_key: "test",
+                    }),
+                ).rejects.toStrictEqual(matrixError);
             });
         });
     });
