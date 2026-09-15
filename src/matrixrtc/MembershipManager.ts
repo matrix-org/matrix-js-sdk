@@ -35,6 +35,7 @@ import {
 } from "./IMembershipManager.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
+import { deepCompare } from "../utils.ts";
 import { isLivekitTransportConfig } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
@@ -188,6 +189,7 @@ export class MembershipManager
     private activated = false;
     private readonly logger: Logger;
     protected callIntent: RTCCallIntent | undefined;
+    protected applicationData: Record<string, unknown> | undefined;
 
     public isActivated(): boolean {
         return this.activated;
@@ -309,6 +311,17 @@ export class MembershipManager
         await this.sendJoinEvent();
     }
 
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        if (!this.activated || !this.ownMembership) {
+            throw Error("You cannot update your application data before joining the call");
+        }
+        if (deepCompare(this.applicationData ?? {}, applicationData)) {
+            return; // No-op
+        }
+        this.applicationData = applicationData;
+        await this.sendJoinEvent();
+    }
+
     /**
      * @throws if the client does not return user or device id.
      * @param joinConfig
@@ -334,6 +347,7 @@ export class MembershipManager
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
+        this.applicationData = joinConfig?.applicationData;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
@@ -801,6 +815,10 @@ export class MembershipManager
                       foci_preferred: [this.rtcTransport, ...(this.fociPreferred ?? [])],
                   };
         return {
+            // Legacy memberships have no application object, so the
+            // application's data sits at the top level, under the fields
+            // this manager owns
+            ...this.applicationData,
             "application": this.slotDescription.application,
             // INFO_SLOT_ID_LEGACY_CASE  (search for all occurances of this INFO to get the full picture)
             // Revert back to "" just for the sending the event.
@@ -1107,6 +1125,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             : {};
         return {
             application: {
+                ...this.applicationData,
                 type: this.slotDescription.application,
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
             },

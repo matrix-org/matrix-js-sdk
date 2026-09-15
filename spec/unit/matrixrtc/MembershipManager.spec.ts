@@ -998,6 +998,53 @@ describe("MembershipManager", () => {
         });
     });
 
+    describe("updateApplicationData()", () => {
+        it("should fail if the user has not joined the call", async () => {
+            const manager = new MembershipManager({}, room, client, callSession);
+            await expect(
+                manager.updateApplicationData({ "org.example.key": 1 }),
+            ).rejects.toThrowErrorMatchingInlineSnapshot(
+                `[Error: You cannot update your application data before joining the call]`,
+            );
+        });
+
+        it("publishes the data at the top level of a legacy membership", async () => {
+            const manager = new MembershipManager(
+                { applicationData: { "org.example.key": "initial" } },
+                room,
+                client,
+                callSession,
+            );
+            const sent = waitForMockCall(client.sendStateEvent);
+            manager.join([]);
+            await sent;
+            expect(
+                (vi.mocked(client.sendStateEvent).mock.calls[0][2] as Record<string, unknown>)["org.example.key"],
+            ).toBe("initial");
+            const membership = mockCallMembership(
+                {
+                    ...sessionMembershipTemplate,
+                    "user_id": client.getUserId()!,
+                    "org.example.key": "initial",
+                } as SessionMembershipData & { user_id: string },
+                room.roomId,
+            );
+            await manager.onRTCSessionMemberUpdate([membership]);
+            // Unchanged data sends nothing
+            await manager.updateApplicationData({ "org.example.key": "initial" });
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            await manager.updateApplicationData({ "org.example.key": { nested: true } });
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            const eventContent = vi.mocked(client.sendStateEvent).mock.calls[1][2] as Record<string, unknown>;
+            expect(eventContent["org.example.key"]).toEqual({ nested: true });
+            // The session's own fields can't be overridden
+            await manager.updateApplicationData({ application: "m.not.a.call", device_id: "X" });
+            const overridden = vi.mocked(client.sendStateEvent).mock.calls[2][2] as SessionMembershipData;
+            expect(overridden.application).toBe("m.call");
+            expect(overridden.device_id).toBe("AAAAAAA");
+        });
+    });
+
     describe("StickyEventMembershipManager", () => {
         beforeEach(() => {
             // Provide a default mock that is like the default "non error" server behaviour.
@@ -1012,7 +1059,7 @@ describe("MembershipManager", () => {
                         client._unstable_restartScheduledDelayedEvent,
                     );
                     const memberManager = new StickyEventMembershipManager(
-                        undefined,
+                        { applicationData: { "org.example.key": "value" } },
                         room,
                         client,
                         callSession,
@@ -1029,7 +1076,7 @@ describe("MembershipManager", () => {
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
-                            application: { type: "m.call" },
+                            application: { "type": "m.call", "org.example.key": "value" },
                             member: {
                                 user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",
