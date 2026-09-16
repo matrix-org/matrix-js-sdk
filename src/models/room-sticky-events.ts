@@ -209,7 +209,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                 event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
                 return;
             }
-            this.addStickyEvents([event]);
+            this.addStickyEvents([event]); // Safe to call because it sorts events by timestamp when updating a keyed entry.
         };
         event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
     }
