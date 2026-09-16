@@ -191,11 +191,11 @@ function isNonNegativeInteger(value: unknown): value is number {
 }
 
 /**
- * Looks up a membership event by ID in the room's timeline and sticky event map.
+ * Looks up an event by ID in the room's timeline and sticky event map.
  *
  * @returns The event, or `undefined` if it isn't available locally.
  */
-function findMembershipEvent(room: RTCNotificationValidationContext["room"], eventId: string): MatrixEvent | undefined {
+function findTimelineOrStickyEvent(room: RTCNotificationValidationContext["room"], eventId: string): MatrixEvent | undefined {
     const timelineEvent = room.findEventById(eventId);
     if (timelineEvent) return timelineEvent;
 
@@ -231,7 +231,7 @@ async function resolveSlotId(content: IContent, room: RTCNotificationValidationC
         throw new Error("Missing slot_id and no m.reference relation to derive it from");
     }
 
-    const membershipEvent = findMembershipEvent(room, membershipEventId);
+    const membershipEvent = findTimelineOrStickyEvent(room, membershipEventId);
     if (!membershipEvent) {
         throw new Error(`Missing slot_id and referenced event ${membershipEventId} is not available locally`);
     }
