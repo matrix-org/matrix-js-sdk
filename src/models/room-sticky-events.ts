@@ -209,9 +209,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                 event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
                 return;
             }
-            // The event has expired while we were waiting for it, so there is nothing to add.
-            if (event.unstableStickyExpiresAt !== undefined && event.unstableStickyExpiresAt <= Date.now()) return;
-
             this.addStickyEvents([event]);
         };
         event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
