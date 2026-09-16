@@ -29,6 +29,7 @@ import {
     type IEventPropertyIsCondition,
     type IPushRule,
     type IPushRules,
+    type IRecipientPermissionCondition,
     type IRoomMemberCountCondition,
     type ISenderNotificationPermissionCondition,
     type PushRuleAction,
@@ -479,6 +480,9 @@ export class PushProcessor {
                 return this.eventFulfillsRoomMemberCountCondition(cond, ev);
             case ConditionKind.SenderNotificationPermission:
                 return this.eventFulfillsSenderNotifPermCondition(cond, ev);
+            case ConditionKind.RecipientPermission:
+            case ConditionKind.RecipientPermissionPrefix:
+                return this.eventFulfillsRecipientPermCondition(cond, ev);
             case ConditionKind.CallStarted:
             case ConditionKind.CallStartedPrefix:
                 return this.eventFulfillsCallStartedCondition(cond, ev);
@@ -508,6 +512,41 @@ export class PushProcessor {
         // the point the event is in the DAG. Unfortunately the js-sdk does not store
         // this.
         return room.currentState.mayTriggerNotifOfType(notifLevelKey, ev.getSender()!);
+    }
+
+    /**
+     * MSC4506 `recipient_permission` condition: matches if the user these push
+     * rules are being evaluated for (i.e. us) has a power level at least that
+     * required to perform the `m.room.power_levels` action named by `key`
+     * (e.g. "invite"), in the room the event is in.
+     */
+    private eventFulfillsRecipientPermCondition(cond: IRecipientPermissionCondition, ev: MatrixEvent): boolean {
+        const actionKey = cond["key"];
+        // Only the power-levels permission actions are valid keys.
+        const defaultLevels: Record<string, number> = { invite: 0, kick: 50, ban: 50, redact: 50 };
+        if (!actionKey || !(actionKey in defaultLevels)) {
+            return false;
+        }
+
+        const room = this.client.getRoom(ev.getRoomId());
+        const userId = this.client.getUserId();
+        if (!room?.currentState || !userId) {
+            return false;
+        }
+
+        // Note that this should not be the current state of the room but the state at
+        // the point the event is in the DAG. Unfortunately the js-sdk does not store
+        // this.
+        const plContent = room.currentState.getStateEvents(EventType.RoomPowerLevels, "")?.getContent() ?? {};
+        const requiredLevel =
+            typeof plContent[actionKey] === "number" ? plContent[actionKey] : defaultLevels[actionKey];
+        const ourLevel =
+            typeof plContent.users?.[userId] === "number"
+                ? plContent.users[userId]
+                : typeof plContent.users_default === "number"
+                  ? plContent.users_default
+                  : 0;
+        return ourLevel >= requiredLevel;
     }
 
     private eventFulfillsRoomMemberCountCondition(cond: IRoomMemberCountCondition, ev: MatrixEvent): boolean {
