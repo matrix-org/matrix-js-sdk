@@ -102,6 +102,15 @@ export interface SessionConfig {
     callIntent?: RTCCallIntent;
 
     /**
+     * Application-specific data to publish in our membership alongside the
+     * application `type` and `m.call.intent`: in the `application` object of
+     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
+     * one. Keys should be namespaced. Read back through
+     * {@link CallMembership.applicationData}.
+     */
+    applicationData?: Record<string, unknown>;
+
+    /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
      * answer before the sender gives up and the call notification is considered timed out.
      */
@@ -719,6 +728,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
             throw Error("Not connected yet");
         }
         await this.membershipManager?.updateCallIntent(callIntent);
+    }
+
+    /**
+     * Replace the application-specific data in our membership (see
+     * {@link SessionConfig.applicationData}), re-sending it if it changed.
+     */
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateApplicationData(applicationData);
     }
 
     /**

@@ -674,6 +674,31 @@ describe("MatrixRTCSession", () => {
             expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
 
+        it("publishes application data in the membership, and updates it once joined", async () => {
+            await expect(sess!.updateApplicationData({ "org.example.key": 1 })).rejects.toThrow("Not connected yet");
+            // The manager needs a real response to stay alive for the update
+            const sent = new Promise<void>((resolve) =>
+                sendStateEventMock.mockImplementation(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "$membership" });
+                }),
+            );
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                applicationData: { "org.example.key": 1 },
+            });
+            await sent;
+            expect((sendStateEventMock.mock.calls[0][2] as Record<string, unknown>)["org.example.key"]).toBe(1);
+            mockRoomState(mockRoom, [
+                { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "org.example.key": 1 } as any,
+            ]);
+            await sess!._onRTCSessionMemberUpdate();
+            expect(sess!.memberships[0].applicationData["org.example.key"]).toBe(1);
+
+            await sess!.updateApplicationData({ "org.example.key": 2 });
+            expect(sendStateEventMock).toHaveBeenCalledTimes(2);
+            expect((sendStateEventMock.mock.calls[1][2] as Record<string, unknown>)["org.example.key"]).toBe(2);
+        });
+
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
