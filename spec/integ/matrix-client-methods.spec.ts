@@ -1805,17 +1805,6 @@ describe("MatrixClient", function () {
             ]);
         });
 
-        it("should allow fallback to the deprecated endpoint", async () => {
-            httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
-            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
-            httpBackend.when("GET", prefix + deprecatedSuffix).respond(200, unstableRoomSummary);
-
-            await Promise.all([
-                expect(client.getRoomSummary(roomId)).resolves.toEqual(unstableRoomSummary),
-                httpBackend.flushAllExpected(),
-            ]);
-        });
-
         it("should not fall back when the room is not found", async () => {
             httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorNotFoundStatus, errorNotFoundBody);
 
@@ -1837,7 +1826,6 @@ describe("MatrixClient", function () {
         it("should respond to unsupported path with error", async () => {
             httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
             httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
-            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
 
             const prom = client.getRoomSummary(roomId).then(
                 function (response) {

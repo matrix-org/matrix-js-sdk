@@ -8878,7 +8878,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Fetches the summary of a room.
      * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
      *
-     * Falls back to the two paths used by an initial version of MSC3266, as implemented in older
+     * Falls back to the initial version of MSC3266, as implemented in older
      * versions of Synapse, if the server does not recognise the stable endpoint.
      *
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.

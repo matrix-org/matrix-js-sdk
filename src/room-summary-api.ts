@@ -79,7 +79,7 @@ const UNSTABLE_PREFIX = "/_matrix/client/unstable/im.nheko.summary";
 /**
  * Fetch the summary of a room.
  *
- * Falls back to the two paths used by an initial version of MSC3266, as implemented in older
+ * Falls back to the initial version of MSC3266, as implemented in older
  * versions of Synapse, if the server does not recognise the stable endpoint.
  *
  * @param http - The HTTP API to make the request with.
@@ -104,15 +104,7 @@ export async function fetchRoomSummary(
     }
 
     const paramOpts = { prefix: UNSTABLE_PREFIX };
-    try {
-        const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-        return await http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, paramOpts);
-    } catch (e) {
-        if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-            const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-            return await http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, paramOpts);
-        } else {
-            throw e;
-        }
-    }
+
+    const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
+    return await http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, paramOpts);
 }
