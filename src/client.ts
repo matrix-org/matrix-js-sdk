@@ -883,6 +883,9 @@ interface IThirdPartyUser {
     fields: object;
 }
 
+// Re-export for backwards compatibility
+export { type RoomSummary };
+
 interface IRoomHierarchy {
     rooms: IHierarchyRoom[];
     next_batch?: string;
