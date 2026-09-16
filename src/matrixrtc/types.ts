@@ -135,11 +135,7 @@ export interface RTCNotificationValidationContext {
     /** The room in which the notification was received. */
     room: Pick<
         Room,
-        | "getLiveTimeline"
-        | "findEventById"
-        | "getUnfilteredTimelineSet"
-        | "_unstable_getStickyEvents"
-        | "_unstable_getKeyedStickyEvent"
+        "getLiveTimeline" | "getUnfilteredTimelineSet" | "_unstable_getStickyEvents" | "_unstable_getKeyedStickyEvent"
     >;
     /** The user ID of the receiving (local) user. */
     userId: string;
@@ -191,28 +187,23 @@ function isNonNegativeInteger(value: unknown): value is number {
 }
 
 /**
- * Looks up an event by ID in the room's timeline and sticky event map.
+ * Looks up a legacy `m.call.member` state event by ID in the room's current state.
  *
- * @returns The event, or `undefined` if it isn't available locally.
+ * @returns The event, or `undefined` if no current membership state event has that ID.
  */
-function findTimelineOrStickyEvent(room: RTCNotificationValidationContext["room"], eventId: string): MatrixEvent | undefined {
-    const timelineEvent = room.findEventById(eventId);
-    if (timelineEvent) return timelineEvent;
-
-    // Sticky member events that arrived outside of the timeline aren't found by `findEventById`.
-    for (const stickyEvent of room._unstable_getStickyEvents()) {
-        if (stickyEvent.getId() === eventId) return stickyEvent;
-    }
-    return undefined;
+function findMembershipStateEvent(
+    room: RTCNotificationValidationContext["room"],
+    eventId: string,
+): MatrixEvent | undefined {
+    const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
+    return roomState?.getStateEvents(EventType.GroupCallMemberPrefix).find((event) => event.getId() === eventId);
 }
 
 /**
  * Determines the ID of the slot that a notification invites to.
  *
  * Notifications predating the `slot_id` property instead carry an `m.reference` relation to the sender's
- * membership event. For those, the slot is read off that membership event, which therefore has to be
- * available locally. This is normally the case, since a notification is only valid while the session it
- * invites to is live, but it does mean such a notification can't be evaluated from the event alone.
+ * membership event.
  *
  * @throws if the slot can't be determined.
  * @returns A promise resolving to the slot ID.
@@ -231,9 +222,9 @@ async function resolveSlotId(content: IContent, room: RTCNotificationValidationC
         throw new Error("Missing slot_id and no m.reference relation to derive it from");
     }
 
-    const membershipEvent = findTimelineOrStickyEvent(room, membershipEventId);
+    const membershipEvent = findMembershipStateEvent(room, membershipEventId);
     if (!membershipEvent) {
-        throw new Error(`Missing slot_id and referenced event ${membershipEventId} is not available locally`);
+        throw new Error(`Missing slot_id and referenced event ${membershipEventId} is not a current membership`);
     }
 
     try {

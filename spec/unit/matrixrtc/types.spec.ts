@@ -61,7 +61,6 @@ describe("parseCallNotificationContent", () => {
     let now: number;
     let notificationTs: number;
     let store: RoomStickyEventsStore;
-    let timelineEvents: MatrixEvent[];
     let relatedEvents: MatrixEvent[];
     let memberStateEvents: MatrixEvent[];
     let slotStatus: "open" | "closed" | undefined;
@@ -119,7 +118,6 @@ describe("parseCallNotificationContent", () => {
         now = Date.now();
         notificationTs = now - 1000;
         store = new RoomStickyEventsStore();
-        timelineEvents = [];
         relatedEvents = [];
         memberStateEvents = [];
         slotStatus = "open";
@@ -142,7 +140,6 @@ describe("parseCallNotificationContent", () => {
         };
         room = {
             getLiveTimeline: () => ({ getState: () => roomState }),
-            findEventById: (eventId: string) => timelineEvents.find((event) => event.getId() === eventId),
             getUnfilteredTimelineSet: () => ({
                 relations: {
                     getChildEventsForEvent: (eventId: string, relType: string, eventType: string) => {
@@ -247,26 +244,26 @@ describe("parseCallNotificationContent", () => {
         // that the event still lands in the sticky event map under the slot the parser is expected to resolve,
         // which lets the remaining receiving rules run.
         const legacyNotification = { slot_id: undefined, msc4354_sticky_key: slotId };
-        const rtcMembershipContent = {
-            slot_id: slotId,
-            application: { type: "m.call" },
-            member: { user_id: sender, device_id: "DEVICE", id: "MEMBER" },
-            transports: { published: [], can_subscribe: [] },
-            versions: [],
-            msc4354_sticky_key: "MEMBER",
+        const legacyMembershipContent = {
+            application: "m.call",
+            call_id: "",
+            device_id: "DEVICE",
+            scope: "m.room",
+            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+            foci_preferred: [],
         };
 
-        function addToTimeline(content: IContent, type = EventType.RTCMembership): MatrixEvent {
+        function addMembershipState(content: IContent): MatrixEvent {
             const event = new MatrixEvent({
                 event_id: `$membership${secureRandomString(8)}`,
                 room_id: roomId,
-                type,
+                type: EventType.GroupCallMemberPrefix,
+                state_key: `_${sender}_DEVICE`,
                 sender,
                 origin_server_ts: notificationTs - 1000,
                 content,
-                ...(type === EventType.GroupCallMemberPrefix ? { state_key: `_${sender}_DEVICE` } : {}),
             });
-            timelineEvents.push(event);
+            memberStateEvents.push(event);
             return event;
         }
 
@@ -277,39 +274,13 @@ describe("parseCallNotificationContent", () => {
             });
         }
 
-        it("resolves the slot from a referenced m.rtc.member event", async () => {
-            const membership = addToTimeline(rtcMembershipContent);
-            expect((await parse(notificationReferencing(membership.getId()))).slot_id).toBe(slotId);
-        });
-
-        it("resolves the slot from a referenced legacy m.call.member event", async () => {
-            // The legacy format uses an empty `call_id` for the room-wide call, which maps to the "ROOM" slot.
-            const membership = addToTimeline(
-                {
-                    application: "m.call",
-                    call_id: "",
-                    device_id: "DEVICE",
-                    scope: "m.room",
-                    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-                    foci_preferred: [],
-                },
-                EventType.GroupCallMemberPrefix,
-            );
+        it("resolves the slot from the referenced membership state event", async () => {
+            const membership = addMembershipState(legacyMembershipContent);
             expect((await parse(notificationReferencing(membership.getId()))).slot_id).toBe("m.call#ROOM");
         });
 
-        it("resolves the slot from a referenced sticky membership outside the timeline", async () => {
-            const membership = makeStickyEvent({
-                type: EventType.RTCMembership,
-                sender,
-                content: rtcMembershipContent,
-            });
-            store.addStickyEvents([membership]);
-            expect((await parse(notificationReferencing(membership.getId()))).slot_id).toBe(slotId);
-        });
-
         it("prefers an explicit slot_id over the referenced membership", async () => {
-            const membership = addToTimeline({ ...rtcMembershipContent, slot_id: "m.call#OTHER" });
+            const membership = addMembershipState({ ...legacyMembershipContent, call_id: "other" });
             const notification = addNotification({
                 "m.relates_to": { rel_type: "m.reference", event_id: membership.getId() },
             });
@@ -329,17 +300,17 @@ describe("parseCallNotificationContent", () => {
         });
 
         it("throws when the relation is not an m.reference", async () => {
-            const membership = addToTimeline(rtcMembershipContent);
+            const membership = addMembershipState(legacyMembershipContent);
             await expect(parse(notificationReferencing(membership.getId(), "m.annotation"))).rejects.toThrow();
         });
 
-        it("throws when the referenced event is not available locally", async () => {
+        it("throws when the referenced event is not a current membership state event", async () => {
             await expect(parse(notificationReferencing("$nowhere"))).rejects.toThrow();
         });
 
-        it("throws when the referenced event is not a membership", async () => {
-            const message = addToTimeline({ body: "hi" }, EventType.RoomMessage);
-            await expect(parse(notificationReferencing(message.getId()))).rejects.toThrow();
+        it("throws when the referenced state event is not a valid membership", async () => {
+            const membership = addMembershipState({ foo: "bar" });
+            await expect(parse(notificationReferencing(membership.getId()))).rejects.toThrow();
         });
     });
 
