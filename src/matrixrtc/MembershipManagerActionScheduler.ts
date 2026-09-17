@@ -2,7 +2,7 @@ import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type EmptyObject } from "../matrix.ts";
 import { sleep } from "../utils.ts";
 import { type MembershipActionData, MembershipActionType } from "./MembershipManager.ts";
-import { type LeaveReason } from "./types.ts";
+import { type LeaveCode } from "./types.ts";
 
 /** @internal */
 export interface Action {
@@ -141,13 +141,13 @@ export class ActionScheduler {
     public initiateJoin(): void {
         this.wakeup({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
     }
-    public initiateLeave(leaveReason?: LeaveReason): void {
+    public initiateLeave(leaveCode?: LeaveCode): void {
         this.wakeup({
             replace: [
                 {
                     ts: Date.now(),
                     type: MembershipActionType.SendLeaveEvent,
-                    data: leaveReason ? { leaveReason } : undefined,
+                    data: leaveCode ? { leaveCode } : undefined,
                 },
                 {
                     ts: Date.now(),

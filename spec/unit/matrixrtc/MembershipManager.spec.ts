@@ -26,14 +26,7 @@ import {
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
-import {
-    MembershipManagerEvent,
-    Status,
-    type Transport,
-    type LivekitFocusSelection,
-    type LeaveReason,
-    LEAVE_REASON_DELAYED,
-} from "../../../src/matrixrtc";
+import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
 import {
     makeMockClient,
     makeMockRoom,
@@ -84,7 +77,7 @@ function createAsyncHandle<T>(method: MockedFunction<(...args: any[]) => any>) {
 const callSession = { id: "ROOM", application: "m.call" };
 
 const membershipDelayedLeaveContent = {
-    leave_reason: LEAVE_REASON_DELAYED,
+    leave_reason: { code: "delayed_leave" },
 };
 
 describe("MembershipManager", () => {
@@ -471,21 +464,23 @@ describe("MembershipManager", () => {
     describe("leave()", () => {
         // TODO add rate limit cases.
         it("canceled delayed leave event when leave is called", async () => {
-            const manager = new MembershipManager({}, room, client, callSession, logger);
+            const manager = new MembershipManager(
+                { leaveReasons: { leave: "the test leave" } },
+                room,
+                client,
+                callSession,
+                logger,
+            );
             manager.join([focus]);
             await vi.runOnlyPendingTimersAsync();
-            const aReason: LeaveReason = {
-                code: "test_leave",
-                reason: "the test leave",
-            };
-            await manager.leave(0, aReason);
+            await manager.leave(0, "leave");
             expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenLastCalledWith("id");
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
             expect(client.sendStateEvent).toHaveBeenLastCalledWith(
                 expect.anything(),
                 expect.anything(),
                 {
-                    leave_reason: aReason,
+                    leave_reason: { code: "leave", reason: "the test leave" },
                 },
                 expect.anything(),
             );
@@ -502,7 +497,7 @@ describe("MembershipManager", () => {
             expect(client.sendStateEvent).toHaveBeenLastCalledWith(
                 room.roomId,
                 "org.matrix.msc3401.call.member",
-                {},
+                { leave_reason: { code: "leave" } },
                 "_@alice:example.org_AAAAAAA_m.call",
             );
             // If there is a unknown error, we do not reset the delayId
@@ -522,7 +517,7 @@ describe("MembershipManager", () => {
             expect(client.sendStateEvent).toHaveBeenLastCalledWith(
                 room.roomId,
                 "org.matrix.msc3401.call.member",
-                {},
+                { leave_reason: { code: "leave" } },
                 "_@alice:example.org_AAAAAAA_m.call",
             );
             expect(client._unstable_sendScheduledDelayedEvent).not.toHaveBeenCalled();
@@ -1169,7 +1164,7 @@ describe("MembershipManager", () => {
         describe("leave()", () => {
             it("canceled delayed leave event when leave is called", async () => {
                 const manager = new StickyEventMembershipManager(
-                    undefined,
+                    { leaveReasons: { leave: "the test leave" } },
                     room,
                     client,
                     callSession,
@@ -1180,11 +1175,7 @@ describe("MembershipManager", () => {
 
                 await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
 
-                const aReason: LeaveReason = {
-                    code: "test_leave",
-                    reason: "the test leave",
-                };
-                await manager.leave(0, aReason);
+                await manager.leave(0, "leave");
                 // The delayed leave
                 expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
                 // The cancel of the delayed
@@ -1197,7 +1188,7 @@ describe("MembershipManager", () => {
                     null,
                     "org.matrix.msc4143.rtc.member",
                     {
-                        leave_reason: aReason,
+                        leave_reason: { code: "leave", reason: "the test leave" },
                         msc4354_sticky_key: expect.anything(),
                     },
                 );

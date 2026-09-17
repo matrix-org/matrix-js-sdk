@@ -247,7 +247,20 @@ export type LeaveMembershipEventContent = {
     leave_reason?: LeaveReason;
 };
 
-export type LeaveCode = "delayed_leave" | "leave" | "slot_closed" | string;
+/**
+ * The fixed set of leave causes. Every application supports all of them.
+ *
+ * - `delayed_leave`: the member left through a scheduled delayed leave event.
+ * - `leave`: the member left intentionally (e.g. by hanging up a call).
+ * - `slot_closed`: the member left because the slot was closed midway through the session.
+ */
+export type LeaveCode = "delayed_leave" | "leave" | "slot_closed";
+
+/**
+ * Human-readable explanations the application supplies for each leave cause.
+ * See {@link SessionConfig.leaveReasons}.
+ */
+export type LeaveReasonStrings = Partial<Record<LeaveCode, string>>;
 
 /**
  * Provides context on why the client left.
@@ -257,22 +270,4 @@ export type LeaveReason = {
     code: LeaveCode;
     /** Optional human-readable explanation of the leave reason */
     reason?: string;
-};
-
-/** The member left through a scheduled delayed leave event */
-export const LEAVE_REASON_DELAYED: LeaveReason = {
-    code: "delayed_leave",
-    reason: "The member left through a scheduled delayed leave event.",
-};
-
-/** The member left intentionally (e.g. by hanging up a call) */
-export const LEAVE_REASON_HANGUP: LeaveReason = {
-    code: "leave",
-    reason: "The member left intentionally (e.g. by hanging up a call).",
-};
-
-/** The member left because the call slot was closed */
-export const LEAVE_REASON_SLOT_CLOSED: LeaveReason = {
-    code: "slot_closed",
-    reason: "The member left because the slot was closed midway through the session.",
 };

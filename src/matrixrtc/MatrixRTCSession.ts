@@ -35,7 +35,8 @@ import type {
     RTCCallIntent,
     Transport,
     SlotDescription,
-    LeaveReason,
+    LeaveCode,
+    LeaveReasonStrings,
     RtcSlotEventContent,
     RtcSlotEncryptionContent,
 } from "./types.ts";
@@ -110,6 +111,12 @@ export interface SessionConfig {
      * {@link CallMembership.applicationData}.
      */
     applicationData?: Record<string, unknown>;
+
+    /**
+     * Human-readable explanations to publish alongside each leave code. Codes without an
+     * entry publish no `reason`.
+     */
+    leaveReasons?: LeaveReasonStrings;
 
     /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
@@ -676,12 +683,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      *
      * @param timeout - Optional timeout in milliseconds that fires if the leave takes too long to complete.
-     * @param leaveReason - The reason for the leave
+     * @param leaveCode - The cause of the leave.
      * @returns Whether the membership update was attempted and did not time out.
      */
     public async leaveRoomSession(
         timeout: number | undefined = undefined,
-        leaveReason: LeaveReason | undefined = undefined,
+        leaveCode: LeaveCode = "leave",
     ): Promise<boolean> {
         if (!this.isJoined()) {
             this.logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
@@ -692,7 +699,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         this.encryptionManager!.leave();
 
-        const leavePromise = this.membershipManager!.leave(timeout, leaveReason);
+        const leavePromise = this.membershipManager!.leave(timeout, leaveCode);
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         return await leavePromise;

@@ -24,9 +24,10 @@ import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
 import {
     isMyMembership,
-    LEAVE_REASON_DELAYED,
+    type LeaveCode,
     type LeaveMembershipEventContent,
     type LeaveReason,
+    type LeaveReasonStrings,
     type RTCCallIntent,
     type SlotDescription,
     Status,
@@ -130,7 +131,7 @@ export type MembershipActionData = {
     RestartDelayedEvent: undefined;
     UpdateExpiry: undefined;
     CancelledScheduledDelayedLeaveEvent: undefined;
-    SendLeaveEvent: { leaveReason?: LeaveReason };
+    SendLeaveEvent: { leaveCode?: LeaveCode };
 };
 
 /**
@@ -211,6 +212,7 @@ export class MembershipManager
     protected readonly logger: Logger;
     protected callIntent: RTCCallIntent | undefined;
     protected applicationData: Record<string, unknown> | undefined;
+    protected leaveReasons: LeaveReasonStrings | undefined;
 
     public isActivated(): boolean {
         return this.activated;
@@ -269,10 +271,10 @@ export class MembershipManager
     /**
      * Leave from the call (Send an rtc session event with content: `{ leave_reason: xxx }`)
      * @param timeout the maximum duration this promise will take to resolve
-     * @param leaveReason the reason for the leave.
+     * @param leaveCode the cause of the leave.
      * @returns true if it managed to leave and false if the timeout condition happened.
      */
-    public leave(timeout?: number, leaveReason?: LeaveReason): Promise<boolean> {
+    public leave(timeout?: number, leaveCode: LeaveCode = "leave"): Promise<boolean> {
         if (!this.scheduler.running) {
             this.logger.warn("Called MembershipManager.leave() even though the MembershipManager is not running");
             return Promise.resolve(true);
@@ -283,7 +285,7 @@ export class MembershipManager
             // reset scheduled actions so we will not do any new actions.
             this.leavePromiseResolvers = Promise.withResolvers<boolean>();
             this.activated = false;
-            this.scheduler.initiateLeave(leaveReason);
+            this.scheduler.initiateLeave(leaveCode);
             if (timeout) setTimeout(() => this.leavePromiseResolvers?.resolve(false), timeout);
         }
         return this.leavePromiseResolvers.promise;
@@ -370,6 +372,7 @@ export class MembershipManager
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
         this.applicationData = joinConfig?.applicationData;
+        this.leaveReasons = joinConfig?.leaveReasons;
         this.scheduler = new ActionScheduler((type, data): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
@@ -516,9 +519,18 @@ export class MembershipManager
                     );
                     return {};
                 }
-                return this.sendLeaveEvent(data?.leaveReason);
+                return this.sendLeaveEvent(data?.leaveCode ?? "leave");
             }
         }
+    }
+
+    /**
+     * Builds the `leave_reason` to publish for a leave cause, attaching the application-supplied
+     * human-readable explanation if there is one.
+     */
+    protected makeLeaveReason(code: LeaveCode): LeaveReason {
+        const reason = this.leaveReasons?.[code];
+        return reason === undefined ? { code } : { code, reason };
     }
 
     // an abstraction to switch between sending state or a sticky event
@@ -528,7 +540,7 @@ export class MembershipManager
             { delay: this.delayedLeaveEventDelayMs },
             EventType.GroupCallMemberPrefix,
             {
-                leave_reason: LEAVE_REASON_DELAYED,
+                leave_reason: this.makeLeaveReason("delayed_leave"),
             },
             this.stateKey,
         );
@@ -795,9 +807,9 @@ export class MembershipManager
             });
     }
 
-    private async sendLeaveEvent(leave_reason?: LeaveReason): Promise<ActionUpdate> {
+    private async sendLeaveEvent(leaveCode: LeaveCode): Promise<ActionUpdate> {
         return await this.clientSendMembership({
-            leave_reason,
+            leave_reason: this.makeLeaveReason(leaveCode),
         })
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
@@ -1134,7 +1146,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             null,
             EventType.RTCMembership,
             {
-                leave_reason: LEAVE_REASON_DELAYED,
+                leave_reason: this.makeLeaveReason("delayed_leave"),
                 msc4354_sticky_key: this.memberId,
             },
         );
