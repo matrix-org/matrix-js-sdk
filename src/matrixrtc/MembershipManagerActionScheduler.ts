@@ -142,17 +142,15 @@ export class ActionScheduler {
         this.wakeup({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent, data: undefined }] });
     }
     public initiateLeave(leaveCode?: LeaveCode): void {
+        // Only the leave event is scheduled here. Cancelling the delayed leave event is scheduled by the
+        // SendLeaveEvent handler once the leave actually made it into the room state: until then the delayed
+        // event is the only thing that would remove our membership if sending the leave event keeps failing.
         this.wakeup({
             replace: [
                 {
                     ts: Date.now(),
                     type: MembershipActionType.SendLeaveEvent,
                     data: leaveCode ? { leaveCode } : undefined,
-                },
-                {
-                    ts: Date.now(),
-                    type: MembershipActionType.CancelledScheduledDelayedLeaveEvent,
-                    data: undefined,
                 },
             ],
         });

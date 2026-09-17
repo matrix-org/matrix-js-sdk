@@ -523,6 +523,86 @@ describe("MembershipManager", () => {
             expect(client._unstable_sendScheduledDelayedEvent).not.toHaveBeenCalled();
             expect(manager.delayId).toBe(undefined);
         });
+        it("only cancels the delayed leave event once the leave event was sent", async () => {
+            const manager = new MembershipManager({}, room, client, callSession, logger);
+            manager.join([focus]);
+            await vi.advanceTimersByTimeAsync(1);
+            // The join event.
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+
+            (client.sendStateEvent as Mock<any>).mockRejectedValueOnce(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "1" }),
+                ),
+            );
+            const leavePromise = manager.leave();
+            await vi.advanceTimersByTimeAsync(1);
+
+            // Sending the leave event failed, so the delayed leave event has to stay around: it is the only
+            // thing that would remove our membership if we never manage to send the leave event.
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            expect(client._unstable_cancelScheduledDelayedEvent).not.toHaveBeenCalled();
+
+            // The retry succeeds, now it is safe to cancel the delayed leave event.
+            await vi.advanceTimersByTimeAsync(1000);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(3);
+            expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenLastCalledWith("id");
+            await expect(leavePromise).resolves.toBe(true);
+        });
+        it("does not cancel the delayed leave event if the leave event can never be sent", async () => {
+            const unrecoverableError = vi.fn();
+            const manager = new MembershipManager({}, room, client, callSession, logger);
+            manager.join([focus], undefined, unrecoverableError);
+            await vi.advanceTimersByTimeAsync(1);
+
+            (client.sendStateEvent as Mock<any>).mockRejectedValue(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "1" }),
+                ),
+            );
+            void manager.leave();
+            // Exhaust the rate limit retries (maximumRateLimitRetryCount defaults to 10).
+            await vi.advanceTimersByTimeAsync(11000);
+
+            expect(unrecoverableError).toHaveBeenCalled();
+            // We never got the leave event through, so the delayed leave event is the only remaining way
+            // for us to be removed from the call.
+            expect(client._unstable_cancelScheduledDelayedEvent).not.toHaveBeenCalled();
+        });
+        it("cancels the delayed leave event when leaving before the join event was sent", async () => {
+            const manager = new MembershipManager({}, room, client, callSession, logger);
+            (client.sendStateEvent as Mock<any>).mockRejectedValue(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "10" }),
+                ),
+            );
+            manager.join([focus]);
+            await vi.advanceTimersByTimeAsync(1);
+            // The delayed leave event is set up but the join event has not made it into the room state yet.
+            expect(manager.delayId).toBe("id");
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+
+            const leavePromise = manager.leave();
+            await vi.advanceTimersByTimeAsync(1);
+
+            // No leave event is needed since we are not joined, but the delayed leave event still has to go.
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenLastCalledWith("id");
+            expect(manager.delayId).toBe(undefined);
+            await expect(leavePromise).resolves.toBe(true);
+        });
         it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             await expect(manager.leave()).resolves.toBeTruthy();

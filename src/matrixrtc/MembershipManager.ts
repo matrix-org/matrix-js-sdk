@@ -512,12 +512,12 @@ export class MembershipManager
                 return this.updateExpiryOnJoinedEvent();
             }
             case MembershipActionType.SendLeaveEvent: {
-                // We are good already
+                // We are good already but still need to get rid of a potentially lingering delayed leave event.
                 if (!this.state.hasMemberStateEvent) {
                     this.logger.debug(
-                        "MembershipManager: SendLeaveEvent but we are already not joined. No action needed.",
+                        "MembershipManager: SendLeaveEvent but we are already not joined. Only cancelling the delayed leave event.",
                     );
-                    return {};
+                    return createReplaceActionUpdate(MembershipActionType.CancelledScheduledDelayedLeaveEvent);
                 }
                 return this.sendLeaveEvent(data?.leaveCode ?? "leave");
             }
@@ -816,7 +816,10 @@ export class MembershipManager
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
-                return {};
+                // Only now that the leave is in the room state it is safe to drop the delayed leave event.
+                // We replace instead of insert so that a scheduled retry of this action cannot send another
+                // leave event after we already left.
+                return createReplaceActionUpdate(MembershipActionType.CancelledScheduledDelayedLeaveEvent);
             })
             .catch((e) => {
                 const update = this.actionUpdateFromErrors(e, MembershipActionType.SendLeaveEvent, "sendStateEvent");
