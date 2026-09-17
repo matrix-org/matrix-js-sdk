@@ -19,7 +19,7 @@ export interface Action {
     /**
      * Additional parameters of the action
      */
-    data?: MembershipActionData[MembershipActionType];
+    data: MembershipActionData[MembershipActionType];
 }
 
 /** @internal */
