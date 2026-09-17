@@ -84,7 +84,7 @@ export class ActionScheduler {
             return;
         }
         this.running = true;
-        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }];
+        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent, data: undefined }];
         try {
             while (this._actions.length > 0) {
                 // Sort so next (smallest ts) action is at the beginning
@@ -139,7 +139,7 @@ export class ActionScheduler {
     }
 
     public initiateJoin(): void {
-        this.wakeup({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
+        this.wakeup({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent, data: undefined }] });
     }
     public initiateLeave(leaveCode?: LeaveCode): void {
         this.wakeup({
@@ -152,6 +152,7 @@ export class ActionScheduler {
                 {
                     ts: Date.now(),
                     type: MembershipActionType.CancelledScheduledDelayedLeaveEvent,
+                    data: undefined,
                 },
             ],
         });

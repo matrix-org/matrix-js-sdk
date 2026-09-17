@@ -175,7 +175,7 @@ function createInsertActionUpdate(
 
 function createReplaceActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
     return {
-        replace: [{ ts: Date.now() + (offset ?? 0), type }],
+        replace: [{ ts: Date.now() + (offset ?? 0), type, data: undefined }],
     };
 }
 
@@ -766,10 +766,11 @@ export class MembershipManager
                     replace: [
                         ...actionsWithoutUpdateExpiry,
                         // To check if the delayed event is still there or got removed by inserting the stateEvent, we need to restart it.
-                        { ts: Date.now(), type: MembershipActionType.RestartDelayedEvent },
+                        { ts: Date.now(), type: MembershipActionType.RestartDelayedEvent, data: undefined },
                         {
                             ts: this.computeNextExpiryActionTs(this.state.expireUpdateIterations),
                             type: MembershipActionType.UpdateExpiry,
+                            data: undefined,
                         },
                     ],
                 };
@@ -795,6 +796,7 @@ export class MembershipManager
                         {
                             ts: this.computeNextExpiryActionTs(nextExpireUpdateIteration),
                             type: MembershipActionType.UpdateExpiry,
+                            data: undefined,
                         },
                     ],
                 };
@@ -1136,9 +1138,7 @@ export class StickyEventMembershipManager extends MembershipManager {
     }
 
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () => {
-        this.logger.debug(
-            `send delayed disconnect membership event memberId: ${this.memberId}`,
-        );
+        this.logger.debug(`send delayed disconnect membership event memberId: ${this.memberId}`);
         return this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
