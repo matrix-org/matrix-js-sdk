@@ -1125,7 +1125,7 @@ export class StickyEventMembershipManager extends MembershipManager {
 
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () => {
         this.logger.debug(
-            `StickyMembershipManager send delayed disconnect membership event memberId: ${this.memberId}`,
+            `send delayed disconnect membership event memberId: ${this.memberId}`,
         );
         return this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
