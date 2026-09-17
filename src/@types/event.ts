@@ -403,7 +403,6 @@ export interface StateEvents {
         | SessionMembershipData
         | LeaveMembershipEventContent
         | EmptyObject;
-    [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
     [EventType.RTCSlot]: RtcSlotEventContent | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
