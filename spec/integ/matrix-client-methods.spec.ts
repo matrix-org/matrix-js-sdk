@@ -1764,7 +1764,6 @@ describe("MatrixClient", function () {
         const stableSuffix = `room_summary/${encodedRoomId}`;
         const prefix = "/_matrix/client/unstable/im.nheko.summary/";
         const suffix = `summary/${encodedRoomId}`;
-        const deprecatedSuffix = `rooms/${encodedRoomId}/summary`;
 
         const errorUnrecogStatus = 404;
         const errorUnrecogBody = {
