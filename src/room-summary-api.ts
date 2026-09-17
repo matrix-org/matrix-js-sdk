@@ -106,5 +106,5 @@ export async function fetchRoomSummary(
     const paramOpts = { prefix: UNSTABLE_PREFIX };
 
     const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-    return await http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, paramOpts);
+    return http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, paramOpts);
 }
