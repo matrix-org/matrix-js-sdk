@@ -899,6 +899,28 @@ describe("MembershipManager", () => {
             );
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
+        it("does not give up when delayed event restarts keep hitting the local timeout", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager({ maximumNetworkErrorRetryCount: 3 }, room, client, callSession);
+            const { promise: stuckPromise, reject: rejectStuckPromise } = Promise.withResolvers<EmptyObject>();
+            const probablyLeftEmit = vi.fn();
+            manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
+            manager.join([focus], focusActive, onError);
+            try {
+                await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
+                // The server never answers restarts: each hits the 2s local timeout and is retried immediately.
+                client._unstable_restartScheduledDelayedEvent = vi.fn((_) => stuckPromise);
+                await vi.advanceTimersByTimeAsync(60000);
+                // Way past `maximumNetworkErrorRetryCount` timeouts, but the server-side delayed leave bounds this
+                // failure mode, so we keep retrying (and report probablyLeft) instead of shutting down.
+                expect(client._unstable_restartScheduledDelayedEvent).toHaveBeenCalledTimes(29);
+                expect(probablyLeftEmit).toHaveBeenCalledWith(true);
+                expect(onError).not.toHaveBeenCalled();
+                expect(manager.status).toBe(Status.Connected);
+            } finally {
+                rejectStuckPromise();
+            }
+        });
         it("falls back to using pure state events when UnsupportedDelayedEventsEndpointError encountered for delayed events", async () => {
             const unrecoverableError = vi.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(
@@ -1009,6 +1031,53 @@ describe("MembershipManager", () => {
         });
     });
 
+    describe("updateApplicationData()", () => {
+        it("should fail if the user has not joined the call", async () => {
+            const manager = new MembershipManager({}, room, client, callSession);
+            await expect(
+                manager.updateApplicationData({ "org.example.key": 1 }),
+            ).rejects.toThrowErrorMatchingInlineSnapshot(
+                `[Error: You cannot update your application data before joining the call]`,
+            );
+        });
+
+        it("publishes the data at the top level of a legacy membership", async () => {
+            const manager = new MembershipManager(
+                { applicationData: { "org.example.key": "initial" } },
+                room,
+                client,
+                callSession,
+            );
+            const sent = waitForMockCall(client.sendStateEvent);
+            manager.join([]);
+            await sent;
+            expect(
+                (vi.mocked(client.sendStateEvent).mock.calls[0][2] as Record<string, unknown>)["org.example.key"],
+            ).toBe("initial");
+            const membership = mockCallMembership(
+                {
+                    ...sessionMembershipTemplate,
+                    "user_id": client.getUserId()!,
+                    "org.example.key": "initial",
+                } as SessionMembershipData & { user_id: string },
+                room.roomId,
+            );
+            await manager.onRTCSessionMemberUpdate([membership]);
+            // Unchanged data sends nothing
+            await manager.updateApplicationData({ "org.example.key": "initial" });
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            await manager.updateApplicationData({ "org.example.key": { nested: true } });
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            const eventContent = vi.mocked(client.sendStateEvent).mock.calls[1][2] as Record<string, unknown>;
+            expect(eventContent["org.example.key"]).toEqual({ nested: true });
+            // The session's own fields can't be overridden
+            await manager.updateApplicationData({ application: "m.not.a.call", device_id: "X" });
+            const overridden = vi.mocked(client.sendStateEvent).mock.calls[2][2] as SessionMembershipData;
+            expect(overridden.application).toBe("m.call");
+            expect(overridden.device_id).toBe("AAAAAAA");
+        });
+    });
+
     describe("StickyEventMembershipManager", () => {
         beforeEach(() => {
             // Provide a default mock that is like the default "non error" server behaviour.
@@ -1023,7 +1092,7 @@ describe("MembershipManager", () => {
                         client._unstable_restartScheduledDelayedEvent,
                     );
                     const memberManager = new StickyEventMembershipManager(
-                        undefined,
+                        { applicationData: { "org.example.key": "value" } },
                         room,
                         client,
                         callSession,
@@ -1040,7 +1109,7 @@ describe("MembershipManager", () => {
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
-                            application: { type: "m.call" },
+                            application: { "type": "m.call", "org.example.key": "value" },
                             member: {
                                 user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",

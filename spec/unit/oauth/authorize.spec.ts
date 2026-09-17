@@ -34,7 +34,6 @@ describe("authorization", () => {
 
     const auth = new OAuth2(delegatedAuthConfig, {
         clientId,
-        redirectUri: baseUrl,
         deviceId,
         codeVerifier: "test-code-verifier",
     });
@@ -52,7 +51,7 @@ describe("authorization", () => {
         const state = "abc123";
 
         it("should generate url with correct parameters", async () => {
-            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state));
+            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, baseUrl));
 
             expect(authUrl.searchParams.get("response_mode")).toEqual("fragment");
             expect(authUrl.searchParams.get("response_type")).toEqual("code");
@@ -67,13 +66,13 @@ describe("authorization", () => {
         });
 
         it("should generate url with create prompt", async () => {
-            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, "fragment", "create"));
+            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, baseUrl, "fragment", "create"));
 
             expect(authUrl.searchParams.get("prompt")).toEqual("create");
         });
 
         it("should generate url with response_mode=query", async () => {
-            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, "query"));
+            const authUrl = new URL(await auth.generateAuthorizationCodeGrantUrl(state, baseUrl, "query"));
 
             expect(authUrl.searchParams.get("response_mode")).toEqual("query");
         });
@@ -120,7 +119,7 @@ describe("authorization", () => {
         it("should make correct request to the token endpoint", async () => {
             const [code] = await setupState();
             const codeVerifier = auth.context.codeVerifier;
-            await auth.completeAuthorizationCodeGrant(code);
+            await auth.completeAuthorizationCodeGrant(code, baseUrl);
 
             expect(fetchMock.callHistory.lastCall(metadata.token_endpoint)?.options).toStrictEqual(
                 expect.objectContaining({
@@ -145,7 +144,7 @@ describe("authorization", () => {
         it("should make correct request to the token endpoint with response_mode=fragment", async () => {
             const [code] = await setupState({ responseMode: "fragment" });
             const codeVerifier = auth.context.codeVerifier;
-            await auth.completeAuthorizationCodeGrant(code);
+            await auth.completeAuthorizationCodeGrant(code, baseUrl);
 
             expect(fetchMock.callHistory.lastCall(metadata.token_endpoint)?.options).toStrictEqual(
                 expect.objectContaining({
@@ -169,7 +168,7 @@ describe("authorization", () => {
 
         it("should return with valid bearer token", async () => {
             const [code, scope] = await setupState();
-            const result = await auth.completeAuthorizationCodeGrant(code);
+            const result = await auth.completeAuthorizationCodeGrant(code, baseUrl);
 
             expect(result).toEqual({
                 access_token: validBearerTokenResponse.access_token,
@@ -193,7 +192,7 @@ describe("authorization", () => {
                 response: tokenResponse,
             });
 
-            const result = await auth.completeAuthorizationCodeGrant(code);
+            const result = await auth.completeAuthorizationCodeGrant(code, baseUrl);
 
             expect(result).toEqual({
                 access_token: validBearerTokenResponse.access_token,
@@ -213,7 +212,7 @@ describe("authorization", () => {
             fetchMock.modifyRoute("token-endpoint", {
                 response: { status: 500 },
             });
-            await expect(auth.completeAuthorizationCodeGrant(code)).rejects.toThrow(
+            await expect(auth.completeAuthorizationCodeGrant(code, baseUrl)).rejects.toThrow(
                 new HTTPError(OAuth2Error.CodeExchangeFailed, 500, expect.anything()),
             );
         });
@@ -227,7 +226,7 @@ describe("authorization", () => {
             fetchMock.modifyRoute("token-endpoint", {
                 response: invalidBearerTokenResponse,
             });
-            await expect(auth.completeAuthorizationCodeGrant(code)).rejects.toThrow(
+            await expect(auth.completeAuthorizationCodeGrant(code, baseUrl)).rejects.toThrow(
                 new Error(OAuth2Error.InvalidBearerTokenResponse),
             );
         });

@@ -1,15 +1,8 @@
-peerDependencyRules:
-    allowedVersions:
-        eslint: "8"
-
-allowedDeprecatedVersions:
-    eslint: "8"
-
 overrides:
-    expect: 30.4.1
-    # https://github.com/advisories/GHSA-fx2h-pf6j-xcff
-    # https://github.com/advisories/GHSA-v6wh-96g9-6wx3
-    vite: 8.1.5
+    expect: 30.5.1
+    # https://github.com/advisories/GHSA-c83g-rgw3-j3cx
+    # https://github.com/advisories/GHSA-73wf-gq98-2v4g
+    browserslist: 4.28.9
 
 allowBuilds:
     unrs-resolver: false

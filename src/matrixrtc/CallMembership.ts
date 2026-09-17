@@ -36,6 +36,20 @@ import { EventType } from "../@types/event.ts";
  */
 export const DEFAULT_EXPIRE_DURATION = 1000 * 60 * 60 * 4;
 
+/** The fields of a legacy session membership that belong to the session, not the application */
+const sessionFields: (keyof SessionMembershipData)[] = [
+    "application",
+    "call_id",
+    "device_id",
+    "focus_active",
+    "foci_preferred",
+    "created_ts",
+    "scope",
+    "expires",
+    "m.call.intent",
+    "membershipID",
+];
+
 /**
  * Describes the source event type that provided the membership data.
  */
@@ -261,10 +275,14 @@ export class CallMembership {
             case MembershipKind.RTC:
                 return data.application;
             case MembershipKind.Session:
-            default:
-                // SessionData does not have application data as such. We return specific
-                // properties in use by other getters in this class, for compatibility.
-                return { "type": data.application, "m.call.intent": data["m.call.intent"] };
+            default: {
+                // SessionData has no application object: the application's own
+                // data sits at the top level beside the session fields, so
+                // everything but those is the application's
+                const { application, ...rest } = data;
+                for (const key of sessionFields) delete rest[key as keyof typeof rest];
+                return { ...rest, "type": application, "m.call.intent": data["m.call.intent"] };
+            }
         }
     }
 

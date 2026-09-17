@@ -93,10 +93,10 @@ describe("cross-signing", () => {
                 logger: new DebugLogger(debug(`matrix-js-sdk:cross-signing`)),
             });
 
-            syncResponder = new SyncResponder(homeserverUrl);
-            e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
             /** an object which intercepts `/keys/upload` requests on the test homeserver */
-            new E2EKeyReceiver(homeserverUrl);
+            const e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver });
+            e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
 
             // Silence warnings from the backup manager
             fetchMock.getOnce(new URL("/_matrix/client/v3/room_keys/version", homeserverUrl).toString(), {

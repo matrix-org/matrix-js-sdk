@@ -196,6 +196,17 @@ describe("CallMembership", () => {
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
             });
+            it("returns the application's own top-level data in applicationData", () => {
+                const withData = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "org.example.key": { nested: true },
+                });
+                expect(withData.applicationData).toStrictEqual({
+                    "org.example.key": { nested: true },
+                    "type": "m.call",
+                    "m.call.intent": "voice",
+                });
+            });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe("m.room");
             });

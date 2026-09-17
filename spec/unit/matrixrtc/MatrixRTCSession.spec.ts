@@ -30,7 +30,11 @@ import {
 } from "./mocks";
 import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
 import { RoomStateEvent } from "../../../src/models/room-state.ts";
-import { type RtcSlotEventContent } from "../../../src/matrixrtc/types.ts";
+import {
+    RTC_SLOT_ENCRYPTION_PER_MEMBER,
+    type RtcSlotEncryptionContent,
+    type RtcSlotEventContent,
+} from "../../../src/matrixrtc/types.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
 import {
@@ -670,6 +674,31 @@ describe("MatrixRTCSession", () => {
             expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
 
+        it("publishes application data in the membership, and updates it once joined", async () => {
+            await expect(sess!.updateApplicationData({ "org.example.key": 1 })).rejects.toThrow("Not connected yet");
+            // The manager needs a real response to stay alive for the update
+            const sent = new Promise<void>((resolve) =>
+                sendStateEventMock.mockImplementation(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "$membership" });
+                }),
+            );
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                applicationData: { "org.example.key": 1 },
+            });
+            await sent;
+            expect((sendStateEventMock.mock.calls[0][2] as Record<string, unknown>)["org.example.key"]).toBe(1);
+            mockRoomState(mockRoom, [
+                { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "org.example.key": 1 } as any,
+            ]);
+            await sess!._onRTCSessionMemberUpdate();
+            expect(sess!.memberships[0].applicationData["org.example.key"]).toBe(1);
+
+            await sess!.updateApplicationData({ "org.example.key": 2 });
+            expect(sendStateEventMock).toHaveBeenCalledTimes(2);
+            expect((sendStateEventMock.mock.calls[1][2] as Record<string, unknown>)["org.example.key"]).toBe(2);
+        });
+
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
@@ -694,7 +723,7 @@ describe("MatrixRTCSession", () => {
                     event_id: ownMembershipId,
                     rel_type: "m.reference",
                 },
-                "lifetime": 30000,
+                "lifetime": 90000,
                 "sender_ts": expect.any(Number),
             });
 
@@ -702,7 +731,7 @@ describe("MatrixRTCSession", () => {
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
-                "lifetime": 30000,
+                "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
                     event_id: expect.any(String),
@@ -751,7 +780,7 @@ describe("MatrixRTCSession", () => {
                     event_id: ownMembershipEventId,
                     rel_type: "m.reference",
                 },
-                "lifetime": 30000,
+                "lifetime": 90000,
                 "sender_ts": expect.any(Number),
             });
 
@@ -759,7 +788,7 @@ describe("MatrixRTCSession", () => {
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
-                "lifetime": 30000,
+                "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
                     event_id: expect.any(String),
@@ -886,6 +915,47 @@ describe("MatrixRTCSession", () => {
                 expect.anything(),
             );
             expect(sess.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
+
+            await sess.leaveRoomSession();
+        });
+
+        it("reports and emits when the key rotation participant limit is reached", async () => {
+            client.encryptAndSendToDevice = vi.fn().mockResolvedValue(undefined);
+            const ownMembership = {
+                ...sessionMembershipTemplate,
+                user_id: client.getUserId()!,
+                device_id: client.getDeviceId()!,
+            };
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:user.example", device_id: "BBBBBB" };
+            const carl = { ...sessionMembershipTemplate, user_id: "@carl:user.example", device_id: "CCCCCC" };
+
+            const mockRoom = makeMockRoom([ownMembership, bob]);
+            const sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                manageMediaKeys: true,
+                keyRotationParticipantLimit: 3,
+            });
+            await flushPromises();
+
+            const onKeyRotationSuppressedChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.KeyRotationSuppressedChanged, onKeyRotationSuppressedChanged);
+
+            expect(sess.isKeyRotationSuppressed).toBe(false);
+
+            // A third participant takes us to the limit
+            mockRoomState(mockRoom, [ownMembership, bob, carl]);
+            await sess._onRTCSessionMemberUpdate();
+
+            expect(sess.isKeyRotationSuppressed).toBe(true);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenCalledExactlyOnceWith(true);
+
+            // Back below the limit
+            mockRoomState(mockRoom, [ownMembership, bob]);
+            await sess._onRTCSessionMemberUpdate();
+
+            expect(sess.isKeyRotationSuppressed).toBe(false);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenLastCalledWith(false);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenCalledTimes(2);
 
             await sess.leaveRoomSession();
         });
@@ -1056,6 +1126,244 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.memberships).toHaveLength(0);
             expect(sess.isSlotClosed()).toBe(true);
+        });
+
+        describe("ensureRtcSlotOpen", () => {
+            const perMemberEncryption: RtcSlotEncryptionContent = { type: RTC_SLOT_ENCRYPTION_PER_MEMBER };
+            let mockRoom: Room;
+
+            beforeEach(() => {
+                client.sendStateEvent = vi.fn().mockResolvedValue({ event_id: "success" });
+                mockRoom = makeMockRoom([], false);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            });
+
+            it("creates the slot from the slot description when no slot event exists", async () => {
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" } },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("declares the given encryption when creating the slot", async () => {
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" }, encryption: perMemberEncryption },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("reopens a closed slot, rewriting application from the slot description", async () => {
+                const existingContent: RtcSlotEventContent = {
+                    status: "closed",
+                    application: { type: "m.call", foo: "bar" },
+                };
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, existingContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" } },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("adds encryption when reopening a closed slot that had none", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(callSession, closedSlotContentWithApplication, mockRoom.roomId),
+                );
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" }, encryption: perMemberEncryption },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("removes encryption when reopening a closed slot without it", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...closedSlotContentWithApplication, encryption: perMemberEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen();
+
+                const sentContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as RtcSlotEventContent;
+                expect(sentContent.status).toBe("open");
+                expect(sentContent.encryption).toBeUndefined();
+            });
+
+            it("replaces already-declared encryption when reopening a closed slot", async () => {
+                const existingEncryption: RtcSlotEncryptionContent = { ...perMemberEncryption, extra: "old" };
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...closedSlotContentWithApplication, encryption: existingEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    expect.objectContaining({ encryption: perMemberEncryption }),
+                    "m.call#ROOM",
+                );
+            });
+
+            it("does nothing when the slot is already open with matching application and no encryption", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, openSlotContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("does nothing when the slot is already open with matching application and encryption", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...openSlotContent, encryption: perMemberEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("rewrites an open slot whose application differs from the slot description", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { status: "open", application: { type: "m.call", foo: "bar" } },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" } },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("rewrites an open slot to add encryption", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, openSlotContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { ...openSlotContent, encryption: perMemberEncryption },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("rewrites an open slot to remove encryption", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...openSlotContent, encryption: perMemberEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen();
+
+                const sentContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as RtcSlotEventContent;
+                expect(sentContent.status).toBe("open");
+                expect(sentContent.encryption).toBeUndefined();
+            });
+
+            it("propagates errors from sending the state event", async () => {
+                client.sendStateEvent = vi.fn().mockRejectedValue(new Error("M_FORBIDDEN"));
+
+                await expect(sess!.ensureRtcSlotOpen()).rejects.toThrow("M_FORBIDDEN");
+            });
+        });
+
+        describe("ensureRtcSlotClosed", () => {
+            let mockRoom: Room;
+
+            beforeEach(() => {
+                client.sendStateEvent = vi.fn().mockResolvedValue({ event_id: "success" });
+                mockRoom = makeMockRoom([], false);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            });
+
+            it("closes an open slot preserving its other content", async () => {
+                const existingContent: RtcSlotEventContent = {
+                    status: "open",
+                    application: { type: "m.call" },
+                    encryption: { type: RTC_SLOT_ENCRYPTION_PER_MEMBER },
+                };
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, existingContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotClosed();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { ...existingContent, status: "closed" },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("does nothing when no slot event exists", async () => {
+                await sess!.ensureRtcSlotClosed();
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("does nothing when the slot is already closed", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotClosed();
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("propagates errors from sending the state event", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, openSlotContent, mockRoom.roomId));
+                client.sendStateEvent = vi.fn().mockRejectedValue(new Error("M_FORBIDDEN"));
+
+                await expect(sess!.ensureRtcSlotClosed()).rejects.toThrow("M_FORBIDDEN");
+            });
         });
     });
     it("ensureRecalculateSessionMembers still runs after a rejected promise (React Native / Hermes regression)", async () => {

@@ -26,7 +26,7 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
-import { logDurationSync } from "../utils.ts";
+import { deepCompare, logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
@@ -37,6 +37,7 @@ import type {
     SlotDescription,
     LeaveReason,
     RtcSlotEventContent,
+    RtcSlotEncryptionContent,
 } from "./types.ts";
 import {
     MembershipManagerEvent,
@@ -66,6 +67,8 @@ export enum MatrixRTCSessionEvent {
     MembershipManagerError = "membership_manager_error",
     /** The RTCSession did send a call notification caused by joining the call as the first member */
     DidSendCallNotification = "did_send_call_notification",
+    /** Whether the session is too large for the media key to be rotated has changed */
+    KeyRotationSuppressedChanged = "key_rotation_suppressed_changed",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -84,6 +87,7 @@ export type MatrixRTCSessionEventHandlerMap = {
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
         notificationContentNew: { event_id: string } & IRTCNotificationContent,
     ) => void;
+    [MatrixRTCSessionEvent.KeyRotationSuppressedChanged]: (isKeyRotationSuppressed: boolean) => void;
 };
 
 export interface SessionConfig {
@@ -97,6 +101,21 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
+
+    /**
+     * Application-specific data to publish in our membership alongside the
+     * application `type` and `m.call.intent`: in the `application` object of
+     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
+     * one. Keys should be namespaced. Read back through
+     * {@link CallMembership.applicationData}.
+     */
+    applicationData?: Record<string, unknown>;
+
+    /**
+     * How long (in milliseconds) the callee's client should keep ringing/waiting for an
+     * answer before the sender gives up and the call notification is considered timed out.
+     */
+    notificationLifetimeMs?: number;
 }
 
 // The names follow these principles:
@@ -200,6 +219,17 @@ export interface EncryptionConfig {
     keyRotationGracePeriodMs?: number;
 
     /**
+     * The number of participants in the session at which the media key will no longer be rotated.
+     *
+     * Rotating a key requires sending it to every participant device, so in large sessions the cost of rotating
+     * on every join/leave becomes prohibitive. At this limit the current key is kept and
+     * distributed to new joiners. No new keys are generated for joiners/leavers.
+     *
+     * Defaults to undefined.
+     */
+    keyRotationParticipantLimit?: number;
+
+    /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
      * tend to leave calls at the same time.
      * @deprecated - Not used by the new encryption manager.
@@ -292,6 +322,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Whether the key rotation is currently halted.
+     * mirror of: EncryptionConfig.keyRotationParticipantLimit
+     */
+    public get isKeyRotationSuppressed(): boolean {
+        return this.encryptionManager?.isKeyRotationSuppressed ?? false;
+    }
+
+    /**
      * The callId (sessionId) of the call.
      *
      * It can be undefined since the callId is only known once the first membership joins.
@@ -328,6 +366,55 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public isSlotClosed(): boolean | undefined {
         return isSlotClosed(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Ensures this session's slot is open, sending a slot state event to open (or create) it if needed.
+     *
+     * The event's `application` is set from this session's slot description and its `encryption` from
+     * `opts.encryption`, replacing whatever an existing slot event declares. Other content is preserved.
+     * No-op if the slot is already open with matching `application` and `encryption`.
+     *
+     * @param opts.encryption - The encryption to declare on the slot, or `undefined` for none.
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotOpen(opts: { encryption?: RtcSlotEncryptionContent } = {}): Promise<void> {
+        const application = { type: this.slotDescription.application };
+        const existingContent = this.getRtcSlot();
+        if (
+            existingContent?.status === "open" &&
+            deepCompare(existingContent.application, application) &&
+            deepCompare(existingContent.encryption, opts.encryption)
+        ) {
+            return;
+        }
+        await this.sendRtcSlot({
+            ...existingContent,
+            status: "open",
+            application,
+            encryption: opts.encryption,
+        });
+    }
+
+    /**
+     * Ensures this session's slot is closed, sending a slot state event to close it if needed.
+     * The other content of the existing slot event is preserved. No-op if no slot event exists.
+     *
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotClosed(): Promise<void> {
+        const existingContent = this.getRtcSlot();
+        if (!existingContent || existingContent.status === "closed") return;
+        await this.sendRtcSlot({ ...existingContent, status: "closed" });
+    }
+
+    private async sendRtcSlot(content: RtcSlotEventContent): Promise<void> {
+        await this.client.sendStateEvent(
+            this.roomSubset.roomId,
+            EventType.RTCSlot,
+            content,
+            computeSlotId(this.slotDescription),
+        );
     }
 
     /**
@@ -651,6 +738,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Replace the application-specific data in our membership (see
+     * {@link SessionConfig.applicationData}), re-sending it if it changed.
+     */
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateApplicationData(applicationData);
+    }
+
+    /**
      * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
      * the keys.
      */
@@ -704,6 +803,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
+        const lifetime = this.joinConfig?.notificationLifetimeMs ?? 90_000;
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
@@ -716,7 +816,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     rel_type: RelationType.Reference,
                 },
                 "sender_ts": Date.now(),
-                "lifetime": 30_000, // 30 seconds
+                "lifetime": lifetime,
             };
             if (callIntent) {
                 content["m.call.intent"] = callIntent;
@@ -810,6 +910,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // Clear the flag.
         this.membershipNeedsRecalculation = false;
         const oldMemberships = this.memberships;
+        // Needs to be computed before `this.memberships` is updated below, since it is derived from it.
+        const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
@@ -854,6 +956,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
         this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        if (this.isKeyRotationSuppressed !== wasKeyRotationSuppressed) {
+            this.logger.info(
+                `Key rotation is now ${this.isKeyRotationSuppressed ? "suppressed" : "active again"} (${this.memberships.length} members)`,
+            );
+            this.emit(MatrixRTCSessionEvent.KeyRotationSuppressedChanged, this.isKeyRotationSuppressed);
+        }
 
         this.setExpiryTimer();
     };

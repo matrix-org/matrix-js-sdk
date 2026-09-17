@@ -1,3 +1,43 @@
+Changes in [42.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.3.0) (2026-09-01)
+==================================================================================================
+## ✨ Features
+
+* Don't treat Matrix-shaped errors as OAuth token refresh grant logouts ([#5473](https://github.com/matrix-org/matrix-js-sdk/pull/5473)). Contributed by @hughns.
+* Update MatrixRTCSession to increase push notification arrival time on mobile clients for element-call ([#5398](https://github.com/matrix-org/matrix-js-sdk/pull/5398)). Contributed by @escix.
+* Add sticky events support to sliding sync (MSC4480) ([#5458](https://github.com/matrix-org/matrix-js-sdk/pull/5458)). Contributed by @eleboucher.
+* Validate that an error from OAuth token refresh looks like an OAuth error before treating as logout ([#5472](https://github.com/matrix-org/matrix-js-sdk/pull/5472)). Contributed by @hughns.
+
+## 🐛 Bug Fixes
+
+* Make setExtendedProfileProperty not throw if the requested property isn't set ([#5484](https://github.com/matrix-org/matrix-js-sdk/pull/5484)). Contributed by @dbkr.
+* make sure `setDefaultKeyId` resolves even if no change is made ([#5485](https://github.com/matrix-org/matrix-js-sdk/pull/5485)). Contributed by @uhoreg.
+
+
+Changes in [42.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.2.0) (2026-08-18)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Fix pre-initialization thread edits when target is known ([#5440](https://github.com/matrix-org/matrix-js-sdk/pull/5440)). Contributed by @basnijholt.
+* Fix package failing to load in Node ESM due to directory import ([#5460](https://github.com/matrix-org/matrix-js-sdk/pull/5460)). Contributed by @syphernl.
+
+
+Changes in [42.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.1.0) (2026-08-04)
+==================================================================================================
+## 🦖 Deprecations
+
+* Remove support for MSC3391 \& MSC3852 ([#5446](https://github.com/matrix-org/matrix-js-sdk/pull/5446)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Allow passing a CA cert PEM when setting up Rust crypto ([#5443](https://github.com/matrix-org/matrix-js-sdk/pull/5443)). Contributed by @andybalaam.
+* Improve types for `/room_keys/version` requests ([#5419](https://github.com/matrix-org/matrix-js-sdk/pull/5419)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Include existing data when updating user profile cache ([#5427](https://github.com/matrix-org/matrix-js-sdk/pull/5427)). Contributed by @dbkr.
+* Fix key backup cached event ordering ([#5281](https://github.com/matrix-org/matrix-js-sdk/pull/5281)). Contributed by @gumadeiras.
+
+
 Changes in [42.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.0.0) (2026-07-21)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES

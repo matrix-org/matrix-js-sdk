@@ -118,4 +118,10 @@ export interface IMembershipManager extends TypedEventEmitter<
      * @param callIntent The new intent to set.
      */
     updateCallIntent(callIntent: RTCCallIntent): Promise<void>;
+
+    /**
+     * Replace the application-specific data of our membership (see
+     * `SessionConfig.applicationData`), re-sending the membership if it changed.
+     */
+    updateApplicationData(applicationData: Record<string, unknown>): Promise<void>;
 }

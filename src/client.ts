@@ -53,7 +53,7 @@ import * as utils from "./utils.ts";
 import { deepCompare, noUnsafeEventProps, type QueryDict, replaceParam, safeSet, sleep } from "./utils.ts";
 import { Direction, EventTimeline } from "./models/event-timeline.ts";
 import { type IActionsObject, PushProcessor } from "./pushprocessor.ts";
-import { AutoDiscovery, type AutoDiscoveryAction } from "./autodiscovery.ts";
+import { type AutoDiscoveryAction } from "./autodiscovery.ts";
 import { encodeUnpaddedBase64Url } from "./base64.ts";
 import { TypedReEmitter } from "./ReEmitter.ts";
 import { logger, type Logger } from "./logger.ts";
@@ -73,7 +73,7 @@ import {
     MediaPrefix,
     Method,
     retryNetworkOperation,
-    type TokenRefreshFunction,
+    type TokenRefreshCallback,
     type Upload,
     type UploadOpts,
     type UploadResponse,
@@ -245,8 +245,16 @@ import { sha256 } from "./digest.ts";
 import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
-import { type Transport } from "./matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "./matrixrtc/index.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
+import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
+import { type PollingCachedValue } from "./pollingCachedValue.ts";
 
 export type Store = IStore;
 
@@ -311,15 +319,32 @@ export interface ICreateClientOpts {
      */
     deviceId?: string;
 
+    /**
+     * The access token to use. Can be omitted if to call only unauthenticated APIs, or provided to
+     * create an authenticated client.
+     */
     accessToken?: string;
+
+    /**
+     * The current refresh token, or omit if the session has no refresh token in which case the tokens
+     * will not be refreshed.
+     */
     refreshToken?: string;
 
     /**
-     * Function used to attempt refreshing access and refresh tokens
-     * Called by http-api when a possibly expired token is encountered
-     * and a refreshToken is found
+     * Called when the access tokens are refreshed.
+     * The client must replace the tokens it had stored previously which will no
+     * longer be valid.
+     *
+     * Required if a {@link refreshToken} is provided.
      */
-    tokenRefreshFunction?: TokenRefreshFunction;
+    onTokenRefresh?: TokenRefreshCallback;
+
+    /**
+     * If this is an OAuth2-native session (as per MSC2965/MSC3861), the OAuth client ID this
+     * application is registered with the delegated auth server under.
+     */
+    oauthClientId?: string;
 
     /**
      * Identity server provider to retrieve the user's access token when accessing
@@ -522,6 +547,10 @@ export interface IStartClientOpts {
     /**
      * The number of seconds between polls to /.well-known/matrix/client, undefined to disable.
      * This should be in the order of hours. Default: undefined.
+     *
+     * When disabled, the client never requests the well-known on its own: nothing is fetched on
+     * startup and {@link MatrixClient.getClientWellKnown} stays undefined. Callers that still need
+     * it can fetch it on demand via {@link MatrixClient.waitForClientWellKnown}.
      */
     clientWellKnownPollPeriod?: number;
 
@@ -1095,6 +1124,7 @@ export enum ClientEvent {
     TurnServers = "turnServers",
     TurnServersError = "turnServers.error",
     UserProfileUpdate = "userProfileUpdate",
+    RtcTransportsUpdated = "rtcTransportsUpdated",
 }
 
 type RoomEvents =
@@ -1165,6 +1195,7 @@ export type ClientEventHandlerMap = {
     [ClientEvent.ReceivedVoipEvent]: (event: MatrixEvent) => void;
     [ClientEvent.TurnServers]: (servers: ITurnServer[]) => void;
     [ClientEvent.TurnServersError]: (error: Error, fatal: boolean) => void;
+    [ClientEvent.RtcTransportsUpdated]: (transports: Transport[]) => void;
     /**
      *
      * @param userId - the user ID of the profile which was updated
@@ -1273,7 +1304,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncLeftRoomsPromise?: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts?: IStoredClientOpts;
-    protected clientWellKnownIntervalID?: ReturnType<typeof setInterval>;
     protected canResetTimelineCallback?: ResetTimelineCallback;
 
     public canSupport = new Map<Feature, ServerSupport>();
@@ -1285,8 +1315,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     // TODO: This should expire: https://github.com/matrix-org/matrix-js-sdk/issues/1020
     protected serverVersionsPromise?: Promise<IServerVersions>;
 
-    protected clientWellKnown?: IClientWellKnown;
-    protected clientWellKnownPromise?: Promise<IClientWellKnown>;
     protected turnServers: ITurnServer[] = [];
     protected turnServersExpiry = 0;
     protected checkTurnServersIntervalID?: ReturnType<typeof setInterval>;
@@ -1316,6 +1344,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public readonly retentionPolicyService: RetentionPolicyService;
     public readonly _unstable_shouldApplyMessageRetention: boolean;
 
+    public cachedRtcTransports: PollingCachedValue<Transport[]>;
+    protected cachedWellKnown: PollingCachedValue<IClientWellKnown>;
+
     public constructor(opts: IMatrixClientCreateOpts) {
         super();
 
@@ -1344,7 +1375,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
             refreshToken: opts.refreshToken,
-            tokenRefreshFunction: opts.tokenRefreshFunction,
+            onTokenRefresh: opts.onTokenRefresh,
+            oauth2ClientConfig: opts.oauthClientId
+                ? {
+                      clientId: opts.oauthClientId,
+                      deviceId: this.deviceId ?? undefined,
+                  }
+                : undefined,
+            authMetadataCallback: this.getAuthMetadata.bind(this),
             prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
@@ -1432,6 +1470,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         // having lots of event listeners is not unusual. 0 means "unlimited".
         this.setMaxListeners(0);
+
+        this.cachedRtcTransports = createRtcTransportsCachedValue(this, this.logger);
+        this.cachedWellKnown = createWellKnownCachedValue(this, this.logger);
     }
 
     public set store(newStore: Store) {
@@ -1510,11 +1551,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
 
+        // Only poll the client well-known when a poll period was configured: leaving
+        // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
         if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
-            this.clientWellKnownIntervalID = setInterval(() => {
-                void this.fetchClientWellKnown();
-            }, 1000 * this.clientOpts.clientWellKnownPollPeriod);
-            void this.fetchClientWellKnown();
+            this.cachedWellKnown.start(1000 * this.clientOpts.clientWellKnownPollPeriod);
         }
 
         this.toDeviceMessageQueue.start();
@@ -1522,6 +1562,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this._unstable_shouldApplyMessageRetention) {
             this.retentionPolicyService?.start();
         }
+
+        this.cachedRtcTransports.start();
     }
 
     /**
@@ -1568,15 +1610,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         globalThis.clearInterval(this.checkTurnServersIntervalID);
         this.checkTurnServersIntervalID = undefined;
 
-        if (this.clientWellKnownIntervalID !== undefined) {
-            globalThis.clearInterval(this.clientWellKnownIntervalID);
-        }
-
         this.toDeviceMessageQueue.stop();
 
         this.matrixRTC.stop();
 
         this.serverCapabilitiesService.stop();
+
+        this.cachedRtcTransports.stop();
+        this.cachedWellKnown.stop();
     }
 
     /**
@@ -1969,6 +2010,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param args.storagePassword - An alternative to `storageKey`. A password which will be used to derive a key to
      *    encrypt the store with. Deriving a key from a password is (deliberately) a slow operation, so prefer
      *    to pass a `storageKey` directly where possible.
+     * @param args.caCertsPem - Optional PEM-formatted string that provides CA certificates. These will be used to check
+     *    X.509 signatures on user identities. Any user identity that has a valid signature according to the supplied
+     *    CAs will be considered verified, without any manual verification taking place.
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     * @param args.x509Signer - Optional async function for signing some data with an X.509 certificate. Used to sign
+     *    the user's identity so compatible clients will recognise this user as verified without manual verification
+     *    taking place. If you supply this you must also supply `x509Validity`.
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     * @param args.x509Validity - Optional function returning the validity period of the X.509 certificate used for
+     *    signing, as the number of milliseconds since the Unix epoch. If you supply this you must also supply
+     *    `x509Signer`.
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
      *
      * @returns a Promise which will resolve when the crypto layer has been
      *    successfully initialised.
@@ -1979,6 +2032,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             cryptoDatabasePrefix?: string;
             storageKey?: Uint8Array;
             storagePassword?: string;
+            caCertsPem?: string;
+            x509Signer?: (item: Uint8Array) => Promise<{
+                signature_bytes: Uint8Array;
+                certificate_chain: string;
+                signature_scheme: "RsaPssSha512";
+            }>;
+            x509Validity?: () => number;
         } = {},
     ): Promise<void> {
         if (this.cryptoBackend) {
@@ -2024,6 +2084,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             },
 
             enableEncryptedStateEvents: this.enableEncryptedStateEvents,
+
+            caCertsPem: args.caCertsPem,
+            x509Signer: args.x509Signer,
+            x509Validity: args.x509Validity,
         });
 
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
@@ -3589,6 +3653,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
             txnId,
         });
+    }
+
+    /**
+     * Get information about a specified delayed event owned by the requesting user.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    public async _unstable_getDelayedEvent(delayId: string): Promise<{
+        delay_id: string;
+        room_id: string;
+        type: string;
+        state_key?: string;
+        delay_ms: number;
+        delayed_since_ts: number;
+        content: IContent;
+        finalised?: {
+            error?: MatrixError["data"];
+            event_id?: string;
+            finalised_ts: number;
+        };
+    }> {
+        // TODO: define a type/interface for the return shape once MSC4140 has become stable
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "getDelayedEvents",
+            );
+        }
+
+        return await this.http.authedRequest(
+            Method.Get,
+            utils.encodeUri("/delayed_events/$delayId", { $delayId: delayId }),
+            undefined,
+            undefined,
+            {
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            },
+        );
     }
 
     /**
@@ -6046,23 +6149,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         return this.http.authedRequest(Method.Post, path, undefined, undefined, { prefix: "" });
     }
 
-    protected async fetchClientWellKnown(): Promise<void> {
-        // `getRawClientConfig` does not throw or reject on network errors, instead
-        // it absorbs errors and returns `{}`.
-        this.clientWellKnownPromise = AutoDiscovery.getRawClientConfig(this.getDomain() ?? undefined);
-        this.clientWellKnown = await this.clientWellKnownPromise;
-        this.emit(ClientEvent.ClientWellKnown, this.clientWellKnown);
-    }
-
     public getClientWellKnown(): IClientWellKnown | undefined {
-        return this.clientWellKnown;
+        return this.cachedWellKnown.get();
     }
 
-    public waitForClientWellKnown(): Promise<IClientWellKnown> {
+    public async waitForClientWellKnown(): Promise<IClientWellKnown> {
         if (!this.clientRunning) {
             throw new Error("Client is not running");
         }
-        return this.clientWellKnownPromise!;
+        const wellKnown = await this.cachedWellKnown.wait();
+        return wellKnown!;
     }
 
     /**
@@ -6173,8 +6269,61 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Requests a token to authenticate against a LiveKit SFU with (MSC4195).
+     *
+     * The homeserver checks that we are joined to `room_id` before obtaining a token from the SFU. If
+     * `server_name` names a remote homeserver, our homeserver forwards the request to it over federation,
+     * which is how a token for another homeserver's SFU is obtained.
+     *
+     * Requires homeserver support for MSC4195.
+     *
+     * @param body - The details of the `m.rtc.member` event to obtain a token for, and the SFU to obtain it from.
+     * @returns The JWT to authenticate with when connecting to the SFU.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
+     * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
+     * of the answering server's SFUs.
+     */
+    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        // There is no /versions flag to check for support, so we just have to attempt a request.
+        return await this.http.authedRequest<LivekitGetTokenResponse>(
+            Method.Post,
+            "/rtc/livekit/get_token",
+            undefined,
+            body,
+            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+        );
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver (MSC4195).
+     *
+     * The homeserver restarts the delayed event for as long as it observes our connection to the SFU, and
+     * sends it once we disconnect, so the client does not have to restart it itself. This is more reliable
+     * than client-side restarts under poor network conditions.
+     *
+     * large timeouts are recommended for delayed delegation (in the range of hours)
+     * Requires homeserver support for MSC4195.
+     *
+     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate, and the SFU
+     * we are connected to.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
+     * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
+     */
+    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        // There is no /versions flag to check for support, so we just have to attempt a request.
+        return await this.http.authedRequest<EmptyObject>(
+            Method.Post,
+            "/rtc/livekit/delegate_delayed_leave",
+            undefined,
+            body,
+            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+        );
+    }
+
+    /**
      * Get the API versions supported by the server, along with any
      * unstable APIs it supports
+     *
      * @returns The server /versions response
      */
     public async getVersions(): Promise<IServerVersions> {
@@ -6723,13 +6872,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * method is called. The state of the MatrixClient object is not affected:
      * it is up to the caller to either reset or destroy the MatrixClient after
      * this method succeeds.
-     * @param stopClient - whether to stop the client before calling /logout to prevent invalid token errors.
+     *
+     * For an OAuth2-native session (ie. one created with `oauth2ClientConfig`), this revokes the access
+     * and refresh tokens directly with the delegated auth server instead of calling the `/logout` API,
+     * since the homeserver does not own the tokens in that case.
+     *
+     * @param stopClient - whether to stop the client before logging out to prevent invalid token errors.
      * @returns Promise which resolves: On success, the empty object `{}`
      */
     public async logout(stopClient = false): Promise<EmptyObject> {
         if (stopClient) {
             this.stopClient();
             this.http.abort();
+        }
+
+        if (this.http.opts.oauth2ClientConfig) {
+            await this.http.revokeOAuthTokens();
+            return {};
         }
 
         return this.http.authedRequest(Method.Post, "/logout");
@@ -6898,7 +7057,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @param includeMembership - the membership type to include in the response
      * @param excludeMembership - the membership type to exclude from the response
-     * @param atEventId - the id of the event for which moment in the timeline the members should be returned for
+     * @param atSyncToken - the point in time, as a sync pagination token, for when the members should be returned for
      * @returns Promise which resolves: dictionary of userid to profile information
      * @returns Rejects: with an error response.
      */
@@ -6906,7 +7065,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         includeMembership?: string,
         excludeMembership?: string,
-        atEventId?: string,
+        atSyncToken?: string,
     ): Promise<{ [userId: string]: IStateEventWithRoomId[] }> {
         const queryParams: Record<string, string> = {};
         if (includeMembership) {
@@ -6915,8 +7074,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (excludeMembership) {
             queryParams.not_membership = excludeMembership;
         }
-        if (atEventId) {
-            queryParams.at = atEventId;
+        if (atSyncToken) {
+            queryParams.at = atSyncToken;
         }
 
         const queryString = utils.encodeParams(queryParams);
@@ -7370,10 +7529,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
-     * @returns The property value.
+     * @returns The property value, or `undefined` if the key was not set OR the profile could not be found.
      *
      * @throws An error if the server does not support MSC4133.
-     * @throws A M_NOT_FOUND error if the key was not set OR the profile could not be found.
      */
     public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
@@ -7385,15 +7543,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (storedProfile?.[key] !== undefined) {
             return storedProfile[key];
         }
-        const profile = (await this.http.authedRequest(
-            Method.Get,
-            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
-            undefined,
-            undefined,
-            {
-                prefix: await this.getExtendedProfileRequestPrefix(),
-            },
-        )) as SyncUserProfile;
+        let profile: SyncUserProfile;
+        try {
+            profile = (await this.http.authedRequest(
+                Method.Get,
+                utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+                undefined,
+                undefined,
+                {
+                    prefix: await this.getExtendedProfileRequestPrefix(),
+                },
+            )) as SyncUserProfile;
+        } catch (e) {
+            if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
+                // The key is not set on the profile (or the profile does not exist).
+                return undefined;
+            }
+            throw e;
+        }
 
         // write through to the cache
         await this.store.storeUserProfiles(
@@ -8850,9 +9017,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws when delegated auth config is invalid or unreachable
      */
     public async getAuthMetadata(): Promise<ValidatedAuthMetadata> {
-        const useStable = await this.isVersionSupported("v1.15");
         const authMetadata = await this.http.request(Method.Get, "/auth_metadata", undefined, undefined, {
-            prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
+            prefix: ClientPrefix.V1,
         });
 
         if (isValidAuthMetadata(authMetadata)) {
