@@ -1002,7 +1002,7 @@ function quickFilterNonRelevantContents(content: IContent, logger: Logger): bool
     // Ignore sticky keys for the count
     const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
     // Don't even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-    if (eventKeysCount === 0 || (eventKeysCount === 1 && "leave_reason" in content)) return false;
+    if (eventKeysCount === 0 || "leave_reason" in content) return false;
 
     // We first decide if it's a MSC4143 event (per device state key)
     if (eventKeysCount > 1 && "application" in content) {
