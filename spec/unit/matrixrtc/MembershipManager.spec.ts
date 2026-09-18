@@ -431,7 +431,7 @@ describe("MembershipManager", () => {
 
             const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
             await vi.advanceTimersByTimeAsync(RESTART_DELAY);
-            expect(manager.delayId).toBe(undefined);
+            expect(manager.delayId).toBeUndefined();
             // first simulate the sync, then resolve sending the delayed event.
             await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
             resolve({ delay_id: "id2" });
@@ -551,7 +551,7 @@ describe("MembershipManager", () => {
                 "_@alice:example.org_AAAAAAA_m.call",
             );
             // The delayed event is finalised, so we stop tracking it.
-            expect(manager.delayId).toBe(undefined);
+            expect(manager.delayId).toBeUndefined();
             expect(onError).not.toHaveBeenCalled();
         });
         it("does nothing if not joined", async () => {
