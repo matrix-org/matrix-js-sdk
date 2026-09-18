@@ -1291,6 +1291,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected clientOpts?: IStoredClientOpts;
     protected canResetTimelineCallback?: ResetTimelineCallback;
 
+    // Set once the server has answered M_UNRECOGNIZED to the MSC4140 delayed event endpoint
+    private delayedEventEndpointUnrecognised = false;
+
     public canSupport = new Map<Feature, ServerSupport>();
 
     // The pushprocessor caches useful things, so keep one and re-use it
@@ -3116,46 +3119,75 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
     }
 
-    private async sendDelayedEventHttpRequest(
+    private sendDelayedEventHttpRequest(
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
     ): Promise<SendDelayedEventResponse> {
-        const path = this.getSendEventPath(event);
-        const content = event.getWireContent();
+        const legacyPath = this.getSendEventPath(event);
+        return this.scheduleDelayedEvent(
+            {
+                roomId: event.getRoomId()!,
+                eventType: event.getWireType(),
+                txnId: event.getTxnId()!,
+                stateKey: event.isState() ? event.getStateKey() : undefined,
+                content: event.getWireContent(),
+            },
+            delayOpts,
+            legacyPath,
+            queryDict,
+        );
+    }
 
-        try {
-            return await this.http.authedRequest<SendDelayedEventResponse>(
-                Method.Put,
-                utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
-                    $roomId: event.getRoomId()!,
-                    $eventType: event.getWireType(),
-                    $txnId: event.getTxnId()!,
-                }),
-                undefined,
-                {
-                    ...delayOpts,
-                    ...queryDict,
-                    ...(event.isState() && { state_key: event.getStateKey()! }),
-                    content,
-                },
-                {
+    /**
+     * Schedules a delayed event through the dedicated MSC4140 endpoint.
+     *
+     * Servers implementing an older version of MSC4140 only accept the delay as a query parameter of the
+     * regular send endpoints, and nothing in `/versions` tells the two apart. When the dedicated endpoint is
+     * unrecognised, this falls back to `legacyPath` and remembers to do so for the lifetime of this client.
+     *
+     * @param legacyPath - the regular send endpoint for this event, used for the fallback.
+     * @param queryDict - query parameters to send on either endpoint.
+     */
+    private async scheduleDelayedEvent(
+        event: { roomId: string; eventType: string; txnId: string; stateKey?: string; content: IContent },
+        delayOpts: SendDelayedEventRequestOpts,
+        legacyPath: string,
+        queryDict?: QueryDict,
+        requestOpts: IRequestOpts = {},
+    ): Promise<SendDelayedEventResponse> {
+        // The dedicated endpoint has no equivalent of a delay made only of a parent delay ID.
+        if (!this.delayedEventEndpointUnrecognised && "delay" in delayOpts) {
+            const path = utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
+                $roomId: event.roomId,
+                $eventType: event.eventType,
+                $txnId: event.txnId,
+            });
+            const body = {
+                delay_ms: delayOpts.delay,
+                ...(event.stateKey !== undefined && { state_key: event.stateKey }),
+                content: event.content,
+            };
+            try {
+                return await this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, queryDict, body, {
+                    ...requestOpts,
                     prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-                },
-            );
-        } catch (e) {
-            // For backwards compatibility with implementations of MSC4140 that
-            // do not support a dedicated endpoint for adding delayed events
-            if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
-                throw e;
+                });
+            } catch (e) {
+                if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
+                    throw e;
+                }
+                this.logger.debug("Server does not recognise the delayed event endpoint, using query parameters");
+                this.delayedEventEndpointUnrecognised = true;
             }
         }
 
         return await this.http.authedRequest<SendDelayedEventResponse>(
             Method.Put,
-            path,
+            legacyPath,
             { ...getUnstableDelayQueryOpts(delayOpts), ...queryDict },
-            content,
+            event.content,
+            requestOpts,
         );
     }
 
@@ -3637,39 +3669,19 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const pathParams = {
             $roomId: roomId,
             $eventType: eventType,
+            $stateKey: stateKey,
         };
-        try {
-            return await this.http.authedRequest(
-                Method.Put,
-                utils.encodeUri("/rooms/$roomId/delayed_event/$eventType", pathParams),
-                undefined,
-                {
-                    ...delayOpts,
-                    state_key: stateKey,
-                    content,
-                },
-                {
-                    ...opts,
-                    prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-                },
-            );
-        } catch (e) {
-            // For backwards compatibility with implementations of MSC4140 that
-            // do not support a dedicated endpoint for adding delayed events
-            if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
-                throw e;
-            }
-            return await this.http.authedRequest(
-                Method.Put,
-                utils.encodeUri("/rooms/$roomId/state/$eventType/$stateKey", {
-                    $stateKey: stateKey,
-                    ...pathParams,
-                }),
-                getUnstableDelayQueryOpts(delayOpts),
-                content,
-                opts,
-            );
+        let path = utils.encodeUri("/rooms/$roomId/state/$eventType", pathParams);
+        if (stateKey !== undefined) {
+            path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
+        return this.scheduleDelayedEvent(
+            { roomId, eventType, txnId: this.makeTxnId(), stateKey, content },
+            delayOpts,
+            path,
+            undefined,
+            opts,
+        );
     }
 
     /**
