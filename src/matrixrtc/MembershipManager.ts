@@ -885,6 +885,8 @@ export class MembershipManager
         const capability = capabilities["m.delayed_events"] ?? capabilities["org.matrix.msc4140.delayed_events"];
         // The MSC says to treat an absent capability as disabled. We do not: Synapse before 1.157.0 supports delayed
         // events without advertising the capability, so we attempt the request and rely on the error handling instead.
+        // TODO: Treat an absent capability as disabled once Synapse before 1.157.0 is no longer deployed
+        // (to revisit from 2026-11-18).
         if (!capability) return true;
         // A `0` in either field means that delayed events are disabled.
         if (capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
@@ -907,6 +909,7 @@ export class MembershipManager
 
         if (error.errcode === "M_UNKNOWN" && error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED") {
             // Error format of Synapse before 1.157.0, which carries the limit.
+            // TODO: Remove this branch once Synapse before 1.157.0 is no longer deployed (to revisit from 2026-11-18).
             const maxDelayAllowed = error.data["org.matrix.msc4140.max_delay"];
             if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
                 this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
