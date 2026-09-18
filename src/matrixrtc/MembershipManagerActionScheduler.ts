@@ -1,7 +1,8 @@
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type EmptyObject } from "../matrix.ts";
 import { sleep } from "../utils.ts";
-import { MembershipActionType } from "./MembershipManager.ts";
+import { type MembershipActionData, MembershipActionType } from "./MembershipManager.ts";
+import { type LeaveCode } from "./types.ts";
 
 /** @internal */
 export interface Action {
@@ -14,6 +15,11 @@ export interface Action {
      * can also be thought of as the type of the action
      */
     type: MembershipActionType;
+
+    /**
+     * Additional parameters of the action
+     */
+    data: MembershipActionData[MembershipActionType];
 }
 
 /** @internal */
@@ -47,7 +53,10 @@ export class ActionScheduler {
 
     public constructor(
         /** This is the callback called for each scheduled action (`this.addAction()`) */
-        private membershipLoopHandler: (type: MembershipActionType) => Promise<ActionUpdate>,
+        private membershipLoopHandler: (
+            type: MembershipActionType,
+            data: MembershipActionData[MembershipActionType],
+        ) => Promise<ActionUpdate>,
         parentLogger?: Logger,
     ) {
         this.logger = (parentLogger ?? rootLogger).getChild(`[NewMembershipActionScheduler]`);
@@ -75,7 +84,7 @@ export class ActionScheduler {
             return;
         }
         this.running = true;
-        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }];
+        this._actions = [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent, data: undefined }];
         try {
             while (this._actions.length > 0) {
                 // Sort so next (smallest ts) action is at the beginning
@@ -101,7 +110,7 @@ export class ActionScheduler {
                     );
                     try {
                         // `this.wakeup` can also be called and sets the `wakeupUpdate` object while we are in the handler.
-                        handlerResult = await this.membershipLoopHandler(nextAction.type);
+                        handlerResult = await this.membershipLoopHandler(nextAction.type, nextAction.data);
                     } catch (e) {
                         // Preserve the original error as `cause`.
                         throw new Error(`The MembershipManager shut down because of the end condition: ${e}`, {
@@ -130,9 +139,20 @@ export class ActionScheduler {
     }
 
     public initiateJoin(): void {
-        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent }] });
+        this.wakeup({ replace: [{ ts: Date.now(), type: MembershipActionType.SendDelayedEvent, data: undefined }] });
     }
-    public initiateLeave(): void {
-        this.wakeup?.({ replace: [{ ts: Date.now(), type: MembershipActionType.SendScheduledDelayedLeaveEvent }] });
+    public initiateLeave(leaveCode?: LeaveCode): void {
+        // Only the leave event is scheduled here. Cancelling the delayed leave event is scheduled by the
+        // SendLeaveEvent handler once the leave actually made it into the room state: until then the delayed
+        // event is the only thing that would remove our membership if sending the leave event keeps failing.
+        this.wakeup({
+            replace: [
+                {
+                    ts: Date.now(),
+                    type: MembershipActionType.SendLeaveEvent,
+                    data: leaveCode ? { leaveCode } : undefined,
+                },
+            ],
+        });
     }
 }

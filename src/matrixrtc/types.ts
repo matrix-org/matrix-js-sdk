@@ -242,3 +242,32 @@ export interface SlotDescription {
      */
     id: string;
 }
+
+export type LeaveMembershipEventContent = {
+    leave_reason?: LeaveReason;
+};
+
+/**
+ * The fixed set of leave causes. Every application supports all of them.
+ *
+ * - `delayed_leave`: the member left through a scheduled delayed leave event.
+ * - `leave`: the member left intentionally (e.g. by hanging up a call).
+ * - `slot_closed`: the member left because the slot was closed midway through the session.
+ */
+export type LeaveCode = "delayed_leave" | "leave" | "slot_closed";
+
+/**
+ * Human-readable explanations the application supplies for each leave cause.
+ * See {@link SessionConfig.leaveReasons}.
+ */
+export type LeaveReasonStrings = Partial<Record<LeaveCode, string>>;
+
+/**
+ * Provides context on why the client left.
+ */
+export type LeaveReason = {
+    /** Identifier for the specific leave cause. Machine-readable.*/
+    code: LeaveCode;
+    /** Optional human-readable explanation of the leave reason */
+    reason?: string;
+};
