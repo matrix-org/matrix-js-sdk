@@ -34,6 +34,20 @@ export interface ISetAvatarUrlCapability extends ICapability {}
 
 export interface IProfileFieldsCapability extends ICapability {}
 
+/**
+ * The limits a homeserver enforces on delayed events, as defined by
+ * [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md).
+ *
+ * A field that is absent means the server does not enforce that limit.
+ * A value of `0` in either field means that delayed events are disabled.
+ */
+export interface IDelayedEventsCapability {
+    /** The maximum delay the server allows for a delayed event, in milliseconds. */
+    max_delay_ms?: number;
+    /** The maximum number of delayed events a user may have scheduled at once. */
+    max_scheduled?: number;
+}
+
 export enum RoomVersionStability {
     Stable = "stable",
     Unstable = "unstable",
@@ -62,6 +76,8 @@ export interface Capabilities {
      * Since Matrix v1.16
      */
     "m.profile_fields"?: IProfileFieldsCapability;
+    "m.delayed_events"?: IDelayedEventsCapability;
+    "org.matrix.msc4140.delayed_events"?: IDelayedEventsCapability;
 }
 
 type CapabilitiesResponse = {
