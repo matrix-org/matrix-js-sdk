@@ -373,10 +373,31 @@ describe("MembershipManager", () => {
                     expect(delays()).toEqual([9000]);
                 });
 
+                it("still tries if the capability is absent (Synapse before 1.157.0)", async () => {
+                    vi.mocked(client.getCachedCapabilities).mockReturnValue({});
+                    vi.mocked(client.getCapabilities).mockResolvedValue({});
+                    vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
+                        new MatrixError({
+                            "errcode": "M_UNKNOWN",
+                            "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
+                            "org.matrix.msc4140.max_delay": 7500,
+                        }),
+                    );
+                    const manager = new MembershipManager(
+                        { delayedLeaveEventDelayMs: 9000 },
+                        room,
+                        client,
+                        callSession,
+                    );
+                    manager.join([focus]);
+                    await vi.advanceTimersByTimeAsync(0);
+                    expect(delays()).toEqual([9000, 7500]);
+                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+                });
+
                 it.each([
                     ["max_delay_ms is 0", { "org.matrix.msc4140.delayed_events": { max_delay_ms: 0 } }],
                     ["max_scheduled is 0", { "m.delayed_events": { max_delay_ms: 7500, max_scheduled: 0 } }],
-                    ["the capability is absent", {}],
                 ])("joins without a delayed leave event if %s", async (_, capabilities) => {
                     vi.mocked(client.getCachedCapabilities).mockReturnValue(capabilities);
                     const manager = new MembershipManager({}, room, client, callSession);

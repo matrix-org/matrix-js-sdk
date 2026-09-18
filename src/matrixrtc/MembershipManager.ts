@@ -883,8 +883,11 @@ export class MembershipManager
     private applyDelayedEventsCapability(capabilities: Capabilities | undefined): boolean {
         if (!capabilities) return true;
         const capability = capabilities["m.delayed_events"] ?? capabilities["org.matrix.msc4140.delayed_events"];
-        // An absent capability or a `0` in either field means that delayed events are disabled.
-        if (!capability || capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
+        // The MSC says to treat an absent capability as disabled. We do not: Synapse before 1.157.0 supports delayed
+        // events without advertising the capability, so we attempt the request and rely on the error handling instead.
+        if (!capability) return true;
+        // A `0` in either field means that delayed events are disabled.
+        if (capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
 
         const maxDelayAllowed = capability.max_delay_ms;
         if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
