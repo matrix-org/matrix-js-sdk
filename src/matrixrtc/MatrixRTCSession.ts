@@ -864,13 +864,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
+     *
+     * @deprecated use {@link ensureRecalculateSessionMembers} instead.
      */
-    // We allow this name schema since this function should only be used for testing purposes.
     public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.recalculateSessionMembers();
+        await this.ensureRecalculateSessionMembers();
     };
 
-    // helper variables to make sure we do not have parallel running recalculations.
+    // Recalculations are chained onto this promise, so they never run in parallel.
     private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
 
     /**
@@ -878,7 +879,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Also ensures that only one recalculation is made at a time.
      * @returns A promise resolving when the state has been recalculated.
      */
-    private ensureRecalculateSessionMembers(): Promise<void> {
+    public ensureRecalculateSessionMembers(): Promise<void> {
         if (this.membershipNeedsRecalculation) {
             // We have already requested recalcuation, don't attempt a new one.
             return this.recalculateSessionMembersPromise;
