@@ -793,24 +793,22 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
+     *
+     * @deprecated use {@link ensureRecalculateSessionMembers} instead.
      */
-    // We allow this name schema since this function should only be used for testing purposes.
     public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.recalculateSessionMembers();
+        await this.ensureRecalculateSessionMembers();
     };
 
-    // helper variables to make sure we do not have parallel running recalculations.
+    // Recalculations are chained onto this promise, so they never run in parallel.
     private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
-    // Incremented by each recalculation, so one that has been overtaken can tell.
-    private recalculationGeneration = 0;
-    private latestRecalculation: Promise<void> = Promise.resolve();
 
     /**
      * Ensures that membership is recalculated when the state of the session may have changed.
      * Also ensures that only one recalculation is made at a time.
      * @returns A promise resolving when the state has been recalculated.
      */
-    private ensureRecalculateSessionMembers(): Promise<void> {
+    public ensureRecalculateSessionMembers(): Promise<void> {
         if (this.membershipNeedsRecalculation) {
             // We have already requested recalcuation, don't attempt a new one.
             return this.recalculateSessionMembersPromise;
@@ -831,37 +829,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
      *
      * This function should be called when the room members or call memberships might have changed.
      */
-    private readonly recalculateSessionMembers = (): Promise<void> => {
-        const recalculation = this.doRecalculateSessionMembers();
-        this.latestRecalculation = recalculation;
-        return recalculation;
-    };
-
-    private readonly doRecalculateSessionMembers = async (): Promise<void> => {
+    private readonly recalculateSessionMembers = async (): Promise<void> => {
         // Clear the flag.
         this.membershipNeedsRecalculation = false;
-        const generation = ++this.recalculationGeneration;
         const oldMemberships = this.memberships;
         // Needs to be computed before `this.memberships` is updated below, since it is derived from it.
         const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
 
-        const memberships = await MatrixRTCSession.sessionMembershipsForSlot(
+        this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
             this.slotDescription,
             this.calculateMembershipsOpts,
         );
-        // Recalculations are async and can overlap: `_onRTCSessionMemberUpdate` is called once per
-        // membership state event, so a batch of them starts several at once. Each reads the room
-        // state when it starts, and parsing takes longer the more memberships there are, so an
-        // older one can finish last. Its result is stale: drop it and let the newest one win,
-        // otherwise members who have since left linger until the next state change.
-        if (generation !== this.recalculationGeneration) {
-            this.logger.debug("Discarding superseded membership recalculation");
-            // Still let our caller see the final state before continuing.
-            await this.latestRecalculation;
-            return;
-        }
-        this.memberships = memberships;
 
         const changed =
             oldMemberships.length != this.memberships.length ||
