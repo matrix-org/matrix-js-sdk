@@ -2952,7 +2952,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let queryOpts = queryDict;
         if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            return this.sendEventHttpRequest(event, delayOptsOrQuery, queryOpts);
+            return this.sendDelayedEventHttpRequest(event, delayOptsOrQuery, queryOpts);
         } else if (!queryOpts) {
             queryOpts = delayOptsOrQuery;
         }
@@ -3106,17 +3106,63 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse>;
-    private sendEventHttpRequest(
+    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse> {
+        const path = this.getSendEventPath(event);
+        return this.http
+            .authedRequest<ISendEventResponse>(Method.Put, path, queryDict, event.getWireContent())
+            .then((res) => {
+                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+                return res;
+            });
+    }
+
+    private async sendDelayedEventHttpRequest(
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
-    ): Promise<SendDelayedEventResponse>;
-    private async sendEventHttpRequest(
-        event: MatrixEvent,
-        queryOrDelayOpts?: SendDelayedEventRequestOpts | QueryDict,
-        queryDict?: QueryDict,
-    ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+    ): Promise<SendDelayedEventResponse> {
+        const path = this.getSendEventPath(event);
+        const content = event.getWireContent();
+
+        try {
+            return await this.http.authedRequest<SendDelayedEventResponse>(
+                Method.Put,
+                utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
+                    $roomId: event.getRoomId()!,
+                    $eventType: event.getWireType(),
+                    $txnId: event.getTxnId()!,
+                }),
+                undefined,
+                {
+                    ...delayOpts,
+                    ...queryDict,
+                    ...(event.isState() && { state_key: event.getStateKey()! }),
+                    content,
+                },
+                {
+                    prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+                },
+            );
+        } catch (e) {
+            // For backwards compatibility with implementations of MSC4140 that
+            // do not support a dedicated endpoint for adding delayed events
+            if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
+                throw e;
+            }
+        }
+
+        return await this.http.authedRequest<SendDelayedEventResponse>(
+            Method.Put,
+            path,
+            { ...getUnstableDelayQueryOpts(delayOpts), ...queryDict },
+            content,
+        );
+    }
+
+    /**
+     * Returns the path to PUT the given event to, assigning the event a transaction ID if it has none.
+     */
+    private getSendEventPath(event: MatrixEvent): string {
         let txnId = event.getTxnId();
         if (!txnId) {
             txnId = this.makeTxnId();
@@ -3129,69 +3175,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $txnId: txnId,
         };
 
-        const content = event.getWireContent();
-
-        const delayOpts =
-            queryOrDelayOpts && isSendDelayedEventRequestOpts(queryOrDelayOpts) ? queryOrDelayOpts : undefined;
-        const queryOpts = !delayOpts ? queryOrDelayOpts : queryDict;
-
-        if (delayOpts) {
-            try {
-                return await this.http.authedRequest<SendDelayedEventResponse>(
-                    Method.Put,
-                    utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", pathParams),
-                    undefined,
-                    {
-                        ...delayOpts,
-                        ...queryOpts,
-                        ...(event.isState() && { state_key: event.getStateKey()! }),
-                        content,
-                    },
-                    {
-                        prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
-                    },
-                );
-            } catch (e) {
-                // For backwards compatibility with implementations of MSC4140 that
-                // do not support a dedicated endpoint for adding delayed events
-                if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
-                    throw e;
-                }
-            }
-        }
-
-        let path: string;
-
         if (event.isState()) {
             let pathTemplate = "/rooms/$roomId/state/$eventType";
             if (event.getStateKey() && event.getStateKey()!.length > 0) {
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
-            path = utils.encodeUri(pathTemplate, {
+            return utils.encodeUri(pathTemplate, {
                 $stateKey: event.getStateKey()!,
                 ...pathParams,
             });
         } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
-            path = utils.encodeUri(pathTemplate, {
+            return utils.encodeUri(pathTemplate, {
                 $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
-            path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
-        }
-
-        if (delayOpts) {
-            return await this.http.authedRequest<SendDelayedEventResponse>(
-                Method.Put,
-                path,
-                { ...getUnstableDelayQueryOpts(delayOpts), ...queryOpts },
-                content,
-            );
-        } else {
-            const res = await this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content);
-            this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
-            return res;
+            return utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
     }
 
