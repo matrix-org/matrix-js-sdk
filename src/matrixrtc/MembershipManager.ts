@@ -863,6 +863,23 @@ export class MembershipManager
                 }
                 throw outcome.error;
             }
+        } else {
+            const pendingSendDelayedEvent = this.scheduler.actions.find(
+                (a) => a.type === MembershipActionType.SendDelayedEvent,
+            );
+            if (pendingSendDelayedEvent) {
+                // A `SendDelayedEvent` action is queued but has not succeeded yet, so we wait for it rather than put
+                // the membership back on the server with nothing to clean it up. The retry gets the same timestamp,
+                // and actions with the same timestamp run in insertion order, so it runs right after that attempt:
+                // straight away if the delayed event is there, or to wait for the next attempt if it rescheduled.
+                // (Without such an action queued we are not using delayed events at all, because the homeserver does
+                // not support them. Then there is also no delayed leave event that could have removed our
+                // membership, and nothing to protect it from.)
+                return this.deferExpiryUpdate(
+                    Math.max(0, pendingSendDelayedEvent.ts - Date.now()),
+                    "no delayed leave event is scheduled",
+                );
+            }
         }
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;
         const myMembership = this.makeMyMembership(this.membershipEventExpiryMs * nextExpireUpdateIteration);
