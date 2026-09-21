@@ -8878,15 +8878,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Fetches the summary of a room.
      * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
      *
-     * Falls back to the initial version of MSC3266, as implemented in older
-     * versions of Synapse, if the server does not recognise the stable endpoint.
+     * Uses the initial version of MSC3266, as implemented in older versions of Synapse, unless the
+     * server advertises support for the spec version which stabilised it.
      *
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
      * @param via - The servers to attempt to request the summary from, when the local server cannot
      *              generate it (for instance, because it has no local user in the room).
      */
-    public getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
-        return fetchRoomSummary(this.http, roomIdOrAlias, via);
+    public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
+        return fetchRoomSummary(this.http, await this.getVersions(), roomIdOrAlias, via);
     }
 
     /**

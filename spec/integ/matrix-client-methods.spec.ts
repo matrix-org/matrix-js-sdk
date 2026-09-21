@@ -1783,7 +1783,18 @@ describe("MatrixClient", function () {
             error: "Room not found",
         };
 
+        /**
+         * Stub the (cached) `/versions` lookup that `getRoomSummary` makes to pick an endpoint.
+         * MSC3266 was stabilised in Matrix 1.15, so a v1.14 server only has the unstable endpoint.
+         */
+        function expectVersions(versions: string[], unstableFeatures: Record<string, boolean> = {}): void {
+            httpBackend
+                .when("GET", "/_matrix/client/versions")
+                .respond(200, { versions, unstable_features: unstableFeatures });
+        }
+
         it("should respond with a valid room summary object", async () => {
+            expectVersions(["v1.14", "v1.15"]);
             httpBackend
                 .when("GET", stablePrefix + stableSuffix)
                 .check((req) => {
@@ -1791,20 +1802,41 @@ describe("MatrixClient", function () {
                 })
                 .respond(200, roomSummary);
 
-            await Promise.all([client.getRoomSummary(roomId, ["server1", "server2"]), httpBackend.flushAllExpected()]);
-        });
-
-        it("should allow fallback to the unstable endpoint", async () => {
-            httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
-            httpBackend.when("GET", prefix + suffix).respond(200, unstableRoomSummary);
-
             await Promise.all([
-                expect(client.getRoomSummary(roomId)).resolves.toEqual(unstableRoomSummary),
+                expect(client.getRoomSummary(roomId, ["server1", "server2"])).resolves.toEqual(roomSummary),
                 httpBackend.flushAllExpected(),
             ]);
         });
 
+        it("should use the stable endpoint when only the unstable feature is advertised", async () => {
+            expectVersions(["v1.14"], { "org.matrix.msc3266": true });
+            httpBackend.when("GET", stablePrefix + stableSuffix).respond(200, roomSummary);
+
+            await Promise.all([
+                expect(client.getRoomSummary(roomId)).resolves.toEqual(roomSummary),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
+        it("should use the unstable endpoint when neither is advertised", async () => {
+            expectVersions(["v1.14"]);
+            httpBackend
+                .when("GET", prefix + suffix)
+                .check((req) => {
+                    expect(new URL(req.path).searchParams.getAll("via")).toEqual(["server1"]);
+                })
+                .respond(200, unstableRoomSummary);
+
+            await Promise.all([
+                expect(client.getRoomSummary(roomId, ["server1"])).resolves.toEqual(unstableRoomSummary),
+                httpBackend.flushAllExpected(),
+            ]);
+            // The stable endpoint must not have been tried; an unmatched request would show up here.
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
         it("should not fall back when the room is not found", async () => {
+            expectVersions(["v1.15"]);
             httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorNotFoundStatus, errorNotFoundBody);
 
             const prom = client.getRoomSummary(roomId).then(
@@ -1818,12 +1850,12 @@ describe("MatrixClient", function () {
             );
 
             await Promise.all([prom, httpBackend.flushAllExpected()]);
-            // If the unstable endpoints had been tried, they would show up here.
+            // If the unstable endpoint had been tried, it would show up here.
             httpBackend.verifyNoOutstandingRequests();
         });
 
         it("should respond to unsupported path with error", async () => {
-            httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
+            expectVersions(["v1.14"]);
             httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
 
             const prom = client.getRoomSummary(roomId).then(
@@ -1841,8 +1873,9 @@ describe("MatrixClient", function () {
         });
 
         it("should respond to invalid path arguments with error", async () => {
-            // M_UNKNOWN rather than M_UNRECOGNIZED, so no fallback to the unstable endpoints fires.
-            httpBackend.when("GET", stablePrefix).respond(errorBadreqStatus, errorBadreqBody);
+            expectVersions(["v1.15"]);
+            // M_UNKNOWN rather than M_UNRECOGNIZED, so no fallback fires.
+            httpBackend.when("GET", stablePrefix + "room_summary/").respond(errorBadreqStatus, errorBadreqBody);
 
             const prom = client.getRoomSummary("notAroom").then(
                 function (response) {

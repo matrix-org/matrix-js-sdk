@@ -22,8 +22,8 @@ limitations under the License.
  * heroes and member counts that `/sync` sends for rooms we are in.
  */
 
-import { type IPublicRoomsChunkRoom } from "./client.ts";
-import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method } from "./http-api/index.ts";
+import { type IPublicRoomsChunkRoom, type IServerVersions } from "./client.ts";
+import { ClientPrefix, type IHttpOpts, type MatrixHttpApi, Method } from "./http-api/index.ts";
 import { type JoinRule } from "./@types/partials.ts";
 import { type Membership } from "./@types/membership.ts";
 import * as utils from "./utils.ts";
@@ -73,38 +73,42 @@ export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alia
     "im.nheko.summary.encryption"?: string;
 }
 
-/** The prefix used by the initial version of MSC3266, as implemented in older versions of Synapse. */
-const UNSTABLE_PREFIX = "/_matrix/client/unstable/im.nheko.summary";
+/** The endpoint stabilised in Matrix 1.15. */
+const STABLE_ENDPOINT = { path: "/room_summary/$roomid", prefix: ClientPrefix.V1 };
+
+/** The endpoint used by the initial version of MSC3266, as implemented in older versions of Synapse. */
+const UNSTABLE_ENDPOINT = { path: "/summary/$roomid", prefix: "/_matrix/client/unstable/im.nheko.summary" };
+
+/** The spec version which stabilised MSC3266 as `/_matrix/client/v1/room_summary/{roomIdOrAlias}`. */
+const STABLE_VERSION = "v1.15";
+
+/** The unstable feature flag advertised for MSC3266. */
+const UNSTABLE_FEATURE = "org.matrix.msc3266";
+
+/** Whether the server advertises the stable room summary endpoint in its `/versions` response. */
+function supportsStableEndpoint(versions: IServerVersions): boolean {
+    return versions.versions?.includes(STABLE_VERSION) || !!versions.unstable_features?.[UNSTABLE_FEATURE];
+}
 
 /**
  * Fetch the summary of a room.
  *
- * Falls back to the initial version of MSC3266, as implemented in older
- * versions of Synapse, if the server does not recognise the stable endpoint.
+ * Uses the path from the initial version of MSC3266, as implemented in older versions of Synapse,
+ * unless the server advertises support for the spec version which stabilised it.
  *
  * @param http - The HTTP API to make the request with.
+ * @param versions - The server's `/versions` response, used to pick the endpoint.
  * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
  * @param via - The servers to attempt to request the summary from, when the local server cannot
  *              generate it (for instance, because it has no local user in the room).
  */
-export async function fetchRoomSummary(
+export function fetchRoomSummary(
     http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
+    versions: IServerVersions,
     roomIdOrAlias: string,
     via?: string[],
 ): Promise<RoomSummary> {
-    try {
-        const path = utils.encodeUri("/room_summary/$roomid", { $roomid: roomIdOrAlias });
-        return await http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, {
-            prefix: ClientPrefix.V1,
-        });
-    } catch (e) {
-        // Only an unrecognised endpoint means we should try the unstable paths. Anything else,
-        // such as a 404 for a room we cannot see, is a real answer and must be passed on.
-        if (!(e instanceof MatrixError) || e.errcode !== "M_UNRECOGNIZED") throw e;
-    }
-
-    const paramOpts = { prefix: UNSTABLE_PREFIX };
-
-    const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-    return http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, paramOpts);
+    const endpoint = supportsStableEndpoint(versions) ? STABLE_ENDPOINT : UNSTABLE_ENDPOINT;
+    const path = utils.encodeUri(endpoint.path, { $roomid: roomIdOrAlias });
+    return http.authedRequest<RoomSummary>(Method.Get, path, { via }, undefined, { prefix: endpoint.prefix });
 }
