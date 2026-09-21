@@ -246,6 +246,61 @@ describe("initRustCrypto", () => {
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
     });
 
+    it("should initialize while a pending room key query stalls and later fails", async () => {
+        const roomId = "!joined:example.com";
+        const inviterId = "@inviter:example.com";
+        const initFromStore = OlmMachine.initFromStore;
+        vi.spyOn(OlmMachine, "initFromStore").mockImplementationOnce(async (...args) => {
+            const machine = await initFromStore(...args);
+            // Seed the real crypto store with a recently accepted invitation.
+            await machine.storeRoomPendingKeyBundle(
+                new RustSdkCryptoJs.RoomId(roomId),
+                new RustSdkCryptoJs.UserId(inviterId),
+            );
+            return machine;
+        });
+
+        const response = Promise.withResolvers<Response>();
+        fetchMock.post("http://server/_matrix/client/v3/keys/query", () => response.promise);
+        const acceptKeyBundle = vi.spyOn(RustCrypto.prototype, "maybeAcceptKeyBundle");
+        const logError = vi.spyOn(DebugLogger.prototype, "error");
+        let initialized = false;
+        const initialization = makeTestRustCrypto(makeMatrixHttpApi());
+        void initialization.then(
+            () => {
+                initialized = true;
+            },
+            () => {},
+        );
+
+        try {
+            // Initialization must finish before the server responds.
+            await waitFor(() => expect(initialized).toBe(true));
+            const crypto = await initialization;
+            expect(fetchMock).toHaveFetched("http://server/_matrix/client/v3/keys/query", {
+                body: { device_keys: { [inviterId]: [] } },
+            });
+            const deviceKeys = await crypto.getOwnDeviceKeys();
+            expect(deviceKeys.ed25519).toEqual(expect.any(String));
+
+            response.resolve(Response.json({ errcode: "M_FORBIDDEN", error: "Key query failed" }, { status: 403 }));
+            await waitFor(() =>
+                expect(logError).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({ errcode: "M_FORBIDDEN" }),
+                ),
+            );
+            expect(await crypto.getOwnDeviceKeys()).toEqual(deviceKeys);
+            const pending = await crypto["olmMachine"].getAllRoomsPendingKeyBundles();
+            expect(pending.map((details) => details.roomId.toString())).toEqual([roomId]);
+        } finally {
+            response.resolve(Response.json({ device_keys: {} }));
+            const [result] = await Promise.allSettled([initialization]);
+            await Promise.allSettled(acceptKeyBundle.mock.results.map((result) => result.value));
+            if (result.status === "fulfilled") result.value.stop();
+        }
+    });
+
     describe("libolm migration", () => {
         let mockStore: RustSdkCryptoJs.StoreHandle;
 

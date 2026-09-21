@@ -286,7 +286,11 @@ async function initOlmMachine(
             logger.info(
                 `Checking for pending key bundle for recently-joined room ${roomId} (joined ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()})`,
             );
-            await rustCrypto.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString());
+            // Key discovery and bundle downloads must not block opening the local crypto store.
+            // Keep the pending marker so a failed attempt can be retried on a later startup.
+            rustCrypto.maybeAcceptKeyBundle(roomId, pendingDetails.inviterId.toString()).catch((err) => {
+                logger.error("Error attempting to download a pending room key bundle", err);
+            });
         } else {
             logger.info(
                 `Clearing pending-key-bundle flag for room ${roomId} (too old: joined ${new Date(pendingDetails.inviteAcceptedAtMillis).toISOString()})`,
