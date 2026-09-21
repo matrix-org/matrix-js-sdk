@@ -26,7 +26,7 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
-import { logDurationSync } from "../utils.ts";
+import { deepCompare, logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
@@ -36,6 +36,7 @@ import type {
     Transport,
     SlotDescription,
     RtcSlotEventContent,
+    RtcSlotEncryptionContent,
 } from "./types.ts";
 import {
     MembershipManagerEvent,
@@ -99,6 +100,15 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
+
+    /**
+     * Application-specific data to publish in our membership alongside the
+     * application `type` and `m.call.intent`: in the `application` object of
+     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
+     * one. Keys should be namespaced. Read back through
+     * {@link CallMembership.applicationData}.
+     */
+    applicationData?: Record<string, unknown>;
 
     /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
@@ -355,6 +365,55 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public isSlotClosed(): boolean | undefined {
         return isSlotClosed(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Ensures this session's slot is open, sending a slot state event to open (or create) it if needed.
+     *
+     * The event's `application` is set from this session's slot description and its `encryption` from
+     * `opts.encryption`, replacing whatever an existing slot event declares. Other content is preserved.
+     * No-op if the slot is already open with matching `application` and `encryption`.
+     *
+     * @param opts.encryption - The encryption to declare on the slot, or `undefined` for none.
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotOpen(opts: { encryption?: RtcSlotEncryptionContent } = {}): Promise<void> {
+        const application = { type: this.slotDescription.application };
+        const existingContent = this.getRtcSlot();
+        if (
+            existingContent?.status === "open" &&
+            deepCompare(existingContent.application, application) &&
+            deepCompare(existingContent.encryption, opts.encryption)
+        ) {
+            return;
+        }
+        await this.sendRtcSlot({
+            ...existingContent,
+            status: "open",
+            application,
+            encryption: opts.encryption,
+        });
+    }
+
+    /**
+     * Ensures this session's slot is closed, sending a slot state event to close it if needed.
+     * The other content of the existing slot event is preserved. No-op if no slot event exists.
+     *
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotClosed(): Promise<void> {
+        const existingContent = this.getRtcSlot();
+        if (!existingContent || existingContent.status === "closed") return;
+        await this.sendRtcSlot({ ...existingContent, status: "closed" });
+    }
+
+    private async sendRtcSlot(content: RtcSlotEventContent): Promise<void> {
+        await this.client.sendStateEvent(
+            this.roomSubset.roomId,
+            EventType.RTCSlot,
+            content,
+            computeSlotId(this.slotDescription),
+        );
     }
 
     /**
@@ -669,6 +728,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
             throw Error("Not connected yet");
         }
         await this.membershipManager?.updateCallIntent(callIntent);
+    }
+
+    /**
+     * Replace the application-specific data in our membership (see
+     * {@link SessionConfig.applicationData}), re-sending it if it changed.
+     */
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateApplicationData(applicationData);
     }
 
     /**

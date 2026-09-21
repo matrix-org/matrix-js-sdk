@@ -383,9 +383,11 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        this.cachedWellKnown.start(
-            opts.clientWellKnownPollPeriod !== undefined ? 1000 * opts.clientWellKnownPollPeriod : undefined,
-        );
+        // Only poll the client well-known when a poll period was configured: leaving
+        // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
+        if (opts.clientWellKnownPollPeriod !== undefined) {
+            this.cachedWellKnown.start(1000 * opts.clientWellKnownPollPeriod);
+        }
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
 

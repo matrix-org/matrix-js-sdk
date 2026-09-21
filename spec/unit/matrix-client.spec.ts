@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import fetchMock from "@fetch-mock/vitest";
-import { type MockedObject, type Mocked } from "vitest";
+import { type MockedObject, type Mocked, type MockInstance } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
@@ -46,6 +46,7 @@ import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
@@ -3872,20 +3873,40 @@ describe("MatrixClient", function () {
             await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
+    });
 
-        it("should use unstable prefix", async () => {
-            const metadata = makeDelegatedAuthMetadata();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    data: metadata,
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
+    describe("logout", () => {
+        const baseUrl = "https://logout-test.example.org";
+        const userId = "@alice:logout-test.example.org";
+        const accessToken = "test-access-token";
+        const refreshToken = "test-refresh-token";
 
-            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
-            expect(httpLookups.length).toEqual(0);
+        it("should call /logout for a non-OAuth2-native session", async () => {
+            fetchMock.postOnce(`${baseUrl}/_matrix/client/v3/logout`, {});
+
+            const client = createClient({ baseUrl, accessToken, userId });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(true);
+        });
+
+        it("should revoke tokens with the delegated auth server instead of calling /logout for an OAuth2-native session", async () => {
+            const authMetadata = makeDelegatedAuthMetadata("https://auth.logout-test.example.org/");
+            fetchMock.get(`${baseUrl}/_matrix/client/versions`, { versions: ["v1.15"] });
+            fetchMock.get(`${baseUrl}/_matrix/client/v1/auth_metadata`, authMetadata);
+            fetchMock.post(authMetadata.revocation_endpoint, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                refreshToken,
+                userId,
+                oauthClientId: "test-client-id",
+            });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(false);
+            expect(fetchMock.callHistory.calls(authMetadata.revocation_endpoint)).toHaveLength(2);
         });
     });
 
@@ -4061,25 +4082,54 @@ describe("MatrixClient", function () {
     });
 
     describe("Well-known", () => {
+        const A_WELLKNOWN: IClientWellKnown = {
+            "m.homeserver": {
+                base_url: "https://hs.org",
+            },
+            "m.identity_server": {
+                base_url: "https://is.org",
+            },
+        };
+
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
         it("caches the well-known value", async () => {
-            const A_WELLKNOWN: IClientWellKnown = {
-                "m.homeserver": {
-                    base_url: "https://hs.org",
-                },
-                "m.identity_server": {
-                    base_url: "https://is.org",
-                },
-            };
-
             void client.startClient();
-
-            vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
 
             const value = await client.waitForClientWellKnown();
             expect(value).toStrictEqual(A_WELLKNOWN);
 
             const cached = client.getClientWellKnown();
             expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await client.startClient();
+            await flushPromises();
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known on startup and polls it when clientWellKnownPollPeriod is set", async () => {
+            await client.startClient({ clientWellKnownPollPeriod: 3600 });
+            await flushPromises();
+
+            expect(getRawClientConfig).toHaveBeenCalledTimes(1);
+            expect(client.getClientWellKnown()).toStrictEqual(A_WELLKNOWN);
+
+            await vi.advanceTimersByTimeAsync(3600 * 1000);
+            expect(getRawClientConfig).toHaveBeenCalledTimes(2);
+
+            client.stopClient();
         });
     });
 

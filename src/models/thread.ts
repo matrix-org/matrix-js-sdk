@@ -369,6 +369,15 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         // Modify this event to point at our room's state, and mark its thread
         // as this.
         this.setEventMetadata(event);
+
+        // The bundled `current_user_participated` flag from the server lags behind local activity,
+        // so relying on it alone drops just-sent replies out of "participated" views until the next
+        // root event bundle refresh. Latch it as soon as the current user authors a thread reply,
+        // matching the server's participated semantics: an m.thread relation, not a reaction or edit.
+        if (event.getSender() === this.client.getUserId() && event.isRelation(THREAD_RELATION_TYPE.name)) {
+            this._currentUserParticipated = true;
+        }
+
         const eventId = event.getId();
         if (
             !this.initialEventsFetched &&
