@@ -564,9 +564,10 @@ export class MembershipManager
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "cancelScheduledDelayedEvent");
                 if (update) return update;
 
-                if (this.isNotFoundError(e)) {
-                    // If we get a M_NOT_FOUND we know that the delayed event got already removed.
+                if (this.isDelayedEventGoneError(e)) {
+                    // The delayed event got already removed (404) or was already sent (409).
                     // This means we are good and can set it to undefined and run this again.
+                    this.logger.info("Delayed event to cancel is already gone, scheduling a new one:", e);
                     this.setAndEmitDelayId(undefined);
                     return createReplaceActionUpdate(repeatActionType);
                 }
@@ -642,7 +643,11 @@ export class MembershipManager
                     this.setAndEmitProbablyLeft(true);
                 }
                 const repeatActionType = MembershipActionType.RestartDelayedEvent;
-                if (this.isNotFoundError(e)) {
+                if (this.isDelayedEventGoneError(e)) {
+                    // The delayed event got already removed (404) or is already finalised (409) and cannot be restarted.
+                    // We schedule a new one. If the leave event got sent, we will notice our missing membership
+                    // through sync (`onRTCSessionMemberUpdate`) and rejoin.
+                    this.logger.info("Delayed event to restart is already gone, scheduling a new one:", e);
                     this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(MembershipActionType.SendDelayedEvent);
                 }
@@ -671,7 +676,10 @@ export class MembershipManager
             .catch((e) => {
                 const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
-                if (this.isNotFoundError(e)) {
+                if (this.isDelayedEventGoneError(e)) {
+                    // The delayed event got already removed (404) or was already cancelled (409).
+                    // It will never send our leave event, so we send it ourselves.
+                    this.logger.info("Delayed leave event is already gone, falling back to SendLeaveEvent:", e);
                     this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(repeatActionType);
                 }
@@ -845,6 +853,30 @@ export class MembershipManager
      */
     private isNotFoundError(error: unknown): boolean {
         return error instanceof MatrixError && error.errcode === "M_NOT_FOUND";
+    }
+
+    /**
+     * Check if its a 409 (conflict) error.
+     * A homeserver answers a delayed event management action (restart, cancel, send) with a 409 if the delayed event
+     * is already finalised with an outcome that conflicts with the action
+     * (MSC4140 — https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md).
+     * The MSC does not mandate an errcode for this case, so we only check the http status.
+     * @param error the error causing this handler check/execution
+     * @returns true if its a conflict error
+     */
+    private isConflictError(error: unknown): boolean {
+        return error instanceof HTTPError && error.httpStatus === 409;
+    }
+
+    /**
+     * Check if the error tells us that the delayed event we tried to manage is gone: either the homeserver does not
+     * know about it anymore (404) or it is already finalised with an outcome that conflicts with our action (409).
+     * In both cases the delayed event will not do what we asked, so the `delayId` is stale and needs to be replaced.
+     * @param error the error causing this handler check/execution
+     * @returns true if the delayed event is gone
+     */
+    private isDelayedEventGoneError(error: unknown): boolean {
+        return this.isNotFoundError(error) || this.isConflictError(error);
     }
 
     /**

@@ -409,6 +409,41 @@ describe("MembershipManager", () => {
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
         });
 
+        it("rejoins if restarting the delayed event conflicts with its finalised outcome (409)", async () => {
+            const RESTART_DELAY = 15000;
+            const onError = vi.fn();
+            const manager = new MembershipManager(
+                { delayedLeaveEventRestartMs: RESTART_DELAY },
+                room,
+                client,
+
+                callSession,
+            );
+            manager.join([focus], undefined, onError);
+            await vi.runOnlyPendingTimersAsync();
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(manager.status).toBe(Status.Connected);
+            // Same scenario as in the "not found" test above, but with a homeserver that keeps finalised delayed events
+            // around and answers with a 409 (without a dedicated errcode) because the delayed leave event was already sent.
+            (client._unstable_restartScheduledDelayedEvent as Mock<any>).mockRejectedValueOnce(
+                new MatrixError({ errcode: "M_UNKNOWN" }, 409),
+            );
+
+            const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+            await vi.advanceTimersByTimeAsync(RESTART_DELAY);
+            expect(manager.delayId).toBeUndefined();
+            // first simulate the sync, then resolve sending the delayed event.
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
+            resolve({ delay_id: "id2" });
+            // Let the scheduler run one iteration so that the new join gets sent
+            await vi.runOnlyPendingTimersAsync();
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            expect(manager.delayId).toBe("id2");
+            expect(manager.status).toBe(Status.Connected);
+            expect(onError).not.toHaveBeenCalled();
+        });
+
         it("uses membershipEventExpiryMs from config", async () => {
             const manager = new MembershipManager(
                 { membershipEventExpiryMs: 1234567 },
@@ -497,6 +532,28 @@ describe("MembershipManager", () => {
             );
             expect(manager.delayId).toBe(undefined);
         });
+        it("send leave event when leave is called and the delayed leave was already cancelled (409)", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager({}, room, client, callSession);
+            manager.join([focus], undefined, onError);
+            await vi.advanceTimersByTimeAsync(1);
+            (client._unstable_sendScheduledDelayedEvent as Mock<any>).mockRejectedValue(
+                new MatrixError({ errcode: "M_UNKNOWN" }, 409),
+            );
+            await expect(manager.leave()).resolves.toBe(true);
+
+            // We send a normal leave event since the cancelled delayed event will never send it for us.
+            expect(client._unstable_sendScheduledDelayedEvent).toHaveBeenCalledTimes(1);
+            expect(client.sendStateEvent).toHaveBeenLastCalledWith(
+                room.roomId,
+                "org.matrix.msc3401.call.member",
+                {},
+                "_@alice:example.org_AAAAAAA_m.call",
+            );
+            // The delayed event is finalised, so we stop tracking it.
+            expect(manager.delayId).toBeUndefined();
+            expect(onError).not.toHaveBeenCalled();
+        });
         it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             await expect(manager.leave()).resolves.toBeTruthy();
@@ -563,6 +620,32 @@ describe("MembershipManager", () => {
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalled();
 
             expect(client._unstable_restartScheduledDelayedEvent).toHaveBeenCalled();
+        });
+
+        it("recreates membership if it is missing and the delayed event to cancel was already sent (409)", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager({}, room, client, callSession);
+            manager.join([focus], focusActive, onError);
+            await vi.advanceTimersByTimeAsync(1);
+            // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
+            vi.mocked(client.sendStateEvent).mockClear();
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockClear();
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockResolvedValue({ delay_id: "id2" });
+            // The delayed leave event is what removed our membership, so cancelling it conflicts with its outcome.
+            vi.mocked(client._unstable_cancelScheduledDelayedEvent).mockRejectedValueOnce(
+                new MatrixError({ errcode: "M_UNKNOWN" }, 409),
+            );
+
+            // Our own membership is removed:
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenCalledTimes(1);
+            expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(manager.delayId).toBe("id2");
+            expect(manager.status).toBe(Status.Connected);
+            expect(onError).not.toHaveBeenCalled();
         });
 
         it("updates the UpdateExpiry entry in the action scheduler", async () => {
