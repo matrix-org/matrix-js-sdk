@@ -878,6 +878,39 @@ describe("MembershipManager", () => {
             expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(20_000);
         });
 
+        it("rejoins rather than letting the membership expire while the restart stays rate limited", async () => {
+            const manager = new MembershipManager(
+                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
+                room,
+                client,
+                { id: "", application: "m.call" },
+            );
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            await vi.advanceTimersByTimeAsync(1);
+            vi.mocked(client.sendStateEvent).mockClear();
+
+            // `Retry-After` is far longer than the 5s of headroom the expiry update has.
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "30" }),
+                ),
+            );
+            // The update is due at 5s and gets a last attempt at 10s, when the membership expires.
+            await vi.advanceTimersByTimeAsync(9_000);
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(2_000);
+
+            // Waiting out the rate limit would have left us expired with nothing sent, so we gave the membership up
+            // and joined again: `expires` starts over instead of being extended to 20s.
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(10_000);
+        });
+
         it("extends `expires` without a restart if delayed events are unsupported", async () => {
             const manager = new MembershipManager(
                 { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
@@ -1348,6 +1381,44 @@ describe("MembershipManager", () => {
 
                 expect(unrecoverableError).toHaveBeenCalled();
                 expect(unrecoverableError.mock.lastCall![0].cause).toBe(stickyError);
+            });
+        });
+
+        describe("background timers", () => {
+            it("rejoins rather than letting the sticky event vanish while the restart stays rate limited", async () => {
+                // A sticky event vanishes an hour after it was sent, whatever `expires` (4h by default) says, so that
+                // is the deadline the expiry update has to meet. Periodic restarts are far apart so that only the
+                // expiry update meets the rate limit.
+                const unrecoverableError = vi.fn();
+                const manager = new StickyEventMembershipManager(
+                    { delayedLeaveEventRestartMs: 2 * 60 * 60_000 },
+                    room,
+                    client,
+                    callSession,
+                    "@alice:example.org:AAAAAAA_m.call",
+                );
+                manager.join([], focus, unrecoverableError);
+                await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                await vi.advanceTimersByTimeAsync(1);
+                vi.mocked(client._unstable_sendStickyEvent).mockClear();
+
+                vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(
+                    new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "30" }),
+                    ),
+                );
+                // The expiry update is due 5s before the hour. Measured against `expires` it would have three hours
+                // to keep retrying, while the sticky event is long gone.
+                await vi.advanceTimersByTimeAsync(61 * 60_000);
+
+                // Instead we gave the membership up when the sticky event vanished and joined again.
+                expect(client._unstable_sendStickyEvent).toHaveBeenCalledTimes(1);
+                expect(unrecoverableError).not.toHaveBeenCalled();
+                expect(manager.status).toBe(Status.Connected);
             });
         });
     });
