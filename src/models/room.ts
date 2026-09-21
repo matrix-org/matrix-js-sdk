@@ -540,6 +540,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
     public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet] | null> {
+        if (this.client?.threadSupportPending) {
+            await this.client.threadSupportPending;
+            if (!this.client.clientRunning) return null;
+        }
         if (this.threadTimelineSetsPromise) {
             return this.threadTimelineSetsPromise;
         }
@@ -2154,6 +2158,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * Without server support that means fetching as much at once as the server allows us to.
      */
     public async fetchRoomThreads(): Promise<void> {
+        if (this.client.threadSupportPending) {
+            await this.client.threadSupportPending;
+            if (!this.client.clientRunning) return;
+        }
         if (this.threadsReady || !this.client.supportsThreads()) {
             return;
         }
@@ -2405,7 +2413,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             };
         }
 
-        const isThreadRelation = event.isRelation(THREAD_RELATION_TYPE.name);
+        const isThreadRelation = event.isThreadRelation;
         const parentEventId = event.getAssociatedId();
         const threadRootId = event.threadRootId;
 
