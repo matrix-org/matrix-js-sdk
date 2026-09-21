@@ -144,6 +144,16 @@ export interface MembershipManagerState {
     probablyLeft: boolean;
 }
 
+/**
+ * The outcome of a a delayed leave event restart attempt.
+ *
+ *  - `"ok"`: the server restarted it, it will fire `delayedLeaveEventDelayMs` from now.
+ *  - `"gone"`: the server does not know the delay id anymore. It either sent the event or lost/cancelled it.
+ *  - `"unsupported"`: the server does not support the delayed events endpoint.
+ *  - `{ error }`: any other failure, for the caller to turn into a retry or to rethrow.
+ */
+type RestartDelayedEventOutcome = "ok" | "gone" | "unsupported" | { error: unknown };
+
 function createInsertActionUpdate(type: MembershipActionType, offset?: number): ActionUpdate {
     return {
         insert: [{ ts: Date.now() + (offset ?? 0), type }],
@@ -586,7 +596,13 @@ export class MembershipManager
         this.emit(MembershipManagerEvent.DelayIdChanged, this.state.delayId);
     }
 
-    private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
+    /**
+     * Attempts to restart the delayed leave event and keeps everything that depends on it in sync.
+     *
+     * @param delayId the id of the delayed leave event to restart
+     * @returns the outcome of the attempt.
+     */
+    private async tryRestartDelayedEvent(delayId: string): Promise<RestartDelayedEventOutcome> {
         // Compute the duration until we expect the server to send the delayed leave event.
         const durationUntilServerDelayedLeave = this.state.expectedServerDelayLeaveTs
             ? this.state.expectedServerDelayLeaveTs - Date.now()
@@ -606,42 +622,54 @@ export class MembershipManager
             );
         });
 
-        // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
-        // to the widget driver this information would get lost. That is why we mimic the AbortError using the race.
-        return await Promise.race([this.client._unstable_restartScheduledDelayedEvent(delayId), abortPromise])
-            .then(() => {
-                // Whenever we successfully restart the delayed event we update the `state.expectedServerDelayLeaveTs`
-                // which stores the predicted timestamp at which the server will send the delayed leave event if there wont be any further
-                // successful restart requests.
-                this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
-                this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
-                this.setAndEmitProbablyLeft(false);
-                return createInsertActionUpdate(
-                    MembershipActionType.RestartDelayedEvent,
-                    this.delayedLeaveEventRestartMs,
-                );
-            })
-            .catch((e) => {
-                if (this.state.expectedServerDelayLeaveTs && this.state.expectedServerDelayLeaveTs <= Date.now()) {
-                    // Once we reach this point it's likely that the server is sending the delayed leave event so we emit `probablyLeft = true`.
-                    // It will emit `probablyLeft = false` once we notice about our leave through sync and successfully setup a new state event.
-                    this.setAndEmitProbablyLeft(true);
-                }
-                const repeatActionType = MembershipActionType.RestartDelayedEvent;
-                if (this.isNotFoundError(e)) {
-                    this.setAndEmitDelayId(undefined);
-                    return createInsertActionUpdate(MembershipActionType.SendDelayedEvent);
-                }
-                // If the HS does not support delayed events we wont reschedule.
-                if (this.isUnsupportedDelayedEndpoint(e)) return {};
+        try {
+            // The obvious choice here would be to use the `IRequestOpts` to set the timeout. Since this call might be forwarded
+            // to the widget driver this information would get lost. That is why we mimic the AbortError using the race.
+            await Promise.race([this.client._unstable_restartScheduledDelayedEvent(delayId), abortPromise]);
+        } catch (e) {
+            if (this.state.expectedServerDelayLeaveTs && this.state.expectedServerDelayLeaveTs <= Date.now()) {
+                // Once we reach this point it's likely that the server is sending the delayed leave event so we emit `probablyLeft = true`.
+                // It will emit `probablyLeft = false` once we notice about our leave through sync and successfully setup a new state event.
+                this.setAndEmitProbablyLeft(true);
+            }
+            if (this.isNotFoundError(e)) {
+                this.setAndEmitDelayId(undefined);
+                return "gone";
+            }
+            if (this.isUnsupportedDelayedEndpoint(e)) return "unsupported";
+            return { error: e };
+        }
 
-                // TODO this also needs a test: get rate limit while checking id delayed event is scheduled
-                const update = this.actionUpdateFromErrors(e, repeatActionType, "restartScheduledDelayedEvent");
-                if (update) return update;
+        // Whenever we successfully restart the delayed event we update the `state.expectedServerDelayLeaveTs`
+        // which stores the predicted timestamp at which the server will send the delayed leave event if there wont be any further
+        // successful restart requests.
+        this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
+        this.resetRateLimitCounter(MembershipActionType.RestartDelayedEvent);
+        this.setAndEmitProbablyLeft(false);
+        return "ok";
+    }
 
-                // In other error cases we have no idea what is happening
-                throw Error("Could not restart delayed event, even though delayed events are supported. " + e);
-            });
+    private async restartDelayedEvent(delayId: string): Promise<ActionUpdate> {
+        const outcome = await this.tryRestartDelayedEvent(delayId);
+        if (outcome === "ok") {
+            return createInsertActionUpdate(MembershipActionType.RestartDelayedEvent, this.delayedLeaveEventRestartMs);
+        }
+        if (outcome === "gone") {
+            return createInsertActionUpdate(MembershipActionType.SendDelayedEvent);
+        }
+        // If the HS does not support delayed events we won't reschedule.
+        if (outcome === "unsupported") return {};
+
+        // TODO this also needs a test: get rate limit while checking if delayed event is scheduled
+        const update = this.actionUpdateFromErrors(
+            outcome.error,
+            MembershipActionType.RestartDelayedEvent,
+            "restartScheduledDelayedEvent",
+        );
+        if (update) return update;
+
+        // In other error cases we have no idea what is happening
+        throw Error("Could not restart delayed event, even though delayed events are supported. " + outcome.error);
     }
 
     private async sendScheduledDelayedLeaveEventOrFallbackToSendLeaveEvent(delayId: string): Promise<ActionUpdate> {
@@ -730,28 +758,29 @@ export class MembershipManager
         // `expires` runs out. So restart the delayed event first. A success guarantees it will outlive the membership
         // update; a 404 tells us it is gone, and we need to fully rejoin instead.
         if (this.state.delayId) {
-            try {
-                await this.client._unstable_restartScheduledDelayedEvent(this.state.delayId);
-                this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
-            } catch (e) {
-                if (this.isNotFoundError(e)) {
-                    // The delayed leave event has been sent, which also means our membership is gone.
-                    this.logger.warn(
-                        "Delayed leave event was already sent by the server, rejoining instead of updating expiry",
-                    );
-                    this.setAndEmitDelayId(undefined);
-                    this.state.hasMemberStateEvent = false;
-                    return createReplaceActionUpdate(MembershipActionType.SendDelayedEvent);
+            const outcome = await this.tryRestartDelayedEvent(this.state.delayId);
+            if (outcome === "gone") {
+                // The delayed leave event has been sent, which also means our membership is gone.
+                this.logger.warn(
+                    "Delayed leave event was already sent by the server, rejoining instead of updating expiry",
+                );
+                this.state.hasMemberStateEvent = false;
+                return createReplaceActionUpdate(MembershipActionType.SendDelayedEvent);
+            }
+            // `"ok"` and `"unsupported"` both let us go ahead: either the delayed leave event was just restarted, or
+            // there is none that could have removed our membership in the first place.
+            if (outcome !== "ok" && outcome !== "unsupported") {
+                // The retry budget belongs to the restart, but what we need to repeat is the expiry update.
+                const update = this.actionUpdateFromErrors(
+                    outcome.error,
+                    MembershipActionType.RestartDelayedEvent,
+                    "restartScheduledDelayedEvent",
+                );
+                if (update) {
+                    const retryTs = "insert" in update ? update.insert[0].ts : Date.now();
+                    return { insert: [{ ts: retryTs, type: MembershipActionType.UpdateExpiry }] };
                 }
-                if (!this.isUnsupportedDelayedEndpoint(e)) {
-                    const update = this.actionUpdateFromErrors(
-                        e,
-                        MembershipActionType.UpdateExpiry,
-                        "restartScheduledDelayedEvent",
-                    );
-                    if (update) return update;
-                    throw e;
-                }
+                throw outcome.error;
             }
         }
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;

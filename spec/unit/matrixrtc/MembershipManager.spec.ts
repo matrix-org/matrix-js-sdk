@@ -780,6 +780,30 @@ describe("MembershipManager", () => {
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             expect(unrecoverableError).toHaveBeenCalled();
         });
+
+        it("does not block the action loop on a delayed leave event restart that never responds", async () => {
+            const manager = new MembershipManager(
+                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
+                room,
+                client,
+                { id: "", application: "m.call" },
+            );
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            await vi.advanceTimersByTimeAsync(1);
+            vi.mocked(client.sendStateEvent).mockClear();
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
+
+            // The homeserver never answers. Forwarded through the widget driver this cannot be caught by a request
+            // timeout, so the local timeout has to do it.
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockReturnValue(new Promise(() => {}));
+            await vi.advanceTimersByTimeAsync(9_000);
+
+            // The loop kept running (a stuck await here would also stop restarts, expiry updates and leaving) and
+            // never re-sent the membership unprotected.
+            expect(vi.mocked(client._unstable_restartScheduledDelayedEvent).mock.calls.length).toBeGreaterThan(1);
+            expect(client.sendStateEvent).not.toHaveBeenCalled();
+        });
     });
 
     describe("status updates", () => {
