@@ -765,6 +765,10 @@ export class MembershipManager
                     "Delayed leave event was already sent by the server, rejoining instead of updating expiry",
                 );
                 this.state.hasMemberStateEvent = false;
+                // Forget our own membership as well, so that the state event we are about to send does not inherit
+                // its `created_ts`. That would keep the identity of the membership we are giving up while `expires`
+                // starts over from a single iteration, which can put the absolute expiry in the past.
+                this._ownMembership = undefined;
                 return createReplaceActionUpdate(MembershipActionType.SendDelayedEvent);
             }
             // `"ok"` and `"unsupported"` both let us go ahead: either the delayed leave event was just restarted, or

@@ -687,6 +687,14 @@ describe("MembershipManager", () => {
             manager.join([focus], focusActive);
             await waitForMockCall(client.sendStateEvent);
             await vi.advanceTimersByTimeAsync(1);
+            // Sync tells us about the membership we just sent, so from here on we know its `created_ts`.
+            const joinedMembership = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+            await manager.onRTCSessionMemberUpdate([
+                mockCallMembership(
+                    { ...joinedMembership, user_id: client.getUserId()!, created_ts: Date.now() },
+                    room.roomId,
+                ),
+            ]);
             vi.mocked(client.sendStateEvent).mockClear();
             vi.mocked(client._unstable_sendDelayedStateEvent).mockClear();
             vi.mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
@@ -706,7 +714,11 @@ describe("MembershipManager", () => {
             expect(vi.mocked(client._unstable_sendDelayedStateEvent).mock.invocationCallOrder[0]).toBeLessThan(
                 vi.mocked(client.sendStateEvent).mock.invocationCallOrder[0],
             );
-            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(10_000);
+            const rejoinedMembership = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+            expect(rejoinedMembership.expires).toBe(10_000);
+            // The membership we gave up must not lend its `created_ts` to the new one: together with `expires`
+            // starting over from a single iteration that can put the absolute expiry in the past.
+            expect(rejoinedMembership.created_ts).toBeUndefined();
             expect(manager.status).toBe(Status.Connected);
         });
 
