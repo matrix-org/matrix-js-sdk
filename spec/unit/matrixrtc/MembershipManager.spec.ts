@@ -848,9 +848,40 @@ describe("MembershipManager", () => {
             expect(manager.status).toBe(Status.Connected);
         });
 
-        it("retries extending `expires` when restarting the delayed leave event is rate limited", async () => {
+        it("extends `expires` despite a rate limited restart while the delayed leave event is known to be pending", async () => {
             const manager = new MembershipManager(
                 { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
+                room,
+                client,
+                { id: "", application: "m.call" },
+            );
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            await vi.advanceTimersByTimeAsync(1);
+            vi.mocked(client.sendStateEvent).mockClear();
+
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
+                new MatrixError(
+                    { errcode: "M_LIMIT_EXCEEDED" },
+                    429,
+                    undefined,
+                    undefined,
+                    new Headers({ "Retry-After": "30" }),
+                ),
+            );
+            // The update is due at 5s. The delayed leave event is not expected to fire before 8s, so the failed
+            // restart was only a refresh and the update can go out on time.
+            await vi.advanceTimersByTimeAsync(5_500);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(20_000);
+            expect(client._unstable_cancelScheduledDelayedEvent).not.toHaveBeenCalled();
+        });
+
+        it("retries extending `expires` when restarting the delayed leave event is rate limited", async () => {
+            // `expires` is long enough that the expiry update falls due after the delayed leave event was expected
+            // to fire, so a failed restart leaves us guessing whether it is still there.
+            const manager = new MembershipManager(
+                { membershipEventExpiryMs: 20_000, delayedLeaveEventRestartMs: 60_000 },
                 room,
                 client,
                 { id: "", application: "m.call" },
@@ -869,18 +900,19 @@ describe("MembershipManager", () => {
                     new Headers({ "Retry-After": "1" }),
                 ),
             );
-            // The update is due at 5s and retried 1s later.
-            await vi.advanceTimersByTimeAsync(5_500);
+            // The update is due at 15s and retried 1s later.
+            await vi.advanceTimersByTimeAsync(15_500);
             // Nothing was sent while rate limited: the membership must not be re-sent unprotected.
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             await vi.advanceTimersByTimeAsync(1_000);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(20_000);
+            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(40_000);
         });
 
         it("rejoins rather than letting the membership expire while the restart stays rate limited", async () => {
+            // As above, the delayed leave event was expected to fire long before the update falls due at 15s.
             const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
+                { membershipEventExpiryMs: 20_000, delayedLeaveEventRestartMs: 60_000 },
                 room,
                 client,
                 { id: "", application: "m.call" },
@@ -900,15 +932,15 @@ describe("MembershipManager", () => {
                     new Headers({ "Retry-After": "30" }),
                 ),
             );
-            // The update is due at 5s and gets a last attempt at 10s, when the membership expires.
-            await vi.advanceTimersByTimeAsync(9_000);
+            // The update is due at 15s and gets a last attempt at 20s, when the membership expires.
+            await vi.advanceTimersByTimeAsync(19_000);
             expect(client.sendStateEvent).not.toHaveBeenCalled();
             await vi.advanceTimersByTimeAsync(2_000);
 
             // Waiting out the rate limit would have left us expired with nothing sent, so we gave the membership up
-            // and joined again: `expires` starts over instead of being extended to 20s.
+            // and joined again: `expires` starts over instead of being extended to 40s.
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(10_000);
+            expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(20_000);
         });
 
         it("does not extend `expires` while no delayed leave event is scheduled", async () => {

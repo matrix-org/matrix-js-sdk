@@ -866,14 +866,25 @@ export class MembershipManager
                     MembershipActionType.RestartDelayedEvent,
                     "restartScheduledDelayedEvent",
                 );
-                if (update) {
+                if (!update) throw outcome.error;
+
+                // A transient failure does not mean the delayed leave event is not there. What we need for the update
+                // to be safe is that it is still pending when the update lands, and `expectedServerDelayLeaveTs` tells
+                // us that: while it is comfortably in the future, the restart was only a refresh we can do without,
+                // and the `RestartDelayedEvent` loop will make up for it. Only a stale timestamp leaves us guessing.
+                const durationUntilServerDelayedLeave = (this.state.expectedServerDelayLeaveTs ?? 0) - Date.now();
+                if (durationUntilServerDelayedLeave > this.delayedLeaveEventRestartLocalTimeoutMs) {
+                    this.logger.warn(
+                        "Could not restart the delayed leave event before extending `expires`, going ahead since it is still pending",
+                        outcome.error,
+                    );
+                } else {
                     const retryTs = "insert" in update ? update.insert[0].ts : Date.now();
                     return this.deferExpiryUpdate(
                         Math.max(0, retryTs - Date.now()),
                         "restarting the delayed leave event failed",
                     );
                 }
-                throw outcome.error;
             }
         } else {
             const pendingSendDelayedEvent = this.scheduler.actions.find(
