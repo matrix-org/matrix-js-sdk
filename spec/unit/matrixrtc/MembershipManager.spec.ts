@@ -996,6 +996,14 @@ describe("MembershipManager", () => {
             await vi.advanceTimersByTimeAsync(6_000);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             expect((vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData).expires).toBe(20_000);
+
+            // The delay id is forgotten, so later updates stop calling an endpoint that is not there.
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
+            // The next update is due 5s before `expires`, which is now 20s.
+            await vi.advanceTimersByTimeAsync(10_000);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            expect((vi.mocked(client.sendStateEvent).mock.calls[1][2] as SessionMembershipData).expires).toBe(30_000);
+            expect(client._unstable_restartScheduledDelayedEvent).not.toHaveBeenCalled();
         });
 
         it("stops if restarting the delayed leave event before extending `expires` fails unexpectedly", async () => {

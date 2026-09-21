@@ -640,7 +640,12 @@ export class MembershipManager
                 this.setAndEmitDelayId(undefined);
                 return "gone";
             }
-            if (this.isUnsupportedDelayedEndpoint(e)) return "unsupported";
+            if (this.isUnsupportedDelayedEndpoint(e)) {
+                // There is nothing left that we could restart, cancel or send with this delay id, so we forget it
+                // instead of making every later action try (and fail) to use it.
+                this.setAndEmitDelayId(undefined);
+                return "unsupported";
+            }
             return { error: e };
         }
 
