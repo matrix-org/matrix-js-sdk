@@ -38,23 +38,23 @@ import { computeSlotId } from "./utils.ts";
 import { isLivekitTransportConfig } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
-On Join:  ───────────────┐   ┌───────────────(1)───────────┐
-                         ▼   ▼                             │
-                   ┌────────────────┐                      │
-                   │SendDelayedEvent│ ──────(2)───┐        │
-                   └────────────────┘             │        │
-                           │(3)                   │        │
-                           ▼                      │        │
-                    ┌─────────────┐               │        │
-       ┌──────(4)───│SendJoinEvent│────(4)─────┐  │        │
-       │            └─────────────┘            │  │        │
-       │  ┌─────┐                  ┌──────┐    │  │        │
-       ▼  ▼     │                  │      ▼    ▼  ▼        │
-┌────────────┐  │                  │ ┌───────────────────┐ │
-│UpdateExpiry│ (s)                (s)|RestartDelayedEvent│ │
-└────────────┘  │                  │ └───────────────────┘ │
-          │     │                  │      │        │       │
-          └─────┘                  └──────┘        └───────┘
+On Join:  ───────────────────┐   ┌───────────────(1)───────────┐
+                             ▼   ▼                             │
+                       ┌────────────────┐                      │
+┌───────(6)───────────▶│SendDelayedEvent│ ──────(2)───┐        │
+│                      └────────────────┘             │        │
+│                              │(3)                   │        │
+│                              ▼                      │        │
+│                       ┌─────────────┐               │        │
+│          ┌──────(4)───│SendJoinEvent│────(4)─────┐  │        │
+│          │            └─────────────┘            │  │        │
+│          │  ┌─────┐                  ┌──────┐    │  │        │
+│          ▼  ▼     │                  │      ▼    ▼  ▼        │
+│   ┌────────────┐  │                  │ ┌───────────────────┐ │
+└───│UpdateExpiry│ (s)                (s)|RestartDelayedEvent│ │
+    └────────────┘  │                  │ └───────────────────┘ │
+              │     │                  │      │        │       │
+              └─────┘                  └──────┘        └───────┘
 
 On Leave: ─────────  STOP ALL ABOVE
                            ▼
@@ -75,6 +75,10 @@ On Leave: ─────────  STOP ALL ABOVE
 (4) Both (UpdateExpiry and RestartDelayedEvent) actions are
     scheduled when successfully sending the state event
 (5) Only if delayed event sending failed (fallback)
+(6) Before extending `expires` we make sure a delayed leave
+    event will outlive the update. If it was only cancelled we
+    schedule a new one and retry; if it already fired, or the
+    membership expires while we retry, we join again from scratch
 (s) Successful restart/resend
 */
 
@@ -96,7 +100,7 @@ export enum MembershipActionType {
 
     SendJoinEvent = "SendJoinEvent",
     //  -> MembershipActionType.SendJoinEvent if we run into a rate limit and need to retry
-    //  -> MembershipActionType.Update if we successfully send the join event then schedule the expire event update
+    //  -> MembershipActionType.UpdateExpiry if we successfully send the join event then schedule the expire event update
     //  -> DelayedLeaveActionType.RestartDelayedEvent to recheck the delayed event
 
     RestartDelayedEvent = "RestartDelayedEvent",
@@ -105,7 +109,10 @@ export enum MembershipActionType {
     //  -> DelayedLeaveActionType.RestartDelayedEvent on success we schedule the next restart
 
     UpdateExpiry = "UpdateExpiry",
-    //  -> MembershipActionType.Update if the timeout has passed so the next update is required.
+    //  -> MembershipActionType.UpdateExpiry if the timeout has passed so the next update is required, or if we first
+    //     have to wait for a delayed leave event that can protect the updated membership.
+    //  -> MembershipActionType.SendDelayedEvent if our delayed leave event is gone. Either to schedule a new one for
+    //     the membership we still have, or to join again from scratch because the server already removed us.
 
     SendScheduledDelayedLeaveEvent = "SendScheduledDelayedLeaveEvent",
     //  -> MembershipActionType.SendLeaveEvent on failure (not found) we need to send the leave manually and cannot use the scheduled delayed event
