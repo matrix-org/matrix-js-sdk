@@ -156,7 +156,7 @@ export interface MembershipManagerState {
 }
 
 /**
- * The outcome of a a delayed leave event restart attempt.
+ * The outcome of a delayed leave event restart attempt.
  *
  *  - `"ok"`: the server restarted it, it will fire `delayedLeaveEventDelayMs` from now.
  *  - `"gone"`: the server does not know the delay id anymore. It either sent the event or lost/cancelled it.
@@ -846,78 +846,97 @@ export class MembershipManager
         return { replace: [...otherActions, { ts: Date.now(), type: MembershipActionType.SendDelayedEvent }, retry] };
     }
 
-    private async updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
-        // Re-sending our membership is only safe while our delayed leave event is still scheduled: if the server has
-        // already sent it (e.g. because the device was asleep and no restarts reached the server), the membership we
-        // would send here would come back to life without any delayed leave event to clean it up, and stay until
-        // `expires` runs out. So restart the delayed event first. A success guarantees it will outlive the membership
-        // update; a 404 tells us it is gone, and we need to fully rejoin instead.
-        if (this.state.delayId) {
-            const outcome = await this.tryRestartDelayedEvent(this.state.delayId);
-            if (outcome === "gone") {
-                if (
-                    this.state.expectedServerDelayLeaveTs !== undefined &&
-                    this.state.expectedServerDelayLeaveTs > Date.now()
-                ) {
-                    // It is too early for the server to have sent the delayed leave event, so it must have been
-                    // cancelled or lost instead (e.g. by a homeserver lacking
-                    // https://github.com/element-hq/synapse/pull/17810 when our last state event landed). Our
-                    // membership is still there and only needs a new delayed event, so we schedule one and pick the
-                    // expiry update back up right after it.
-                    return this.deferExpiryUpdate(0, "the delayed leave event was cancelled or lost", {
-                        resendDelayedEvent: true,
-                    });
-                }
-                // The delayed leave event has been sent, which also means our membership is gone.
-                return this.rejoinFromScratch("the server already sent our delayed leave event");
-            }
-            // `"ok"` and `"unsupported"` both let us go ahead: either the delayed leave event was just restarted, or
-            // there is none that could have removed our membership in the first place.
-            if (outcome !== "ok" && outcome !== "unsupported") {
-                // The retry budget belongs to the restart, but what we need to repeat is the expiry update.
-                const update = this.actionUpdateFromErrors(
-                    outcome.error,
-                    MembershipActionType.RestartDelayedEvent,
-                    "restartScheduledDelayedEvent",
-                );
-                if (!update) throw outcome.error;
+    /**
+     * Makes sure a delayed leave event is scheduled that will outlive the membership update we are about to send.
+     *
+     * Re-sending our membership is only safe while our delayed leave event is still scheduled: if the server has
+     * already sent it (e.g. because the device was asleep and no restarts reached the server), the membership we
+     * would send would come back to life without any delayed leave event to clean it up, and stay until `expires`
+     * runs out. So we restart the delayed event first. A success guarantees it will outlive the membership update;
+     * a 404 tells us it is gone, and we have to work out why.
+     * @returns `undefined` if the membership can be sent, otherwise the action to take instead.
+     */
+    private async ensureDelayedLeaveEventProtectsMembership(): Promise<ActionUpdate | undefined> {
+        if (!this.state.delayId) return this.waitForPendingDelayedLeaveEvent();
 
-                // A transient failure does not mean the delayed leave event is not there. What we need for the update
-                // to be safe is that it is still pending when the update lands, and `expectedServerDelayLeaveTs` tells
-                // us that: while it is comfortably in the future, the restart was only a refresh we can do without,
-                // and the `RestartDelayedEvent` loop will make up for it. Only a stale timestamp leaves us guessing.
-                const durationUntilServerDelayedLeave = (this.state.expectedServerDelayLeaveTs ?? 0) - Date.now();
-                if (durationUntilServerDelayedLeave > this.delayedLeaveEventRestartLocalTimeoutMs) {
-                    this.logger.warn(
-                        "Could not restart the delayed leave event before extending `expires`, going ahead since it is still pending",
-                        outcome.error,
-                    );
-                } else {
-                    const retryTs = "insert" in update ? update.insert[0].ts : Date.now();
-                    return this.deferExpiryUpdate(
-                        Math.max(0, retryTs - Date.now()),
-                        "restarting the delayed leave event failed",
-                    );
-                }
-            }
-        } else {
-            const pendingSendDelayedEvent = this.scheduler.actions.find(
-                (a) => a.type === MembershipActionType.SendDelayedEvent,
-            );
-            if (pendingSendDelayedEvent) {
-                // A `SendDelayedEvent` action is queued but has not succeeded yet, so we wait for it rather than put
-                // the membership back on the server with nothing to clean it up. The retry gets the same timestamp,
-                // and actions with the same timestamp run in insertion order, so it runs right after that attempt:
-                // straight away if the delayed event is there, or to wait for the next attempt if it rescheduled.
-                // (Without such an action queued we are not using delayed events at all, because the homeserver does
-                // not support them. Then there is also no delayed leave event that could have removed our
-                // membership, and nothing to protect it from.)
-                return this.deferExpiryUpdate(
-                    Math.max(0, pendingSendDelayedEvent.ts - Date.now()),
-                    "no delayed leave event is scheduled",
-                );
-            }
+        const outcome = await this.tryRestartDelayedEvent(this.state.delayId);
+        // `"ok"` and `"unsupported"` both let us go ahead: either the delayed leave event was just restarted, or
+        // there is none that could have removed our membership in the first place.
+        if (outcome === "ok" || outcome === "unsupported") return undefined;
+        if (outcome === "gone") return this.recoverFromGoneDelayedLeaveEvent();
+        return this.recoverFromFailedDelayedLeaveEventRestart(outcome.error);
+    }
+
+    /**
+     * Without a delay id, a `SendDelayedEvent` action may be queued that has not succeeded yet. Then we wait for it
+     * rather than put the membership back on the server with nothing to clean it up. The retry gets the same
+     * timestamp, and actions with the same timestamp run in insertion order, so it runs right after that attempt:
+     * straight away if the delayed event is there, or to wait for the next attempt if it rescheduled.
+     *
+     * Without such an action queued we are not using delayed events at all, because the homeserver does not support
+     * them. Then there is also no delayed leave event that could have removed our membership, and nothing to protect
+     * it from.
+     * @returns `undefined` if the membership can be sent, otherwise the deferred expiry update.
+     */
+    private waitForPendingDelayedLeaveEvent(): ActionUpdate | undefined {
+        const pending = this.scheduler.actions.find((a) => a.type === MembershipActionType.SendDelayedEvent);
+        if (!pending) return undefined;
+        return this.deferExpiryUpdate(Math.max(0, pending.ts - Date.now()), "no delayed leave event is scheduled");
+    }
+
+    /**
+     * The server does not know our delayed leave event anymore. Whether it sent it or lost it decides whether we
+     * still have a membership to extend.
+     */
+    private recoverFromGoneDelayedLeaveEvent(): ActionUpdate {
+        if (this.state.expectedServerDelayLeaveTs !== undefined && this.state.expectedServerDelayLeaveTs > Date.now()) {
+            // It is too early for the server to have sent the delayed leave event, so it must have been cancelled or
+            // lost instead (e.g. by a homeserver lacking https://github.com/element-hq/synapse/pull/17810 when our
+            // last state event landed). Our membership is still there and only needs a new delayed event, so we
+            // schedule one and pick the expiry update back up right after it.
+            return this.deferExpiryUpdate(0, "the delayed leave event was cancelled or lost", {
+                resendDelayedEvent: true,
+            });
         }
+        // The delayed leave event has been sent, which also means our membership is gone.
+        return this.rejoinFromScratch("the server already sent our delayed leave event");
+    }
+
+    /**
+     * Restarting our delayed leave event failed with something other than a 404.
+     * @param error what the restart failed with
+     * @returns `undefined` if the membership can be sent regardless, otherwise the action to take instead.
+     * @throws the error if it is not one we retry on.
+     */
+    private recoverFromFailedDelayedLeaveEventRestart(error: unknown): ActionUpdate | undefined {
+        // The retry budget belongs to the restart, but what we need to repeat is the expiry update.
+        const update = this.actionUpdateFromErrors(
+            error,
+            MembershipActionType.RestartDelayedEvent,
+            "restartScheduledDelayedEvent",
+        );
+        if (!update) throw error;
+
+        // A transient failure does not mean the delayed leave event is not there. What we need for the update to be
+        // safe is that it is still pending when the update lands, and `expectedServerDelayLeaveTs` tells us that:
+        // while it is comfortably in the future, the restart was only a refresh we can do without, and the
+        // `RestartDelayedEvent` loop will make up for it. Only a stale timestamp leaves us guessing.
+        const durationUntilServerDelayedLeave = (this.state.expectedServerDelayLeaveTs ?? 0) - Date.now();
+        if (durationUntilServerDelayedLeave > this.delayedLeaveEventRestartLocalTimeoutMs) {
+            this.logger.warn(
+                "Could not restart the delayed leave event before extending `expires`, going ahead since it is still pending",
+                error,
+            );
+            return undefined;
+        }
+        const retryTs = "insert" in update ? update.insert[0].ts : Date.now();
+        return this.deferExpiryUpdate(Math.max(0, retryTs - Date.now()), "restarting the delayed leave event failed");
+    }
+
+    private async updateExpiryOnJoinedEvent(): Promise<ActionUpdate> {
+        const protection = await this.ensureDelayedLeaveEventProtectsMembership();
+        if (protection) return protection;
+
         const nextExpireUpdateIteration = this.state.expireUpdateIterations + 1;
         const myMembership = this.makeMyMembership(this.membershipEventExpiryMs * nextExpireUpdateIteration);
         return await this.clientSendMembership(myMembership)

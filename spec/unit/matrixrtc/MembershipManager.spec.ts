@@ -73,6 +73,22 @@ function createAsyncHandle<T>(method: MockedFunction<(...args: any[]) => any>) {
     return { reject, resolve };
 }
 
+/** The server's answer when it does not know the delayed event (anymore). */
+function notFoundError(): MatrixError {
+    return new MatrixError({ errcode: "M_NOT_FOUND" }, 404);
+}
+
+/** The server's answer when it rate limits us, asking to try again after the given number of seconds. */
+function rateLimitError(retryAfterSeconds: number): MatrixError {
+    return new MatrixError(
+        { errcode: "M_LIMIT_EXCEEDED" },
+        429,
+        undefined,
+        undefined,
+        new Headers({ "Retry-After": String(retryAfterSeconds) }),
+    );
+}
+
 const callSession = { id: "ROOM", application: "m.call" };
 
 describe("MembershipManager", () => {
@@ -645,6 +661,24 @@ describe("MembershipManager", () => {
                 expect(sentMembership.expires).toBe(expire * i);
             }
         }
+
+        /**
+         * Joins with the given config and lets the join settle, so that the test starts from a connected manager and
+         * `sendStateEvent` only records what happens next.
+         * @param settleMs how long to let the joined manager run before handing it over
+         */
+        async function joinAndSettle(
+            config: ConstructorParameters<typeof MembershipManager>[0],
+            settleMs = 1,
+        ): Promise<MembershipManager> {
+            const manager = new MembershipManager(config, room, client, { id: "", application: "m.call" });
+            manager.join([focus], focusActive);
+            await waitForMockCall(client.sendStateEvent);
+            await vi.advanceTimersByTimeAsync(settleMs);
+            vi.mocked(client.sendStateEvent).mockClear();
+            return manager;
+        }
+
         // eslint-disable-next-line @vitest/expect-expect
         it("extends `expires` when call still active", async () => {
             await testExpires(10_000);
@@ -705,9 +739,7 @@ describe("MembershipManager", () => {
 
             // The device sleeps, no restarts reach the server and it sends our delayed leave event. When we wake up
             // the expiry update is due, and the restart it makes first finds the delayed event gone.
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(notFoundError());
             // The expiry update is due 5s (the headroom) before `expires`.
             await vi.advanceTimersByTimeAsync(16_000);
 
@@ -749,9 +781,7 @@ describe("MembershipManager", () => {
 
             // The server cannot have sent the delayed leave event yet, so it was cancelled or lost and our
             // membership is still there.
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(notFoundError());
             await vi.advanceTimersByTimeAsync(6_000);
 
             // A replacement delayed event was scheduled, and only then was `expires` extended.
@@ -773,29 +803,13 @@ describe("MembershipManager", () => {
             // restart then runs while the replacement `SendDelayedEvent` is still pending. Left in the queue, it would
             // find no delay id and queue a second `SendDelayedEvent`, which cancels the replacement once it lands and
             // `replace`s the queue down to itself, taking the next expiry update with it.
-            const manager = new MembershipManager(
+            const manager = await joinAndSettle(
                 { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 1_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
+                4_500,
             );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(4_500);
-            vi.mocked(client.sendStateEvent).mockClear();
 
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
-            );
-            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "1" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(notFoundError());
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(rateLimitError(1));
             // The replacement lands at 6s and schedules its restart loop.
             await vi.advanceTimersByTimeAsync(2_000);
             vi.mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
@@ -813,29 +827,10 @@ describe("MembershipManager", () => {
             // Restarts are far enough apart that the periodic one queued at 7s runs after the replacement delayed
             // event has landed. Left in the queue, it would find the new delay id, restart it and schedule itself
             // again: a second loop next to the one the replacement started.
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 7_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            const manager = await joinAndSettle({ membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 7_000 });
 
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
-            );
-            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "1" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(notFoundError());
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(rateLimitError(1));
             // The expiry update meets the 404 at 5s, the replacement lands at 6s and schedules its restart loop.
             await vi.advanceTimersByTimeAsync(6_500);
             vi.mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
@@ -849,26 +844,9 @@ describe("MembershipManager", () => {
         });
 
         it("extends `expires` despite a rate limited restart while the delayed leave event is known to be pending", async () => {
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 });
 
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "30" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(rateLimitError(30));
             // The update is due at 5s. The delayed leave event is not expected to fire before 8s, so the failed
             // restart was only a refresh and the update can go out on time.
             await vi.advanceTimersByTimeAsync(5_500);
@@ -880,26 +858,9 @@ describe("MembershipManager", () => {
         it("retries extending `expires` when restarting the delayed leave event is rate limited", async () => {
             // `expires` is long enough that the expiry update falls due after the delayed leave event was expected
             // to fire, so a failed restart leaves us guessing whether it is still there.
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 20_000, delayedLeaveEventRestartMs: 60_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 20_000, delayedLeaveEventRestartMs: 60_000 });
 
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "1" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(rateLimitError(1));
             // The update is due at 15s and retried 1s later.
             await vi.advanceTimersByTimeAsync(15_500);
             // Nothing was sent while rate limited: the membership must not be re-sent unprotected.
@@ -911,27 +872,10 @@ describe("MembershipManager", () => {
 
         it("rejoins rather than letting the membership expire while the restart stays rate limited", async () => {
             // As above, the delayed leave event was expected to fire long before the update falls due at 15s.
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 20_000, delayedLeaveEventRestartMs: 60_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 20_000, delayedLeaveEventRestartMs: 60_000 });
 
             // `Retry-After` is far longer than the 5s of headroom the expiry update has.
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "30" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(rateLimitError(30));
             // The update is due at 15s and gets a last attempt at 20s, when the membership expires.
             await vi.advanceTimersByTimeAsync(19_000);
             expect(client.sendStateEvent).not.toHaveBeenCalled();
@@ -944,31 +888,12 @@ describe("MembershipManager", () => {
         });
 
         it("does not extend `expires` while no delayed leave event is scheduled", async () => {
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 1_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 1_000 });
 
             // The periodic restart finds the delayed event gone, and scheduling a replacement stays rate limited for
             // longer than the membership has left, so we never get a new delay id.
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(
-                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
-            );
-            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValue(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "30" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(notFoundError());
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValue(rateLimitError(30));
             // The expiry update is due at 5s and keeps being deferred until the membership expires at 10s.
             await vi.advanceTimersByTimeAsync(9_000);
 
@@ -977,30 +902,11 @@ describe("MembershipManager", () => {
         });
 
         it("extends `expires` as soon as the replacement delayed leave event lands", async () => {
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 });
 
             // The delayed event was cancelled, and the replacement is rate limited once: it lands at 6s.
-            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
-            );
-            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
-                new MatrixError(
-                    { errcode: "M_LIMIT_EXCEEDED" },
-                    429,
-                    undefined,
-                    undefined,
-                    new Headers({ "Retry-After": "1" }),
-                ),
-            );
+            vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(notFoundError());
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(rateLimitError(1));
             await vi.advanceTimersByTimeAsync(5_500);
             // Not sent unprotected in the meantime...
             expect(client.sendStateEvent).not.toHaveBeenCalled();
@@ -1011,16 +917,7 @@ describe("MembershipManager", () => {
         });
 
         it("extends `expires` without a restart if delayed events are unsupported", async () => {
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 });
 
             vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
                 new UnsupportedDelayedEventsEndpointError("unsupported", "restartScheduledDelayedEvent"),
@@ -1060,16 +957,7 @@ describe("MembershipManager", () => {
         });
 
         it("does not block the action loop on a delayed leave event restart that never responds", async () => {
-            const manager = new MembershipManager(
-                { membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 },
-                room,
-                client,
-                { id: "", application: "m.call" },
-            );
-            manager.join([focus], focusActive);
-            await waitForMockCall(client.sendStateEvent);
-            await vi.advanceTimersByTimeAsync(1);
-            vi.mocked(client.sendStateEvent).mockClear();
+            await joinAndSettle({ membershipEventExpiryMs: 10_000, delayedLeaveEventRestartMs: 60_000 });
             vi.mocked(client._unstable_restartScheduledDelayedEvent).mockClear();
 
             // The homeserver never answers. Forwarded through the widget driver this cannot be caught by a request
@@ -1578,15 +1466,7 @@ describe("MembershipManager", () => {
                 await vi.advanceTimersByTimeAsync(1);
                 vi.mocked(client._unstable_sendStickyEvent).mockClear();
 
-                vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(
-                    new MatrixError(
-                        { errcode: "M_LIMIT_EXCEEDED" },
-                        429,
-                        undefined,
-                        undefined,
-                        new Headers({ "Retry-After": "30" }),
-                    ),
-                );
+                vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValue(rateLimitError(30));
                 // The expiry update is due 5s before the hour. Measured against `expires` it would have three hours
                 // to keep retrying, while the sticky event is long gone.
                 await vi.advanceTimersByTimeAsync(61 * 60_000);
