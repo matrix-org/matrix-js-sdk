@@ -760,6 +760,33 @@ export class MembershipManager
         if (this.state.delayId) {
             const outcome = await this.tryRestartDelayedEvent(this.state.delayId);
             if (outcome === "gone") {
+                if (
+                    this.state.expectedServerDelayLeaveTs !== undefined &&
+                    this.state.expectedServerDelayLeaveTs > Date.now()
+                ) {
+                    // It is too early for the server to have sent the delayed leave event, so it must have been
+                    // cancelled or lost instead (e.g. by a homeserver lacking
+                    // https://github.com/element-hq/synapse/pull/17810 when our last state event landed). Our
+                    // membership is still there and only needs a new delayed event, so we schedule one and pick the
+                    // expiry update back up right after it (actions with the same timestamp run in insertion order).
+                    //
+                    // The periodic `RestartDelayedEvent` that is still queued has to go, like `sendJoinEvent` does it:
+                    // sending the delayed event schedules the one restart loop we want, and a leftover one would
+                    // either start a second loop, or, while the replacement is still pending, queue a second
+                    // `SendDelayedEvent` that cancels the replacement and `replace`s this update out of the queue.
+                    const otherActions = this.scheduler.actions.filter(
+                        (a) =>
+                            a.type !== MembershipActionType.RestartDelayedEvent &&
+                            a.type !== MembershipActionType.UpdateExpiry,
+                    );
+                    return {
+                        replace: [
+                            ...otherActions,
+                            { ts: Date.now(), type: MembershipActionType.SendDelayedEvent },
+                            { ts: Date.now(), type: MembershipActionType.UpdateExpiry },
+                        ],
+                    };
+                }
                 // The delayed leave event has been sent, which also means our membership is gone.
                 this.logger.warn(
                     "Delayed leave event was already sent by the server, rejoining instead of updating expiry",
