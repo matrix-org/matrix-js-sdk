@@ -41,10 +41,10 @@ endpoints from before Matrix 1.1, for example.
 > Servers may require or use authenticated endpoints for media (images, files, avatars, etc). See the
 > [Authenticated Media](#authenticated-media) section for information on how to enable support for this.
 
-Using `yarn` instead of `npm` is recommended. Please see the Yarn [install guide](https://classic.yarnpkg.com/en/docs/install)
-if you do not have it already.
+Using `pnpm` instead of `npm` is recommended. Please see the pnpm [install
+guide](https://pnpm.io/installation#using-corepack) if you do not have it already.
 
-`yarn add matrix-js-sdk`
+`pnpm add matrix-js-sdk`
 
 ```javascript
 import * as sdk from "matrix-js-sdk";
@@ -207,6 +207,7 @@ As well as the primary entry point (`matrix-js-sdk`), there are several other en
 | `matrix-js-sdk/lib/crypto-api` | Cryptography functionality.                                                                         |
 | `matrix-js-sdk/lib/types`      | Low-level types, reflecting data structures defined in the Matrix spec.                             |
 | `matrix-js-sdk/lib/testing`    | Test utilities, which may be useful in test code but should not be used in production code.         |
+| `matrix-js-sdk/lib/rendezvous` | Utilities around MSC4108 QR code login and rendezvous servers.                                      |
 | `matrix-js-sdk/lib/utils/*.js` | A set of modules exporting standalone functions (and their types).                                  |
 
 ## Examples
@@ -310,7 +311,7 @@ This SDK uses [Typedoc](https://typedoc.org/guides/doccomments) doc comments. Yo
 host the API reference from the source files like this:
 
 ```
-  $ yarn gendoc
+  $ pnpm gendoc
   $ cd docs
   $ python -m http.server 8005
 ```
@@ -339,7 +340,7 @@ await matrixClient.initRustCrypto();
 
 Note that by default it will attempt to use the Indexed DB provided by the browser as a crypto store. If running outside the browser, you will need to pass [an options object](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#initrustcrypto) which includes `useIndexedDB: false`, to use an ephemeral in-memory store instead. Note that without a persistent store, you'll need to create a new device on the server side (with [`MatrixClient.loginRequest`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#loginrequest)) each time your application starts.
 
-After calling `initRustCrypto`, you can obtain a reference to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html) interface, which is the main entry point for end-to-end encryption, by calling [`MatrixClient.getCrypto`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#getCrypto).
+After calling `initRustCrypto`, you can obtain a reference to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoApi.html) interface, which is the main entry point for end-to-end encryption, by calling [`MatrixClient.getCrypto`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html#getCrypto).
 
 **WARNING**: the cryptography stack is not thread-safe. Having multiple `MatrixClient` instances connected to the same Indexed DB will cause data corruption and decryption failures. The application layer is responsible for ensuring that only one `MatrixClient` issue is instantiated at a time.
 
@@ -453,7 +454,7 @@ want to use this SDK, skip this section._
 First, you need to pull in the right build tools:
 
 ```
- $ yarn install
+ $ pnpm install
 ```
 
 ## Building
@@ -461,17 +462,17 @@ First, you need to pull in the right build tools:
 To build a browser version from scratch when developing:
 
 ```
- $ yarn build
+ $ pnpm build
 ```
 
-To run tests (Jest):
+To run tests:
 
 ```
- $ yarn test
+ $ pnpm test
 ```
 
 To run linting:
 
 ```
- $ yarn lint
+ $ pnpm lint
 ```

@@ -71,9 +71,9 @@ describe("MatrixClient syncing", () => {
         const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
         const httpBackend = testClient.httpBackend;
         const client = testClient.client;
-        httpBackend!.when("GET", "/versions").respond(200, {});
-        httpBackend!.when("GET", "/pushrules").respond(200, {});
-        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+        httpBackend.when("GET", "/versions").respond(200, {});
+        httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
         return [client, httpBackend];
     };
 
@@ -94,6 +94,7 @@ describe("MatrixClient syncing", () => {
             presence: {},
         };
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should /sync after /pushrules and /filter.", async () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
 
@@ -226,7 +227,8 @@ describe("MatrixClient syncing", () => {
 
             // noinspection ES6MissingAwait
             client!.startClient();
-            await httpBackend!.flushAllExpected();
+            // wait for all three syncs to be processed, not just for their responses to be delivered
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(3)]);
 
             expect(fires).toBe(3);
         });
@@ -341,7 +343,8 @@ describe("MatrixClient syncing", () => {
 
             // noinspection ES6MissingAwait
             client!.startClient();
-            await httpBackend!.flushAllExpected();
+            // wait for all three syncs to be processed, not just for their responses to be delivered
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(3)]);
 
             expect(fires).toBe(3);
         });
@@ -501,10 +504,69 @@ describe("MatrixClient syncing", () => {
                 })
                 .respond(200, syncData);
 
-            client!.store.getSavedSyncToken = jest.fn().mockResolvedValue("this-is-a-token");
+            client!.store.getSavedSyncToken = vi.fn().mockResolvedValue("this-is-a-token");
             client!.startClient({ initialSyncLimit: 1 });
 
             return httpBackend!.flushAllExpected();
+        });
+
+        it("should not pass a cached sync to the crypto layer", async () => {
+            // A cached sync carries no E2EE data. In particular it has no `device_one_time_keys_count`, which the
+            // crypto layer would interpret as "no one-time keys on the server" and upload a fresh batch on every
+            // restart (https://github.com/matrix-org/matrix-js-sdk/issues/5501).
+            const cryptoCallbacks = {
+                processSyncChanges: vi.fn().mockResolvedValue([]),
+                onSyncCompleted: vi.fn(),
+                stop: vi.fn(),
+            };
+            // @ts-ignore private field
+            client!.cryptoBackend = cryptoCallbacks;
+            client!.store.getSavedSync = vi.fn().mockResolvedValue({
+                nextBatch: "cached_token",
+                roomsData: { join: {}, invite: {}, leave: {}, knock: {} },
+                accountData: [],
+            });
+            httpBackend!
+                .when("GET", "/sync")
+                .respond(200, { ...syncData, device_one_time_keys_count: { signed_curve25519: 50 } });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            // only the live sync should have reached the crypto layer
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledWith(
+                expect.objectContaining({ oneTimeKeysCounts: { signed_curve25519: 50 } }),
+            );
+        });
+
+        it("should still process room data if the crypto layer fails to process the sync", async () => {
+            const cryptoCallbacks = {
+                processSyncChanges: vi.fn().mockRejectedValue(new Error("crypto store is broken")),
+                onSyncCompleted: vi.fn(),
+                stop: vi.fn(),
+            };
+            // @ts-ignore private field
+            client!.cryptoBackend = cryptoCallbacks;
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                rooms: {
+                    join: {
+                        [roomOne]: {
+                            timeline: { events: [], prev_batch: "prev" },
+                            state: { events: [] },
+                            ephemeral: { events: [] },
+                            account_data: { events: [] },
+                        },
+                    },
+                },
+            });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), emitPromise(client!, ClientEvent.Sync)]);
+
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(client!.getRoom(roomOne)).toBeTruthy();
         });
     });
 
@@ -879,7 +941,7 @@ describe("MatrixClient syncing", () => {
         // events that arrive in the incremental sync as if they preceeded the
         // timeline events, however this breaks peeking, so it's disabled
         // (see sync.js)
-        it.skip("should correctly interpret state in incremental sync.", () => {
+        it.todo("should correctly interpret state in incremental sync.", () => {
             httpBackend!.when("GET", "/sync").respond(200, syncData);
             httpBackend!.when("GET", "/sync").respond(200, nextSyncData);
 
@@ -896,9 +958,9 @@ describe("MatrixClient syncing", () => {
             });
         });
 
-        it.skip("should update power levels for users in a room", () => {});
+        it.todo("should update power levels for users in a room", () => {});
 
-        it.skip("should update the room topic", () => {});
+        it.todo("should update the room topic", () => {});
 
         describe("onMarkerStateEvent", () => {
             const normalMessageEvent = utils.mkMessage({
@@ -994,7 +1056,7 @@ describe("MatrixClient syncing", () => {
                     roomVersion: "org.matrix.msc2716v3",
                 },
             ].forEach((testMeta) => {
-                // eslint-disable-next-line jest/valid-title
+                // eslint-disable-next-line @vitest/valid-title
                 describe(testMeta.label, () => {
                     const roomCreateEvent = utils.mkEvent({
                         type: "m.room.create",
@@ -1324,27 +1386,27 @@ describe("MatrixClient syncing", () => {
 
             // Make sure it re-registers the state listeners after the
             // `room.currentState` reference changes
-            it("should be able to listen to state events even after " + "refreshing the timeline", async () => {
+            it("should be able to listen to state events even after refreshing the timeline", async () => {
                 const testClientWithTimelineSupport = new TestClient(selfUserId, "DEVICE", selfAccessToken, undefined, {
                     timelineSupport: true,
                 });
                 httpBackend = testClientWithTimelineSupport.httpBackend;
-                httpBackend!.when("GET", "/versions").respond(200, {});
-                httpBackend!.when("GET", "/pushrules").respond(200, {});
-                httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+                httpBackend.when("GET", "/versions").respond(200, {});
+                httpBackend.when("GET", "/pushrules").respond(200, {});
+                httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
                 client = testClientWithTimelineSupport.client;
 
                 // Create a room from the sync
-                httpBackend!.when("GET", "/sync").respond(200, syncData);
-                client!.startClient();
-                await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+                httpBackend.when("GET", "/sync").respond(200, syncData);
+                client.startClient();
+                await Promise.all([httpBackend.flushAllExpected(), awaitSyncEvent()]);
 
                 // Get the room after the first sync so the room is created
-                const room = client!.getRoom(roomOne)!;
+                const room = client.getRoom(roomOne)!;
                 expect(room).toBeTruthy();
 
                 let stateEventEmitCount = 0;
-                client!.on(RoomStateEvent.Update, () => {
+                client.on(RoomStateEvent.Update, () => {
                     stateEventEmitCount += 1;
                 });
 
@@ -1354,10 +1416,8 @@ describe("MatrixClient syncing", () => {
                 expect(stateEventEmitCount).toEqual(1);
 
                 const eventsInRoom = syncData.rooms.join[roomOne].timeline.events;
-                const contextUrl =
-                    `/rooms/${encodeURIComponent(roomOne)}/context/` +
-                    `${encodeURIComponent(eventsInRoom[0].event_id!)}`;
-                httpBackend!.when("GET", contextUrl).respond(200, () => {
+                const contextUrl = `/rooms/${encodeURIComponent(roomOne)}/context/${encodeURIComponent(eventsInRoom[0].event_id!)}`;
+                httpBackend.when("GET", contextUrl).respond(200, () => {
                     return {
                         start: "start_token",
                         events_before: [EVENTS[1], EVENTS[0]],
@@ -1370,7 +1430,7 @@ describe("MatrixClient syncing", () => {
 
                 // Refresh the timeline. This will cause the `room.currentState`
                 // reference to change
-                await Promise.all([room.refreshLiveTimeline(), httpBackend!.flushAllExpected()]);
+                await Promise.all([room.refreshLiveTimeline(), httpBackend.flushAllExpected()]);
 
                 // Cause `RoomStateEvent.Update` to be fired
                 room.currentState.setStateEvents([SOME_STATE_EVENT]);
@@ -1835,7 +1895,7 @@ describe("MatrixClient syncing", () => {
             await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
 
             const room = client!.getRoom(roomOne);
-            room!.hasEncryptionStateEvent = jest.fn().mockReturnValue(true);
+            room!.hasEncryptionStateEvent = vi.fn().mockReturnValue(true);
 
             expect(room!.getThreadUnreadNotificationCount(THREAD_ID, NotificationCountType.Total)).toBe(5);
 
@@ -2290,24 +2350,24 @@ describe("MatrixClient syncing", () => {
     });
 
     describe("of a room", () => {
-        it.skip(
+        it.todo(
             "should sync when a join event (which changes state) for the user" +
                 " arrives down the event stream (e.g. join from another device)",
             () => {},
         );
 
-        it.skip("should sync when the user explicitly calls joinRoom", () => {});
+        it.todo("should sync when the user explicitly calls joinRoom", () => {});
     });
 
     describe("syncLeftRooms", () => {
         beforeEach(async () => {
-            client!.startClient();
+            void client!.startClient();
 
             await httpBackend!.flushAllExpected();
             // the /sync call from syncLeftRooms ends up in the request
             // queue behind the call from the running client; add a response
             // to flush the client's one out.
-            await httpBackend!.when("GET", "/sync").respond(200, {});
+            httpBackend!.when("GET", "/sync").respond(200, {});
         });
 
         it("should create and use an appropriate filter", () => {
@@ -2519,7 +2579,7 @@ describe("MatrixClient syncing", () => {
             const eventB2 = new MatrixEvent({ type: "b", content: { body: "2" } });
 
             client!.store.storeAccountDataEvents([eventA1, eventB1]);
-            const fn = jest.fn();
+            const fn = vi.fn();
             client!.on(ClientEvent.AccountData, fn);
 
             httpBackend!.when("GET", "/sync").respond(200, {
@@ -2545,6 +2605,64 @@ describe("MatrixClient syncing", () => {
             expect(eventB?.getContent().body).toBe("2");
 
             client!.off(ClientEvent.AccountData, fn);
+        });
+    });
+
+    describe("user profiles", () => {
+        const TEST_STATUS_UPDATE = {
+            text: "Swimming in the Great Lakes!",
+            emoji: "🏊️",
+        };
+
+        beforeEach(() => {
+            vi.spyOn(client!, "doesServerSupportExtendedProfiles").mockResolvedValue(true);
+        });
+
+        it("should consume user profile updates from the sync response", async () => {
+            const fn = vi.fn();
+            client!.on(ClientEvent.UserProfileUpdate, fn);
+
+            httpBackend!.expectedRequests = [];
+            httpBackend!.when("GET", "/versions").respond(200, {});
+            httpBackend!.when("GET", "/pushrules").respond(200, {});
+            httpBackend!
+                .when("POST", "/filter")
+                .check((req) => {
+                    expect(req.data).toEqual({
+                        "org.matrix.msc4429.profile_fields": {
+                            ids: ["m.status"],
+                        },
+                    });
+                })
+                .respond(200, { filter_id: "a filter id" });
+
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "batch_token",
+                rooms: {},
+                presence: {},
+                users: {
+                    ["@alice:localhost"]: {
+                        profile_updates: {
+                            ["m.status"]: TEST_STATUS_UPDATE,
+                        },
+                    },
+                },
+            });
+
+            await Promise.all([
+                client!.startClient({ unstableMSC4429SyncUserProfileFields: ["m.status"] }),
+                httpBackend!.flushAllExpected(),
+            ]);
+
+            expect(await client!.getExtendedProfileProperty("@alice:localhost", "m.status")).toEqual(
+                TEST_STATUS_UPDATE,
+            );
+
+            expect(fn).toHaveBeenCalledWith("@alice:localhost", {
+                "m.status": TEST_STATUS_UPDATE,
+            });
+
+            client!.off(ClientEvent.UserProfileUpdate, fn);
         });
     });
 
@@ -2613,7 +2731,8 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
 
         // noinspection ES6MissingAwait
         idbClient.startClient();
-        await idbHttpBackend.flushAllExpected();
+        // wait for the sync to be processed, not just for its response to be delivered
+        await Promise.all([idbHttpBackend.flushAllExpected(), utils.syncPromise(idbClient)]);
 
         expect(fires).toBe(1);
 
@@ -2715,7 +2834,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         idbHttpBackend.verifyNoOutstandingExpectation();
         // Force sync accumulator to persist, reset client, assert it doesn't re-fetch event on next start-up
         await idbClient.store.save(true);
-        await idbClient.stopClient();
+        idbClient.stopClient();
         await idbClient.store.destroy();
         await idbHttpBackend.stop();
 
@@ -2738,7 +2857,7 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         assertEventsExpected(idbClient);
 
         idbHttpBackend.verifyNoOutstandingExpectation();
-        await idbClient.stopClient();
+        idbClient.stopClient();
         await idbHttpBackend.stop();
     });
 });

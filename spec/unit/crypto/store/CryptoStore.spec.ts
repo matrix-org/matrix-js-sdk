@@ -14,8 +14,11 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * @vitest-environment happy-dom
+ */
+
 import "fake-indexeddb/auto";
-import "jest-localstorage-mock";
 import { IndexedDBCryptoStore, LocalStorageCryptoStore, MemoryCryptoStore } from "../../../../src";
 import { type CryptoStore, MigrationState, SESSION_BATCH_SIZE } from "../../../../src/crypto/store/base";
 

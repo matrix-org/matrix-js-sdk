@@ -31,7 +31,7 @@ describe("recovery key", () => {
             // Mutate the encoded key to have incorrect parity
             encodedKey = encodedKey.replace("EsSz", "EsSZ");
 
-            expect(() => decodeRecoveryKey(encodedKey!)).toThrow("Incorrect parity");
+            expect(() => decodeRecoveryKey(encodedKey)).toThrow("Incorrect parity");
         });
 
         it("should decode a valid encoded key", () => {

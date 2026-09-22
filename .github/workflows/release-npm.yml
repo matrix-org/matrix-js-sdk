@@ -1,6 +1,11 @@
 name: Publish to npm
 on:
     workflow_call:
+        inputs:
+            dir:
+                description: The directory to release
+                type: string
+                default: "."
         outputs:
             id:
                 description: "The npm package@version string we published"
@@ -17,29 +22,49 @@ jobs:
             id: ${{ steps.npm-publish.outputs.id }}
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   ref: staging
+                  persist-credentials: false
 
-            - name: 🔧 Yarn cache
-              uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
               with:
-                  cache: "yarn"
-                  registry-url: "https://registry.npmjs.org"
-                  node-version-file: package.json
-
-            # Ensure npm 11.5.1 or later is installed
-            - name: Update npm
-              run: npm install -g npm@latest
-
-            - name: 🔨 Install dependencies
-              run: "yarn install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: 🚀 Publish to npm
               id: npm-publish
+              working-directory: ${{ inputs.dir }}
               run: |
-                  npm publish --provenance --access public --tag "$TAG"
-                  release=$(jq -r '"\(.name)@\(.version)"' package.json)
+                  version=$(jq -r '.version' package.json)
+                  if [[ "$version" == *-rc.* ]]; then
+                      tag=next
+                  else
+                      tag=latest
+                  fi
+
+                  pnpm publish --provenance --access public --publish-branch staging --tag "$tag"
+
+                  name=$(jq -r '.name' package.json)
+                  release="$name@$version"
+
+                  # NPM now scans published packages before they are made available for download
+                  # block here until the package is ready to be consumed.
+                  echo "Waiting for $release to become available for download..."
+                  tmpdir=$(mktemp -d)
+                  for i in $(seq 1 60); do
+                      if (cd "$tmpdir" && npm pack "$release" >/dev/null 2>&1); then
+                          echo "$release is available"
+                          break
+                      fi
+                      if [[ "$i" -eq 60 ]]; then
+                          echo "::error::Timed out waiting for $release to become available on npm"
+                          exit 1
+                      fi
+                      sleep 10
+                  done
+                  rm -rf "$tmpdir"
+
                   echo "id=$release" >> $GITHUB_OUTPUT
-              env:
-                  TAG: ${{ contains(steps.npm-publish.outputs.id, '-rc.') && 'next' || 'latest' }}

@@ -228,6 +228,42 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
     }
 
     /**
+     * Recalculate the disambiguation flag for this member based on current room state.
+     * This should be called when another member's display name changes and may affect
+     * whether this member needs disambiguation.
+     *
+     * @param roomState - The current room state to use for disambiguation check
+     * @returns true if the member's name changed as a result of the disambiguation update
+     *
+     * @remarks
+     * Fires {@link RoomMemberEvent.Name}
+     */
+    public recalculateDisambiguatedName(roomState: RoomState): boolean {
+        if (!this.events.member) {
+            return false;
+        }
+
+        const displayName = this.events.member.getDirectionalContent().displayname ?? "";
+        const newDisambiguate = shouldDisambiguate(this.userId, displayName, roomState);
+
+        if (newDisambiguate === this.disambiguate) {
+            return false;
+        }
+
+        this.disambiguate = newDisambiguate;
+        const oldName = this.name;
+        this.name = calculateDisplayName(this.userId, displayName, this.disambiguate);
+
+        if (oldName !== this.name) {
+            this.updateModifiedTime();
+            this.emit(RoomMemberEvent.Name, this.events.member, this, oldName);
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Update this room member's power level event. Will fire
      * "RoomMember.powerLevel" if the new power level is different
      * @param powerLevel - The power level of the room member.

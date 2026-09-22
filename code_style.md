@@ -33,7 +33,7 @@
 
 Unless otherwise specified, the following applies to all code:
 
-1. Files must be formatted with Prettier.
+1. Files must be formatted with Oxfmt.
 2. 120 character limit per line. Match existing code in the file if it is using a lower guide.
 3. A tab/indentation is 4 spaces.
 4. Newlines are Unix.
@@ -213,7 +213,7 @@ Unless otherwise specified, the following applies to all code:
 ## Tests
 
 1. Tests must be written in TypeScript.
-2. Jest mocks are declared below imports, but above everything else.
+2. Mocks are declared below imports, but above everything else.
 3. Use the following convention template:
 
     ```typescript

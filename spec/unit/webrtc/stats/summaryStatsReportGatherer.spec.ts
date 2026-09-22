@@ -22,7 +22,7 @@ describe("SummaryStatsReportGatherer", () => {
     let emitter: StatsReportEmitter;
     beforeEach(() => {
         emitter = new StatsReportEmitter();
-        emitter.emitSummaryStatsReport = jest.fn();
+        emitter.emitSummaryStatsReport = vi.fn();
         reporter = new SummaryStatsReportGatherer(emitter);
     });
 

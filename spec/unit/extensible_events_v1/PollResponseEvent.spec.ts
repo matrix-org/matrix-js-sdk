@@ -104,7 +104,7 @@ describe("PollResponseEvent", () => {
                 [M_POLL_RESPONSE.name]: {
                     answers: ["one"],
                 },
-            } as any, // force invalid type
+            },
         };
         expect(() => new PollResponseEvent(input)).toThrow(
             new InvalidEventError("Relationship must be a reference to an event"),

@@ -16,18 +16,18 @@ jobs:
             contents: write
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   ref: staging
                   fetch-depth: 0
+                  persist-credentials: false
 
-            - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
               with:
-                  node-version-file: package.json
-                  cache: "yarn"
-
-            - name: Install Deps
-              run: "yarn install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - uses: t3chguy/release-drafter@105e541c2c3d857f032bd522c0764694758fabad
               id: draft-release
@@ -37,7 +37,7 @@ jobs:
                   disable-autolabeler: true
 
             - name: Get actions scripts
-              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   repository: matrix-org/matrix-js-sdk
                   persist-credentials: false
@@ -48,7 +48,7 @@ jobs:
 
             - name: Ingest upstream changes
               if: inputs.include-changes
-              uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+              uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   RELEASE_ID: ${{ steps.draft-release.outputs.id }}

@@ -14,8 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// eslint-disable-next-line no-restricted-imports
-import { EventEmitter } from "events";
+import { EventEmitter } from "node:events";
 
 import { ReEmitter } from "../../src/ReEmitter";
 
@@ -38,7 +37,7 @@ describe("ReEmitter", function () {
         const src = new EventSource();
         const tgt = new EventTarget();
 
-        const handler = jest.fn();
+        const handler = vi.fn();
         tgt.on(EVENTNAME, handler);
 
         const reEmitter = new ReEmitter(tgt);
@@ -61,7 +60,7 @@ describe("ReEmitter", function () {
         // without the workaround in ReEmitter, this would throw
         src.doAnError();
 
-        const handler = jest.fn();
+        const handler = vi.fn();
         tgt.on("error", handler);
 
         src.doAnError();

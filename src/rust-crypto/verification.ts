@@ -728,7 +728,7 @@ export class RustSASVerifier extends BaseRustVerifer<RustSdkCryptoJs.Sas> implem
                 mismatch: (): void => {
                     const request = this.inner.cancelWithCode("m.mismatched_sas");
                     if (request) {
-                        this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                        void this.outgoingRequestProcessor.makeOutgoingRequest(request);
                     }
                 },
                 cancel: (): void => {

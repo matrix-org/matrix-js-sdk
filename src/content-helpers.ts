@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type MBeaconEventContent, type MBeaconInfoContent, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { MsgType } from "./@types/event.ts";
-import { M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events.ts";
+import { type IMessageRendering, M_TEXT, REFERENCE_RELATION } from "./@types/extensible_events.ts";
 import { isProvided } from "./extensible_events_v1/utilities.ts";
 import {
     M_ASSET,
@@ -29,7 +29,7 @@ import {
     type MAssetContent,
     type LegacyLocationEventContent,
 } from "./@types/location.ts";
-import { type MRoomTopicEventContent, type MTopicContent, M_TOPIC } from "./@types/topic.ts";
+import { type MRoomTopicEventContent, type MTopicContent, M_TOPIC, type MTopicEvent } from "./@types/topic.ts";
 import { type RoomMessageEventContent } from "./@types/events.ts";
 
 /**
@@ -206,7 +206,7 @@ export type TopicState = {
 };
 
 export const parseTopicContent = (content: MRoomTopicEventContent): TopicState => {
-    const mtopicParent = M_TOPIC.findIn<MTopicContent>(content);
+    const mtopicParent = M_TOPIC.findIn<MTopicContent | IMessageRendering[]>(content as MTopicEvent);
     const mtopic = Array.isArray(mtopicParent) ? mtopicParent : mtopicParent?.["m.text"];
     // TODO remove support for the old malformed m.topic arrays after a few releases (only allow array in m.text)
     //      https://github.com/matrix-org/matrix-js-sdk/pull/4984#pullrequestreview-3174251065

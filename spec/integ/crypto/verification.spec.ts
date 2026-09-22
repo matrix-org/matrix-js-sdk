@@ -18,12 +18,12 @@ import "fake-indexeddb/auto";
 
 import anotherjson from "another-json";
 import debug from "debug";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
+import { type RouteResponse } from "fetch-mock";
 import { IDBFactory } from "fake-indexeddb";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import Olm from "@matrix-org/olm";
 
-import type FetchMock from "fetch-mock";
 import {
     createClient,
     DebugLogger,
@@ -63,7 +63,7 @@ import {
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
     TEST_ROOM_ID,
     TEST_USER_ID,
-} from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -86,22 +86,19 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
 beforeEach(() => {
-    // The verification flows use javascript timers to set timeouts. We tell jest to use mock timer implementations
-    // to ensure that we don't end up with dangling timeouts.
-    // But the wasm bindings of matrix-sdk-crypto rely on a working `queueMicrotask`.
-    jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+    vi.useFakeTimers({
+        toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+    });
 });
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -130,25 +127,22 @@ describe("verification", () => {
     beforeEach(async () => {
         // anything that we don't have a specific matcher for silently returns a 404
         fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
 
         e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
         e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
         e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
-        syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+        syncResponder = new SyncResponder(TEST_HOMESERVER_URL, { e2eKeyReceiver });
 
         mockInitialApiRequests(TEST_HOMESERVER_URL);
     });
 
     afterEach(async () => {
-        if (aliceClient !== undefined) {
-            await aliceClient.stopClient();
-        }
+        aliceClient?.stopClient();
 
         // Allow in-flight things to complete before we tear down the test
-        await jest.runAllTimersAsync();
-
-        fetchMock.mockReset();
+        if (vi.isFakeTimers()) {
+            await vi.runAllTimersAsync();
+        }
     });
 
     describe("Outgoing verification requests for another device", () => {
@@ -156,11 +150,10 @@ describe("verification", () => {
             // pretend that we have another device, which we will verify
             e2eKeyResponder.addDeviceKeys(SIGNED_TEST_DEVICE_DATA);
 
-            fetchMock.put(
-                new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`),
-                { ok: false, status: 404 },
-                { overwriteRoutes: true },
-            );
+            fetchMock.put(new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp("m.secret.request")}`), {
+                ok: false,
+                status: 404,
+            });
         });
 
         // test with (1) the default verification method list, (2) a custom verification method list.
@@ -176,6 +169,7 @@ describe("verification", () => {
             }
 
             // have alice initiate a verification. She should send a m.key.verification.request
+            // oxlint-disable-next-line prefer-const
             let [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
@@ -190,8 +184,8 @@ describe("verification", () => {
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
             expect(request.pending).toBe(true);
-            // we're using fake timers, so the timeout should have exactly 10 minutes left still.
-            expect(request.timeout).toEqual(600_000);
+            expect(request.timeout).toBeLessThanOrEqual(600_000); // 10 mins
+            expect(request.timeout).toBeGreaterThan(540_000); // 9 mins
 
             // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
             {
@@ -212,7 +206,6 @@ describe("verification", () => {
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             if (methods !== undefined) {
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(new Set(toDeviceMessage.methods)).toEqual(new Set(methods));
             }
 
@@ -245,7 +238,7 @@ describe("verification", () => {
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            jest.advanceTimersByTime(10);
+            vi.advanceTimersByTime(10);
 
             requestBody = await sendToDevicePromise;
             toDeviceMessage = requestBody.messages[TEST_USER_ID][TEST_DEVICE_ID];
@@ -323,7 +316,7 @@ describe("verification", () => {
             expect(request.otherPartySupportsMethod("m.sas.v1")).toBe(true);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // And now Alice starts a SAS verification
             let sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
@@ -516,7 +509,6 @@ describe("verification", () => {
             // Rust crypto waits for the 'done' to arrive from the other side.
             if (request.phase === VerificationPhase.Done) {
                 const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
-                // eslint-disable-next-line jest/no-conditional-expect
                 expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
                 await verificationPromise;
             }
@@ -639,7 +631,7 @@ describe("verification", () => {
             expect(request.verifier).toBeUndefined();
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // ... but Alice wants to do an SAS verification
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.start");
@@ -684,7 +676,7 @@ describe("verification", () => {
             expect(request.verifier).toBeUndefined();
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // ... but the dummy device wants to do an SAS verification
             returnToDeviceMessageFromSync(buildSasStartMessage(transactionId));
@@ -792,7 +784,7 @@ describe("verification", () => {
             const sendToDevicePromise = expectSendToDeviceMessage("m.key.verification.accept");
             const verificationPromise = verifier.verify();
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            jest.advanceTimersByTime(10);
+            vi.advanceTimersByTime(10);
             await sendToDevicePromise;
 
             // now we unceremoniously cancel. We expect the verificatationPromise to reject.
@@ -937,19 +929,16 @@ describe("verification", () => {
         function awaitRoomMessageRequest(): Promise<IContent> {
             return new Promise((resolve) => {
                 // Case of unencrypted message of the new crypto
-                fetchMock.put(
-                    "express:/_matrix/client/v3/rooms/:roomId/send/m.room.message/:txId",
-                    (url: string, options: RequestInit) => {
-                        resolve(JSON.parse(options.body as string));
-                        return { event_id: "$YUwRidLecu:example.com" };
-                    },
-                );
+                fetchMock.put("express:/_matrix/client/v3/rooms/:roomId/send/m.room.message/:txId", (callLog) => {
+                    resolve(JSON.parse(callLog.options.body as string));
+                    return { event_id: "$YUwRidLecu:example.com" };
+                });
 
                 // Case of encrypted message of the old crypto
                 fetchMock.put(
                     "express:/_matrix/client/v3/rooms/:roomId/send/m.room.encrypted/:txId",
-                    async (url: string, options: RequestInit) => {
-                        const encryptedMessage = JSON.parse(options.body as string);
+                    async (callLog) => {
+                        const encryptedMessage = JSON.parse(callLog.options.body as string);
                         const event = new MatrixEvent({
                             content: encryptedMessage,
                             type: "m.room.encrypted",
@@ -972,7 +961,7 @@ describe("verification", () => {
 
             // In `DeviceList#doQueuedQueries`, the key download response is processed every 5ms
             // 5ms by users, ie Bob and Alice
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             const messageRequestPromise = awaitRoomMessageRequest();
             const verificationRequest = await aliceClient
@@ -1082,14 +1071,14 @@ describe("verification", () => {
         });
 
         it("ignores old verification requests", async () => {
-            const debug = jest.fn();
-            const info = jest.fn();
-            const warn = jest.fn();
+            const debug = vi.fn();
+            const info = vi.fn();
+            const warn = vi.fn();
 
             // @ts-ignore overriding RustCrypto's logger
             aliceClient.getCrypto()!.logger = { debug, info, warn };
 
-            const eventHandler = jest.fn();
+            const eventHandler = vi.fn();
             aliceClient.on(CryptoEvent.VerificationRequestReceived, eventHandler);
 
             const verificationRequestEvent = createVerificationRequestEvent();
@@ -1105,7 +1094,7 @@ describe("verification", () => {
 
             // Wait until the request has been processed. We use a real sleep()
             // here to make sure any background async tasks are completed.
-            jest.useRealTimers();
+            vi.useRealTimers();
             await waitFor(async () => {
                 expect(info).toHaveBeenCalledWith(
                     expect.stringMatching(/^Ignoring just-received verification request/),
@@ -1187,7 +1176,7 @@ describe("verification", () => {
             returnToDeviceMessageFromSync(toDeviceEvent);
 
             // advance the clock, because the devicelist likes to sleep for 5ms during key downloads
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // Wait for the request to be decrypted
             const request1 = await requestEventPromise;
@@ -1224,7 +1213,7 @@ describe("verification", () => {
             expect(matrixEvent.getContent().msgtype).toEqual("m.bad.encrypted");
 
             // Advance time by 5mins, the verification request should be ignored after that
-            jest.advanceTimersByTime(5 * 60 * 1000);
+            vi.advanceTimersByTime(5 * 60 * 1000);
 
             // Send Bob the room keys
             returnToDeviceMessageFromSync(toDeviceEvent);
@@ -1246,21 +1235,31 @@ describe("verification", () => {
         const olmDeviceId = "OLM_DEVICE";
         let usermasterPubKey: string;
 
-        const matchingBackupInfo: KeyBackupInfo = {
+        const unsignedMatchingBackupInfo: KeyBackupInfo = {
             algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
             version: "1",
             auth_data: {
                 public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
             },
+            etag: "",
+            count: 0,
         };
 
-        const nonMatchingBackupInfo: KeyBackupInfo = {
+        /** {@link unsignedMatchingBackupInfo}, with the addition of a signature */
+        let signedMatchingBackupInfo: KeyBackupInfo;
+
+        const unsignedNonMatchingBackupInfo: KeyBackupInfo = {
             algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
             version: "1",
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
+
+        /** {@link unsignedNonMatchingBackupInfo}, with the addition of a signature */
+        let signedNonMatchingBackupInfo: KeyBackupInfo;
 
         const unknownAlgorithmBackupInfo: KeyBackupInfo = {
             algorithm: "m.megolm_backup.foo_bar",
@@ -1268,6 +1267,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
 
         beforeEach(async () => {
@@ -1276,12 +1277,14 @@ describe("verification", () => {
             testOlmAccount = new Olm.Account();
             testOlmAccount.create();
 
+            signedMatchingBackupInfo = JSON.parse(JSON.stringify(unsignedMatchingBackupInfo));
+            signedNonMatchingBackupInfo = JSON.parse(JSON.stringify(unsignedNonMatchingBackupInfo));
             const bootstrapped = bootstrapCrossSigningTestOlmAccount(testOlmAccount, TEST_USER_ID, olmDeviceId, [
-                matchingBackupInfo,
-                nonMatchingBackupInfo,
+                signedMatchingBackupInfo,
+                signedNonMatchingBackupInfo,
             ]);
 
-            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID]![olmDeviceId]);
+            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID][olmDeviceId]);
             e2eKeyResponder.addCrossSigningData(bootstrapped);
 
             usermasterPubKey = Object.values(bootstrapped.master_keys![TEST_USER_ID].keys)[0];
@@ -1290,7 +1293,7 @@ describe("verification", () => {
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([TEST_USER_ID]));
             await syncPromise(aliceClient);
             // DeviceList has a sleep(5) which we need to make happen
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
 
             // The client should now know about the olm device
             const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
@@ -1302,11 +1305,10 @@ describe("verification", () => {
             testOlmAccount?.free();
 
             // Allow in-flight things to complete before we tear down the test
-            await jest.runAllTimersAsync();
-
-            fetchMock.mockReset();
+            await vi.runAllTimersAsync();
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("Should request cross signing keys after verification", async () => {
             const requestPromises = mockSecretRequestAndGetPromises();
 
@@ -1327,7 +1329,7 @@ describe("verification", () => {
 
             const keyBackupIsCached = emitPromise(aliceClient, CryptoEvent.KeyBackupDecryptionKeyCached);
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, matchingBackupInfo);
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, signedMatchingBackupInfo);
 
             await keyBackupIsCached;
 
@@ -1380,7 +1382,11 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                signedNonMatchingBackupInfo,
+            );
 
             // the backup secret should not be cached
             const cachedKey = await retrieveBackupPrivateKeyWithDelay();
@@ -1412,11 +1418,45 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
+            await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", signedNonMatchingBackupInfo);
 
             // the backup secret should not be cached
             const cachedKey = await retrieveBackupPrivateKeyWithDelay();
             expect(cachedKey).toBeNull();
+        });
+
+        // Regression test for https://github.com/element-hq/element-web/issues/32894
+        it("Should enable key backup upload after receiving a valid decryption key, even if the backup is unsigned", async () => {
+            fetchMock.get("express:/_matrix/client/v3/room_keys/version", unsignedMatchingBackupInfo);
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            const requestPromises = mockSecretRequestAndGetPromises();
+
+            // Verify against the test device
+            await doInteractiveVerification();
+
+            // The test device sends over the decryption key
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+            const keyBackupIsCached = emitPromise(aliceClient, CryptoEvent.KeyBackupDecryptionKeyCached);
+            await encryptAndSendSecretSendMessage(requestId!, BACKUP_DECRYPTION_KEY_BASE64);
+            await keyBackupIsCached;
+
+            // The backup secret should be cached
+            const cachedKey = await aliceCrypto.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeTruthy();
+
+            // And backup upload should be enabled, after a short delay
+            vi.useRealTimers();
+            try {
+                await waitFor(async () => {
+                    const activeVersion = await aliceCrypto.getActiveSessionBackupVersion();
+                    expect(activeVersion).toEqual("1");
+                });
+            } finally {
+                vi.useFakeTimers({
+                    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+                });
+            }
         });
 
         /**
@@ -1424,11 +1464,13 @@ describe("verification", () => {
          */
         async function retrieveBackupPrivateKeyWithDelay(): Promise<Uint8Array | null> {
             // We are lacking a way to signal that the secret has been received, so we wait a bit..
-            jest.useRealTimers();
+            vi.useRealTimers();
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            jest.useFakeTimers({ doNotFake: ["queueMicrotask"] });
+            vi.useFakeTimers({
+                toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+            });
 
             return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
         }
@@ -1447,6 +1489,37 @@ describe("verification", () => {
             secret: string,
             expectBackup: KeyBackupInfo | MatrixError | Error,
         ) {
+            const expectBackupCheck = new Promise((resolve) => {
+                fetchMock.get("express:/_matrix/client/v3/room_keys/version", (callLog) => {
+                    resolve(undefined);
+                    if (expectBackup instanceof MatrixError) {
+                        return {
+                            status: expectBackup.httpStatus,
+                            body: expectBackup.data,
+                        };
+                    }
+
+                    if (expectBackup instanceof Error) {
+                        return Promise.reject(expectBackup);
+                    }
+
+                    return expectBackup;
+                });
+            });
+
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
+            await encryptAndSendSecretSendMessage(requestId, secret);
+
+            await expectBackupCheck;
+        }
+
+        /**
+         * Creates a peer to peer session, encrypts the secret as a to-device message, and returns the to-device message from /sync.
+         *
+         * @param requestId - The requestId of the secret request that we are replying to
+         * @param secret - The secret value
+         */
+        async function encryptAndSendSecretSendMessage(requestId: string, secret: string) {
             const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
 
             const toDeviceEvent = encryptSecretSend({
@@ -1456,40 +1529,12 @@ describe("verification", () => {
                 recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
                 p2pSession: p2pSession,
                 olmAccount: testOlmAccount,
-                requestId: requestId!,
+                requestId: requestId,
                 secret: secret,
             });
 
-            const expectBackupCheck = new Promise((resolve) => {
-                fetchMock.get(
-                    "express:/_matrix/client/v3/room_keys/version",
-                    (url, request) => {
-                        resolve(undefined);
-                        if (expectBackup instanceof MatrixError) {
-                            return {
-                                status: expectBackup.httpStatus,
-                                body: expectBackup.data,
-                            };
-                        }
-
-                        if (expectBackup instanceof Error) {
-                            return Promise.reject(expectBackup);
-                        }
-
-                        return expectBackup;
-                    },
-                    {
-                        overwriteRoutes: true,
-                    },
-                );
-            });
-
-            fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
-
             // The dummy device sends the secret
             returnToDeviceMessageFromSync(toDeviceEvent);
-
-            await expectBackupCheck;
         }
 
         /**
@@ -1562,7 +1607,7 @@ describe("verification", () => {
         // user will be one).
         syncResponder.sendOrQueueSyncResponse({});
         // DeviceList has a sleep(5) which we need to make happen
-        await jest.advanceTimersByTimeAsync(10);
+        await vi.advanceTimersByTimeAsync(10);
 
         // The client should now know about the dummy device
         const devices = await aliceClient.getCrypto()!.getUserDeviceInfo([TEST_USER_ID]);
@@ -1596,8 +1641,8 @@ function expectSendToDeviceMessage(msgtype: string): Promise<{ messages: any }> 
     return new Promise((resolve) => {
         fetchMock.putOnce(
             new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/${escapeRegExp(msgtype)}`),
-            (url: string, opts: RequestInit): FetchMock.MockResponse => {
-                resolve(JSON.parse(opts.body as string));
+            (callLog): RouteResponse => {
+                resolve(JSON.parse(callLog.options.body as string));
                 return {};
             },
         );
@@ -1618,29 +1663,25 @@ function mockSecretRequestAndGetPromises(): Map<string, Promise<string>> {
     const uskRequestResolvers = Promise.withResolvers<string>();
     const backupKeyRequestResolvers = Promise.withResolvers<string>();
 
-    fetchMock.put(
-        new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`),
-        (url: string, opts: RequestInit): FetchMock.MockResponse => {
-            const messages = JSON.parse(opts.body as string).messages[TEST_USER_ID];
-            // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
-            const content = Object.values(messages)[0] as any;
-            if (content.action == "request") {
-                const name = content.name;
-                const requestId = content.request_id;
-                if (name == "m.cross_signing.user_signing") {
-                    uskRequestResolvers.resolve(requestId);
-                } else if (name == "m.cross_signing.master") {
-                    mskRequestResolvers.resolve(requestId);
-                } else if (name == "m.cross_signing.self_signing") {
-                    sskRequestResolvers.resolve(requestId);
-                } else if (name == "m.megolm_backup.v1") {
-                    backupKeyRequestResolvers.resolve(requestId);
-                }
+    fetchMock.put(new RegExp(`/_matrix/client/(r0|v3)/sendToDevice/m.secret.request`), (callLog): RouteResponse => {
+        const messages = JSON.parse(callLog.options.body as string).messages[TEST_USER_ID];
+        // rust crypto broadcasts to all devices, old crypto to a specific device, take the first one
+        const content = Object.values(messages)[0] as any;
+        if (content.action == "request") {
+            const name = content.name;
+            const requestId = content.request_id;
+            if (name == "m.cross_signing.user_signing") {
+                uskRequestResolvers.resolve(requestId);
+            } else if (name == "m.cross_signing.master") {
+                mskRequestResolvers.resolve(requestId);
+            } else if (name == "m.cross_signing.self_signing") {
+                sskRequestResolvers.resolve(requestId);
+            } else if (name == "m.megolm_backup.v1") {
+                backupKeyRequestResolvers.resolve(requestId);
             }
-            return {};
-        },
-        { overwriteRoutes: true },
-    );
+        }
+        return {};
+    });
 
     const promiseMap = new Map<string, Promise<string>>();
     promiseMap.set("m.cross_signing.master", mskRequestResolvers.promise);

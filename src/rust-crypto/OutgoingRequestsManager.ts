@@ -127,11 +127,13 @@ export class OutgoingRequestsManager {
 
         const outgoingRequests: OutgoingRequest[] = await this.olmMachine.outgoingRequests();
 
+        let successes = 0;
         for (const request of outgoingRequests) {
             if (this.stopped) return;
             try {
                 await logDuration(this.logger, `Make outgoing request ${request.type}`, async () => {
                     await this.outgoingRequestProcessor.makeOutgoingRequest(request);
+                    successes++;
                 });
             } catch (e) {
                 // as part of the loop we silently ignore errors, but log them.
@@ -140,10 +142,7 @@ export class OutgoingRequestsManager {
             }
         }
 
-        // If we handled any requests this time, more may have been queued as
-        // part of that handling, so do an extra check to make sure we handle
-        // them immediately. See
-        // If we handled any requests this time, more may have been queued as
+        // If we successfully handled any requests this time, more may have been queued as
         // part of that handling.
         //
         // For example, we may have processed a `/keys/claim` request, which
@@ -151,10 +150,14 @@ export class OutgoingRequestsManager {
         // send out an `m.secret.send` message.
         // (See https://github.com/element-hq/element-web/issues/30988.)
         //
-        // So, if we have processed any requests, flag that we need make another
+        // So, if we have successfully processed any requests, flag that we need to make another
         // pass around the outgoing-requests loop, to make sure we handle any
         // pending requests immediately.
-        if (outgoingRequests.length > 0) {
+        //
+        // If all requests failed (or there weren't any) we don't want to retry them in a tight
+        // loop. They will be retried after the next sync.
+        // (See https://github.com/element-hq/element-web/issues/31790.)
+        if (successes > 0) {
             // We call doProcessOutgoingRequests but since we expect that we are
             // already processing outgoing requests, this call will not kick off
             // the processing loop, but just set `nextLoopDeferred` and return,

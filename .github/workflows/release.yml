@@ -24,7 +24,7 @@ concurrency: ${{ github.workflow }}
 permissions: {} # No permissions required
 jobs:
     release:
-        uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop
+        uses: matrix-org/matrix-js-sdk/.github/workflows/release-make.yml@develop # zizmor: ignore[unpinned-uses,secrets-inherit]
         permissions:
             contents: write
             issues: write
@@ -41,28 +41,33 @@ jobs:
         runs-on: ubuntu-24.04
         strategy:
             matrix:
-                repo:
-                    - element-hq/element-web
+                include:
+                    - repo: element-hq/element-web
+                      path: apps/web
         steps:
-            - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   repository: ${{ matrix.repo }}
                   ref: staging
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
+                  persist-credentials: true
 
-            - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
               with:
-                  cache: "yarn"
-                  node-version: "lts/*"
+                  runtime: node
+                  cache: true
+                  install: false
 
             - name: Bump dependency
               env:
                   DEPENDENCY: ${{ needs.release.outputs.npm-id }}
+                  DIR: ${{ matrix.path }}
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
-                  yarn upgrade "$DEPENDENCY" --exact
-                  git add package.json yarn.lock
+                  pnpm add -C "$DIR" "$DEPENDENCY" --save-exact --ignore-scripts
+                  git add "$DIR"/package.json pnpm-lock.yaml
                   git commit -am"Upgrade dependency to $DEPENDENCY"
                   git push origin staging
 
@@ -73,22 +78,22 @@ jobs:
         runs-on: ubuntu-24.04
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
-
-            - name: 🔧 Yarn cache
-              uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
-                  cache: "yarn"
-                  node-version-file: package.json
+                  persist-credentials: false
 
-            - name: 🔨 Install dependencies
-              run: "yarn install --frozen-lockfile"
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+              with:
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: 📖 Generate docs
-              run: yarn gendoc
+              run: pnpm gendoc
 
             - name: Upload artifact
-              uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+              uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
               with:
                   path: _docs
 
@@ -106,4 +111,4 @@ jobs:
         steps:
             - name: Deploy to GitHub Pages
               id: deployment
-              uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+              uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

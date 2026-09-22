@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,38 +14,34 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixEvent } from "../../../src";
-import {
-    CallMembership,
-    type SessionMembershipData,
-    DEFAULT_EXPIRE_DURATION,
-    type RtcMembershipData,
-} from "../../../src/matrixrtc/CallMembership";
-import { membershipTemplate } from "./mocks";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
+import { type IContent, type MatrixEvent } from "../../../src/models/event.ts";
+import { EventType } from "../../../src/@types/event.ts";
+import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership.ts";
 
-function makeMockEvent(originTs = 0): MatrixEvent {
-    return {
-        getTs: jest.fn().mockReturnValue(originTs),
-        getSender: jest.fn().mockReturnValue("@alice:example.org"),
-        getId: jest.fn().mockReturnValue("$eventid"),
-        getContent: jest.fn().mockReturnValue({}),
-    } as unknown as MatrixEvent;
-}
-
-function createCallMembership(ev: MatrixEvent, content: unknown): CallMembership {
-    (ev.getContent as jest.Mock).mockReturnValue(content);
+function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
+    vi.mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, "xx");
 }
 
 describe("CallMembership", () => {
     describe("SessionMembershipData", () => {
+        function makeMockEvent(originTs = 0): MatrixEvent {
+            return {
+                getTs: vi.fn().mockReturnValue(originTs),
+                getSender: vi.fn().mockReturnValue("@alice:example.org"),
+                getId: vi.fn().mockReturnValue("$eventid"),
+                getContent: vi.fn().mockReturnValue({}),
+                getType: vi.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
+            } as unknown as MatrixEvent;
+        }
         beforeEach(() => {
-            jest.useFakeTimers();
+            vi.useFakeTimers();
         });
 
         afterEach(() => {
-            jest.useRealTimers();
+            vi.useRealTimers();
         });
 
         const membershipTemplate: SessionMembershipData = {
@@ -91,13 +87,13 @@ describe("CallMembership", () => {
 
         it("considers memberships unexpired if local age low enough", () => {
             const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
+            fakeEvent.getTs = vi.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION - 1));
             expect(createCallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(false);
         });
 
         it("considers memberships expired if local age large enough", () => {
             const fakeEvent = makeMockEvent(1000);
-            fakeEvent.getTs = jest.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
+            fakeEvent.getTs = vi.fn().mockReturnValue(Date.now() - (DEFAULT_EXPIRE_DURATION + 1));
             expect(createCallMembership(fakeEvent, membershipTemplate).isExpired()).toEqual(true);
         });
 
@@ -158,8 +154,35 @@ describe("CallMembership", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
             it("returns correct slot_id", () => {
-                expect(membership.slotId).toBe("m.call#");
-                expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+                // slot_id is application and call_id dependent. So we create
+                // a membership for each possible combination
+
+                // non call application (should not alter call_id even with empty string)
+                const nonCallMembership = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: "m.not.a.call",
+                    call_id: "",
+                });
+                // non "" call id should not be altered
+                const callMembershipCustomId = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    call_id: "customCallId",
+                });
+
+                // for membership (application = m.call and call_id = "") we expect "" -> ROOM
+                // for legacy events we expect the room to be added automagically
+                // See INFO_SLOT_ID_LEGACY_CASE comments
+                expect(membership.slotId).toBe("m.call#ROOM");
+                expect(membership.slotDescription).toStrictEqual({ id: "ROOM", application: "m.call" });
+
+                expect(nonCallMembership.slotId).toBe("m.not.a.call#");
+                expect(nonCallMembership.slotDescription).toStrictEqual({ id: "", application: "m.not.a.call" });
+
+                expect(callMembershipCustomId.slotId).toBe("m.call#customCallId");
+                expect(callMembershipCustomId.slotDescription).toStrictEqual({
+                    id: "customCallId",
+                    application: "m.call",
+                });
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
@@ -173,6 +196,17 @@ describe("CallMembership", () => {
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
             });
+            it("returns the application's own top-level data in applicationData", () => {
+                const withData = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "org.example.key": { nested: true },
+                });
+                expect(withData.applicationData).toStrictEqual({
+                    "org.example.key": { nested: true },
+                    "type": "m.call",
+                    "m.call.intent": "voice",
+                });
+            });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe("m.room");
             });
@@ -185,14 +219,45 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(true);
             });
         });
+        describe("expiry calculation", () => {
+            let fakeEvent: MatrixEvent;
+            let membership: CallMembership;
+
+            beforeEach(() => {
+                // server origin timestamp for this event is 1000
+                fakeEvent = makeMockEvent(1000);
+                membership = createCallMembership(fakeEvent!, membershipTemplate);
+
+                vi.useFakeTimers();
+            });
+
+            afterEach(() => {
+                vi.useFakeTimers();
+            });
+
+            it("calculates time until expiry", () => {
+                vi.setSystemTime(2000);
+                // should be using absolute expiry time
+                expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+            });
+        });
     });
 
     describe("RtcMembershipData", () => {
+        function makeMockEvent(originTs = 0, content: IContent = {}): MatrixEvent {
+            return {
+                getTs: vi.fn().mockReturnValue(originTs),
+                getSender: vi.fn().mockReturnValue("@alice:example.org"),
+                getId: vi.fn().mockReturnValue("$eventid"),
+                getContent: vi.fn().mockReturnValue(content),
+                getType: vi.fn().mockReturnValue(EventType.RTCMembership),
+            } as unknown as MatrixEvent;
+        }
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
-            rtc_transports: [{ type: "livekit" }],
+            transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
             versions: [],
             msc4354_sticky_key: "abc123",
         };
@@ -205,6 +270,11 @@ describe("CallMembership", () => {
         it("rejects membership with invalid slot_id", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "invalid_slot_id" });
+            }).toThrow();
+        });
+        it("rejects membership with slot_id that contains extra #", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#mycall#extra" });
             }).toThrow();
         });
         it("accepts membership with valid slot_id", () => {
@@ -263,6 +333,19 @@ describe("CallMembership", () => {
                 });
             }).toThrow();
         });
+
+        it("rejects membership with incorrect transports", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { can_subscribe: [1] } });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { wrong_key: [] } });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: "not an object" });
+            }).toThrow();
+        });
+
         it("rejects membership with incorrect sticky_key", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), membershipTemplate);
@@ -307,19 +390,15 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it("considers memberships unexpired if local age low enough", () => {
-            // TODO link prev event
-        });
-
-        it("considers memberships expired if local age large enough", () => {
-            // TODO link prev event
-        });
+        // TODO link prev event
+        it.todo("considers memberships unexpired if local age low enough");
+        it.todo("considers memberships expired if local age large enough");
 
         describe("getTransport", () => {
             it("gets the correct active transport with oldest_membership", () => {
                 const oldestMembership = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
-                    rtc_transports: [{ type: "oldest_transport" }],
+                    transports: { ...membershipTemplate.transports, published: [{ type: "oldest_transport" }] },
                 });
                 const membership = createCallMembership(makeMockEvent(), membershipTemplate);
 
@@ -370,28 +449,9 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-    });
-
-    describe("expiry calculation", () => {
-        let fakeEvent: MatrixEvent;
-        let membership: CallMembership;
-
-        beforeEach(() => {
-            // server origin timestamp for this event is 1000
-            fakeEvent = makeMockEvent(1000);
-            membership = createCallMembership(fakeEvent!, membershipTemplate);
-
-            jest.useFakeTimers();
-        });
-
-        afterEach(() => {
-            jest.useRealTimers();
-        });
-
-        it("calculates time until expiry", () => {
-            jest.setSystemTime(2000);
-            // should be using absolute expiry time
-            expect(membership.getMsUntilExpiry()).toEqual(DEFAULT_EXPIRE_DURATION - 1000);
+        it("uses unpadded base64 for RTC backend identities", async () => {
+            const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
+            expect(membership.rtcBackendIdentity).toBe("jUZ0Q1yF5nV3LlAI5xfD1I7BPnAytJaPEAR57EXjJ6s");
         });
     });
 });

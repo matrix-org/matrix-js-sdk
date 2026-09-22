@@ -29,12 +29,7 @@ describe("sha256", () => {
     });
 
     it("throws if webcrypto is not available", async () => {
-        const oldCrypto = globalThis.crypto;
-        try {
-            globalThis.crypto = {} as any;
-            await expect(sha256("test")).rejects.toThrow();
-        } finally {
-            globalThis.crypto = oldCrypto;
-        }
+        vi.stubGlobal("crypto", {});
+        await expect(sha256("test")).rejects.toThrow();
     });
 });

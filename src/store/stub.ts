@@ -274,7 +274,22 @@ export class StubStore implements IStore {
         return Promise.resolve();
     }
 
+    public async getUserProfile(): Promise<undefined> {
+        return undefined;
+    }
+
+    public async storeUserProfiles(): Promise<void> {
+        return;
+    }
+
+    public async removeUserProfiles(): Promise<void> {
+        return;
+    }
+
     public async destroy(): Promise<void> {
+        // Nothing to do
+    }
+    public async removeEventsFromRoom(roomId: string, eventIds: string[]): Promise<void> {
         // Nothing to do
     }
 }

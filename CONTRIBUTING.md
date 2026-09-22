@@ -117,7 +117,7 @@ checks, so please check back after a few minutes.
 Your PR should include tests.
 
 For new user facing features in `matrix-js-sdk`, you
-must include comprehensive unit tests written in Jest.
+must include comprehensive unit tests written in Vitest.
 The existing tests can be found under `spec/unit`
 
 It's good practice to write tests alongside the code as it ensures the code is testable from
@@ -127,6 +127,10 @@ functionality. Unit tests are necessary even for bug fixes.
 When writing unit tests, please aim for a high level of test coverage
 for new code - 80% or greater. If you cannot achieve that, please document
 why it's not possible in your PR.
+CI will validate that the coverage reached on your change is sufficient,
+you can also assert this locally by installing https://github.com/Bachmann1234/diff_cover,
+running the entire test suite in coverage mode `pnpm coverage` then running
+`pnpm coverage:diff` to see the coverage of the diff between your HEAD and `develop`.
 
 Tests validate that your change works as intended and also document
 concisely what is being changed. Ideally, your new tests fail

@@ -18,6 +18,9 @@ import { type EventType, type RelationType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { FilterComponent, type IFilterComponent } from "./filter-component.ts";
 import { type MatrixEvent } from "./models/event.ts";
+import { NamespacedValue } from "./NamespacedValue.ts";
+
+const profileFieldsFilterName = new NamespacedValue("profile_fields", "org.matrix.msc4429.profile_fields");
 
 /**
  */
@@ -33,13 +36,14 @@ function setProp(obj: Record<string, any>, keyNesting: string, val: any): void {
     currentObj[nestedKeys[nestedKeys.length - 1]] = val;
 }
 
-/* eslint-disable camelcase */
 export interface IFilterDefinition {
-    event_fields?: string[];
-    event_format?: "client" | "federation";
-    presence?: IFilterComponent;
-    account_data?: IFilterComponent;
-    room?: IRoomFilter;
+    "event_fields"?: string[];
+    "event_format"?: "client" | "federation";
+    "presence"?: IFilterComponent;
+    "account_data"?: IFilterComponent;
+    "room"?: IRoomFilter;
+    "profile_fields"?: ProfileFieldsFilter;
+    "org.matrix.msc4429.profile_fields"?: ProfileFieldsFilter;
 }
 
 export interface IRoomEventFilter extends IFilterComponent {
@@ -67,7 +71,13 @@ interface IRoomFilter {
     timeline?: IRoomEventFilter;
     account_data?: IRoomEventFilter;
 }
-/* eslint-enable camelcase */
+
+/**
+ * Filter section used for requesting a set of extended profile fields that will be sent down the sync stream.
+ */
+interface ProfileFieldsFilter {
+    ids: string[];
+}
 
 export class Filter {
     public static LAZY_LOADING_MESSAGES_FILTER = {
@@ -241,5 +251,18 @@ export class Filter {
      */
     public setIncludeLeaveRooms(includeLeave: boolean): void {
         setProp(this.definition, "room.include_leave", includeLeave);
+    }
+
+    /**
+     * Set the list of fields to be included in the profile information sent down the sync stream.
+     * @param ids The field IDs to sync.
+     * @param stable Whether to use the stable or unstable versions of this filter.
+     * @experimental
+     */
+    public setUnstableMSC4429SyncUserProfiles(ids: string[], stable: boolean): void {
+        const field = stable
+            ? profileFieldsFilterName.name
+            : (profileFieldsFilterName.unstable ?? profileFieldsFilterName.name);
+        this.definition[field] = { ids };
     }
 }

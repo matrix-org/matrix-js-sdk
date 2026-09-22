@@ -35,6 +35,7 @@ describe("AutoDiscovery", function () {
         AutoDiscovery.setFetchFn(realAutoDiscoveryFetch);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should throw an error when no domain is specified", function () {
         getHttpBackend();
         return Promise.all([
@@ -190,7 +191,7 @@ describe("AutoDiscovery", function () {
         };
         return Promise.all([
             httpBackend.flushAllExpected(),
-            AutoDiscovery.findClientConfig("example.org").then(expect(expected).toEqual),
+            AutoDiscovery.findClientConfig("example.org").then((config) => expect(config).toEqual(expected)),
         ]);
     });
 
@@ -487,95 +488,89 @@ describe("AutoDiscovery", function () {
         ]);
     });
 
-    it(
-        "should return SUCCESS / FAIL_PROMPT when the identity server configuration " + "is wrong (missing base_url)",
-        function () {
-            const httpBackend = getHttpBackend();
-            httpBackend
-                .when("GET", "/_matrix/client/versions")
-                .check((req) => {
-                    expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
-                })
-                .respond(200, {
-                    versions: ["v1.5"],
-                });
-            httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
-                "m.homeserver": {
-                    // Note: we also expect this test to trim the trailing slash
-                    base_url: "https://chat.example.org/",
-                },
-                "m.identity_server": {
-                    not_base_url: "https://identity.example.org",
-                },
+    it("should return SUCCESS / FAIL_PROMPT when the identity server configuration is wrong (missing base_url)", function () {
+        const httpBackend = getHttpBackend();
+        httpBackend
+            .when("GET", "/_matrix/client/versions")
+            .check((req) => {
+                expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
+            })
+            .respond(200, {
+                versions: ["v1.5"],
             });
-            return Promise.all([
-                httpBackend.flushAllExpected(),
-                AutoDiscovery.findClientConfig("example.org").then((conf) => {
-                    const expected = {
-                        "m.homeserver": {
-                            state: "SUCCESS",
-                            error: null,
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                // Note: we also expect this test to trim the trailing slash
+                base_url: "https://chat.example.org/",
+            },
+            "m.identity_server": {
+                not_base_url: "https://identity.example.org",
+            },
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "SUCCESS",
+                        error: null,
 
-                            // We still expect the base_url to be here for debugging purposes.
-                            base_url: "https://chat.example.org",
-                        },
-                        "m.identity_server": {
-                            state: "FAIL_PROMPT",
-                            error: AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
-                            base_url: null,
-                        },
-                    };
+                        // We still expect the base_url to be here for debugging purposes.
+                        base_url: "https://chat.example.org",
+                    },
+                    "m.identity_server": {
+                        state: "FAIL_PROMPT",
+                        error: AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
+                        base_url: null,
+                    },
+                };
 
-                    expect(conf).toEqual(expected);
-                }),
-            ]);
-        },
-    );
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
 
-    it(
-        "should return SUCCESS / FAIL_PROMPT when the identity server configuration " + "is wrong (empty base_url)",
-        function () {
-            const httpBackend = getHttpBackend();
-            httpBackend
-                .when("GET", "/_matrix/client/versions")
-                .check((req) => {
-                    expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
-                })
-                .respond(200, {
-                    versions: ["v1.5"],
-                });
-            httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
-                "m.homeserver": {
-                    // Note: we also expect this test to trim the trailing slash
-                    base_url: "https://chat.example.org/",
-                },
-                "m.identity_server": {
-                    base_url: "",
-                },
+    it("should return SUCCESS / FAIL_PROMPT when the identity server configuration is wrong (empty base_url)", function () {
+        const httpBackend = getHttpBackend();
+        httpBackend
+            .when("GET", "/_matrix/client/versions")
+            .check((req) => {
+                expect(req.path).toEqual("https://chat.example.org/_matrix/client/versions");
+            })
+            .respond(200, {
+                versions: ["v1.5"],
             });
-            return Promise.all([
-                httpBackend.flushAllExpected(),
-                AutoDiscovery.findClientConfig("example.org").then((conf) => {
-                    const expected = {
-                        "m.homeserver": {
-                            state: "SUCCESS",
-                            error: null,
+        httpBackend.when("GET", "/.well-known/matrix/client").respond(200, {
+            "m.homeserver": {
+                // Note: we also expect this test to trim the trailing slash
+                base_url: "https://chat.example.org/",
+            },
+            "m.identity_server": {
+                base_url: "",
+            },
+        });
+        return Promise.all([
+            httpBackend.flushAllExpected(),
+            AutoDiscovery.findClientConfig("example.org").then((conf) => {
+                const expected = {
+                    "m.homeserver": {
+                        state: "SUCCESS",
+                        error: null,
 
-                            // We still expect the base_url to be here for debugging purposes.
-                            base_url: "https://chat.example.org",
-                        },
-                        "m.identity_server": {
-                            state: "FAIL_PROMPT",
-                            error: AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
-                            base_url: null,
-                        },
-                    };
+                        // We still expect the base_url to be here for debugging purposes.
+                        base_url: "https://chat.example.org",
+                    },
+                    "m.identity_server": {
+                        state: "FAIL_PROMPT",
+                        error: AutoDiscovery.ERROR_INVALID_IS_BASE_URL,
+                        base_url: null,
+                    },
+                };
 
-                    expect(conf).toEqual(expected);
-                }),
-            ]);
-        },
-    );
+                expect(conf).toEqual(expected);
+            }),
+        ]);
+    });
 
     it(
         "should return SUCCESS / FAIL_PROMPT when the identity server configuration " +

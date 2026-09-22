@@ -193,7 +193,7 @@ export class AutoDiscovery {
 
         // Step 3.1: Non-spec check to ensure the server will actually work for us. We need to check if
         // any of the versions in `SUPPORTED_MATRIX_VERSIONS` are listed in the /versions response.
-        const hsVersionSet = new Set(hsVersions.raw!["versions"]);
+        const hsVersionSet = new Set(hsVersions.raw["versions"]);
         let supportedVersionFound = false;
         for (const version of SUPPORTED_MATRIX_VERSIONS) {
             if (hsVersionSet.has(version)) {
@@ -358,7 +358,7 @@ export class AutoDiscovery {
         }
 
         // Step 2: Validate and parse the config
-        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw!);
+        return AutoDiscovery.fromDiscoveryConfig(wellknown.raw);
     }
 
     /**

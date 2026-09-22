@@ -15,15 +15,21 @@ limitations under the License.
 */
 
 import anotherjson from "another-json";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
 import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
-import { TEST_ROOM_ID as ROOM_ID } from "../../test-utils/test-data";
+import { TEST_ROOM_ID as ROOM_ID } from "../../test-utils/crypto-test-data";
 import { logger } from "../../../src/logger";
-import { createClient, PendingEventOrdering, type IStartClientOpts, type MatrixClient } from "../../../src/matrix";
+import {
+    createClient,
+    HistoryVisibility,
+    PendingEventOrdering,
+    type IStartClientOpts,
+    type MatrixClient,
+} from "../../../src/matrix";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { type ISyncResponder, SyncResponder } from "../../test-utils/SyncResponder";
@@ -72,7 +78,6 @@ describe("Encrypted State Events", () => {
 
     beforeEach(async () => {
         fetchMock.catch(404);
-        fetchMock.config.warnOnFallback = false;
 
         const homeserverUrl = "https://alice-server.com";
         aliceClient = createClient({
@@ -85,7 +90,7 @@ describe("Encrypted State Events", () => {
         });
 
         keyReceiver = new E2EKeyReceiver(homeserverUrl);
-        syncResponder = new SyncResponder(homeserverUrl);
+        syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver: keyReceiver });
 
         await aliceClient.initRustCrypto();
 
@@ -96,15 +101,11 @@ describe("Encrypted State Events", () => {
     }, 10000);
 
     afterEach(async () => {
-        await aliceClient.stopClient();
-        await jest.runAllTimersAsync();
-        fetchMock.mockReset();
+        aliceClient.stopClient();
     });
 
     function expectAliceKeyQuery(response: any) {
-        fetchMock.postOnce(new RegExp("/keys/query"), (url: string, opts: RequestInit) => response, {
-            overwriteRoutes: false,
-        });
+        fetchMock.postOnce(new RegExp("/keys/query"), (callLog) => response);
     }
 
     function expectAliceKeyClaim(response: any) {
@@ -190,6 +191,7 @@ describe("Encrypted State Events", () => {
         expect(decryptedEvent.getContent().topic).toEqual("Secret!");
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("Should send an encrypted state event", async () => {
         const homeserverUrl = aliceClient.getHomeserverUrl();
         const keyResponder = new E2EKeyResponder(homeserverUrl);
@@ -201,7 +203,7 @@ describe("Encrypted State Events", () => {
         await startClientAndAwaitFirstSync();
 
         // Alice shares a room with Bob
-        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"], ROOM_ID, true));
+        syncResponder.sendOrQueueSyncResponse(getSyncResponse(["@bob:xyz"], HistoryVisibility.Joined, ROOM_ID, true));
         await syncPromise(aliceClient);
 
         // ... and claim one of Bob's OTKs ...

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
 import Olm from "@matrix-org/olm";
@@ -28,7 +28,7 @@ import {
     type MatrixEvent,
     type ReceivedToDeviceMessage,
 } from "../../../src";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { SyncResponder } from "../../test-utils/SyncResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -37,7 +37,6 @@ import { encryptOlmEvent, establishOlmSession, getTestOlmAccountKeys } from "./o
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -59,7 +58,6 @@ describe("to-device-messages", () => {
         async () => {
             // anything that we don't have a specific matcher for silently returns a 404
             fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
 
             const homeserverUrl = "https://server.com";
             aliceClient = createClient({
@@ -71,7 +69,7 @@ describe("to-device-messages", () => {
 
             e2eKeyResponder = new E2EKeyResponder(homeserverUrl);
             e2eKeyReceiver = new E2EKeyReceiver(homeserverUrl);
-            syncResponder = new SyncResponder(homeserverUrl);
+            syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver });
 
             // add bob as known user
             syncResponder.sendOrQueueSyncResponse(getSyncResponse([testData.BOB_TEST_USER_ID]));
@@ -100,7 +98,6 @@ describe("to-device-messages", () => {
 
     afterEach(async () => {
         aliceClient.stopClient();
-        fetchMock.mockReset();
     });
 
     describe("encryptToDeviceMessages", () => {

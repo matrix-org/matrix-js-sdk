@@ -14,12 +14,17 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type Mocked, mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+/**
+ * @vitest-environment happy-dom
+ */
+
+import fetchMock from "@fetch-mock/vitest";
+import { type MockedObject, type Mocked, type MockInstance } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
     ClientEvent,
+    type IClientWellKnown,
     type IMatrixClientCreateOpts,
     type ITurnServerResponse,
     MatrixClient,
@@ -41,9 +46,11 @@ import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
+    AutoDiscovery,
     ClientPrefix,
     ConditionKind,
     ContentHelpers,
@@ -75,22 +82,27 @@ import {
 } from "../../src/models/invites-ignorer";
 import { type QueryDict } from "../../src/utils";
 import { type SyncState } from "../../src/sync";
-import * as featureUtils from "../../src/feature";
 import { StubStore } from "../../src/store/stub";
 import { type ServerSideSecretStorageImpl } from "../../src/secret-storage";
 import { KnownMembership } from "../../src/@types/membership";
 import { type RoomMessageEventContent } from "../../src/@types/events";
-import { mockOpenIdConfiguration } from "../test-utils/oidc.ts";
+import { makeDelegatedAuthMetadata } from "../test-utils/auth.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
-import { type Transport } from "src/matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "../../src/matrixrtc/index.ts";
+import { type IStore } from "../../src/store/index.ts";
 
-jest.useFakeTimers();
+vi.useFakeTimers();
 
-jest.mock("../../src/webrtc/call", () => ({
-    ...jest.requireActual("../../src/webrtc/call"),
-    supportsMatrixCall: jest.fn(() => false),
+vi.mock("../../src/webrtc/call", async () => ({
+    ...(await vi.importActual("../../src/webrtc/call")),
+    supportsMatrixCall: vi.fn(() => false),
 }));
 
 // Utility function to ease the transition from our QueryDict type to a Map
@@ -129,16 +141,13 @@ type WrappedRoom = Room & {
     _state: Map<string, any>;
 };
 
-/** A list of methods to run after the current test */
-const afterTestHooks: (() => Promise<void> | void)[] = [];
+beforeEach(() => {
+    // anything that we don't have a specific matcher for silently returns a 404
+    fetchMock.catch(404);
+});
 
 afterEach(async () => {
-    fetchMock.reset();
-    jest.restoreAllMocks();
-    for (const hook of afterTestHooks) {
-        await hook();
-    }
-    afterTestHooks.length = 0;
+    vi.restoreAllMocks();
 });
 
 describe("convertQueryDictToMap", () => {
@@ -198,6 +207,12 @@ describe("MatrixClient", function () {
         data: {},
     };
 
+    const RTC_TRANSPORT_RESPONSE: HttpLookup = {
+        method: "GET",
+        path: "/rtc/transports/",
+        data: { rtc_transports: [] },
+    };
+
     const FILTER_PATH = "/user/" + encodeURIComponent(userId) + "/filter";
 
     const FILTER_RESPONSE: HttpLookup = {
@@ -232,7 +247,7 @@ describe("MatrixClient", function () {
         method: Method,
         path: string,
         queryParams?: QueryDict,
-        body?: BodyInit,
+        body?: Body,
         requestOpts: IRequestOpts = {},
     ) {
         const { prefix } = requestOpts;
@@ -290,7 +305,6 @@ describe("MatrixClient", function () {
             }
 
             if (next.error) {
-                // eslint-disable-next-line
                 return Promise.reject(
                     new MatrixError(
                         {
@@ -332,23 +346,21 @@ describe("MatrixClient", function () {
             store: store,
             scheduler: scheduler,
             userId: userId,
-            ...(opts || {}),
+            ...opts,
         });
         // FIXME: We shouldn't be yanking http like this.
-        client.http = (
-            ["authedRequest", "getContentUri", "request", "uploadContent", "idServerRequest"] as const
-        ).reduce((r, k) => {
-            r[k] = jest.fn();
+        client.http = (["authedRequest", "request", "uploadContent", "idServerRequest"] as const).reduce((r, k) => {
+            r[k] = vi.fn();
             return r;
         }, {} as MatrixHttpApi<any>);
-        mocked(client.http.authedRequest).mockImplementation(httpReq);
-        mocked(client.http.request).mockImplementation(httpReq);
+        vi.mocked(client.http.authedRequest).mockImplementation(httpReq as any);
+        vi.mocked(client.http.request).mockImplementation(httpReq as any);
     }
 
     beforeEach(function () {
         scheduler = (["getQueueForEvent", "queueEvent", "removeEventFromQueue", "setProcessFunction"] as const).reduce(
             (r, k) => {
-                r[k] = jest.fn();
+                r[k] = vi.fn();
                 return r;
             },
             {} as MatrixScheduler,
@@ -373,17 +385,19 @@ describe("MatrixClient", function () {
                 "startup",
                 "deleteAllData",
                 "setUserCreator",
+                "storeUserProfiles",
             ] as const
         ).reduce((r, k) => {
-            r[k] = jest.fn();
+            r[k] = vi.fn();
             return r;
         }, {} as Store);
-        store.getSavedSync = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.getSavedSyncToken = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.setSyncData = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.getClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.storeClientOptions = jest.fn().mockReturnValue(Promise.resolve(null));
-        store.isNewlyCreated = jest.fn().mockReturnValue(Promise.resolve(true));
+        store.getSavedSync = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.getSavedSyncToken = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.setSyncData = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.getClientOptions = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.storeClientOptions = vi.fn().mockReturnValue(Promise.resolve(null));
+        store.isNewlyCreated = vi.fn().mockReturnValue(Promise.resolve(true));
+        store.getUserProfile = vi.fn().mockReturnValue(undefined);
 
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
@@ -397,6 +411,7 @@ describe("MatrixClient", function () {
         pendingLookup = null;
         httpLookups = [];
         httpLookups.push(PUSH_RULES_RESPONSE);
+        httpLookups.push(RTC_TRANSPORT_RESPONSE);
         httpLookups.push(FILTER_RESPONSE);
         httpLookups.push(SYNC_RESPONSE);
     });
@@ -407,10 +422,9 @@ describe("MatrixClient", function () {
         // means they may call /events and then fail an expect() which will fail
         // a DIFFERENT test (pollution between tests!) - we return unresolved
         // promises to stop the client from continuing to run.
-        mocked(client.http.authedRequest).mockImplementation(function () {
+        vi.mocked(client.http.authedRequest).mockImplementation(function () {
             return new Promise(() => {});
         });
-        client.stopClient();
     });
 
     describe("mxcUrlToHttp", () => {
@@ -469,7 +483,7 @@ describe("MatrixClient", function () {
             }
 
             // Then the number of requests me made matches our expectation
-            const calls = mocked(client.http.authedRequest).mock.calls;
+            const calls = vi.mocked(client.http.authedRequest).mock.calls;
             expect(calls.length).toStrictEqual(responses.length);
 
             // And each request was as we expected
@@ -489,6 +503,7 @@ describe("MatrixClient", function () {
             }
         }
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should call stable endpoint", async () => {
             await assertRequestsMade([
                 {
@@ -497,6 +512,7 @@ describe("MatrixClient", function () {
             ]);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should fallback to unstable endpoint when stable endpoint 400s", async () => {
             await assertRequestsMade([
                 {
@@ -513,6 +529,7 @@ describe("MatrixClient", function () {
             ]);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should fallback to unstable endpoint when stable endpoint 404s", async () => {
             await assertRequestsMade([
                 {
@@ -529,6 +546,7 @@ describe("MatrixClient", function () {
             ]);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should fallback to unstable endpoint when stable endpoint 405s", async () => {
             await assertRequestsMade([
                 {
@@ -545,6 +563,7 @@ describe("MatrixClient", function () {
             ]);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should not fallback to unstable endpoint when stable endpoint returns an error (500)", async () => {
             await assertRequestsMade(
                 [
@@ -560,6 +579,7 @@ describe("MatrixClient", function () {
             );
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should not fallback to unstable endpoint when stable endpoint is rate-limiting (429)", async () => {
             await assertRequestsMade(
                 [
@@ -575,6 +595,7 @@ describe("MatrixClient", function () {
             );
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should not fallback to unstable endpoint when stable endpoint says bad gateway (502)", async () => {
             await assertRequestsMade(
                 [
@@ -628,11 +649,87 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("sendRtcDecline", () => {
+        const roomId = "!room:example.org";
+        const notificationEventId = "$notification:example.org";
+        const expectedContent = {
+            "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
+            "msc4354_sticky_key": notificationEventId,
+        };
+
+        const txnId = "txn";
+        const path = `/rooms/${encodeURIComponent(roomId)}/send/${EventType.RTCDecline}/${txnId}`;
+
+        beforeEach(() => {
+            unstableFeatures["org.matrix.msc4354"] = true;
+            vi.spyOn(client, "makeTxnId").mockReturnValue(txnId);
+        });
+
+        it("sends the decline as a sticky event keyed on the notification", async () => {
+            const eventId = "$decline:example.org";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: eventId },
+                    expectBody: expectedContent,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 120000 },
+                },
+            ];
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).resolves.toEqual({ event_id: eventId });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("uses the given sticky duration", async () => {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: "$decline:example.org" },
+                    expectBody: expectedContent,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 30000 },
+                },
+            ];
+
+            await client.sendRtcDecline(roomId, notificationEventId, 30_000);
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("falls back to a regular event when the server doesn't support sticky events", async () => {
+            unstableFeatures["org.matrix.msc4354"] = false;
+            const eventId = "$decline:example.org";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: eventId },
+                    expectBody: expectedContent,
+                    // The event is sent without a sticky duration, i.e. as a regular event.
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": undefined },
+                },
+            ];
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).resolves.toEqual({ event_id: eventId });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("does not fall back when sending the sticky event fails for another reason", async () => {
+            const error = new Error("network go boom");
+            vi.spyOn(client, "_unstable_sendStickyEvent").mockRejectedValue(error);
+            const sendEvent = vi.spyOn(client, "sendEvent");
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).rejects.toThrow(error);
+            expect(sendEvent).not.toHaveBeenCalled();
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
         const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -648,6 +745,7 @@ describe("MatrixClient", function () {
             await client.sendEvent(roomId, EventType.RoomMessage, { ...content }, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("overload with null threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -663,6 +761,7 @@ describe("MatrixClient", function () {
             await client.sendEvent(roomId, null, EventType.RoomMessage, { ...content }, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("overload with threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -686,13 +785,14 @@ describe("MatrixClient", function () {
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should add thread relation if threadId is passed and the relation is missing", async () => {
             const eventId = "$eventId:example.org";
             const threadId = "$threadId:server";
             const txnId = client.makeTxnId();
 
             const room = new Room(roomId, client, userId);
-            mocked(store.getRoom).mockReturnValue(room);
+            vi.mocked(store.getRoom).mockReturnValue(room);
 
             const rootEvent = new MatrixEvent({ event_id: threadId });
             room.createThread(threadId, rootEvent, [rootEvent], false);
@@ -719,6 +819,7 @@ describe("MatrixClient", function () {
             await client.sendEvent(roomId, threadId, EventType.RoomMessage, { ...content }, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
             const eventId = "$eventId:example.org";
             const threadId = "$threadId:server";
@@ -735,7 +836,7 @@ describe("MatrixClient", function () {
             } satisfies RoomMessageEventContent;
 
             const room = new Room(roomId, client, userId);
-            mocked(store.getRoom).mockReturnValue(room);
+            vi.mocked(store.getRoom).mockReturnValue(room);
 
             const rootEvent = new MatrixEvent({ event_id: threadId });
             room.createThread(threadId, rootEvent, [rootEvent], false);
@@ -808,6 +909,7 @@ describe("MatrixClient", function () {
             await expect(client._unstable_sendScheduledDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([false, true])(
             "works with null threadId (with dedicated endpoint: %s)",
             async (useDedicatedEndpoint: boolean) => {
@@ -899,6 +1001,7 @@ describe("MatrixClient", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([false, true])(
             "works with non-null threadId (with dedicated endpoint: %s)",
             async (useDedicatedEndpoint: boolean) => {
@@ -999,6 +1102,7 @@ describe("MatrixClient", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([false, true])(
             "should add thread relation if threadId is passed and the relation is missing (with dedicated endpoint: %s)",
             async (useDedicatedEndpoint: boolean) => {
@@ -1017,7 +1121,7 @@ describe("MatrixClient", function () {
                 };
 
                 const room = new Room(roomId, client, userId);
-                mocked(store.getRoom).mockReturnValue(room);
+                vi.mocked(store.getRoom).mockReturnValue(room);
 
                 const rootEvent = new MatrixEvent({ event_id: threadId });
                 room.createThread(threadId, rootEvent, [rootEvent], false);
@@ -1108,6 +1212,7 @@ describe("MatrixClient", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([false, true])(
             "should add thread relation if threadId is passed and the relation is missing with reply (with dedicated endpoint: %s)",
             async (useDedicatedEndpoint: boolean) => {
@@ -1136,7 +1241,7 @@ describe("MatrixClient", function () {
                 };
 
                 const room = new Room(roomId, client, userId);
-                mocked(store.getRoom).mockReturnValue(room);
+                vi.mocked(store.getRoom).mockReturnValue(room);
 
                 const rootEvent = new MatrixEvent({ event_id: threadId });
                 room.createThread(threadId, rootEvent, [rootEvent], false);
@@ -1227,6 +1332,7 @@ describe("MatrixClient", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([false, true])(
             "can send a delayed state event (with dedicated endpoint: %s)",
             async (useDedicatedEndpoint: boolean) => {
@@ -1362,6 +1468,7 @@ describe("MatrixClient", function () {
             const inputs = statuses.flatMap((status) =>
                 delayIds.map((delayId) => [status, delayId] as [(typeof statuses)[0], (typeof delayIds)[0]]),
             );
+            // eslint-disable-next-line @vitest/expect-expect
             it.each(inputs)("can look up delayed events (status = %s, delayId = %s)", async (status, delayId) => {
                 httpLookups = [
                     {
@@ -1378,8 +1485,23 @@ describe("MatrixClient", function () {
 
                 await client._unstable_getDelayedEvents(status, delayId);
             });
+
+            // eslint-disable-next-line @vitest/expect-expect
+            it("can look up a single delayed event", async () => {
+                const delayId = "id";
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    },
+                ];
+
+                await client._unstable_getDelayedEvent(delayId);
+            });
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
             "can %s scheduled delayed events (action in request body)",
             async (action: UpdateDelayedEventAction) => {
@@ -1399,6 +1521,7 @@ describe("MatrixClient", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it.each([UpdateDelayedEventAction.Cancel, UpdateDelayedEventAction.Restart, UpdateDelayedEventAction.Send])(
             "can %s scheduled delayed events (action in request body fallback when auth required)",
             async (action: UpdateDelayedEventAction) => {
@@ -1428,6 +1551,7 @@ describe("MatrixClient", function () {
             },
         );
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("can cancel scheduled delayed events (action in request path)", async () => {
             const delayId = "id";
             httpLookups = [
@@ -1441,6 +1565,7 @@ describe("MatrixClient", function () {
             await client._unstable_cancelScheduledDelayedEvent(delayId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("can restart scheduled delayed events (action in request path)", async () => {
             const delayId = "id";
             httpLookups = [
@@ -1454,6 +1579,7 @@ describe("MatrixClient", function () {
             await client._unstable_restartScheduledDelayedEvent(delayId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("can send scheduled delayed events (action in request path)", async () => {
             const delayId = "id";
             httpLookups = [
@@ -1600,6 +1726,66 @@ describe("MatrixClient", function () {
             expect(httpLookups).toHaveLength(0);
         });
 
+        it("can fetch a property from an extended user profile with a cached profile", async () => {
+            const testProfile = {
+                test_key: "foo",
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockImplementation(async (requestedUserId) => {
+                expect(requestedUserId).toEqual(userId);
+                return testProfile;
+            });
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
+        });
+
+        it("resolves to undefined if the property is not set on the extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    error: { errcode: "M_NOT_FOUND", httpStatus: 404 },
+                },
+            ];
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toBeUndefined();
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("rethrows other errors when fetching a property from an extended profile", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    error: { errcode: "M_FORBIDDEN", httpStatus: 403 },
+                },
+            ];
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).rejects.toThrow(MatrixError);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("preserves previously cached keys when writing through the profile cache", async () => {
+            const storedProfile = { other_key: "bar" };
+            const testProfile = { test_key: "foo" };
+            (client.store as MockedObject<IStore>).getUserProfile.mockImplementation(async (requestedUserId) => {
+                expect(requestedUserId).toEqual(userId);
+                return storedProfile;
+            });
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: testProfile,
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
+
+            expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
+                new Map([[userId, { ...storedProfile, ...testProfile }]]),
+            );
+        });
+
         it("can set a property in our extended profile", async () => {
             httpLookups = [
                 {
@@ -1669,7 +1855,7 @@ describe("MatrixClient", function () {
         const roomId = "!room:example.org";
         const roomName = "Test Tree";
         const mockRoom = {} as unknown as Room;
-        const fn = jest.fn().mockImplementation((opts) => {
+        const fn = vi.fn().mockImplementation((opts) => {
             expect(opts).toMatchObject({
                 name: roomName,
                 preset: Preset.PrivateChat,
@@ -1721,7 +1907,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1740,7 +1925,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1783,7 +1967,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1802,7 +1985,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1820,7 +2002,6 @@ describe("MatrixClient", function () {
             getMyMembership: () => KnownMembership.Join,
             currentState: {
                 getStateEvents: (eventType, stateKey) => {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (eventType === EventType.RoomCreate) {
                         expect(stateKey).toEqual("");
                         return new MatrixEvent({
@@ -1838,7 +2019,6 @@ describe("MatrixClient", function () {
                     } else {
                         throw new Error("Unexpected event type or state key");
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 },
             } as Room["currentState"],
         } as unknown as Room;
@@ -1851,16 +2031,15 @@ describe("MatrixClient", function () {
     });
 
     it("should not POST /filter if a matching filter already exists", async function () {
-        httpLookups = [PUSH_RULES_RESPONSE, SYNC_RESPONSE];
+        httpLookups = [PUSH_RULES_RESPONSE, RTC_TRANSPORT_RESPONSE, SYNC_RESPONSE];
         const filterId = "ehfewf";
-        mocked(store.getFilterIdByName).mockReturnValue(filterId);
+        vi.mocked(store.getFilterIdByName).mockReturnValue(filterId);
         const filter = new Filter("0", filterId);
         filter.setDefinition({ room: { timeline: { limit: 8 } } });
-        mocked(store.getFilter).mockReturnValue(filter);
+        vi.mocked(store.getFilter).mockReturnValue(filter);
         const syncPromise = new Promise<void>((resolve, reject) => {
             client.on(ClientEvent.Sync, function syncListener(state) {
                 if (state === "SYNCING") {
-                    // eslint-disable-next-line jest/no-conditional-expect
                     expect(httpLookups.length).toEqual(0);
                     client.removeListener(ClientEvent.Sync, syncListener);
                     resolve();
@@ -1894,7 +2073,9 @@ describe("MatrixClient", function () {
     });
 
     describe("getOrCreateFilter", function () {
+        // eslint-disable-next-line @vitest/expect-expect
         it("should POST createFilter if no id is present in localStorage", function () {});
+        // eslint-disable-next-line @vitest/expect-expect
         it("should use an existing filter if id is present in localStorage", function () {});
         it("should handle localStorage filterId missing from the server", async () => {
             function getFilterName(userId: string, suffix?: string) {
@@ -1916,7 +2097,7 @@ describe("MatrixClient", function () {
                 },
             });
             httpLookups.push(FILTER_RESPONSE);
-            mocked(store.getFilterIdByName).mockReturnValue(invalidFilterId);
+            vi.mocked(store.getFilterIdByName).mockReturnValue(invalidFilterId);
 
             const filterName = getFilterName(client.credentials.userId!);
             client.store.setFilterIdByName(filterName, invalidFilterId);
@@ -1947,11 +2128,10 @@ describe("MatrixClient", function () {
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(2);
                         expect(client.retryImmediately()).toBe(true);
-                        jest.advanceTimersByTime(1);
+                        vi.advanceTimersByTime(1);
                     } else if (state === "PREPARED" && httpLookups.length === 0) {
                         client.removeListener(ClientEvent.Sync, syncListener);
                         resolve(null);
@@ -1959,7 +2139,6 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -1967,6 +2146,7 @@ describe("MatrixClient", function () {
         });
 
         it("should work on /sync", async () => {
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push({
                 method: "GET",
                 path: "/sync",
@@ -1981,13 +2161,11 @@ describe("MatrixClient", function () {
             const isSyncingPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
                     if (state === "ERROR" && httpLookups.length > 0) {
-                        /* eslint-disable jest/no-conditional-expect */
                         expect(httpLookups.length).toEqual(1);
                         expect(client.retryImmediately()).toBe(true);
-                        /* eslint-enable jest/no-conditional-expect */
-                        jest.advanceTimersByTime(1);
+                        vi.advanceTimersByTime(1);
                     } else if (state === "RECONNECTING" && httpLookups.length > 0) {
-                        jest.advanceTimersByTime(10000);
+                        vi.advanceTimersByTime(10000);
                     } else if (state === "SYNCING" && httpLookups.length === 0) {
                         client.removeListener(ClientEvent.Sync, syncListener);
                         resolve(null);
@@ -2005,17 +2183,17 @@ describe("MatrixClient", function () {
                 path: "/pushrules/",
                 error: { errcode: "NOPE_NOPE_NOPE" },
             });
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push(PUSH_RULES_RESPONSE);
             httpLookups.push(FILTER_RESPONSE);
             httpLookups.push(SYNC_RESPONSE);
 
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
-                    /* eslint-disable jest/no-conditional-expect */
                     if (state === "ERROR" && httpLookups.length > 0) {
                         expect(httpLookups.length).toEqual(3);
                         expect(client.retryImmediately()).toBe(true);
-                        jest.advanceTimersByTime(1);
+                        vi.advanceTimersByTime(1);
                     } else if (state === "PREPARED" && httpLookups.length === 0) {
                         client.removeListener(ClientEvent.Sync, syncListener);
                         resolve(null);
@@ -2023,7 +2201,6 @@ describe("MatrixClient", function () {
                         // unexpected state transition!
                         expect(state).toEqual(null);
                     }
-                    /* eslint-enable jest/no-conditional-expect */
                 });
             });
             await client.startClient();
@@ -2047,10 +2224,11 @@ describe("MatrixClient", function () {
                     done();
                 }
                 // standard retry time is 5 to 10 seconds
-                jest.advanceTimersByTime(10000);
+                vi.advanceTimersByTime(10000);
             };
         }
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should transition null -> PREPARED after the first /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
@@ -2061,10 +2239,12 @@ describe("MatrixClient", function () {
             await didSyncPromise;
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should transition null -> ERROR after a failed /filter", async () => {
             const expectedStates: [string, string | null][] = [];
             httpLookups = [];
             httpLookups.push(PUSH_RULES_RESPONSE);
+            httpLookups.push(RTC_TRANSPORT_RESPONSE);
             httpLookups.push({
                 method: "POST",
                 path: FILTER_PATH,
@@ -2118,6 +2298,7 @@ describe("MatrixClient", function () {
             await didSyncPromise;
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should transition PREPARED -> SYNCING after /sync", async () => {
             const expectedStates: [string, string | null][] = [];
             expectedStates.push(["PREPARED", null]);
@@ -2173,6 +2354,7 @@ describe("MatrixClient", function () {
             await didSyncPromise;
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should transition SYNCING -> SYNCING on subsequent /sync successes", async () => {
             const expectedStates: [string, string | null][] = [];
             httpLookups.push(SYNC_RESPONSE);
@@ -2276,33 +2458,36 @@ describe("MatrixClient", function () {
 
     describe("redactEvent", () => {
         const roomId = "!room:example.org";
-        const mockRoom = {
-            getMyMembership: () => KnownMembership.Join,
-            currentState: {
-                getStateEvents: (eventType, stateKey) => {
-                    if (eventType === EventType.RoomEncryption) {
-                        expect(stateKey).toEqual("");
-                        return new MatrixEvent({ content: {} });
-                    } else {
-                        throw new Error("Unexpected event type or state key");
-                    }
-                },
-            } as Room["currentState"],
-            getThread: jest.fn(),
-            addPendingEvent: jest.fn(),
-            updatePendingEvent: jest.fn(),
-            reEmitter: {
-                reEmit: jest.fn(),
-            },
-        } as unknown as Room;
+        let mockRoom: Room;
 
         beforeEach(() => {
+            mockRoom = {
+                getMyMembership: () => KnownMembership.Join,
+                currentState: {
+                    getStateEvents: (eventType, stateKey) => {
+                        if (eventType === EventType.RoomEncryption) {
+                            expect(stateKey).toEqual("");
+                            return new MatrixEvent({ content: {} });
+                        } else {
+                            throw new Error("Unexpected event type or state key");
+                        }
+                    },
+                } as Room["currentState"],
+                getThread: vi.fn(),
+                addPendingEvent: vi.fn(),
+                updatePendingEvent: vi.fn(),
+                reEmitter: {
+                    reEmit: vi.fn(),
+                },
+            } as unknown as Room;
+
             client.getRoom = (getRoomId) => {
                 expect(getRoomId).toEqual(roomId);
                 return mockRoom;
             };
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("overload without threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -2317,6 +2502,7 @@ describe("MatrixClient", function () {
             await client.redactEvent(roomId, eventId, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("overload with null threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -2331,6 +2517,7 @@ describe("MatrixClient", function () {
             await client.redactEvent(roomId, null, eventId, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("overload with threadId works", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -2345,6 +2532,7 @@ describe("MatrixClient", function () {
             await client.redactEvent(roomId, "$threadId:server", eventId, txnId);
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("does not get wrongly encrypted", async () => {
             const eventId = "$eventId:example.org";
             const txnId = client.makeTxnId();
@@ -2382,6 +2570,7 @@ describe("MatrixClient", function () {
                 );
             });
 
+            // eslint-disable-next-line @vitest/expect-expect
             it("and the server has unstable support for relation based redactions, it should send 'org.matrix.msc3912.with_relations' in the request body", async () => {
                 unstableFeatures["org.matrix.msc3912"] = true;
                 // load supported features
@@ -2396,7 +2585,7 @@ describe("MatrixClient", function () {
                             `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
                             `/${encodeURIComponent(txnId)}`,
                         expectBody: {
-                            reason: "redaction test",
+                            "reason": "redaction test",
                             ["org.matrix.msc3912.with_relations"]: ["m.reference"],
                         },
                         data: { event_id: eventId },
@@ -2418,7 +2607,7 @@ describe("MatrixClient", function () {
         const mockRoom = {
             getMyMembership: () => KnownMembership.Join,
             updatePendingEvent: (event: MatrixEvent, status: EventStatus) => event.setStatus(status),
-            hasEncryptionStateEvent: jest.fn().mockReturnValue(true),
+            hasEncryptionStateEvent: vi.fn().mockReturnValue(true),
         } as unknown as Room;
 
         let mockCrypto: Mocked<CryptoBackend>;
@@ -2438,9 +2627,9 @@ describe("MatrixClient", function () {
                 return mockRoom;
             };
             mockCrypto = {
-                isEncryptionEnabledInRoom: jest.fn().mockResolvedValue(true),
-                encryptEvent: jest.fn(),
-                stop: jest.fn(),
+                isEncryptionEnabledInRoom: vi.fn().mockResolvedValue(true),
+                encryptEvent: vi.fn(),
+                stop: vi.fn(),
             } as unknown as Mocked<CryptoBackend>;
             client["cryptoBackend"] = mockCrypto;
         });
@@ -2451,6 +2640,7 @@ describe("MatrixClient", function () {
             expect(httpLookups.filter((h) => h.path.includes("/send/")).length).toBe(0);
         }
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should cancel an event which is queued", () => {
             event.setStatus(EventStatus.QUEUED);
             client.scheduler?.queueEvent(event);
@@ -2476,6 +2666,7 @@ describe("MatrixClient", function () {
             assertCancelled();
         });
 
+        // eslint-disable-next-line @vitest/expect-expect
         it("should cancel an event which is not sent", () => {
             event.setStatus(EventStatus.NOT_SENT);
             client.cancelPendingEvent(event);
@@ -2535,10 +2726,10 @@ describe("MatrixClient", function () {
 
     describe("read-markers and read-receipts", () => {
         it("setRoomReadMarkers", () => {
-            client.setRoomReadMarkersHttpRequest = jest.fn();
+            client.setRoomReadMarkersHttpRequest = vi.fn();
             const room = {
-                hasPendingEvent: jest.fn().mockReturnValue(false),
-                addLocalEchoReceipt: jest.fn(),
+                hasPendingEvent: vi.fn().mockReturnValue(false),
+                addLocalEchoReceipt: vi.fn(),
             } as unknown as Room;
             const rrEvent = new MatrixEvent({ event_id: "read_event_id" });
             const rpEvent = new MatrixEvent({ event_id: "read_private_event_id" });
@@ -2573,7 +2764,7 @@ describe("MatrixClient", function () {
         const content = makeBeaconInfoContent(100, true);
 
         beforeEach(() => {
-            mocked(client.http.authedRequest).mockClear().mockResolvedValue({});
+            vi.mocked(client.http.authedRequest).mockClear().mockResolvedValue({});
         });
 
         it("creates new beacon info", async () => {
@@ -2581,7 +2772,7 @@ describe("MatrixClient", function () {
 
             // event type combined
             const expectedEventType = M_BEACON_INFO.name;
-            const [method, path, queryParams, requestContent] = mocked(client.http.authedRequest).mock.calls[0];
+            const [method, path, queryParams, requestContent] = vi.mocked(client.http.authedRequest).mock.calls[0];
             expect(method).toBe("PUT");
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
@@ -2595,7 +2786,7 @@ describe("MatrixClient", function () {
             await client.unstable_setLiveBeacon(roomId, content);
 
             // event type combined
-            const [, path, , requestContent] = mocked(client.http.authedRequest).mock.calls[0];
+            const [, path, , requestContent] = vi.mocked(client.http.authedRequest).mock.calls[0];
             expect(path).toEqual(
                 `/rooms/${encodeURIComponent(roomId)}/state/` +
                     `${encodeURIComponent(M_BEACON_INFO.name)}/${encodeURIComponent(userId)}`,
@@ -2606,7 +2797,7 @@ describe("MatrixClient", function () {
         describe("processBeaconEvents()", () => {
             it("does nothing when events is falsy", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
+                const roomStateProcessSpy = vi.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, undefined);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
@@ -2614,7 +2805,7 @@ describe("MatrixClient", function () {
 
             it("does nothing when events is of length 0", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
+                const roomStateProcessSpy = vi.spyOn(room.currentState, "processBeaconEvents");
 
                 client.processBeaconEvents(room, []);
                 expect(roomStateProcessSpy).not.toHaveBeenCalled();
@@ -2622,7 +2813,7 @@ describe("MatrixClient", function () {
 
             it("calls room states processBeaconEvents with events", () => {
                 const room = new Room(roomId, client, userId);
-                const roomStateProcessSpy = jest.spyOn(room.currentState, "processBeaconEvents");
+                const roomStateProcessSpy = vi.spyOn(room.currentState, "processBeaconEvents");
 
                 const messageEvent = testUtils.mkMessage({ room: roomId, user: userId, event: true });
                 const beaconEvent = makeBeaconEvent(userId);
@@ -2636,7 +2827,7 @@ describe("MatrixClient", function () {
     describe("setRoomTopic", () => {
         const roomId = "!foofoofoofoofoofoo:matrix.org";
         const createSendStateEventMock = (topic: string, htmlTopic?: string) => {
-            return jest.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
+            return vi.fn().mockImplementation((roomId: string, eventType: string, content: any, stateKey: string) => {
                 expect(roomId).toEqual(roomId);
                 expect(eventType).toEqual(EventType.RoomTopic);
                 expect(content).toMatchObject(ContentHelpers.makeTopicContent(topic, htmlTopic));
@@ -2672,7 +2863,7 @@ describe("MatrixClient", function () {
         const newPassword = "newpassword";
 
         const passwordTest = (expectedRequestContent: any) => {
-            const [method, path, queryParams, requestContent] = mocked(client.http.authedRequest).mock.calls[0];
+            const [method, path, queryParams, requestContent] = vi.mocked(client.http.authedRequest).mock.calls[0];
             expect(method).toBe("POST");
             expect(path).toEqual("/account/password");
             expect(queryParams).toBeFalsy();
@@ -2680,7 +2871,7 @@ describe("MatrixClient", function () {
         };
 
         beforeEach(() => {
-            mocked(client.http.authedRequest).mockClear().mockResolvedValue({});
+            vi.mocked(client.http.authedRequest).mockClear().mockResolvedValue({});
         });
 
         it("no logout_devices specified", async () => {
@@ -2719,25 +2910,25 @@ describe("MatrixClient", function () {
             const response = {
                 aliases: ["#woop:example.org", "#another:example.org"],
             };
-            mocked(client.http.authedRequest).mockClear().mockResolvedValue(response);
+            vi.mocked(client.http.authedRequest).mockClear().mockResolvedValue(response);
 
             const roomId = "!whatever:example.org";
             const result = await client.getLocalAliases(roomId);
 
             // Current version of the endpoint we support is v3
-            const [method, path, queryParams, data, opts] = mocked(client.http.authedRequest).mock.calls[0];
+            const [method, path, queryParams, data, opts] = vi.mocked(client.http.authedRequest).mock.calls[0];
             expect(data).toBeFalsy();
             expect(method).toBe("GET");
             expect(path).toEqual(`/rooms/${encodeURIComponent(roomId)}/aliases`);
             expect(opts).toMatchObject({ prefix: "/_matrix/client/v3" });
             expect(queryParams).toBeFalsy();
-            expect(result!.aliases).toEqual(response.aliases);
+            expect(result.aliases).toEqual(response.aliases);
         });
     });
 
     describe("pollingTurnServers", () => {
         afterEach(() => {
-            mocked(supportsMatrixCall).mockReset();
+            vi.mocked(supportsMatrixCall).mockReset();
         });
 
         it("is false if the client isn't started", () => {
@@ -2746,14 +2937,14 @@ describe("MatrixClient", function () {
         });
 
         it("is false if VoIP is not supported", async () => {
-            mocked(supportsMatrixCall).mockReturnValue(false);
+            vi.mocked(supportsMatrixCall).mockReturnValue(false);
             makeClient(); // create the client a second time so it picks up the supportsMatrixCall mock
             await client.startClient();
             expect(client.pollingTurnServers).toBe(false);
         });
 
         it("is true if VoIP is supported", async () => {
-            mocked(supportsMatrixCall).mockReturnValue(true);
+            vi.mocked(supportsMatrixCall).mockReturnValue(true);
             makeClient(); // create the client a second time so it picks up the supportsMatrixCall mock
             await client.startClient();
             expect(client.pollingTurnServers).toBe(true);
@@ -2762,7 +2953,7 @@ describe("MatrixClient", function () {
 
     describe("checkTurnServers", () => {
         beforeEach(() => {
-            mocked(supportsMatrixCall).mockReturnValue(true);
+            vi.mocked(supportsMatrixCall).mockReturnValue(true);
         });
 
         beforeEach(() => {
@@ -2770,7 +2961,7 @@ describe("MatrixClient", function () {
         });
 
         afterAll(() => {
-            mocked(supportsMatrixCall).mockReset();
+            vi.mocked(supportsMatrixCall).mockReset();
         });
 
         it("emits an event when new TURN creds are found", async () => {
@@ -2783,7 +2974,7 @@ describe("MatrixClient", function () {
                 username: "1443779631:@user:example.com",
                 password: "JlKfBy1QwLrO20385QyAtEyIv0=",
             } as unknown as ITurnServerResponse;
-            jest.spyOn(client, "turnServer").mockResolvedValue(turnServer);
+            vi.spyOn(client, "turnServer").mockResolvedValue(turnServer);
 
             const events: any[][] = [];
             const onTurnServers = (...args: any[]) => events.push(args);
@@ -2805,7 +2996,7 @@ describe("MatrixClient", function () {
 
         it("emits an event when an error occurs", async () => {
             const error = new Error(":(");
-            jest.spyOn(client, "turnServer").mockRejectedValue(error);
+            vi.spyOn(client, "turnServer").mockRejectedValue(error);
 
             const events: any[][] = [];
             const onTurnServersError = (...args: any[]) => events.push(args);
@@ -2817,7 +3008,7 @@ describe("MatrixClient", function () {
 
         it("considers 403 errors fatal", async () => {
             const error = { httpStatus: 403 };
-            jest.spyOn(client, "turnServer").mockRejectedValue(error);
+            vi.spyOn(client, "turnServer").mockRejectedValue(error);
 
             const events: any[][] = [];
             const onTurnServersError = (...args: any[]) => events.push(args);
@@ -2834,11 +3025,11 @@ describe("MatrixClient", function () {
         const accessToken = "sometoken";
 
         beforeEach(() => {
-            mocked(supportsMatrixCall).mockReturnValue(true);
+            vi.mocked(supportsMatrixCall).mockReturnValue(true);
         });
 
         afterAll(() => {
-            mocked(supportsMatrixCall).mockReset();
+            vi.mocked(supportsMatrixCall).mockReset();
         });
 
         it("should not call /voip/turnServer when disableVoip = true", () => {
@@ -2868,7 +3059,7 @@ describe("MatrixClient", function () {
             });
 
             // The call will trigger the request if VoIP is supported
-            expect(fetchMock.called(`${baseUrl}/_matrix/client/unstable/voip/turnServer`)).toBe(false);
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/unstable/voip/turnServer`)).toBe(false);
         });
 
         it("should return null from createCall when disableVoip = true", () => {
@@ -3149,7 +3340,7 @@ describe("MatrixClient", function () {
             const newSourceRoom = client.getRoom(NEW_SOURCE_ROOM_ID) as WrappedRoom;
 
             // Fetch the list of sources and check that we do not have the new room yet.
-            const policies = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
+            const policies = client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies).toBeTruthy();
             const ignoreInvites = policies[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites).toBeTruthy();
@@ -3163,7 +3354,7 @@ describe("MatrixClient", function () {
             expect(added2).toBe(false);
 
             // Fetch the list of sources and check that we have added the new room.
-            const policies2 = await client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
+            const policies2 = client.getAccountData(POLICIES_ACCOUNT_EVENT_TYPE.name)!.getContent();
             expect(policies2).toBeTruthy();
             const ignoreInvites2 = policies2[IGNORE_INVITES_ACCOUNT_EVENT_KEY.name];
             expect(ignoreInvites2).toBeTruthy();
@@ -3221,17 +3412,11 @@ describe("MatrixClient", function () {
 
         /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
         async function setUpClient(): Promise<MatrixClient> {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
-
             mockInitialApiRequests(TEST_HOMESERVER_URL, userId);
 
             const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
             await client.startClient();
 
-            // Remember to stop the client again, to stop it spamming logs and HTTP requests
-            afterTestHooks.push(() => client.stopClient());
             return client;
         }
 
@@ -3248,10 +3433,10 @@ describe("MatrixClient", function () {
                 `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+            fetchMock.put(url, testresponse);
 
             // suppress the expected warning on the console
-            jest.spyOn(console, "warn").mockImplementation();
+            vi.spyOn(console, "warn").mockImplementation(() => {});
 
             // WHEN we call `setAccountData` ...
             const result = await client.setAccountData(eventType, content);
@@ -3260,12 +3445,11 @@ describe("MatrixClient", function () {
             expect(result).toEqual(testresponse);
 
             // and the REST call should have happened, and had the correct content
-            const lastCall = fetchMock.lastCall("put-account-data");
+            const lastCall = fetchMock.callHistory.lastCall(url);
             expect(lastCall).toBeDefined();
-            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+            expect(lastCall?.options?.body).toEqual(JSON.stringify(content));
 
             // and a warning should have been logged
-            // eslint-disable-next-line no-console
             expect(console.warn).toHaveBeenCalledWith(
                 expect.stringContaining("Calling `setAccountData` before the client is started"),
             );
@@ -3285,19 +3469,19 @@ describe("MatrixClient", function () {
                 `/_matrix/client/v3/user/${encodeURIComponent(client.getSafeUserId())}/account_data/${eventType}`,
                 TEST_HOMESERVER_URL,
             ).toString();
-            fetchMock.put({ url, name: "put-account-data" }, testresponse);
+            fetchMock.put(url, testresponse);
 
             // WHEN we call `setAccountData` ...
             const setProm = client.setAccountData(eventType, content);
 
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
             // THEN, the REST call should have happened, and had the correct content
-            const lastCall = fetchMock.lastCall("put-account-data");
+            const lastCall = fetchMock.callHistory.lastCall(url);
             expect(lastCall).toBeDefined();
-            expect(lastCall?.[1]?.body).toEqual(JSON.stringify(content));
+            expect(lastCall?.options?.body).toEqual(JSON.stringify(content));
 
             // Even after waiting a bit more, the method should not yet have returned
-            await jest.advanceTimersByTimeAsync(10);
+            await vi.advanceTimersByTimeAsync(10);
             let finished = false;
             setProm.finally(() => (finished = true));
             expect(finished).toBeFalsy();
@@ -3331,7 +3515,7 @@ describe("MatrixClient", function () {
             syncResponder.sendOrQueueSyncResponse({
                 account_data: { events: [{ type: eventType, content: syncedContent }] },
             });
-            await jest.advanceTimersByTimeAsync(1);
+            await vi.advanceTimersByTimeAsync(1);
 
             // Check that getAccountData is ready
             expect(client.getAccountData(eventType)?.event).toEqual({ type: eventType, content: syncedContent });
@@ -3340,105 +3524,7 @@ describe("MatrixClient", function () {
             await client.setAccountData(eventType, content);
 
             // THEN there should be no REST call
-            expect(fetchMock.calls(/account_data/).length).toEqual(0);
-        });
-    });
-
-    describe("delete account data", () => {
-        const TEST_HOMESERVER_URL = "https://alice-server.com";
-
-        /** Create and start a MatrixClient, connected to the `TEST_HOMESERVER_URL` */
-        async function setUpClient(versionsResponse: object = { versions: ["1"] }): Promise<MatrixClient> {
-            // anything that we don't have a specific matcher for silently returns a 404
-            fetchMock.catch(404);
-            fetchMock.config.warnOnFallback = false;
-
-            fetchMock.getOnce(new URL("/_matrix/client/versions", TEST_HOMESERVER_URL).toString(), versionsResponse, {
-                overwriteRoutes: true,
-            });
-            fetchMock.getOnce(
-                new URL("/_matrix/client/v3/pushrules/", TEST_HOMESERVER_URL).toString(),
-                {},
-                { overwriteRoutes: true },
-            );
-            fetchMock.postOnce(
-                new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, TEST_HOMESERVER_URL).toString(),
-                { filter_id: "fid" },
-                { overwriteRoutes: true },
-            );
-
-            const client = createClient({ baseUrl: TEST_HOMESERVER_URL, userId });
-            await client.startClient();
-
-            // Remember to stop the client again, to stop it spamming logs and HTTP requests
-            afterTestHooks.push(() => client.stopClient());
-            return client;
-        }
-
-        it("makes correct request when deletion is supported by server in unstable versions", async () => {
-            const eventType = "im.vector.test";
-            const versionsResponse = {
-                versions: ["1"],
-                unstable_features: {
-                    "org.matrix.msc3391": true,
-                },
-            };
-            const client = await setUpClient(versionsResponse);
-
-            const url = new URL(
-                `/_matrix/client/unstable/org.matrix.msc3391/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
-                TEST_HOMESERVER_URL,
-            ).toString();
-            fetchMock.delete({ url, name: "delete-data" }, {});
-
-            await client.deleteAccountData(eventType);
-
-            expect(fetchMock.calls("delete-data").length).toEqual(1);
-        });
-
-        it("makes correct request when deletion is supported by server based on matrix version", async () => {
-            const eventType = "im.vector.test";
-            // we don't have a stable version for account data deletion yet to test this code path with
-            // so mock the support map to fake stable support
-            const stableSupportedDeletionMap = new Map();
-            stableSupportedDeletionMap.set(featureUtils.Feature.AccountDataDeletion, featureUtils.ServerSupport.Stable);
-            jest.spyOn(featureUtils, "buildFeatureSupportMap").mockResolvedValue(stableSupportedDeletionMap);
-
-            const client = await setUpClient();
-
-            const url = new URL(
-                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
-                TEST_HOMESERVER_URL,
-            ).toString();
-            fetchMock.delete({ url, name: "delete-data" }, {});
-
-            await client.deleteAccountData(eventType);
-
-            expect(fetchMock.calls("delete-data").length).toEqual(1);
-        });
-
-        it("makes correct request when deletion is not supported by server", async () => {
-            const eventType = "im.vector.test";
-
-            const syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
-            const client = await setUpClient();
-
-            const url = new URL(
-                `/_matrix/client/v3/user/${encodeURIComponent(userId)}/account_data/${eventType}`,
-                TEST_HOMESERVER_URL,
-            ).toString();
-            fetchMock.put({ url, name: "put-account-data" }, {});
-
-            const setProm = client.deleteAccountData(eventType);
-            syncResponder.sendOrQueueSyncResponse({
-                account_data: { events: [{ type: eventType, content: {} }] },
-            });
-            await setProm;
-
-            // account data updated with empty content
-            const lastCall = fetchMock.lastCall("put-account-data");
-            expect(lastCall).toBeDefined();
-            expect(lastCall?.[1]?.body).toEqual("{}");
+            expect(fetchMock.callHistory.calls(/account_data/).length).toEqual(0);
         });
     });
 
@@ -3696,7 +3782,7 @@ describe("MatrixClient", function () {
                     room3.addLiveEvents([tombstoneEvent(room4.roomId, room3.roomId)], { addToState: true });
                 }
 
-                mocked(store.getRoom).mockImplementation((roomId: string) => {
+                vi.mocked(store.getRoom).mockImplementation((roomId: string) => {
                     return { room1, room2, room3, room4 }[roomId] || null;
                 });
 
@@ -3740,7 +3826,7 @@ describe("MatrixClient", function () {
                 dynRoom4.addLiveEvents([tombstoneEvent(dynRoom5.roomId, dynRoom4.roomId)], { addToState: true });
                 dynRoom5.addLiveEvents([predecessorEvent(dynRoom5.roomId, dynRoom4.roomId)], { addToState: true });
 
-                mocked(store.getRoom)
+                vi.mocked(store.getRoom)
                     .mockClear()
                     .mockImplementation((roomId: string) => {
                         return { room1, room2, room3, room4, dynRoom1, dynRoom2, dynRoom4, dynRoom5 }[roomId] || null;
@@ -3756,7 +3842,7 @@ describe("MatrixClient", function () {
 
             it("Returns just this room if there is no predecessor", () => {
                 const mainRoom = new Room("mainRoom", client, "@carol:alexandria.example.com");
-                mocked(store.getRoom).mockReturnValue(mainRoom);
+                vi.mocked(store.getRoom).mockReturnValue(mainRoom);
                 const history = client.getRoomUpgradeHistory(mainRoom.roomId);
                 expect(history).toEqual([mainRoom]);
             });
@@ -3924,9 +4010,9 @@ describe("MatrixClient", function () {
 
         beforeEach(() => {
             mockSecretStorage = {
-                getDefaultKeyId: jest.fn(),
-                hasKey: jest.fn(),
-                isStored: jest.fn(),
+                getDefaultKeyId: vi.fn(),
+                hasKey: vi.fn(),
+                isStored: vi.fn(),
             } as unknown as Mocked<ServerSideSecretStorageImpl>;
             client["_secretStorage"] = mockSecretStorage;
         });
@@ -4040,15 +4126,15 @@ describe("MatrixClient", function () {
                 client.setPushRules(pushRules);
             });
 
-            it("should throw when trying to paginate forwards", async () => {
+            it("should throw when trying to paginate forwards", () => {
                 const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
-                await expect(
-                    async () => await client.paginateEventTimeline(timeline, { backwards: false }),
-                ).rejects.toThrow("paginateNotifTimeline can only paginate backwards");
+                expect(() => client.paginateEventTimeline(timeline, { backwards: false })).toThrow(
+                    "paginateNotifTimeline can only paginate backwards",
+                );
             });
 
             it("defaults limit to 30 events", async () => {
-                jest.spyOn(client.http, "authedRequest");
+                vi.spyOn(client.http, "authedRequest");
                 const timeline = client.getNotifTimelineSet()!.getLiveTimeline();
                 await client.paginateEventTimeline(timeline, { backwards: true });
 
@@ -4117,7 +4203,7 @@ describe("MatrixClient", function () {
                 data: {},
             };
             httpLookups = [response];
-            jest.spyOn(client.http, "authedRequest").mockClear();
+            vi.spyOn(client.http, "authedRequest").mockClear();
         });
 
         it("should make correct request to set pusher", async () => {
@@ -4139,58 +4225,60 @@ describe("MatrixClient", function () {
 
     describe("getAuthMetadata", () => {
         beforeEach(() => {
-            fetchMock.mockReset();
-            // This request is made by oidc-client-ts so is not intercepted by httpLookups
-            fetchMock.get("https://auth.org/jwks", {
-                status: 200,
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                keys: [],
-            });
+            makeClient();
         });
 
-        it("should use unstable prefix", async () => {
-            const metadata = mockOpenIdConfiguration();
+        it("should use stable prefix", async () => {
+            const metadata = makeDelegatedAuthMetadata();
+            client.getVersions = vi.fn().mockResolvedValue({
+                versions: ["v1.15"],
+            });
             httpLookups = [
                 {
                     method: "GET",
                     path: `/auth_metadata`,
                     data: metadata,
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
+                    prefix: "/_matrix/client/v1",
                 },
             ];
 
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
-            });
+            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
+    });
 
-        it("should fall back to auth_issuer + openid-configuration", async () => {
-            const metadata = mockOpenIdConfiguration();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    error: new MatrixError({ errcode: "M_UNRECOGNIZED" }, 404),
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-                {
-                    method: "GET",
-                    path: `/auth_issuer`,
-                    data: { issuer: metadata.issuer },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
-            fetchMock.get("https://auth.org/.well-known/openid-configuration", metadata);
+    describe("logout", () => {
+        const baseUrl = "https://logout-test.example.org";
+        const userId = "@alice:logout-test.example.org";
+        const accessToken = "test-access-token";
+        const refreshToken = "test-refresh-token";
 
-            await expect(client.getAuthMetadata()).resolves.toEqual({
-                ...metadata,
-                signingKeys: [],
+        it("should call /logout for a non-OAuth2-native session", async () => {
+            fetchMock.postOnce(`${baseUrl}/_matrix/client/v3/logout`, {});
+
+            const client = createClient({ baseUrl, accessToken, userId });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(true);
+        });
+
+        it("should revoke tokens with the delegated auth server instead of calling /logout for an OAuth2-native session", async () => {
+            const authMetadata = makeDelegatedAuthMetadata("https://auth.logout-test.example.org/");
+            fetchMock.get(`${baseUrl}/_matrix/client/versions`, { versions: ["v1.15"] });
+            fetchMock.get(`${baseUrl}/_matrix/client/v1/auth_metadata`, authMetadata);
+            fetchMock.post(authMetadata.revocation_endpoint, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                refreshToken,
+                userId,
+                oauthClientId: "test-client-id",
             });
-            expect(httpLookups.length).toEqual(0);
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(false);
+            expect(fetchMock.callHistory.calls(authMetadata.revocation_endpoint)).toHaveLength(2);
         });
     });
 
@@ -4198,7 +4286,7 @@ describe("MatrixClient", function () {
         it("should return hashed lookup results", async () => {
             const ID_ACCESS_TOKEN = "hello_id_server_please_let_me_make_a_request";
 
-            client.http.idServerRequest = jest.fn().mockImplementation((method, path, params) => {
+            client.http.idServerRequest = vi.fn().mockImplementation((method, path, params) => {
                 if (method === "GET" && path === "/hash_details") {
                     return { algorithms: ["sha256"], lookup_pepper: "carrot" };
                 } else if (method === "POST" && path === "/lookup") {
@@ -4251,6 +4339,203 @@ describe("MatrixClient", function () {
                     extra_field: "foobar",
                 },
             ]);
+        });
+    });
+
+    describe("MSC4195 LiveKit endpoints", () => {
+        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
+
+        describe("_unstable_getLivekitToken", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "thejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("passes on the server name of a remote homeserver", async () => {
+                const body = {
+                    url: "wss://livekit.remote.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    server_name: "remote.example.com",
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "theremotejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "theremotejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
+                    },
+                ];
+                await expect(
+                    client._unstable_getLivekitToken({
+                        url: "wss://not-an-sfu.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+
+        describe("_unstable_delegateDelayedLeave", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    delay_id: "1234567890",
+                } satisfies LivekitDelegateDelayedLeaveRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: {},
+                    },
+                ];
+                expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
+                    },
+                ];
+                await expect(
+                    client._unstable_delegateDelayedLeave({
+                        url: "wss://livekit.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                        delay_id: "1234567890",
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+    });
+
+    describe("Well-known", () => {
+        const A_WELLKNOWN: IClientWellKnown = {
+            "m.homeserver": {
+                base_url: "https://hs.org",
+            },
+            "m.identity_server": {
+                base_url: "https://is.org",
+            },
+        };
+
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
+        it("caches the well-known value", async () => {
+            void client.startClient();
+
+            const value = await client.waitForClientWellKnown();
+            expect(value).toStrictEqual(A_WELLKNOWN);
+
+            const cached = client.getClientWellKnown();
+            expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await client.startClient();
+            await flushPromises();
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known on startup and polls it when clientWellKnownPollPeriod is set", async () => {
+            await client.startClient({ clientWellKnownPollPeriod: 3600 });
+            await flushPromises();
+
+            expect(getRawClientConfig).toHaveBeenCalledTimes(1);
+            expect(client.getClientWellKnown()).toStrictEqual(A_WELLKNOWN);
+
+            await vi.advanceTimersByTimeAsync(3600 * 1000);
+            expect(getRawClientConfig).toHaveBeenCalledTimes(2);
+
+            client.stopClient();
+        });
+    });
+
+    describe("getUrlPreview", () => {
+        it("makes a well-formed request to the new endpoint", async () => {
+            client.getVersions = vi.fn().mockResolvedValue({
+                versions: ["v1.11"],
+            });
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/media/preview_url`,
+                    expectQueryParams: { url: "https://example.org/", ts: "60000" },
+                    data: { "og:title": "Test" },
+                    prefix: "/_matrix/client/v1",
+                },
+            ];
+            expect(await client.getUrlPreview("https://example.org", 60000)).toEqual({
+                "og:title": "Test",
+            });
+        });
+        it("makes a well-formed request to the old endpoint", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/preview_url`,
+                    expectQueryParams: { url: "https://example.org/", ts: "60000" },
+                    data: { "og:title": "Test" },
+                    prefix: "/_matrix/media/v3",
+                },
+            ];
+            expect(await client.getUrlPreview("https://example.org", 60000)).toEqual({
+                "og:title": "Test",
+            });
         });
     });
 });

@@ -1,7 +1,6 @@
 import mkdebug from "debug";
 
-// eslint-disable-next-line no-restricted-imports
-import type EventEmitter from "events";
+import type EventEmitter from "node:events";
 import {
     type IContent,
     type IEvent,
@@ -13,6 +12,7 @@ import {
 import {
     ClientEvent,
     EventType,
+    HistoryVisibility,
     type IJoinedRoom,
     type IPusher,
     type ISyncResponse,
@@ -22,7 +22,7 @@ import {
 } from "../../src";
 import { SyncState } from "../../src/sync";
 import { eventMapperFor } from "../../src/event-mapper";
-import { TEST_ROOM_ID } from "./test-data";
+import { TEST_ROOM_ID } from "./crypto-test-data";
 import { KnownMembership, type Membership } from "../../src/@types/membership";
 
 const debug = mkdebug("test-utils");
@@ -57,14 +57,19 @@ export function syncPromise(client: MatrixClient, count = 1): Promise<void> {
 }
 
 /**
- * Return a sync response which contains a single room (by default TEST_ROOM_ID), with the members given
- * @param roomMembers
- * @param roomId
+ * Return a sync response which contains a single room (by default `TEST_ROOM_ID`), with the members given
+ * and history visibility set to `shared`.
  *
- * @returns the sync response
+ * @param roomMembers - An array of user IDs representing the members of the room.
+ * @param roomHistoryVisibility - The history visibility setting for the room. Defaults to `shared`.
+ * @param roomId - The ID of the room. Defaults to `TEST_ROOM_ID`.
+ * @param encryptStateEvents - A boolean indicating whether state events should be encrypted. Defaults to `false`.
+ *
+ * @returns The sync response object containing the room data.
  */
 export function getSyncResponse(
     roomMembers: string[],
+    roomHistoryVisibility: HistoryVisibility = HistoryVisibility.Shared,
     roomId = TEST_ROOM_ID,
     encryptStateEvents = false,
 ): ISyncResponse {
@@ -83,6 +88,14 @@ export function getSyncResponse(
                     content: {
                         "algorithm": "m.megolm.v1.aes-sha2",
                         "io.element.msc4362.encrypt_state_events": encryptStateEvents,
+                    },
+                }),
+                mkEventCustom({
+                    sender: roomMembers[0],
+                    type: "m.room.history_visibility",
+                    state_key: "",
+                    content: {
+                        history_visibility: roomHistoryVisibility,
                     },
                 }),
             ],
@@ -133,10 +146,10 @@ export function mock<T>(constr: { new (...args: any[]): T }, name: string): T {
         return "mock" + (name ? " of " + name : "");
     };
     for (const key of Object.getOwnPropertyNames(constr.prototype)) {
-        // eslint-disable-line guard-for-in
         try {
+            // oxlint-disable-next-line unicorn/no-instanceof-builtins
             if (constr.prototype[key] instanceof Function) {
-                result[key] = jest.fn();
+                result[key] = vi.fn();
             }
         } catch {
             // Direct access to some non-function fields of DOM prototypes may
@@ -180,7 +193,7 @@ export function mkEvent(opts: IEventOpts & { event?: boolean }, client?: MatrixC
         throw new Error("Missing .type or .content =>" + JSON.stringify(opts));
     }
     const event: Partial<IEvent> = {
-        type: opts.type as string,
+        type: opts.type,
         room_id: opts.room,
         sender: opts.sender || opts.user, // opts.user for backwards-compat
         content: opts.content,
@@ -591,8 +604,9 @@ export async function advanceTimersUntil<T>(promise: Promise<T>): Promise<T> {
         resolved = true;
     });
 
+    // oxlint-disable-next-line no-unmodified-loop-condition
     while (!resolved) {
-        await jest.advanceTimersByTimeAsync(1);
+        await vi.advanceTimersByTimeAsync(1);
     }
 
     return await promise;
@@ -640,8 +654,9 @@ export function waitFor<T>(
         if (usingJestFakeTimers) {
             checkCallback();
 
+            // oxlint-disable-next-line no-unmodified-loop-condition
             while (!finished) {
-                jest.advanceTimersByTime(interval);
+                vi.advanceTimersByTime(interval);
 
                 // Could have timed-out
                 if (finished) break;

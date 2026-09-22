@@ -51,6 +51,7 @@ function validateMediaId(mediaId: string): boolean {
  * for authenticated media will *not* be checked - it is the caller's responsibility
  * to do so before calling this function. Note also that `useAuthentication`
  * implies `allowRedirects`. Defaults to false (unauthenticated endpoints).
+ * @param animated - Whether the desired thumbnail should be animated.
  * @returns The complete URL to the content, may be an empty string if the provided mxc is not valid.
  */
 export function getHttpUriForMxc(
@@ -62,6 +63,7 @@ export function getHttpUriForMxc(
     allowDirectLinks = false,
     allowRedirects?: boolean,
     useAuthentication?: boolean,
+    animated?: boolean,
 ): string {
     if (typeof mxc !== "string" || !mxc) {
         return "";
@@ -106,6 +108,9 @@ export function getHttpUriForMxc(
     }
     if (resizeMethod) {
         url.searchParams.set("method", resizeMethod);
+    }
+    if (animated !== undefined) {
+        url.searchParams.set("animated", String(animated));
     }
 
     if (typeof allowRedirects === "boolean") {

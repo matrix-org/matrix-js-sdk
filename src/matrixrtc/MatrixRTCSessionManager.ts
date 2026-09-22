@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,8 +20,10 @@ import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession, type SlotDescription } from "./MatrixRTCSession.ts";
+import { MatrixRTCSession } from "./MatrixRTCSession.ts";
 import { EventType } from "../@types/event.ts";
+import { type RtcSlotEventContent, type SlotDescription } from "./types.ts";
+import { computeSlotId } from "./utils.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -56,10 +58,10 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     public constructor(
         rootLogger: Logger,
         private client: MatrixClient,
-        private readonly slotDescription: SlotDescription = { application: "m.call", id: "" }, // Default to the Matrix Call application
+        private readonly slotDescription: SlotDescription = { application: "m.call", id: "ROOM" }, // Default to the Matrix Call application
     ) {
         super();
-        this.logger = rootLogger.getChild("[MatrixRTCSessionManager]");
+        this.logger = rootLogger.getChild(`[MatrixRTCSessionManager ${computeSlotId(slotDescription)}]`);
     }
 
     public start(): void {
@@ -97,6 +99,25 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     }
 
     /**
+     * Reads the current slot state event's content for the given room's session.
+     *
+     * @returns The slot event's content, or `undefined` if no slot event exists for the session.
+     */
+    public getRtcSlot(room: Room): RtcSlotEventContent | undefined {
+        return this.getRoomSession(room).getRtcSlot();
+    }
+
+    /**
+     * Whether the given room's slot is closed.
+     *
+     * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
+     * if no slot exists.
+     */
+    public isSlotClosed(room: Room): boolean | undefined {
+        return this.getRoomSession(room).isSlotClosed();
+    }
+
+    /**
      * Gets the main MatrixRTC session for a room, returning an empty session
      * if no members are currently participating
      */
@@ -127,7 +148,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     };
 
     private readonly onRoomState = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.GroupCallMemberPrefix) {
+        if (event.getType() !== EventType.GroupCallMemberPrefix && event.getType() !== EventType.RTCSlot) {
             return;
         }
         const room = this.client.getRoom(event.getRoomId());
@@ -151,7 +172,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // Alternatively we would need to setup some event emission when the RTC session ended.
         // TODO we want to add the emission en session end. This makes the responsibility of the session manager more clear.
 
-        await session._onRTCSessionMemberUpdate().catch((error) => {
+        await session.ensureRecalculateSessionMembers().catch((error) => {
             this.logger.error(`Error updating RTC session members for ${room.roomId}: ${error}`);
         });
 

@@ -1,10 +1,10 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`RustCrypto importing and exporting room keys should import and export keys 1`] = `
+exports[`RustCrypto > importing and exporting room keys > should import and export keys 1`] = `
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
-  "org.matrix.msc3061.shared_history": false,
+  "m.shared_history": true,
   "room_id": "!room:id",
   "sender_claimed_keys": {
     "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0",
@@ -15,11 +15,11 @@ exports[`RustCrypto importing and exporting room keys should import and export k
 }
 `;
 
-exports[`RustCrypto importing and exporting room keys should import and export keys as JSON 1`] = `
+exports[`RustCrypto > importing and exporting room keys > should import and export keys as JSON 1`] = `
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
-  "org.matrix.msc3061.shared_history": false,
+  "m.shared_history": true,
   "room_id": "!room:id",
   "sender_claimed_keys": {
     "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0",

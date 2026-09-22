@@ -14,22 +14,38 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import type { Mocked, MockedFunction } from "jest-mock";
+import fetchMock from "@fetch-mock/vitest";
+import { type Mocked, type MockedFunction } from "vitest";
+
 import { FetchHttpApi } from "../../../src/http-api/fetch";
 import { TypedEventEmitter } from "../../../src/models/typed-event-emitter";
 import {
     ClientPrefix,
-    ConnectionError,
     HttpApiEvent,
     type HttpApiEventHandlerMap,
     IdentityPrefix,
     type IHttpOpts,
     MatrixError,
     Method,
+    TokenRefreshError,
 } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
 import { type QueryDict, sleep } from "../../../src/utils";
 import { type Logger } from "../../../src/logger";
+import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
+
+function makeTokenResponse(
+    accessToken: string,
+    refreshToken?: string,
+    expiresIn?: number,
+): { access_token: string; refresh_token?: string; token_type: string; expires_in?: number } {
+    return {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        token_type: "Bearer",
+        expires_in: expiresIn,
+    };
+}
 
 describe("FetchHttpApi", () => {
     const baseUrl = "http://baseUrl";
@@ -38,7 +54,7 @@ describe("FetchHttpApi", () => {
     const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
 
     beforeEach(() => {
-        jest.useRealTimers();
+        vi.useRealTimers();
     });
 
     it("should support aborting multiple times", () => {
@@ -47,29 +63,29 @@ describe("FetchHttpApi", () => {
 
         api.request(Method.Get, "/foo");
         api.request(Method.Get, "/baz");
-        expect(fetchFn.mock.calls[0][0].href.endsWith("/foo")).toBeTruthy();
-        expect(fetchFn.mock.calls[0][1].signal.aborted).toBeFalsy();
-        expect(fetchFn.mock.calls[1][0].href.endsWith("/baz")).toBeTruthy();
-        expect(fetchFn.mock.calls[1][1].signal.aborted).toBeFalsy();
+        expect((fetchFn.mock.calls[0][0] as URL).href.endsWith("/foo")).toBeTruthy();
+        expect(fetchFn.mock.calls[0][1]?.signal?.aborted).toBeFalsy();
+        expect((fetchFn.mock.calls[1][0] as URL).href.endsWith("/baz")).toBeTruthy();
+        expect(fetchFn.mock.calls[1][1]?.signal?.aborted).toBeFalsy();
 
         api.abort();
-        expect(fetchFn.mock.calls[0][1].signal.aborted).toBeTruthy();
-        expect(fetchFn.mock.calls[1][1].signal.aborted).toBeTruthy();
+        expect(fetchFn.mock.calls[0][1]?.signal?.aborted).toBeTruthy();
+        expect(fetchFn.mock.calls[1][1]?.signal?.aborted).toBeTruthy();
 
         api.request(Method.Get, "/bar");
-        expect(fetchFn.mock.calls[2][0].href.endsWith("/bar")).toBeTruthy();
-        expect(fetchFn.mock.calls[2][1].signal.aborted).toBeFalsy();
+        expect((fetchFn.mock.calls[2][0] as URL).href.endsWith("/bar")).toBeTruthy();
+        expect(fetchFn.mock.calls[2][1]?.signal?.aborted).toBeFalsy();
 
         api.abort();
-        expect(fetchFn.mock.calls[2][1].signal.aborted).toBeTruthy();
+        expect(fetchFn.mock.calls[2][1]?.signal?.aborted).toBeTruthy();
     });
 
     it("should fall back to global fetch if fetchFn not provided", () => {
-        globalThis.fetch = jest.fn();
-        expect(globalThis.fetch).not.toHaveBeenCalled();
+        const spy = (globalThis.fetch = vi.fn());
+        expect(spy).not.toHaveBeenCalled();
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, onlyData: true });
         api.fetch("test");
-        expect(globalThis.fetch).toHaveBeenCalled();
+        expect(spy).toHaveBeenCalled();
     });
 
     it("should update identity server base url", () => {
@@ -97,8 +113,8 @@ describe("FetchHttpApi", () => {
                 onlyData: true,
             });
             api.idServerRequest(Method.Get, "/test", { foo: "bar", via: ["a", "b"] }, IdentityPrefix.V2);
-            expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).toBe("bar");
-            expect(fetchFn.mock.calls[0][0].searchParams.getAll("via")).toEqual(["a", "b"]);
+            expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("foo")).toBe("bar");
+            expect((fetchFn.mock.calls[0][0] as URL).searchParams.getAll("via")).toEqual(["a", "b"]);
         });
 
         it("should send params as body for non-GET requests", () => {
@@ -112,8 +128,8 @@ describe("FetchHttpApi", () => {
             });
             const params = { foo: "bar", via: ["a", "b"] };
             api.idServerRequest(Method.Post, "/test", params, IdentityPrefix.V2);
-            expect(fetchFn.mock.calls[0][0].searchParams.get("foo")).not.toBe("bar");
-            expect(JSON.parse(fetchFn.mock.calls[0][1].body)).toStrictEqual(params);
+            expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("foo")).not.toBe("bar");
+            expect(JSON.parse(fetchFn.mock.calls[0][1]!.body as string)).toStrictEqual(params);
         });
 
         it("should add Authorization header if token provided", () => {
@@ -126,7 +142,7 @@ describe("FetchHttpApi", () => {
                 onlyData: true,
             });
             api.idServerRequest(Method.Post, "/test", {}, IdentityPrefix.V2, "token");
-            expect(fetchFn.mock.calls[0][1].headers.Authorization).toBe("Bearer token");
+            expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>).Authorization).toBe("Bearer token");
         });
     });
 
@@ -142,7 +158,7 @@ describe("FetchHttpApi", () => {
 
     it("should set an Accept header, and parse the response as JSON, by default", async () => {
         const result = { a: 1 };
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue(result) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue(result) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(api.requestOtherUrl(Method.Get, "http://url")).resolves.toBe(result);
         expect(fetchFn.mock.calls[0][1].headers.Accept).toBe("application/json");
@@ -150,7 +166,7 @@ describe("FetchHttpApi", () => {
 
     it("should not set an Accept header, and should return text if json=false", async () => {
         const text = "418 I'm a teapot";
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, text: jest.fn().mockResolvedValue(text) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, text: vi.fn().mockResolvedValue(text) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(
             api.requestOtherUrl(Method.Get, "http://url", undefined, {
@@ -162,7 +178,7 @@ describe("FetchHttpApi", () => {
 
     it("should not set an Accept header, and should return a blob, if rawResponseBody is true", async () => {
         const blob = new Blob(["blobby"]);
-        const fetchFn = jest.fn().mockResolvedValue({ ok: true, blob: jest.fn().mockResolvedValue(blob) });
+        const fetchFn = vi.fn().mockResolvedValue({ ok: true, blob: vi.fn().mockResolvedValue(blob) });
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
         await expect(
             api.requestOtherUrl(Method.Get, "http://url", undefined, {
@@ -176,7 +192,7 @@ describe("FetchHttpApi", () => {
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
-            fetchFn: jest.fn(),
+            fetchFn: vi.fn(),
             onlyData: true,
         });
         await expect(
@@ -195,7 +211,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path");
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("token");
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBe("token");
     });
 
     it("should send token via headers by default", async () => {
@@ -208,7 +224,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path");
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBe("Bearer token");
     });
 
     it("should not send a token if not calling `authedRequest`", () => {
@@ -221,8 +237,8 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         api.request(Method.Get, "/path");
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBeFalsy();
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBeFalsy();
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBeFalsy();
     });
 
     it("should ensure no token is leaked out via query params if sending via headers", async () => {
@@ -236,8 +252,8 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", { access_token: "123" });
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBeFalsy();
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer token");
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBeFalsy();
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBe("Bearer token");
     });
 
     it("should not override manually specified access token via query params", async () => {
@@ -251,7 +267,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         await api.authedRequest(Method.Get, "/path", { access_token: "RealToken" });
-        expect(fetchFn.mock.calls[0][0].searchParams.get("access_token")).toBe("RealToken");
+        expect((fetchFn.mock.calls[0][0] as URL).searchParams.get("access_token")).toBe("RealToken");
     });
 
     it("should not override manually specified access token via header", async () => {
@@ -267,7 +283,7 @@ describe("FetchHttpApi", () => {
         await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Authorization: "Bearer RealToken" },
         });
-        expect(fetchFn.mock.calls[0][1].headers["Authorization"]).toBe("Bearer RealToken");
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Authorization"]).toBe("Bearer RealToken");
     });
 
     it("should not override Accept header", async () => {
@@ -276,18 +292,18 @@ describe("FetchHttpApi", () => {
         await api.authedRequest(Method.Get, "/path", undefined, undefined, {
             headers: { Accept: "text/html" },
         });
-        expect(fetchFn.mock.calls[0][1].headers["Accept"]).toBe("text/html");
+        expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>)["Accept"]).toBe("text/html");
     });
 
     it("should emit NoConsent when given errcode=M_CONTENT_NOT_GIVEN", async () => {
-        const fetchFn = jest.fn().mockResolvedValue({
+        const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             headers: {
                 get(name: string): string | null {
                     return name === "Content-Type" ? "application/json" : null;
                 },
             },
-            text: jest.fn().mockResolvedValue(
+            text: vi.fn().mockResolvedValue(
                 JSON.stringify({
                     errcode: "M_CONSENT_NOT_GIVEN",
                     error: "Ye shall ask for consent",
@@ -309,12 +325,19 @@ describe("FetchHttpApi", () => {
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             const api = new FetchHttpApi(emitter, { baseUrl, prefix, fetchFn, onlyData: true });
             await api.authedRequest(Method.Post, "/account/password");
-            expect(fetchFn.mock.calls[0][1].headers.Authorization).toBeUndefined();
+            expect((fetchFn.mock.calls[0][1]!.headers as Record<string, any>).Authorization).toBeUndefined();
         });
 
         describe("with refresh token", () => {
             const accessToken = "test-access-token";
             const refreshToken = "test-refresh-token";
+            const clientId = "test-client-id";
+            const redirectUri = "https://test.org";
+            const authMetadata = makeDelegatedAuthMetadata("https://issuer.org/");
+            const oauth2ClientConfig = {
+                clientId,
+                redirectUri,
+            };
 
             describe("when an unknown token error is encountered", () => {
                 const unknownTokenErrBody = {
@@ -322,7 +345,13 @@ describe("FetchHttpApi", () => {
                     error: "Token is not active",
                     soft_logout: false,
                 };
-                const unknownTokenErr = new MatrixError(unknownTokenErrBody, 401);
+                const unknownTokenErr = new MatrixError(
+                    unknownTokenErrBody,
+                    401,
+                    undefined,
+                    undefined,
+                    expect.anything(),
+                );
                 const unknownTokenResponse = {
                     ok: false,
                     status: 401,
@@ -331,19 +360,19 @@ describe("FetchHttpApi", () => {
                             return name === "Content-Type" ? "application/json" : null;
                         },
                     },
-                    text: jest.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
+                    text: vi.fn().mockResolvedValue(JSON.stringify(unknownTokenErrBody)),
                 };
                 const okayResponse = {
                     ok: true,
                     status: 200,
-                    json: jest.fn().mockResolvedValue({ x: 1 }),
+                    json: vi.fn().mockResolvedValue({ x: 1 }),
                 };
 
-                describe("without a tokenRefreshFunction", () => {
+                describe("without an oauth2ClientConfig", () => {
                     it("should emit logout and throw", async () => {
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
@@ -359,78 +388,68 @@ describe("FetchHttpApi", () => {
                     });
                 });
 
-                describe("with a tokenRefreshFunction", () => {
-                    it("should emit logout and throw when token refresh fails", async () => {
-                        const error = new MatrixError();
-                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                describe("with an oauth2ClientConfig", () => {
+                    const makeOAuthApi = (
+                        fetchFn: MockedFunction<Window["fetch"]>,
+                    ): { api: FetchHttpApi<any>; emitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap> } => {
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
+                        vi.spyOn(emitter, "emit");
                         const api = new FetchHttpApi(emitter, {
                             baseUrl,
                             prefix,
                             fetchFn,
-                            tokenRefreshFunction,
+                            oauth2ClientConfig,
+                            authMetadataCallback: () => Promise.resolve(authMetadata),
                             accessToken,
                             refreshToken,
                             onlyData: true,
                         });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toEqual(
+                        return { api, emitter };
+                    };
+
+                    it("should emit logout and throw when token refresh fails", async () => {
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 400,
+                            body: { errcode: "M_UNKNOWN", error: "failed" },
+                        });
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
-                        const error = new ConnectionError("transitive fault");
-                        const tokenRefreshFunction = jest.fn().mockRejectedValue(error);
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            tokenRefreshFunction,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toEqual(
-                            unknownTokenErr,
+                        fetchMock.post(authMetadata.token_endpoint, { throws: new Error("transitive fault") });
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            new TokenRefreshError(unknownTokenErr),
                         );
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
                         expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should refresh token and retry request", async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockResolvedValue({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 200,
+                            headers: { "Content-Type": "application/json" },
+                            body: makeTokenResponse(newAccessToken, newRefreshToken),
                         });
-                        const fetchFn = jest
+                        const fetchFn = vi
                             .fn()
                             .mockResolvedValueOnce(unknownTokenResponse)
                             .mockResolvedValueOnce(okayResponse);
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            tokenRefreshFunction,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
+                        const { api, emitter } = makeOAuthApi(fetchFn);
                         const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
                             headers: {},
                         });
                         expect(result).toEqual({ x: 1 });
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
+                        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
 
                         expect(fetchFn).toHaveBeenCalledTimes(2);
                         // uses new access token
@@ -448,35 +467,24 @@ describe("FetchHttpApi", () => {
                         // count because it's only to get a token with an expiry)
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
-                        const tokenRefreshFunction = jest.fn().mockReturnValue({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 200,
+                            headers: { "Content-Type": "application/json" },
                             // This needs to be sufficiently high that it's over the threshold for
                             // 'plenty of time' (which is a minute in practice).
-                            expiry: new Date(Date.now() + 5 * 60 * 1000),
+                            body: makeTokenResponse(newAccessToken, newRefreshToken, 5 * 60),
                         });
 
                         // fetch doesn't like our new or old tokens
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            tokenRefreshFunction,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
 
                         // tried to refresh the token once (to get the one with an expiry)
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
-                        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+                        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
 
                         expect(fetchFn).toHaveBeenCalledTimes(2);
                         // uses new access token on retry
@@ -486,53 +494,38 @@ describe("FetchHttpApi", () => {
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
-                    it("should try to refresh the token if it will expire soon", async () => {
+                    it("should try to refresh the token if it will expire soon", { timeout: 20_000 }, async () => {
                         const newAccessToken = "new-access-token";
                         const newRefreshToken = "new-refresh-token";
 
-                        // first refresh is to get a token with an expiry at all, because we
-                        // can't specify an expiry on the token we inject
-                        const tokenRefreshFunction = jest.fn().mockResolvedValueOnce({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 1000),
-                        });
+                        // first two refreshes return a token that will expire 'soon'; the third
+                        // returns one with adequate time left so it stops retrying and fails the request.
+                        fetchMock
+                            .postOnce(authMetadata.token_endpoint, {
+                                status: 200,
+                                headers: { "Content-Type": "application/json" },
+                                body: makeTokenResponse(newAccessToken, newRefreshToken, 1),
+                            })
+                            .postOnce(authMetadata.token_endpoint, {
+                                status: 200,
+                                headers: { "Content-Type": "application/json" },
+                                body: makeTokenResponse(newAccessToken, newRefreshToken, 1),
+                            })
+                            .postOnce(authMetadata.token_endpoint, {
+                                status: 200,
+                                headers: { "Content-Type": "application/json" },
+                                body: makeTokenResponse(newAccessToken, newRefreshToken, 5 * 60),
+                            });
 
-                        // next refresh is to return a token that will expire 'soon'
-                        tokenRefreshFunction.mockResolvedValueOnce({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 1000),
-                        });
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        // ...and finally we return a token that has adequate time left
-                        // so that it will cease retrying and fail the request.
-                        tokenRefreshFunction.mockResolvedValueOnce({
-                            accessToken: newAccessToken,
-                            refreshToken: newRefreshToken,
-                            expiry: new Date(Date.now() + 5 * 60 * 1000),
-                        });
-
-                        const fetchFn = jest.fn().mockResolvedValue(unknownTokenResponse);
-
-                        const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
-                        jest.spyOn(emitter, "emit");
-                        const api = new FetchHttpApi(emitter, {
-                            baseUrl,
-                            prefix,
-                            fetchFn,
-                            tokenRefreshFunction,
-                            accessToken,
-                            refreshToken,
-                            onlyData: true,
-                        });
-                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                        const { api } = makeOAuthApi(fetchFn);
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
 
                         // We should have seen the 3 token refreshes, as above.
-                        expect(tokenRefreshFunction).toHaveBeenCalledWith(refreshToken);
-                        expect(tokenRefreshFunction).toHaveBeenCalledTimes(3);
+                        expect(fetchMock).toHaveFetchedTimes(3, authMetadata.token_endpoint);
                     });
                 });
             });
@@ -543,7 +536,7 @@ describe("FetchHttpApi", () => {
         const localBaseUrl = "http://baseurl";
         const baseUrlWithTrailingSlash = "http://baseurl/";
         const makeApi = (thisBaseUrl = baseUrl): FetchHttpApi<any> => {
-            const fetchFn = jest.fn();
+            const fetchFn = vi.fn();
             const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
             return new FetchHttpApi(emitter, { baseUrl: thisBaseUrl, prefix, fetchFn, onlyData: true });
         };
@@ -596,7 +589,7 @@ describe("FetchHttpApi", () => {
 
         describe("extraParams handling", () => {
             const makeApiWithExtraParams = (extraParams: QueryDict): FetchHttpApi<any> => {
-                const fetchFn = jest.fn();
+                const fetchFn = vi.fn();
                 const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                 return new FetchHttpApi(emitter, {
                     baseUrl: localBaseUrl,
@@ -655,7 +648,7 @@ describe("FetchHttpApi", () => {
             });
 
             it("should work when extraParams is undefined", () => {
-                const fetchFn = jest.fn();
+                const fetchFn = vi.fn();
                 const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                 const api = new FetchHttpApi(emitter, { baseUrl: localBaseUrl, prefix, fetchFn, onlyData: true });
 
@@ -679,11 +672,11 @@ describe("FetchHttpApi", () => {
     });
 
     it("should not log query parameters", async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         const responseResolvers = Promise.withResolvers<Response>();
-        const fetchFn = jest.fn().mockReturnValue(responseResolvers.promise);
+        const fetchFn = vi.fn().mockReturnValue(responseResolvers.promise);
         const mockLogger = {
-            debug: jest.fn(),
+            debug: vi.fn(),
         } as unknown as Mocked<Logger>;
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
@@ -693,7 +686,7 @@ describe("FetchHttpApi", () => {
             onlyData: true,
         });
         const prom = api.requestOtherUrl(Method.Get, "https://server:8448/some/path?query=param#fragment");
-        jest.advanceTimersByTime(1234);
+        vi.advanceTimersByTime(1234);
         responseResolvers.resolve({ ok: true, status: 200, json: () => Promise.resolve("RESPONSE") } as Response);
         await prom;
         expect(mockLogger.debug).not.toHaveBeenCalledWith("fragment");
@@ -712,9 +705,16 @@ describe("FetchHttpApi", () => {
         `);
     });
 
-    it("should not make multiple concurrent refresh token requests", async () => {
-        const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
-        const fetchFn = jest.fn().mockResolvedValue({
+    const makeUnknownTokenRefreshSetup = (issuer: string) => {
+        const authMetadata = makeDelegatedAuthMetadata(issuer);
+        const oauth2ClientConfig = {
+            clientId: "test-client-id",
+            redirectUri: "https://test.org",
+        };
+        const deferredTokenRefresh = Promise.withResolvers<Parameters<typeof fetchMock.post>[1]>();
+        fetchMock.post(authMetadata.token_endpoint, () => deferredTokenRefresh.promise);
+
+        const fetchFn = vi.fn().mockResolvedValue({
             ok: false,
             status: tokenInactiveError.httpStatus,
             async text() {
@@ -724,77 +724,67 @@ describe("FetchHttpApi", () => {
                 return tokenInactiveError.data;
             },
             headers: {
-                get: jest.fn().mockReturnValue("application/json"),
+                get: vi.fn().mockReturnValue("application/json"),
             },
         });
-        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
 
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
             fetchFn,
-            doNotAttemptTokenRefresh: false,
-            tokenRefreshFunction,
+            oauth2ClientConfig,
+            authMetadataCallback: () => Promise.resolve(authMetadata),
             accessToken: "ACCESS_TOKEN",
             refreshToken: "REFRESH_TOKEN",
             onlyData: true,
         });
+
+        return { authMetadata, deferredTokenRefresh, fetchFn, api };
+    };
+
+    const makeSuccessFetchResponse = () => ({
+        ok: true,
+        status: 200,
+        async text() {
+            return "{}";
+        },
+        async json() {
+            return {};
+        },
+        headers: {
+            get: vi.fn().mockReturnValue("application/json"),
+        },
+    });
+
+    it("should not make multiple concurrent refresh token requests", async () => {
+        const { authMetadata, deferredTokenRefresh, fetchFn, api } = makeUnknownTokenRefreshSetup(
+            "https://issuer-concurrent.org/",
+        );
 
         const prom1 = api.authedRequest(Method.Get, "/path1");
         const prom2 = api.authedRequest(Method.Get, "/path2");
 
         await sleep(0); // wait for requests to fire
         expect(fetchFn).toHaveBeenCalledTimes(2);
-        fetchFn.mockResolvedValue({
-            ok: true,
+        fetchFn.mockResolvedValue(makeSuccessFetchResponse());
+        deferredTokenRefresh.resolve({
             status: 200,
-            async text() {
-                return "{}";
-            },
-            async json() {
-                return {};
-            },
-            headers: {
-                get: jest.fn().mockReturnValue("application/json"),
-            },
+            headers: { "Content-Type": "application/json" },
+            body: makeTokenResponse("NEW_ACCESS_TOKEN", "NEW_REFRESH_TOKEN"),
         });
-        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
 
         await prom1;
         await prom2;
         expect(fetchFn).toHaveBeenCalledTimes(4); // 2 original calls + 2 retries
-        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
         expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
         expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });
 
     it("should use newly refreshed token if request starts mid-refresh", async () => {
-        const deferredTokenRefresh = Promise.withResolvers<{ accessToken: string; refreshToken: string }>();
-        const fetchFn = jest.fn().mockResolvedValue({
-            ok: false,
-            status: tokenInactiveError.httpStatus,
-            async text() {
-                return JSON.stringify(tokenInactiveError.data);
-            },
-            async json() {
-                return tokenInactiveError.data;
-            },
-            headers: {
-                get: jest.fn().mockReturnValue("application/json"),
-            },
-        });
-        const tokenRefreshFunction = jest.fn().mockReturnValue(deferredTokenRefresh.promise);
-
-        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
-            baseUrl,
-            prefix,
-            fetchFn,
-            doNotAttemptTokenRefresh: false,
-            tokenRefreshFunction,
-            accessToken: "ACCESS_TOKEN",
-            refreshToken: "REFRESH_TOKEN",
-            onlyData: true,
-        });
+        const { authMetadata, deferredTokenRefresh, fetchFn, api } = makeUnknownTokenRefreshSetup(
+            "https://issuer-midrefresh.org/",
+        );
 
         const prom1 = api.authedRequest(Method.Get, "/path1");
         await sleep(0); // wait for request to fire
@@ -802,20 +792,12 @@ describe("FetchHttpApi", () => {
         const prom2 = api.authedRequest(Method.Get, "/path2");
         await sleep(0); // wait for request to fire
 
-        deferredTokenRefresh.resolve({ accessToken: "NEW_ACCESS_TOKEN", refreshToken: "NEW_REFRESH_TOKEN" });
-        fetchFn.mockResolvedValue({
-            ok: true,
+        deferredTokenRefresh.resolve({
             status: 200,
-            async text() {
-                return "{}";
-            },
-            async json() {
-                return {};
-            },
-            headers: {
-                get: jest.fn().mockReturnValue("application/json"),
-            },
+            headers: { "Content-Type": "application/json" },
+            body: makeTokenResponse("NEW_ACCESS_TOKEN", "NEW_REFRESH_TOKEN"),
         });
+        fetchFn.mockResolvedValue(makeSuccessFetchResponse());
 
         await prom1;
         await prom2;
@@ -826,12 +808,12 @@ describe("FetchHttpApi", () => {
         expect(fetchFn.mock.calls[2][1]).toEqual(
             expect.objectContaining({ headers: expect.objectContaining({ Authorization: "Bearer NEW_ACCESS_TOKEN" }) }),
         );
-        expect(tokenRefreshFunction).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveFetchedTimes(1, authMetadata.token_endpoint);
         expect(api.opts.accessToken).toBe("NEW_ACCESS_TOKEN");
         expect(api.opts.refreshToken).toBe("NEW_REFRESH_TOKEN");
     });
 });
 
-function makeMockFetchFn(): MockedFunction<any> {
-    return jest.fn().mockResolvedValue({ ok: true, json: jest.fn().mockResolvedValue({}) });
+function makeMockFetchFn(): MockedFunction<Window["fetch"]> {
+    return vi.fn().mockResolvedValue({ ok: true, json: vi.fn().mockResolvedValue({}) });
 }

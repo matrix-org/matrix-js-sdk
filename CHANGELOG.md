@@ -1,3 +1,234 @@
+Changes in [42.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.3.0) (2026-09-01)
+==================================================================================================
+## ✨ Features
+
+* Don't treat Matrix-shaped errors as OAuth token refresh grant logouts ([#5473](https://github.com/matrix-org/matrix-js-sdk/pull/5473)). Contributed by @hughns.
+* Update MatrixRTCSession to increase push notification arrival time on mobile clients for element-call ([#5398](https://github.com/matrix-org/matrix-js-sdk/pull/5398)). Contributed by @escix.
+* Add sticky events support to sliding sync (MSC4480) ([#5458](https://github.com/matrix-org/matrix-js-sdk/pull/5458)). Contributed by @eleboucher.
+* Validate that an error from OAuth token refresh looks like an OAuth error before treating as logout ([#5472](https://github.com/matrix-org/matrix-js-sdk/pull/5472)). Contributed by @hughns.
+
+## 🐛 Bug Fixes
+
+* Make setExtendedProfileProperty not throw if the requested property isn't set ([#5484](https://github.com/matrix-org/matrix-js-sdk/pull/5484)). Contributed by @dbkr.
+* make sure `setDefaultKeyId` resolves even if no change is made ([#5485](https://github.com/matrix-org/matrix-js-sdk/pull/5485)). Contributed by @uhoreg.
+
+
+Changes in [42.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.2.0) (2026-08-18)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Fix pre-initialization thread edits when target is known ([#5440](https://github.com/matrix-org/matrix-js-sdk/pull/5440)). Contributed by @basnijholt.
+* Fix package failing to load in Node ESM due to directory import ([#5460](https://github.com/matrix-org/matrix-js-sdk/pull/5460)). Contributed by @syphernl.
+
+
+Changes in [42.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.1.0) (2026-08-04)
+==================================================================================================
+## 🦖 Deprecations
+
+* Remove support for MSC3391 \& MSC3852 ([#5446](https://github.com/matrix-org/matrix-js-sdk/pull/5446)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Allow passing a CA cert PEM when setting up Rust crypto ([#5443](https://github.com/matrix-org/matrix-js-sdk/pull/5443)). Contributed by @andybalaam.
+* Improve types for `/room_keys/version` requests ([#5419](https://github.com/matrix-org/matrix-js-sdk/pull/5419)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Include existing data when updating user profile cache ([#5427](https://github.com/matrix-org/matrix-js-sdk/pull/5427)). Contributed by @dbkr.
+* Fix key backup cached event ordering ([#5281](https://github.com/matrix-org/matrix-js-sdk/pull/5281)). Contributed by @gumadeiras.
+
+
+Changes in [42.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.0.0) (2026-07-21)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Properly support Matrix v1.18 OAuth2 APIs ([#5390](https://github.com/matrix-org/matrix-js-sdk/pull/5390)). Contributed by @t3chguy.
+* Remove unused getContentUri ([#5400](https://github.com/matrix-org/matrix-js-sdk/pull/5400)). Contributed by @t3chguy.
+
+
+Changes in [41.9.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.9.0) (2026-07-07)
+==================================================================================================
+## ✨ Features
+
+* Add method `CryptoApi.getUserCrossSigningKeys` ([#5389](https://github.com/matrix-org/matrix-js-sdk/pull/5389)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Fix restarting delayed events via compatibility path in RoomWidgetClient ([#5380](https://github.com/matrix-org/matrix-js-sdk/pull/5380)). Contributed by @robintown.
+
+
+Changes in [41.8.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.8.0) (2026-06-23)
+==================================================================================================
+## ✨ Features
+
+* MatrixRTC: Preserve original error as `cause` when wrapping in scheduler ([#5363](https://github.com/matrix-org/matrix-js-sdk/pull/5363)). Contributed by @fkwp.
+* Add mechanism to locally enforce MSC1763 retention rules ([#5353](https://github.com/matrix-org/matrix-js-sdk/pull/5353)). Contributed by @Half-Shot.
+
+## 🐛 Bug Fixes
+
+* Fall back to local indexeddb backend when worker fails to start ([#5361](https://github.com/matrix-org/matrix-js-sdk/pull/5361)). Contributed by @t3chguy.
+
+
+Changes in [41.7.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.7.0) (2026-06-09)
+==================================================================================================
+## ✨ Features
+
+* MSC4140: use auth for delayed event management ([#5340](https://github.com/matrix-org/matrix-js-sdk/pull/5340)). Contributed by @AndrewFerr.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] SECURITY: Update matrix-sdk-crypto-wasm to v18.3.1 ([#5356](https://github.com/matrix-org/matrix-js-sdk/pull/5356)). Contributed by @RiotRobot.
+* fix(MatrixRTCSession): replace no-arg .finally() with .then(fn, fn) to fix crash on React Native / Hermes ([#5307](https://github.com/matrix-org/matrix-js-sdk/pull/5307)). Contributed by @JeanLuX.
+
+
+Changes in [41.6.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.6.0) (2026-05-26)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Throw sane error on completeLoginOnNewDevice IdP rejection ([#5321](https://github.com/matrix-org/matrix-js-sdk/pull/5321)). Contributed by @t3chguy.
+
+
+Changes in [41.5.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.5.0) (2026-05-12)
+==================================================================================================
+## ✨ Features
+
+* MSC4108v2024 iteration and support for sign in on new device ([#5283](https://github.com/matrix-org/matrix-js-sdk/pull/5283)). Contributed by @t3chguy.
+* Enable encrypted history sharing by default ([#5300](https://github.com/matrix-org/matrix-js-sdk/pull/5300)). Contributed by @richvdh.
+* Restore functional `start` command ([#5298](https://github.com/matrix-org/matrix-js-sdk/pull/5298)). Contributed by @t3chguy.
+* Support stable identifiers for MSC4268 and MSC4287 ([#5299](https://github.com/matrix-org/matrix-js-sdk/pull/5299)). Contributed by @andybalaam.
+* Implement MSC4429: Profile Updates for Legacy Sync ([#5246](https://github.com/matrix-org/matrix-js-sdk/pull/5246)). Contributed by @Half-Shot.
+* Support stable identifiers for MSC4268 ([#5290](https://github.com/matrix-org/matrix-js-sdk/pull/5290)). Contributed by @andybalaam.
+
+
+Changes in [41.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.4.0) (2026-04-28)
+==================================================================================================
+## ✨ Features
+
+* Handle secret pushing for key backups ([#5189](https://github.com/matrix-org/matrix-js-sdk/pull/5189)). Contributed by @uhoreg.
+* Add support for `m.recent_emoji` account data event ([#5280](https://github.com/matrix-org/matrix-js-sdk/pull/5280)). Contributed by @t3chguy.
+* Adapt LiveKit Identity hash calculation to latest MSC4195 update ([#5268](https://github.com/matrix-org/matrix-js-sdk/pull/5268)). Contributed by @fkwp.
+* Support the stable prefix for MSC4287 (key backup preference) ([#5258](https://github.com/matrix-org/matrix-js-sdk/pull/5258)). Contributed by @andybalaam.
+* Handle response\_mode=fragment in completeAuthorizationCodeGrant ([#5266](https://github.com/matrix-org/matrix-js-sdk/pull/5266)). Contributed by @t3chguy.
+* Allow generating OIDC URIs with response\_mode=fragment ([#5265](https://github.com/matrix-org/matrix-js-sdk/pull/5265)). Contributed by @t3chguy.
+* Expose `UserVerificationStatus.known` flag ([#5255](https://github.com/matrix-org/matrix-js-sdk/pull/5255)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* Allow oidc jwks\_uri to be omitted ([#5271](https://github.com/matrix-org/matrix-js-sdk/pull/5271)). Contributed by @t3chguy.
+
+
+Changes in [41.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.3.0) (2026-04-07)
+==================================================================================================
+## 🐛 Bug Fixes
+
+* Rotate the current room key when we see a member leave ([#5231](https://github.com/matrix-org/matrix-js-sdk/pull/5231)). Contributed by @kaylendog.
+
+
+Changes in [41.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.2.0) (2026-03-24)
+==================================================================================================
+## ✨ Features
+
+* Only share history if room history visibility is shared ([#5216](https://github.com/matrix-org/matrix-js-sdk/pull/5216)). Contributed by @kaylendog.
+* History sharing: resume key-bundle import on restart ([#5214](https://github.com/matrix-org/matrix-js-sdk/pull/5214)). Contributed by @richvdh.
+* Move `CryptoApi.shareRoomHistoryWithUser` to `CryptoBackend` ([#5218](https://github.com/matrix-org/matrix-js-sdk/pull/5218)). Contributed by @richvdh.
+
+
+Changes in [41.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.1.0) (2026-03-10)
+==================================================================================================
+## ✨ Features
+
+* Throw a specific error when the backup decryption key does not match the public backup ([#5202](https://github.com/matrix-org/matrix-js-sdk/pull/5202)). Contributed by @andybalaam.
+* Update getUrlPreview to use /\_matrix/client/v1/media/preview\_url ([#5191](https://github.com/matrix-org/matrix-js-sdk/pull/5191)). Contributed by @Half-Shot.
+
+
+Changes in [41.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v41.0.0) (2026-02-24)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Add support for Matrix Spec v1.13 ([#5160](https://github.com/matrix-org/matrix-js-sdk/pull/5160)). Contributed by @t3chguy.
+
+## ✨ Features
+
+* Download room keys from backup prior to buliding historic room key bundles ([#5171](https://github.com/matrix-org/matrix-js-sdk/pull/5171)). Contributed by @kaylendog.
+* Add support for Matrix Spec v1.13 ([#5160](https://github.com/matrix-org/matrix-js-sdk/pull/5160)). Contributed by @t3chguy.
+* Add logging on MSC4108 DELETE request ([#5140](https://github.com/matrix-org/matrix-js-sdk/pull/5140)). Contributed by @reivilibre.
+* Add `m.invite_permission_config` account data type ([#5183](https://github.com/matrix-org/matrix-js-sdk/pull/5183)). Contributed by @richvdh.
+
+## 🐛 Bug Fixes
+
+* fix(relations): prevent stale m.replace from overriding newer edits ([#5192](https://github.com/matrix-org/matrix-js-sdk/pull/5192)). Contributed by @basnijholt.
+* Fix reactive display name disambiguation ([#5135](https://github.com/matrix-org/matrix-js-sdk/pull/5135)). Contributed by @aditya-cherukuru.
+* Fix empty string to room compatibility trick to only apply to m.call ([#5172](https://github.com/matrix-org/matrix-js-sdk/pull/5172)). Contributed by @toger5.
+
+
+Changes in [40.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.2.0) (2026-02-10)
+==================================================================================================
+## 🦖 Deprecations
+
+* [MatrixRTC] Remove sending of deprecated `notify` event (we now use `m.rtc.notification`) ([#5167](https://github.com/matrix-org/matrix-js-sdk/pull/5167)). Contributed by @toger5.
+
+## ✨ Features
+
+* Use stable /auth\_metadata endpoint where homeserver supports v1.15 ([#5174](https://github.com/matrix-org/matrix-js-sdk/pull/5174)). Contributed by @hughns.
+* Support additional\_creators in upgradeRoom (MSC4289) ([#5173](https://github.com/matrix-org/matrix-js-sdk/pull/5173)). Contributed by @andybalaam.
+* [MatrixRTC] Minimal change to transition from "" to "ROOM" as the callId/slotId ([#5166](https://github.com/matrix-org/matrix-js-sdk/pull/5166)). Contributed by @toger5.
+* [MatrixRTC] Do not send the `livekit_alias` in sticky events ([#5165](https://github.com/matrix-org/matrix-js-sdk/pull/5165)). Contributed by @toger5.
+* Improve startup performance by using `promise.all` when processing rooms from sync ([#5095](https://github.com/matrix-org/matrix-js-sdk/pull/5095)). Contributed by @MidhunSureshR.
+* Add OAuthGrantType enum for OAuth 2.0 API grant types ([#5161](https://github.com/matrix-org/matrix-js-sdk/pull/5161)). Contributed by @hughns.
+* Add support for stable OAuth2.0 aware feature from MSC3824 ([#5159](https://github.com/matrix-org/matrix-js-sdk/pull/5159)). Contributed by @hughns.
+* Give RoomWidgetClient the ability to send and receive sticky events ([#5142](https://github.com/matrix-org/matrix-js-sdk/pull/5142)). Contributed by @robintown.
+
+## 🐛 Bug Fixes
+
+* [js sdk embedded/widget] Fix race where this.syncApi.injectRoomEvents was called before the syncApi is instantiated ([#5168](https://github.com/matrix-org/matrix-js-sdk/pull/5168)). Contributed by @toger5.
+* [MatrixRTC] Fix delayId not resetting on leave ([#5156](https://github.com/matrix-org/matrix-js-sdk/pull/5156)). Contributed by @toger5.
+
+
+Changes in [40.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.1.0) (2026-01-27)
+==================================================================================================
+## 🦖 Deprecations
+
+* Deprecate unused `EventShieldReason` reason codes ([#5127](https://github.com/matrix-org/matrix-js-sdk/pull/5127)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Add stable m.oauth UIA stage enum ([#5138](https://github.com/matrix-org/matrix-js-sdk/pull/5138)). Contributed by @hughns.
+* Add `MatrixEvent.getKeyForwardingUser` ([#5128](https://github.com/matrix-org/matrix-js-sdk/pull/5128)). Contributed by @richvdh.
+* Add types for (unstable) policy servers ([#5116](https://github.com/matrix-org/matrix-js-sdk/pull/5116)). Contributed by @turt2live.
+
+## 🐛 Bug Fixes
+
+* [Backport staging] Recalculate room name on loading members ([#5164](https://github.com/matrix-org/matrix-js-sdk/pull/5164)). Contributed by @RiotRobot.
+* Avoid rapidly retrying failed requests ([#5146](https://github.com/matrix-org/matrix-js-sdk/pull/5146)). Contributed by @andybalaam.
+* [matrixRTC] MatrixRTCSessions, add missing event reemission. ([#5144](https://github.com/matrix-org/matrix-js-sdk/pull/5144)). Contributed by @toger5.
+* Use normal base64 encoding for RTC backend identities ([#5129](https://github.com/matrix-org/matrix-js-sdk/pull/5129)). Contributed by @robintown.
+* export parseCallNotificationContent and isMyMembership from RTC types ([#5132](https://github.com/matrix-org/matrix-js-sdk/pull/5132)). Contributed by @Half-Shot.
+
+
+Changes in [40.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v40.0.0) (2026-01-13)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* MatrixRTC Pseudonymous livekit identities ([#5110](https://github.com/matrix-org/matrix-js-sdk/pull/5110)). Contributed by @toger5.
+
+## 🦖 Deprecations
+
+* Mark `forwardingCurve25519KeyChain` as deprecated ([#5111](https://github.com/matrix-org/matrix-js-sdk/pull/5111)). Contributed by @richvdh.
+* Mark `IEventDecryptionResult` as deprecated ([#5112](https://github.com/matrix-org/matrix-js-sdk/pull/5112)). Contributed by @richvdh.
+
+## ✨ Features
+
+* Implement MSC4387: M\_SAFETY error ([#5107](https://github.com/matrix-org/matrix-js-sdk/pull/5107)). Contributed by @Half-Shot.
+* Implement \_unstable\_getRTCTransports for MSC4143 ([#5104](https://github.com/matrix-org/matrix-js-sdk/pull/5104)). Contributed by @Half-Shot.
+* Use `membershipID` for session events ([#5105](https://github.com/matrix-org/matrix-js-sdk/pull/5105)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Make MatrixRTC encryption key types narrower for TS 5.9 compatibility ([#5117](https://github.com/matrix-org/matrix-js-sdk/pull/5117)). Contributed by @robintown.
+* Re-check outgoing requests after processing them ([#5109](https://github.com/matrix-org/matrix-js-sdk/pull/5109)). Contributed by @andybalaam.
+* Make token refresher init itself lazily ([#5106](https://github.com/matrix-org/matrix-js-sdk/pull/5106)). Contributed by @dbkr.
+
+
 Changes in [39.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v39.4.0) (2025-12-16)
 ==================================================================================================
 ## ✨ Features

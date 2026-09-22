@@ -17,7 +17,7 @@ limitations under the License.
 */
 
 // `expect` is allowed in helper functions which are called within `test`/`it` blocks
-/* eslint-disable jest/no-standalone-expect */
+/* eslint-disable @vitest/no-standalone-expect */
 
 import MockHttpBackend from "matrix-mock-request";
 
@@ -39,7 +39,7 @@ import { type ISyncResponder } from "./test-utils/SyncResponder";
  * Wrapper for a MockStorageApi, MockHttpBackend and MatrixClient
  *
  * @deprecated Avoid using this; it is tied too tightly to matrix-mock-request and is generally inconvenient to use.
- *    Instead, construct a MatrixClient manually, use fetch-mock-jest to intercept the HTTP requests, and
+ *    Instead, construct a MatrixClient manually, use fetch-mock to intercept the HTTP requests, and
  *    use things like {@link E2EKeyReceiver} and {@link SyncResponder} to manage the requests.
  */
 export class TestClient implements IE2EKeyReceiver, ISyncResponder {
@@ -47,6 +47,8 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     public readonly client: MatrixClient;
     public deviceKeys?: IDeviceKeys | null;
     public oneTimeKeys?: Record<string, IOneTimeKey>;
+
+    public readonly _unstable_shouldApplyMessageRetention = false;
 
     constructor(
         public readonly userId?: string,
@@ -229,7 +231,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
      * Calling this will register a response for `/sync`, and then, in the background, flush a single `/sync` request.
      * Try calling {@link syncPromise} to wait for the sync to complete.
      *
-     * @param response - response to /sync request
+     * @param syncResponse - response to /sync request
      */
     public sendOrQueueSyncResponse(syncResponse: object): void {
         this.httpBackend.when("GET", "/sync").respond(200, syncResponse);
@@ -239,7 +241,7 @@ export class TestClient implements IE2EKeyReceiver, ISyncResponder {
     /**
      * flush a single /sync request, and wait for the syncing event
      *
-     * @deprecated: prefer to use {@link #sendOrQueueSyncResponse} followed by {@link syncPromise}.
+     * @deprecated prefer to use {@link #sendOrQueueSyncResponse} followed by {@link syncPromise}.
      */
     public flushSync(): Promise<void> {
         logger.log(`${this}: flushSync`);

@@ -1,5 +1,5 @@
 import { logger as loggerInstance } from "../logger.ts";
-import { type MatrixEvent } from "./event.ts";
+import { type MatrixEvent, MatrixEventEvent } from "./event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 
 const logger = loggerInstance.getChild("RoomStickyEvents");
@@ -85,6 +85,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     /**
      * Get all sticky events that are currently active.
      * @returns An iterable set of events.
+     * @yields {@link StickyMatrixEvent}
      */
     public *getStickyEvents(): Iterable<StickyMatrixEvent> {
         yield* this.unkeyedStickyEvents;
@@ -130,6 +131,13 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      *          and the previous event it may have replaced.
      */
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: StickyMatrixEvent } | { added: false } {
+        // The map is keyed on the event's type and sticky key, both of which are encrypted. Wait for the
+        // event to be decrypted, otherwise it would be filed under `m.room.encrypted` with no sticky key.
+        if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
+            this.addStickyEventOnceDecrypted(event);
+            return { added: false };
+        }
+
         const stickyKey = event.getContent().msc4354_sticky_key;
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
             throw new Error(`${event.getId()} is missing msc4354_sticky_key`);
@@ -186,6 +194,24 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             added: currentEventSet[0] === stickyEvent,
             prevEvent: currentEventSet?.[1],
         };
+    }
+
+    /**
+     * Adds the event to the map once it has been decrypted, emitting `RoomEvent.StickyEvents` at that point.
+     *
+     * Decryption may fail because the keys haven't arrived yet, in which case we keep waiting. An event that
+     * is never decrypted simply never enters the map.
+     */
+    private addStickyEventOnceDecrypted(event: MatrixEvent): void {
+        const onEventDecrypted = (): void => {
+            if (event.isDecryptionFailure()) {
+                // The event may still be decrypted later, e.g. once the keys arrive. Keep listening.
+                event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
+                return;
+            }
+            this.addStickyEvents([event]); // Safe to call because it sorts events by timestamp when updating a keyed entry.
+        };
+        event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
     }
 
     /**

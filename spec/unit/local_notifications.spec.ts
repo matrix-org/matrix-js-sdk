@@ -23,7 +23,7 @@ let client: MatrixClient;
 describe("Local notification settings", () => {
     beforeEach(() => {
         client = new TestClient("@alice:matrix.org", "123", undefined, undefined, undefined).client;
-        client.setAccountData = jest.fn();
+        client.setAccountData = vi.fn();
     });
 
     describe("Lets you set local notification settings", () => {

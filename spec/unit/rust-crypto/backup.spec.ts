@@ -1,12 +1,12 @@
-import { type Mocked } from "jest-mock";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type Mocked } from "vitest";
 
 import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
 import { CryptoEvent, type KeyBackupSession } from "../../../src/crypto-api/index.ts";
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
-import * as testData from "../../test-utils/test-data";
-import * as TestData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
+import * as TestData from "../../test-utils/crypto-test-data";
 import { RustBackupManager, type KeyBackup } from "../../../src/rust-crypto/backup";
 import { logger } from "../../../src/logger.ts";
 
@@ -43,39 +43,39 @@ describe("Upload keys to backup", () => {
     }
 
     beforeEach(async () => {
-        jest.useFakeTimers();
+        vi.useFakeTimers();
         idGenerator = 0;
 
         mockOlmMachine = {
-            getBackupKeys: jest.fn().mockResolvedValue({
-                backupVersion: TestData.SIGNED_BACKUP_DATA.version!,
+            getBackupKeys: vi.fn().mockResolvedValue({
+                backupVersion: TestData.SIGNED_BACKUP_DATA.version,
                 decryptionKey: RustSdkCryptoJs.BackupDecryptionKey.fromBase64(TestData.BACKUP_DECRYPTION_KEY_BASE64),
-            } as unknown as RustSdkCryptoJs.BackupKeys),
-            backupRoomKeys: jest.fn(),
-            isBackupEnabled: jest.fn().mockResolvedValue(true),
-            enableBackupV1: jest.fn(),
-            verifyBackup: jest.fn().mockResolvedValue({
-                trusted: jest.fn().mockResolvedValue(true),
-            } as unknown as RustSdkCryptoJs.SignatureVerification),
-            roomKeyCounts: jest.fn(),
+            } satisfies Partial<RustSdkCryptoJs.BackupKeys>),
+            backupRoomKeys: vi.fn(),
+            isBackupEnabled: vi.fn().mockResolvedValue(true),
+            enableBackupV1: vi.fn(),
+            saveBackupDecryptionKey: vi.fn(),
+            verifyBackup: vi.fn().mockResolvedValue({
+                trusted: vi.fn().mockResolvedValue(true),
+            } satisfies Partial<RustSdkCryptoJs.SignatureVerification>),
+            roomKeyCounts: vi.fn(),
         } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
 
         outgoingRequestProcessor = {
-            makeOutgoingRequest: jest.fn(),
+            makeOutgoingRequest: vi.fn(),
         } as unknown as Mocked<OutgoingRequestProcessor>;
 
         rustBackupManager = new RustBackupManager(logger, mockOlmMachine, httpAPi, outgoingRequestProcessor);
-
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
     });
 
     afterEach(() => {
-        fetchMock.reset();
-        jest.useRealTimers();
-        jest.resetAllMocks();
+        vi.useRealTimers();
+        vi.resetAllMocks();
     });
 
     it("Should call expensive roomKeyCounts only once per loop", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
         const remainingEmitted: number[] = [];
 
         const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
@@ -105,7 +105,7 @@ describe("Upload keys to backup", () => {
         } as unknown as RustSdkCryptoJs.RoomKeyCounts);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         await zeroRemainingWasEmitted;
 
@@ -122,6 +122,8 @@ describe("Upload keys to backup", () => {
     });
 
     it("Should not call expensive roomKeyCounts when only one iteration is needed", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+
         const zeroRemainingWasEmitted = new Promise<void>((resolve) => {
             rustBackupManager.on(CryptoEvent.KeyBackupSessionsRemaining, (count) => {
                 if (count == 0) {
@@ -134,11 +136,51 @@ describe("Upload keys to backup", () => {
         mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(2)).mockResolvedValue(undefined);
 
         await rustBackupManager.checkKeyBackupAndEnable(false);
-        await jest.runAllTimersAsync();
+        await vi.runAllTimersAsync();
 
         await zeroRemainingWasEmitted;
 
         expect(outgoingRequestProcessor.makeOutgoingRequest).toHaveBeenCalledTimes(1);
         expect(mockOlmMachine.roomKeyCounts).toHaveBeenCalledTimes(0);
+    });
+
+    it("Should emit key cached after enabling a newly-created backup", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
+            status: 404,
+            body: {
+                errcode: "M_NOT_FOUND",
+                error: "No backup found",
+            },
+        });
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "42" });
+
+        await rustBackupManager.checkKeyBackupAndEnable(false);
+
+        const keyCachedEventState = Promise.withResolvers<{
+            activeBackupVersion: string | null;
+            eventVersion: string;
+            serverBackupVersion: string | undefined;
+        }>();
+        rustBackupManager.on(CryptoEvent.KeyBackupDecryptionKeyCached, async (eventVersion) => {
+            const [activeBackupVersion, serverBackupInfo] = await Promise.all([
+                rustBackupManager.getActiveBackupVersion(),
+                rustBackupManager.getServerBackupInfo(),
+            ]);
+            keyCachedEventState.resolve({
+                activeBackupVersion,
+                eventVersion,
+                serverBackupVersion: serverBackupInfo?.version,
+            });
+        });
+
+        await rustBackupManager.setupKeyBackup(async () => {});
+
+        await expect(keyCachedEventState.promise).resolves.toEqual({
+            activeBackupVersion: "42",
+            eventVersion: "42",
+            serverBackupVersion: "42",
+        });
+        expect(mockOlmMachine.enableBackupV1).toHaveBeenCalledWith(expect.any(String), "42");
+        expect(mockOlmMachine.saveBackupDecryptionKey).toHaveBeenCalledWith(expect.anything(), "42");
     });
 });

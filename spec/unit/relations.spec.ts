@@ -20,16 +20,16 @@ import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations, RelationsEvent } from "../../src/models/relations";
 import { TestClient } from "../TestClient";
-import { RelationType } from "../../src";
+import { MatrixClient, RelationType } from "../../src";
 import { logger } from "../../src/logger";
 
 describe("Relations", function () {
     afterEach(() => {
-        jest.spyOn(logger, "error").mockRestore();
+        vi.spyOn(logger, "error").mockRestore();
     });
 
     it("should deduplicate annotations", function () {
-        const room = new Room("room123", null!, null!);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
         const relations = new Relations("m.annotation", "m.reaction", room);
 
         // Create an instance of an annotation
@@ -86,13 +86,13 @@ describe("Relations", function () {
         const relationType = RelationType.Reference;
         const eventType = M_POLL_START.stable!;
         const altEventTypes = [M_POLL_START.unstable!];
-        const room = new Room("room123", null!, null!);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
 
         it("should not add events without a relation", async () => {
             // dont pollute console
-            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
             const relations = new Relations(relationType, eventType, room);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
             const event = new MatrixEvent({ type: eventType });
 
             await relations.addEvent(event);
@@ -104,9 +104,9 @@ describe("Relations", function () {
 
         it("should not add events of incorrect event type", async () => {
             // dont pollute console
-            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
             const relations = new Relations(relationType, eventType, room);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
             const event = new MatrixEvent({
                 type: "different-event-type",
                 content: {
@@ -127,7 +127,7 @@ describe("Relations", function () {
 
         it("adds events that match alt event types", async () => {
             const relations = new Relations(relationType, eventType, room, altEventTypes);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
             const event = new MatrixEvent({
                 type: M_POLL_START.unstable!,
                 content: {
@@ -146,7 +146,7 @@ describe("Relations", function () {
         });
 
         it("should not add events of incorrect relation type", async () => {
-            const logSpy = jest.spyOn(logger, "error").mockImplementation(() => {});
+            const logSpy = vi.spyOn(logger, "error").mockImplementation(() => {});
             const relations = new Relations(relationType, eventType, room);
             const event = new MatrixEvent({
                 type: eventType,
@@ -159,7 +159,7 @@ describe("Relations", function () {
             });
 
             await relations.addEvent(event);
-            const emitSpy = jest.spyOn(relations, "emit");
+            const emitSpy = vi.spyOn(relations, "emit");
 
             expect(logSpy).toHaveBeenCalledWith(`Event relation info doesn't match this container`);
             // event not added
@@ -168,6 +168,7 @@ describe("Relations", function () {
         });
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should emit created regardless of ordering", async function () {
         const targetEvent = new MatrixEvent({
             sender: "@bob:example.com",
@@ -192,7 +193,7 @@ describe("Relations", function () {
 
         // Add the target event first, then the relation event
         {
-            const room = new Room("room123", null!, null!);
+            const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
             const relationsCreated = new Promise((resolve) => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
@@ -206,7 +207,7 @@ describe("Relations", function () {
 
         // Add the relation event first, then the target event
         {
-            const room = new Room("room123", null!, null!);
+            const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
             const relationsCreated = new Promise((resolve) => {
                 targetEvent.once(MatrixEventEvent.RelationsCreated, resolve);
             });
@@ -220,7 +221,7 @@ describe("Relations", function () {
     });
 
     it("should re-use Relations between all timeline sets in a room", async () => {
-        const room = new Room("room123", null!, null!);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), null!);
         const timelineSet1 = new EventTimelineSet(room);
         const timelineSet2 = new EventTimelineSet(room);
         expect(room.relations).toBe(timelineSet1.relations);
@@ -229,7 +230,7 @@ describe("Relations", function () {
 
     it("should ignore m.replace for state events", async () => {
         const userId = "@bob:example.com";
-        const room = new Room("room123", null!, userId);
+        const room = new Room("room123", new MatrixClient({ baseUrl: "http://example.org" }), userId);
         const relations = new Relations("m.replace", "m.room.topic", room);
 
         // Create an instance of a state event with rel_type m.replace
@@ -272,6 +273,108 @@ describe("Relations", function () {
         expect(originalTopic.getContent().topic).toBe("orig");
         expect(badlyEditedTopic.replacingEvent()).toBe(null);
         expect(badlyEditedTopic.getContent().topic).toBe("topic");
+    });
+
+    describe("m.replace async ordering", () => {
+        const userId = "@bob:example.com";
+        const roomId = "!room:example.com";
+        const targetEventId = "$target";
+
+        function makeEditEvent(eventId: string, ts: number): MatrixEvent {
+            return new MatrixEvent({
+                sender: userId,
+                type: "m.room.message",
+                event_id: eventId,
+                room_id: roomId,
+                origin_server_ts: ts,
+                content: {
+                    "body": `edited ${eventId}`,
+                    "msgtype": "m.text",
+                    "m.new_content": {
+                        body: `edited ${eventId}`,
+                        msgtype: "m.text",
+                    },
+                    "m.relates_to": {
+                        event_id: targetEventId,
+                        rel_type: "m.replace",
+                    },
+                },
+            });
+        }
+
+        it("should not let a slow-decrypting older edit overwrite a newer one", async () => {
+            const room = new Room(roomId, new TestClient(userId).client, userId);
+            const relations = new Relations("m.replace", "m.room.message", room);
+
+            const targetEvent = new MatrixEvent({
+                sender: userId,
+                type: "m.room.message",
+                event_id: targetEventId,
+                room_id: roomId,
+                origin_server_ts: 1000,
+                content: { body: "original", msgtype: "m.text" },
+            });
+
+            await relations.setTargetEvent(targetEvent);
+
+            // Create two edits: edit1 is older (ts=2000), edit2 is newer (ts=3000).
+            const edit1 = makeEditEvent("$edit1", 2000);
+            const edit2 = makeEditEvent("$edit2", 3000);
+
+            // Simulate edit1 being in the process of decryption: isBeingDecrypted()
+            // returns true and getDecryptionPromise() returns a deferred promise.
+            let resolveEdit1Decryption!: () => void;
+            const edit1DecryptionPromise = new Promise<void>((resolve) => {
+                resolveEdit1Decryption = resolve;
+            });
+            vi.spyOn(edit1, "isBeingDecrypted").mockReturnValue(true);
+            vi.spyOn(edit1, "getDecryptionPromise").mockReturnValue(edit1DecryptionPromise);
+            vi.spyOn(edit1, "shouldAttemptDecryption").mockReturnValue(false);
+
+            // edit2 is already decrypted.
+            vi.spyOn(edit2, "isBeingDecrypted").mockReturnValue(false);
+            vi.spyOn(edit2, "shouldAttemptDecryption").mockReturnValue(false);
+
+            // Add edit1 first (it will block on decryption).
+            const addEdit1Promise = relations.addEvent(edit1);
+
+            // While edit1 is still decrypting, add edit2 (resolves immediately).
+            await relations.addEvent(edit2);
+
+            // edit2 should be applied as the replacement (it's newer).
+            expect(targetEvent.replacingEvent()).toBe(edit2);
+
+            // Now resolve edit1's decryption — the stale result must NOT overwrite edit2.
+            resolveEdit1Decryption();
+            await addEdit1Promise;
+
+            // edit2 must still be the replacing event, not edit1.
+            expect(targetEvent.replacingEvent()).toBe(edit2);
+        });
+
+        it("should apply an edit correctly when there is no concurrency", async () => {
+            const room = new Room(roomId, new TestClient(userId).client, userId);
+            const relations = new Relations("m.replace", "m.room.message", room);
+
+            const targetEvent = new MatrixEvent({
+                sender: userId,
+                type: "m.room.message",
+                event_id: targetEventId,
+                room_id: roomId,
+                origin_server_ts: 1000,
+                content: { body: "original", msgtype: "m.text" },
+            });
+
+            await relations.setTargetEvent(targetEvent);
+
+            const edit = makeEditEvent("$edit1", 2000);
+            vi.spyOn(edit, "isBeingDecrypted").mockReturnValue(false);
+            vi.spyOn(edit, "shouldAttemptDecryption").mockReturnValue(false);
+
+            await relations.addEvent(edit);
+
+            expect(targetEvent.replacingEvent()).toBe(edit);
+        });
     });
 
     it("getSortedAnnotationsByKey should return null for non-annotation relations", async () => {

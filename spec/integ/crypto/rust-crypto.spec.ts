@@ -16,7 +16,8 @@ limitations under the License.
 
 import "fake-indexeddb/auto";
 import { IDBFactory } from "fake-indexeddb";
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
+import { OlmMachine } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { createClient, IndexedDBCryptoStore } from "../../../src";
 import { populateStore } from "../../test-utils/test_indexeddb_cryptostore_dump";
@@ -26,12 +27,11 @@ import { FULL_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostor
 import { EMPTY_ACCOUNT_DATASET } from "../../test-utils/test_indexeddb_cryptostore_dump/empty_account";
 import { CryptoEvent } from "../../../src/crypto-api";
 
-jest.setTimeout(15000);
+vi.setConfig({ testTimeout: 15000 });
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -122,6 +122,75 @@ describe("MatrixClient.initRustCrypto", () => {
         );
     });
 
+    const CA_PEM = `-----BEGIN CERTIFICATE-----
+MIIFazCCA1OgAwIBAgIUcP2Ij9JBq8IQfZT5dhNLsbPXYwowDQYJKoZIhvcNAQEL
+BQAwRTELMAkGA1UEBhMCVUsxDzANBgNVBAgMBkxvbmRvbjETMBEGA1UECgwKZWxl
+bWVudC5pbzEQMA4GA1UEAwwHdGVzdC1jYTAeFw0yNjA0MjcxMzIxMjdaFw0yNzA0
+MjcxMzIxMjdaMEUxCzAJBgNVBAYTAlVLMQ8wDQYDVQQIDAZMb25kb24xEzARBgNV
+BAoMCmVsZW1lbnQuaW8xEDAOBgNVBAMMB3Rlc3QtY2EwggIiMA0GCSqGSIb3DQEB
+AQUAA4ICDwAwggIKAoICAQD3R1GuEpYIBXuZ47E4Cd6GNuaaUgF9ygRuy1dFgoqY
+wRt564jkOYB6Ht5le4R/rb3u6fIeu9j4X2k7DNJPc4H5smHX3ih4BJ5Yli2pzG9S
+iUj7dFY69bDA02c4DQP/gjVQddbBUEolPj5L5Ig3a++7zaPloegB/AQ+f9NTceI8
+eehVQ2dWZlI45ltVlXPxUI5MFm3iSJ889ogX+OQMSouARm6/4d3VMTHpSkPPKpH0
+vgFzn/96/C6yWKz7Fis8lM6MRqd8Ka5O5eZ0hAhVktPkUfgVZKpEsCYNVCBqJgOU
+OU8FcMLinK9Zp0k8xZkTBXQbFXsKQNTa9/alX9wi2+c41O9d1MmhkYUwkdNh7OJO
+//jbm7E5x//10bVgPB7eEqDUA/M/LzSZPmw/94lOcHRHBJyo0mcP74Bcg+tHydwD
+xUe8gETLb7ctrlZ+HXMozoeZLeieR7knlHdFbUyufmpsrs/ONLzkPKqG4nqEjhCi
+B+PZLFkRM08677FVDTmHWTN2ARAjhdOGWQBSkoD/0qlNJ3cmaqRl4uApPNRCnEKL
+HDLwDNA1AH0Y5RmJX9vblfOdmGNEygpxLQmQ5IsQbJS47orupSNnDToP+IjGheOe
+r5e8pWTzGO+ptO1a8GaSurrfWLk5D4wVNp+i0rCU1yBa/vCpaUjmSxEn2sG/SyKX
+jQIDAQABo1MwUTAdBgNVHQ4EFgQU2F6Rmhfww1sT23VCfSE3mt8+lhEwHwYDVR0j
+BBgwFoAU2F6Rmhfww1sT23VCfSE3mt8+lhEwDwYDVR0TAQH/BAUwAwEB/zANBgkq
+hkiG9w0BAQsFAAOCAgEAJmUlRR7PrS5EXNy+fToAYkSt4xFlTfOeXN6JdQzCia+x
+s5TFtqQe/giphQKLN/i9Mm3w0E0u8WA87TKlaWdrZrCivLEhwvieq0u3XwqY628z
+8vlcqJuhM4Soe80AQiL51NeHp0WDhBTWnwCXF/e7GA4xryjg7zqhGZjY8+m61vSd
+sLT/N05mSsW/m7ZAwxhe2XBVMXvHNTVuAbHX5+4mX9OXRAbnXg5Cexn1sKONsR1L
+kN5VjSSvLmzX4AhV0oIRT23NfWBPJnq2s4S9DFDi2uYqE0BWUR1AZOagaVowFsJQ
+q8ccwOQMdZZkAC3h2IIVNzYuFFeXkpZM6Bp7Js9IOJrDCL+A/UsndRkv9gX4SVgd
+y9vQQBr5iaI5RTKkEiprnZhKOyBd3X/QpAoPRdhiGeImRpKt8vhF+JetGc2E1o+O
+CSDpNjD6uI3SHSKt2mlOfeNoZms1pxY36gNYsytFGXf3qdb1I9cP4GRI6cz4JbmP
+Y3eczjaqZMcOaPBBZlYz867C5sZi2tvqT75jlB+rVckKRIEl1bL4EZEpvRbK+nfJ
+RFSPEY1fryCthLfa67ThB+IAonX4jU663sLoAQW1FEpJp3q08kKJOoCXlCMZ7g1P
+eXmIj7ZEOIsufPdiYuKDp/aUdgUHmuCGyegfoCJze36SdFX5q6z8Aq5nKPtz+FM=
+-----END CERTIFICATE-----
+`;
+
+    it("should pass on the caCertsPem and sign function if supplied", async () => {
+        // Given a Matrix client
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+        });
+
+        const initFromStore = vi.spyOn(OlmMachine, "initFromStore");
+
+        const x509Signer = async (item: Uint8Array) => {
+            return {
+                signature_bytes: item,
+                certificate_chain: "MYCHAIN",
+                signature_scheme: "RsaPssSha512" as const,
+            };
+        };
+
+        const x509Validity = () => 12000.3;
+
+        // When we init Rust crypto and pass a PEM for the CA certs
+        await matrixClient.initRustCrypto({ caCertsPem: CA_PEM, x509Signer, x509Validity });
+
+        // Then that PEM was passed in to the Olm machine
+        expect(initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            expect.anything(),
+            CA_PEM,
+            x509Signer,
+            x509Validity,
+        );
+    });
+
+    // eslint-disable-next-line @vitest/expect-expect
     it("should ignore a second call", async () => {
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -134,10 +203,6 @@ describe("MatrixClient.initRustCrypto", () => {
     });
 
     describe("Libolm Migration", () => {
-        beforeEach(() => {
-            fetchMock.reset();
-        });
-
         it("should migrate from libolm", async () => {
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", FULL_ACCOUNT_DATASET.backupResponse);
 
@@ -155,7 +220,7 @@ describe("MatrixClient.initRustCrypto", () => {
                 pickleKey: FULL_ACCOUNT_DATASET.pickleKey,
             });
 
-            const progressListener = jest.fn();
+            const progressListener = vi.fn();
             matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
 
             await matrixClient.initRustCrypto();
@@ -326,7 +391,7 @@ describe("MatrixClient.initRustCrypto", () => {
             });
 
             // When we start Rust crypto, potentially triggering an upgrade
-            const progressListener = jest.fn();
+            const progressListener = vi.fn();
             matrixClient.addListener(CryptoEvent.LegacyCryptoStoreMigrationProgress, progressListener);
 
             await matrixClient.initRustCrypto();
@@ -472,14 +537,14 @@ describe("MatrixClient.clearStores", () => {
 
         await matrixClient.initRustCrypto({ storagePassword: "testKey" });
         expect(await indexedDB.databases()).toHaveLength(2);
-        await matrixClient.stopClient();
+        matrixClient.stopClient();
 
         await matrixClient.clearStores();
         expect(await indexedDB.databases()).toHaveLength(0);
     });
 
+    // eslint-disable-next-line @vitest/expect-expect
     it("should not fail in environments without indexedDB", async () => {
-        // eslint-disable-next-line no-global-assign
         indexedDB = undefined!;
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -487,7 +552,7 @@ describe("MatrixClient.clearStores", () => {
             deviceId: "aliceDevice",
         });
 
-        await matrixClient.stopClient();
+        matrixClient.stopClient();
 
         await matrixClient.clearStores();
         // No error thrown in clearStores
@@ -505,7 +570,7 @@ describe("MatrixClient.clearStores", () => {
 
         await matrixClient.initRustCrypto({ cryptoDatabasePrefix: "my-prefix" });
         expect(await indexedDB.databases()).toHaveLength(1);
-        await matrixClient.stopClient();
+        matrixClient.stopClient();
 
         await matrixClient.clearStores({ cryptoDatabasePrefix: "my-prefix" });
         expect(await indexedDB.databases()).toHaveLength(0);

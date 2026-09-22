@@ -38,7 +38,6 @@ export type BeaconEventHandlerMap = {
     [BeaconEvent.LivenessChange]: (isLive: boolean, beacon: Beacon) => void;
     [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
     [BeaconEvent.LocationUpdate]: (locationState: BeaconLocationState) => void;
-    [BeaconEvent.Destroy]: (beaconIdentifier: string) => void;
 };
 
 export const isTimestampInDuration = (startTimestamp: number, durationMs: number, timestamp: number): boolean =>

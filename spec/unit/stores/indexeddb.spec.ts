@@ -14,17 +14,21 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+/**
+ * @vitest-environment happy-dom
+ */
+
 import "fake-indexeddb/auto";
-import "jest-localstorage-mock";
 import { IDBFactory } from "fake-indexeddb";
 
 import { IndexedDBStore, type IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
 import { emitPromise } from "../../test-utils/test-utils";
-import { type LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
+import { RemoteIndexedDBStoreBackend } from "../../../src/store/indexeddb-remote-backend";
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
-        jest.clearAllMocks();
+        vi.clearAllMocks();
     });
 
     const roomId = "!room:id";
@@ -62,7 +66,7 @@ describe("IndexedDBStore", () => {
         // Simulate a broken IDB
         (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
             const err = new Error(
-                "Failed to execute 'transaction' on 'IDBDatabase': " + "The database connection is closing.",
+                "Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
             );
             err.name = "InvalidStateError";
             throw err;
@@ -74,6 +78,62 @@ describe("IndexedDBStore", () => {
             store.setOutOfBandMembers(roomId, [member1, member2]),
         ]);
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(2);
+    });
+
+    it("should degrade to local IDB backend if remote worker fails to start", async () => {
+        const store = new IndexedDBStore({
+            workerFactory: () => {
+                const w = {
+                    postMessage: vi.fn(),
+                } as unknown as Worker;
+                setTimeout(() => {
+                    w.onerror!({ error: "IndexedDB worker failed to connect" } as ErrorEvent);
+                }, 100);
+                return w;
+            },
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+
+        expect(store.backend).toBeInstanceOf(RemoteIndexedDBStoreBackend);
+        await store.startup();
+        expect(store.backend).toBeInstanceOf(LocalIndexedDBStoreBackend);
+    });
+
+    it("should handle failed queries", async () => {
+        const store = new IndexedDBStore({
+            indexedDB: indexedDB,
+            dbName: "database",
+            localStorage,
+        });
+        await store.startup();
+
+        // Simulate a failed query
+        let txn: IDBRequest;
+        (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
+            return {
+                objectStore: (name: string) =>
+                    ({
+                        name,
+                        openCursor: (query: unknown) => {
+                            return (txn = {
+                                error: new DOMException("Expected error"),
+                            } as IDBRequest);
+                        },
+                    }) as IDBObjectStore,
+            } as IDBTransaction;
+        };
+
+        // Call backend directly as otherwise the error is masked.
+        const promise = store.backend.getClientOptions();
+        // The function uses a Promise.then(() => trick to delay execution
+        // so we need to wait before we can call the txn onerror handler.
+        process.nextTick(() => {
+            txn!.onerror!(new Event("we-ignore-this"));
+        });
+
+        await expect(() => promise).rejects.toThrow("selectQuery failed for client_options");
     });
 
     it("Should load presence events on startup", async () => {
@@ -133,8 +193,8 @@ describe("IndexedDBStore", () => {
     });
 
     it("should use MemoryStore methods for pending events if no localStorage", async () => {
-        jest.spyOn(MemoryStore.prototype, "setPendingEvents");
-        jest.spyOn(MemoryStore.prototype, "getPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "setPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "getPendingEvents");
 
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
@@ -150,8 +210,8 @@ describe("IndexedDBStore", () => {
     });
 
     it("should persist pending events to localStorage if available", async () => {
-        jest.spyOn(MemoryStore.prototype, "setPendingEvents");
-        jest.spyOn(MemoryStore.prototype, "getPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "setPendingEvents");
+        vi.spyOn(MemoryStore.prototype, "getPendingEvents");
 
         const store = new IndexedDBStore({
             indexedDB: indexedDB,
@@ -236,7 +296,7 @@ describe("IndexedDBStore", () => {
 
         // @ts-ignore - private field access
         (store.backend as LocalIndexedDBStoreBackend).db!.onclose!({} as Event);
-        await storeClosedResolvers.promise;
+        await expect(storeClosedResolvers.promise).resolves.toBeUndefined();
     });
 
     it("should use remote backend if workerFactory passed", async () => {
@@ -256,7 +316,7 @@ describe("IndexedDBStore", () => {
             workerFactory: () => new MockWorker() as Worker,
         });
         store.startup();
-        await workerPostMessageResolvers.promise;
+        await expect(workerPostMessageResolvers.promise).resolves.toBeUndefined();
     });
 
     it("remote worker should pass closed event", async () => {
@@ -275,7 +335,7 @@ describe("IndexedDBStore", () => {
         const storeClosedResolvers = Promise.withResolvers<void>();
         store.on("closed", storeClosedResolvers.resolve);
         (worker as any).onmessage({ data: { command: "closed" } });
-        await storeClosedResolvers.promise;
+        await expect(storeClosedResolvers.promise).resolves.toBeUndefined();
     });
 
     it("remote worker should pass command failures", async () => {
@@ -312,7 +372,7 @@ describe("IndexedDBStore", () => {
     });
 
     it("remote worker should terminate upon destroy call", async () => {
-        const terminate = jest.fn();
+        const terminate = vi.fn();
         const worker = new (class MockWorker {
             private onmessage!: (data: any) => void;
             postMessage(data: any) {

@@ -36,11 +36,11 @@ interface DehydratedDeviceResp {
     };
 }
 /**
- * The response body of `POST /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/events`.
+ * The response body of `GET /_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/{device_id}/events`.
  */
 interface DehydratedDeviceEventsResp {
     events: IToDeviceEvent[];
-    next_batch: string;
+    next_batch?: string;
 }
 
 /**
@@ -267,28 +267,29 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
         const path = encodeUri("/dehydrated_device/$device_id/events", {
             $device_id: dehydratedDeviceResp.device_id,
         });
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
+
+        do {
             const eventResp: DehydratedDeviceEventsResp = await this.http.authedRequest<DehydratedDeviceEventsResp>(
-                Method.Post,
+                Method.Get,
                 path,
+                nextBatch ? { from: nextBatch } : undefined,
                 undefined,
-                nextBatch ? { next_batch: nextBatch } : {},
                 {
                     prefix: UnstablePrefix,
                 },
             );
 
-            if (eventResp.events.length === 0) {
-                break;
-            }
             toDeviceCount += eventResp.events.length;
             nextBatch = eventResp.next_batch;
-            const roomKeyInfos = await rehydratedDevice.receiveEvents(JSON.stringify(eventResp.events));
-            roomKeyCount += roomKeyInfos.length;
 
-            this.emit(CryptoEvent.RehydrationProgress, roomKeyCount, toDeviceCount);
-        }
+            if (eventResp.events.length > 0) {
+                const roomKeyInfos = await rehydratedDevice.receiveEvents(JSON.stringify(eventResp.events));
+                roomKeyCount += roomKeyInfos.length;
+
+                this.emit(CryptoEvent.RehydrationProgress, roomKeyCount, toDeviceCount);
+            }
+        } while (nextBatch !== undefined);
+
         this.logger.info(`dehydration: received ${roomKeyCount} room keys from ${toDeviceCount} to-device events`);
         this.emit(CryptoEvent.RehydrationCompleted);
 

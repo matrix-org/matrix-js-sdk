@@ -36,8 +36,8 @@ describe("secret-storage", () => {
     describe("secretStorageContainsCrossSigningKeys", () => {
         it("should return false when the master cross-signing key is not stored in secret storage", async () => {
             const secretStorage = {
-                isStored: jest.fn().mockReturnValue(false),
-                getDefaultKeyId: jest.fn().mockResolvedValue("SFQ3TbqGOdaaRVfxHtNkn0tvhx0rVj9S"),
+                isStored: vi.fn().mockReturnValue(false),
+                getDefaultKeyId: vi.fn().mockResolvedValue("SFQ3TbqGOdaaRVfxHtNkn0tvhx0rVj9S"),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -51,7 +51,7 @@ describe("secret-storage", () => {
                     if (type === "m.cross_signing.master") return { secretStorageKey: {} };
                     else return { secretStorageKey2: {} };
                 },
-                getDefaultKeyId: jest.fn().mockResolvedValue("SFQ3TbqGOdaaRVfxHtNkn0tvhx0rVj9S"),
+                getDefaultKeyId: vi.fn().mockResolvedValue("SFQ3TbqGOdaaRVfxHtNkn0tvhx0rVj9S"),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -68,7 +68,7 @@ describe("secret-storage", () => {
                         return { secretStorageKey2: {} };
                     }
                 },
-                getDefaultKeyId: jest.fn().mockResolvedValue("secretStorageKey"),
+                getDefaultKeyId: vi.fn().mockResolvedValue("secretStorageKey"),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -77,8 +77,8 @@ describe("secret-storage", () => {
 
         it("should return true when master, user signing and self signing keys are all encrypted with default key", async () => {
             const secretStorage = {
-                isStored: jest.fn().mockReturnValue({ secretStorageKey: {} }),
-                getDefaultKeyId: jest.fn().mockResolvedValue("secretStorageKey"),
+                isStored: vi.fn().mockReturnValue({ secretStorageKey: {} }),
+                getDefaultKeyId: vi.fn().mockResolvedValue("secretStorageKey"),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -87,8 +87,8 @@ describe("secret-storage", () => {
 
         it("should return false when master, user signing and self signing keys are all encrypted with a non-default key", async () => {
             const secretStorage = {
-                isStored: jest.fn().mockResolvedValue({ defaultKey: {} }),
-                getDefaultKeyId: jest.fn().mockResolvedValue("anotherCommonKey"),
+                isStored: vi.fn().mockResolvedValue({ defaultKey: {} }),
+                getDefaultKeyId: vi.fn().mockResolvedValue("anotherCommonKey"),
             } as unknown as ServerSideSecretStorage;
 
             const result = await secretStorageContainsCrossSigningKeys(secretStorage);
@@ -98,7 +98,7 @@ describe("secret-storage", () => {
 
     it("Check canAccessSecrets", async () => {
         const secretStorage = {
-            isStored: jest.fn((secretName) => {
+            isStored: vi.fn((secretName) => {
                 if (secretName == "secretA") {
                     return { aaaa: {} };
                 } else if (secretName == "secretB") {
@@ -113,7 +113,7 @@ describe("secret-storage", () => {
                     return null;
                 }
             }),
-            getDefaultKeyId: jest.fn().mockResolvedValue("aaaa"),
+            getDefaultKeyId: vi.fn().mockResolvedValue("aaaa"),
         } as unknown as ServerSideSecretStorage;
 
         expect(await secretStorageCanAccessSecrets(secretStorage, ["secretE"])).toStrictEqual(true);

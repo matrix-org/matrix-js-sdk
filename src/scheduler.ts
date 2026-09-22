@@ -40,14 +40,12 @@ interface IQueueEntry<T> {
  */
 type ProcessFunction<T> = (event: MatrixEvent) => Promise<T>;
 
-// eslint-disable-next-line camelcase
 export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Default retry algorithm for the matrix scheduler. Retries events up to 4 times with exponential backoff.
      * @param attempts - Number of attempts that have been made, including the one that just failed (ie. starting at 1)
      * @see retryAlgorithm
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public static RETRY_BACKOFF_RATELIMIT(event: MatrixEvent | null, attempts: number, err: MatrixError): number {
         return calculateRetryBackoff(err, attempts, false);
     }
@@ -57,7 +55,6 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * concurrently.
      * @see queueAlgorithm
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public static QUEUE_MESSAGES(event: MatrixEvent): string | null {
         // enqueue messages or events that associate with another event (redactions and relations)
         if (event.getType() === EventType.RoomMessage || event.hasAssociation()) {

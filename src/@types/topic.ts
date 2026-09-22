@@ -42,7 +42,7 @@ import { type IMessageRendering } from "./extensible_events.ts";
 /**
  * The event type for an m.topic event (in content)
  */
-export const M_TOPIC = new NamespacedValue("m.topic");
+export const M_TOPIC = new NamespacedValue("m.topic", null);
 
 /**
  * The event content for an m.topic event (in content)

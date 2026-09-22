@@ -130,7 +130,7 @@ export class PerSessionKeyBackupDownloader {
     /**
      * Check if key download is successfully configured and active.
      *
-     * @return `true` if key download is correctly configured and active; otherwise `false`.
+     * @returns `true` if key download is correctly configured and active; otherwise `false`.
      */
     public isKeyBackupDownloadConfigured(): boolean {
         return this.configuration !== null;
@@ -394,7 +394,7 @@ export class PerSessionKeyBackupDownloader {
     ): Promise<void> {
         const sessionsToImport: Record<string, KeyBackupSession> = { [sessionInfo.megolmSessionId]: data };
 
-        const keys = await configuration!.decryptor.decryptSessions(sessionsToImport);
+        const keys = await configuration.decryptor.decryptSessions(sessionsToImport);
         for (const k of keys) {
             k.room_id = sessionInfo.roomId;
         }

@@ -1,5 +1,5 @@
 /*
-Copyright 2025 The Matrix.org Foundation C.I.C.
+Copyright 2025-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ import {
     type IEncryptionManager,
 } from "./EncryptionManager.ts";
 import { type EncryptionConfig, type MembershipConfig } from "./MatrixRTCSession.ts";
-import { CallMembership } from "./CallMembership.ts";
+import type { CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
 import { type Logger } from "../logger.ts";
@@ -30,9 +30,20 @@ import {
     type InboundEncryptionSession,
     type OutboundEncryptionSession,
     type ParticipantDeviceInfo,
-    type Statistics,
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
+import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
+
+/**
+ * Default for {@link EncryptionConfig.keyRotationParticipantLimit}.
+ *
+ * Setting this to undefined implies that we do not have a limit and full rotations are always done.
+ * This is the most secure and least performant option.
+ * It is highly recommended to set this to < 50 for client deployments that are planned to be used for large calls.
+ * But before setting this, make yourself familiar with the exact security implications.
+ * Key, rotations will stop when reaching this user limit in a call. The call will still be encrypted.
+ */
+const DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT: number | undefined = undefined;
 
 /**
  * RTCEncryptionManager is used to manage the encryption keys for a call.
@@ -58,7 +69,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * The encryption manager stores the keys because the application layer might not be ready yet to handle the keys.
      * The keys are stored and can be retrieved later when the application layer is ready {@link RTCEncryptionManager#getEncryptionKeys}.
      */
-    private participantKeyRings = new Map<
+    private readonly participantKeyRings = new Map<
         EncryptionKeyMapKey,
         Array<{
             key: Uint8Array<ArrayBuffer>;
@@ -94,6 +105,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private keyRotationGracePeriodMs = 10_000;
 
     /**
+     * The number of participants at or above which we stop rotating the key altogether.
+     * The current key is still distributed to new joiners, but no new key is generated.
+     * @see EncryptionConfig.keyRotationParticipantLimit
+     * @private
+     */
+    private keyRotationParticipantLimit = DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT;
+
+    /**
      * If a new key distribution is being requested while one is going on, we will set this flag to true.
      * This will ensure that a new round is started after the current one.
      * @private
@@ -111,7 +130,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger | undefined = undefined;
 
-    private rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
+    private readonly rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
 
     /**
      *
@@ -124,10 +143,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
      * @param rtcBackendIdProvider - A function to compute the rtc backend identity, exposed for testing purposes
      */
     public constructor(
-        private ownMembership: CallMembershipIdentityParts,
+        private readonly ownMembership: CallMembershipIdentityParts,
         private getMemberships: () => CallMembership[],
         private transport: IKeyTransport,
-        private statistics: Statistics,
         // Callback to notify the media layer of new keys
         private onEncryptionKeysChanged: (
             keyBin: Uint8Array<ArrayBuffer>,
@@ -139,7 +157,22 @@ export class RTCEncryptionManager implements IEncryptionManager {
         rtcBackendIdProvider?: (userId: string, deviceId: string, memberId: string) => Promise<string>,
     ) {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
-        this.rtcIdentityProvider = rtcBackendIdProvider ?? CallMembership.computeRtcIdentityRaw;
+        this.rtcIdentityProvider = rtcBackendIdProvider ?? computeRtcIdentityRaw;
+    }
+
+    /**
+     * Whether the session currently has too many participants for the key to be rotated.
+     *
+     * This is computed by checking the participant count. If there are too many participants for efficient rotations,
+     * the key rotation will be suppressed.
+     * While this is true, the current key is still shared with new joiners and the current call is still fully encrypted,
+     * but no new key is generated for joiners or leavers. Changes are signalled by {@link MatrixRTCSessionEvent.KeyRotationSuppressedChanged}.
+     * @see EncryptionConfig.keyRotationParticipantLimit
+     */
+    public get isKeyRotationSuppressed(): boolean {
+        if (!this.manageMediaKeys) return false;
+        if (this.keyRotationParticipantLimit === undefined) return false;
+        return this.getMemberships().length >= this.keyRotationParticipantLimit;
     }
 
     private async getOwnRtcBackendIdentity(): Promise<string> {
@@ -222,6 +255,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.useHashedRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
+        this.keyRotationParticipantLimit =
+            joinConfig?.keyRotationParticipantLimit ?? DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT;
 
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
         void this.getOwnRtcBackendIdentity(); // precompute own identity
@@ -296,7 +331,6 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 candidateInboundSession.keyIndex,
                 candidateInboundSession.membership,
             );
-            this.statistics.counters.roomEventEncryptionKeysReceived += 1;
         } else {
             this.logger?.info(
                 `Received an out of order key for ${membership.userId}:${membership.deviceId}, dropping it`,
@@ -344,7 +378,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             })
             .map((membership) => {
                 return {
-                    userId: membership.sender!,
+                    userId: membership.sender,
                     deviceId: membership.deviceId,
                     membershipTs: membership.createdTs(),
                 };
@@ -376,54 +410,66 @@ export class RTCEncryptionManager implements IEncryptionManager {
         );
 
         let toDistributeTo: ParticipantDeviceInfo[] = [];
-        let outboundKey: OutboundEncryptionSession;
+        //default to current session
+        let newOutboundEncryptionSession: OutboundEncryptionSession = this.outboundSession!;
         let hasKeyChanged = false;
-        if (anyLeft.length > 0) {
-            // We need to rotate the key
-            const newOutboundKey = this.createNewOutboundSession();
-            hasKeyChanged = true;
-            toDistributeTo = toShareWith;
-            outboundKey = newOutboundKey;
-        } else if (anyJoined.length > 0) {
-            const now = Date.now();
-            const keyAge = now - this.outboundSession!.creationTS;
-            // If the current key is recently created (less than `keyRotationGracePeriodMs`), we can keep it and just distribute it to the new joiners.
-            if (keyAge < this.keyRotationGracePeriodMs) {
-                // keep the same key
-                // XXX In the future we want to distribute a ratcheted key, not the current one
-                this.logger?.debug(`New joiners detected, but the key is recent enough (age:${keyAge}), keeping it`);
-                toDistributeTo = anyJoined;
-                outboundKey = this.outboundSession!;
-            } else {
+
+        // Rotating means sending the new key to every participant, this is expensive in large session.
+        if (this.isKeyRotationSuppressed) {
+            if (anyJoined.length > 0) {
+                this.logger?.debug(
+                    `New joiners detected, but the session has ${toShareWith.length} participants (limit:${this.keyRotationParticipantLimit}), keeping the key`,
+                );
+            }
+            toDistributeTo = anyJoined;
+        } else {
+            if (anyLeft.length > 0) {
                 // We need to rotate the key
-                this.logger?.debug(`New joiners detected, rotating the key`);
-                const newOutboundKey = this.createNewOutboundSession();
+                newOutboundEncryptionSession = this.createNewOutboundSession();
                 hasKeyChanged = true;
                 toDistributeTo = toShareWith;
-                outboundKey = newOutboundKey;
+            } else if (anyJoined.length > 0) {
+                const keyAge = Date.now() - this.outboundSession!.creationTS;
+                if (keyAge < this.keyRotationGracePeriodMs) {
+                    this.logger?.debug(
+                        `New joiners detected, but the key is recent enough (age:${keyAge}), keeping it`,
+                    );
+                    toDistributeTo = anyJoined;
+                } else {
+                    this.logger?.debug(`New joiners detected, rotating the key`);
+                    // We need to rotate the key
+                    newOutboundEncryptionSession = this.createNewOutboundSession();
+                    hasKeyChanged = true;
+                    toDistributeTo = toShareWith;
+                }
             }
-        } else {
-            // no changes
+        }
+        // return early if we dont have anything to distribute.
+        if (toDistributeTo.length === 0) {
             return;
         }
 
         try {
             this.logger?.trace(`Sending key...`);
-            await this.transport.sendKey(encodeBase64(outboundKey.key), outboundKey.keyId, toDistributeTo);
-            this.statistics.counters.roomEventEncryptionKeysSent += 1;
-            outboundKey.sharedWith.push(...toDistributeTo);
-            this.logger?.trace(
-                `key index:${outboundKey.keyId} sent to ${outboundKey.sharedWith.map((m) => `${m.userId}:${m.deviceId}`).join(",")}`,
+            await this.transport.sendKey(
+                encodeBase64(newOutboundEncryptionSession.key),
+                newOutboundEncryptionSession.keyId,
+                toDistributeTo,
             );
+            newOutboundEncryptionSession.sharedWith.push(...toDistributeTo);
+            const outboundSessionList = newOutboundEncryptionSession.sharedWith
+                .map((m) => `${m.userId}:${m.deviceId}`)
+                .join(",");
+            this.logger?.trace(`key index:${newOutboundEncryptionSession.keyId} sent to ${outboundSessionList}`);
             if (hasKeyChanged) {
                 // Delay a bit before using this key
                 // It is recommended not to start using a key immediately but instead wait for a short time to make sure it is delivered.
-                this.logger?.trace(`Delay Rollout for key:${outboundKey.keyId}...`);
+                this.logger?.trace(`Delay Rollout for key:${newOutboundEncryptionSession.keyId}...`);
                 await sleep(this.useKeyDelay);
-                this.logger?.trace(`...Delayed rollout of index:${outboundKey.keyId} `);
+                this.logger?.trace(`...Delayed rollout of index:${newOutboundEncryptionSession.keyId} `);
                 this.addKeyToParticipantWithBackendIdentity(
-                    outboundKey.key,
-                    outboundKey.keyId,
+                    newOutboundEncryptionSession.key,
+                    newOutboundEncryptionSession.keyId,
                     this.ownMembership,
                     await this.getOwnRtcBackendIdentity(),
                 );
@@ -449,7 +495,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private nextKeyIndex(): number {
         if (this.outboundSession) {
-            return (this.outboundSession!.keyId + 1) % 256;
+            return (this.outboundSession.keyId + 1) % 256;
         }
         return 0;
     }

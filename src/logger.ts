@@ -52,35 +52,35 @@ export interface BaseLogger {
      *
      * @param msg - Data to log.
      */
-    trace(...msg: any[]): void;
+    trace(this: void, ...msg: any[]): void;
 
     /**
      * Output debug message to the logger.
      *
      * @param msg - Data to log.
      */
-    debug(...msg: any[]): void;
+    debug(this: void, ...msg: any[]): void;
 
     /**
      * Output info message to the logger.
      *
      * @param msg - Data to log.
      */
-    info(...msg: any[]): void;
+    info(this: void, ...msg: any[]): void;
 
     /**
      * Output warn message to the logger.
      *
      * @param msg - Data to log.
      */
-    warn(...msg: any[]): void;
+    warn(this: void, ...msg: any[]): void;
 
     /**
      * Output error message to the logger.
      *
      * @param msg - Data to log.
      */
-    error(...msg: any[]): void;
+    error(this: void, ...msg: any[]): void;
 }
 
 // This is to demonstrate, that you can use any namespace you want.
@@ -98,11 +98,9 @@ const DEFAULT_NAMESPACE = "matrix";
 // when logging so we always get the current value of console methods.
 loglevel.methodFactory = function (methodName, logLevel, loggerName) {
     return function (this: PrefixedLogger, ...args): void {
-        /* eslint-disable @typescript-eslint/no-invalid-this */
         if (this.prefix) {
             args.unshift(this.prefix);
         }
-        /* eslint-enable @typescript-eslint/no-invalid-this */
         const supportedByConsole =
             methodName === "error" ||
             methodName === "warn" ||

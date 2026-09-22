@@ -23,7 +23,21 @@ limitations under the License.
  * versions; only that we should be able to provide a base level of functionality with a server that offers support for
  * any of the listed versions.
  */
-export const SUPPORTED_MATRIX_VERSIONS = ["v1.1", "v1.2", "v1.3", "v1.4", "v1.5", "v1.6", "v1.7", "v1.8", "v1.9"];
+export const SUPPORTED_MATRIX_VERSIONS = [
+    "v1.1",
+    "v1.2",
+    "v1.3",
+    "v1.4",
+    "v1.5",
+    "v1.6",
+    "v1.7",
+    "v1.8",
+    "v1.9",
+    "v1.10",
+    "v1.11",
+    "v1.12",
+    "v1.13",
+];
 
 /**
  * The oldest Matrix specification version the js-sdk supports.

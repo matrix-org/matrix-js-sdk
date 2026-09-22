@@ -24,7 +24,7 @@ import {
     type IdentityKeys,
     type OlmMachine,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
-import { type Mocked } from "jest-mock";
+import { type Mocked } from "vitest";
 
 import { HistoryVisibility, type MatrixEvent, type Room, type RoomMember } from "../../../src";
 import { RoomEncryptor, toRustHistoryVisibility } from "../../../src/rust-crypto/RoomEncryptor";
@@ -66,14 +66,14 @@ describe("RoomEncryptor", () => {
 
         function createMockEvent(text: string): Mocked<MatrixEvent> {
             return {
-                getTxnId: jest.fn().mockReturnValue(""),
-                getType: jest.fn().mockReturnValue("m.room.message"),
-                getContent: jest.fn().mockReturnValue({
+                getTxnId: vi.fn().mockReturnValue(""),
+                getType: vi.fn().mockReturnValue("m.room.message"),
+                getContent: vi.fn().mockReturnValue({
                     body: text,
                     msgtype: "m.text",
                 }),
                 isState: () => false,
-                makeEncrypted: jest.fn().mockReturnValue(undefined),
+                makeEncrypted: vi.fn().mockReturnValue(undefined),
             } as unknown as Mocked<MatrixEvent>;
         }
 
@@ -81,32 +81,32 @@ describe("RoomEncryptor", () => {
             mockOlmMachine = {
                 identityKeys: {
                     curve25519: {
-                        toBase64: jest.fn().mockReturnValue("curve25519"),
+                        toBase64: vi.fn().mockReturnValue("curve25519"),
                     } as unknown as Curve25519PublicKey,
                     ed25519: {
-                        toBase64: jest.fn().mockReturnValue("ed25519"),
+                        toBase64: vi.fn().mockReturnValue("ed25519"),
                     } as unknown as Ed25519PublicKey,
                 } as unknown as Mocked<IdentityKeys>,
-                shareRoomKey: jest.fn(),
-                updateTrackedUsers: jest.fn().mockResolvedValue(undefined),
-                encryptRoomEvent: jest.fn().mockResolvedValue("{}"),
+                shareRoomKey: vi.fn(),
+                updateTrackedUsers: vi.fn().mockResolvedValue(undefined),
+                encryptRoomEvent: vi.fn().mockResolvedValue("{}"),
             } as unknown as Mocked<OlmMachine>;
 
             mockKeyClaimManager = {
-                ensureSessionsForUsers: jest.fn(),
+                ensureSessionsForUsers: vi.fn(),
             } as unknown as Mocked<KeyClaimManager>;
 
             mockOutgoingRequestManager = {
-                doProcessOutgoingRequests: jest.fn().mockResolvedValue(undefined),
+                doProcessOutgoingRequests: vi.fn().mockResolvedValue(undefined),
             } as unknown as Mocked<OutgoingRequestsManager>;
 
             mockRoom = {
                 roomId: "!foo:example.org",
-                getJoinedMembers: jest.fn().mockReturnValue([mockRoomMember]),
-                getEncryptionTargetMembers: jest.fn().mockReturnValue([mockRoomMember]),
-                shouldEncryptForInvitedMembers: jest.fn().mockReturnValue(true),
-                getHistoryVisibility: jest.fn().mockReturnValue(HistoryVisibility.Invited),
-                getBlacklistUnverifiedDevices: jest.fn().mockReturnValue(null),
+                getJoinedMembers: vi.fn().mockReturnValue([mockRoomMember]),
+                getEncryptionTargetMembers: vi.fn().mockReturnValue([mockRoomMember]),
+                shouldEncryptForInvitedMembers: vi.fn().mockReturnValue(true),
+                getHistoryVisibility: vi.fn().mockReturnValue(HistoryVisibility.Invited),
+                getBlacklistUnverifiedDevices: vi.fn().mockReturnValue(null),
             } as unknown as Mocked<Room>;
 
             roomEncryptor = new RoomEncryptor(

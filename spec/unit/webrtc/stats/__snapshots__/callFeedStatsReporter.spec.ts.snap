@@ -1,6 +1,6 @@
-// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`CallFeedStatsReporter should builds CallFeedReport 1`] = `
+exports[`CallFeedStatsReporter > should > builds CallFeedReport 1`] = `
 {
   "callFeeds": [],
   "callId": "CALL_ID",
@@ -76,7 +76,7 @@ exports[`CallFeedStatsReporter should builds CallFeedReport 1`] = `
 }
 `;
 
-exports[`CallFeedStatsReporter should extends CallFeedReport with call feeds 1`] = `
+exports[`CallFeedStatsReporter > should > extends CallFeedReport with call feeds 1`] = `
 [
   {
     "audio": {

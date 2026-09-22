@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { type KeyBackupInfo } from "../../src/crypto-api";
 
@@ -25,20 +25,15 @@ import { type KeyBackupInfo } from "../../src/crypto-api";
  * @param userId - the local user's ID. Defaults to `@alice:localhost`.
  */
 export function mockInitialApiRequests(homeserverUrl: string, userId: string = "@alice:localhost") {
-    fetchMock.getOnce(
-        new URL("/_matrix/client/versions", homeserverUrl).toString(),
-        { versions: ["v1.1"] },
-        { overwriteRoutes: true },
-    );
-    fetchMock.getOnce(
-        new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(),
-        {},
-        { overwriteRoutes: true },
-    );
+    fetchMock.getOnce(new URL("/_matrix/client/versions", homeserverUrl).toString(), { versions: ["v1.1"] });
+    fetchMock.getOnce(new URL("/_matrix/client/v3/pushrules/", homeserverUrl).toString(), {});
     fetchMock.postOnce(
         new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter`, homeserverUrl).toString(),
         { filter_id: "fid" },
-        { overwriteRoutes: true },
+    );
+    fetchMock.getOnce(
+        new URL(`/_matrix/client/v3/user/${encodeURIComponent(userId)}/filter/fid`, homeserverUrl).toString(),
+        { filter_id: "fid" },
     );
 }
 
@@ -65,24 +60,30 @@ export function mockSetupCrossSigningRequests(): void {
  * @param backupVersion - The backup version that will be returned by `POST room_keys/version`.
  */
 export function mockSetupMegolmBackupRequests(backupVersion: string): void {
-    fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-        status: 404,
-        body: {
-            errcode: "M_NOT_FOUND",
-            error: "No current backup version",
+    fetchMock.get(
+        "path:/_matrix/client/v3/room_keys/version",
+        {
+            status: 404,
+            body: {
+                errcode: "M_NOT_FOUND",
+                error: "No current backup version",
+            },
         },
-    });
+        { name: "room-keys-version" },
+    );
 
-    fetchMock.post("path:/_matrix/client/v3/room_keys/version", (url, request) => {
-        const backupData: KeyBackupInfo = JSON.parse((request.body as string) ?? "{}");
-        backupData.version = backupVersion;
-        backupData.count = 0;
-        backupData.etag = "zer";
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", backupData, {
-            overwriteRoutes: true,
-        });
-        return {
-            version: backupVersion,
-        };
-    });
+    fetchMock.post(
+        "path:/_matrix/client/v3/room_keys/version",
+        (callLog) => {
+            const backupData: KeyBackupInfo = JSON.parse((callLog.options.body as string) ?? "{}");
+            backupData.version = backupVersion;
+            backupData.count = 0;
+            backupData.etag = "zer";
+            fetchMock.modifyRoute("room-keys-version", { response: backupData });
+            return {
+                version: backupVersion,
+            };
+        },
+        { name: "post-room-keys-version" },
+    );
 }

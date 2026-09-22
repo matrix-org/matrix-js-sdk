@@ -1,4 +1,4 @@
-import fetchMock from "fetch-mock-jest";
+import fetchMock from "@fetch-mock/vitest";
 
 import { ClientPrefix, MatrixClient } from "../../src";
 import { SSOAction } from "../../src/@types/auth";
@@ -51,27 +51,26 @@ describe("SSO login URL", function () {
             const urlString = client.client.getSsoLoginUrl(redirectUri, undefined, undefined, undefined);
             const url = new URL(urlString);
             expect(url.searchParams.has("org.matrix.msc3824.action")).toBe(false);
+            expect(url.searchParams.has("action")).toBe(false);
         });
 
         it("register", function () {
             const urlString = client.client.getSsoLoginUrl(redirectUri, undefined, undefined, SSOAction.REGISTER);
             const url = new URL(urlString);
             expect(url.searchParams.get("org.matrix.msc3824.action")).toEqual("register");
+            expect(url.searchParams.get("action")).toEqual("register");
         });
 
         it("login", function () {
             const urlString = client.client.getSsoLoginUrl(redirectUri, undefined, undefined, SSOAction.LOGIN);
             const url = new URL(urlString);
             expect(url.searchParams.get("org.matrix.msc3824.action")).toEqual("login");
+            expect(url.searchParams.get("action")).toEqual("login");
         });
     });
 });
 
 describe("refreshToken", () => {
-    afterEach(() => {
-        fetchMock.mockReset();
-    });
-
     it("requests the correctly-prefixed /refresh endpoint when server correctly accepts /v3", async () => {
         const client = createExampleMatrixClient();
 
