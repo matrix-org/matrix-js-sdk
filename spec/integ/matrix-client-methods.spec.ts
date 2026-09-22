@@ -1731,24 +1731,39 @@ describe("MatrixClient", function () {
         const roomId = "!foo:bar";
         const encodedRoomId = encodeURIComponent(roomId);
 
+        const commonFields: RoomSummary = {
+            room_id: roomId,
+            name: "My Room",
+            avatar_url: "",
+            topic: "My room topic",
+            world_readable: false,
+            guest_can_join: false,
+            num_joined_members: 1,
+            room_type: "",
+            join_rule: JoinRule.Knock,
+            membership: "leave",
+            canonical_alias: "#my-room:bar",
+        };
+
+        /** What the stable endpoint returns: the room version and encryption under their spec names. */
         const roomSummary: RoomSummary = {
-            "room_id": roomId,
-            "name": "My Room",
-            "avatar_url": "",
-            "topic": "My room topic",
-            "world_readable": false,
-            "guest_can_join": false,
-            "num_joined_members": 1,
-            "room_type": "",
-            "join_rule": JoinRule.Public,
-            "membership": "leave",
+            ...commonFields,
+            room_version: "6",
+            encryption: "algo",
+            allowed_room_ids: ["!space:bar"],
+        };
+
+        /** What older Synapse returns from the initial version of MSC3266: the prefixed fields only. */
+        const unstableRoomSummary: RoomSummary = {
+            ...commonFields,
             "im.nheko.summary.room_version": "6",
             "im.nheko.summary.encryption": "algo",
         };
 
+        const stablePrefix = "/_matrix/client/v1/";
+        const stableSuffix = `room_summary/${encodedRoomId}`;
         const prefix = "/_matrix/client/unstable/im.nheko.summary/";
         const suffix = `summary/${encodedRoomId}`;
-        const deprecatedSuffix = `rooms/${encodedRoomId}/summary`;
 
         const errorUnrecogStatus = 404;
         const errorUnrecogBody = {
@@ -1762,32 +1777,86 @@ describe("MatrixClient", function () {
             error: "Invalid request",
         };
 
-        it("should respond with a valid room summary object", () => {
-            httpBackend.when("GET", prefix + suffix).respond(200, roomSummary);
+        const errorNotFoundStatus = 404;
+        const errorNotFoundBody = {
+            errcode: "M_NOT_FOUND",
+            error: "Room not found",
+        };
 
-            const prom = client.getRoomSummary(roomId).then((response) => {
-                expect(response).toEqual(roomSummary);
-            });
+        /**
+         * Stub the (cached) `/versions` lookup that `getRoomSummary` makes to pick an endpoint.
+         * MSC3266 was stabilised in Matrix 1.15, so a v1.14 server only has the unstable endpoint.
+         */
+        function expectVersions(versions: string[], unstableFeatures: Record<string, boolean> = {}): void {
+            httpBackend
+                .when("GET", "/_matrix/client/versions")
+                .respond(200, { versions, unstable_features: unstableFeatures });
+        }
 
-            httpBackend.flush("");
-            return prom;
+        it("should respond with a valid room summary object", async () => {
+            expectVersions(["v1.14", "v1.15"]);
+            httpBackend
+                .when("GET", stablePrefix + stableSuffix)
+                .check((req) => {
+                    expect(new URL(req.path).searchParams.getAll("via")).toEqual(["server1", "server2"]);
+                })
+                .respond(200, roomSummary);
+
+            await Promise.all([
+                expect(client.getRoomSummary(roomId, ["server1", "server2"])).resolves.toEqual(roomSummary),
+                httpBackend.flushAllExpected(),
+            ]);
         });
 
-        it("should allow fallback to the deprecated endpoint", () => {
-            httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
-            httpBackend.when("GET", prefix + deprecatedSuffix).respond(200, roomSummary);
+        it("should use the stable endpoint when only the unstable feature is advertised", async () => {
+            expectVersions(["v1.14"], { "org.matrix.msc3266": true });
+            httpBackend.when("GET", stablePrefix + stableSuffix).respond(200, roomSummary);
 
-            const prom = client.getRoomSummary(roomId).then((response) => {
-                expect(response).toEqual(roomSummary);
-            });
-
-            httpBackend.flush("");
-            return prom;
+            await Promise.all([
+                expect(client.getRoomSummary(roomId)).resolves.toEqual(roomSummary),
+                httpBackend.flushAllExpected(),
+            ]);
         });
 
-        it("should respond to unsupported path with error", () => {
+        it("should use the unstable endpoint when neither is advertised", async () => {
+            expectVersions(["v1.14"]);
+            httpBackend
+                .when("GET", prefix + suffix)
+                .check((req) => {
+                    expect(new URL(req.path).searchParams.getAll("via")).toEqual(["server1"]);
+                })
+                .respond(200, unstableRoomSummary);
+
+            await Promise.all([
+                expect(client.getRoomSummary(roomId, ["server1"])).resolves.toEqual(unstableRoomSummary),
+                httpBackend.flushAllExpected(),
+            ]);
+            // The stable endpoint must not have been tried; an unmatched request would show up here.
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        it("should not fall back when the room is not found", async () => {
+            expectVersions(["v1.15"]);
+            httpBackend.when("GET", stablePrefix + stableSuffix).respond(errorNotFoundStatus, errorNotFoundBody);
+
+            const prom = client.getRoomSummary(roomId).then(
+                function (response) {
+                    throw Error("request not failed");
+                },
+                function (error) {
+                    expect(error.httpStatus).toEqual(errorNotFoundStatus);
+                    expect(error.errcode).toEqual(errorNotFoundBody.errcode);
+                },
+            );
+
+            await Promise.all([prom, httpBackend.flushAllExpected()]);
+            // If the unstable endpoint had been tried, it would show up here.
+            httpBackend.verifyNoOutstandingRequests();
+        });
+
+        it("should respond to unsupported path with error", async () => {
+            expectVersions(["v1.14"]);
             httpBackend.when("GET", prefix + suffix).respond(errorUnrecogStatus, errorUnrecogBody);
-            httpBackend.when("GET", prefix + deprecatedSuffix).respond(errorUnrecogStatus, errorUnrecogBody);
 
             const prom = client.getRoomSummary(roomId).then(
                 function (response) {
@@ -1800,12 +1869,13 @@ describe("MatrixClient", function () {
                 },
             );
 
-            httpBackend.flush("");
-            return prom;
+            await Promise.all([prom, httpBackend.flushAllExpected()]);
         });
 
-        it("should respond to invalid path arguments with error", () => {
-            httpBackend.when("GET", prefix).respond(errorBadreqStatus, errorBadreqBody);
+        it("should respond to invalid path arguments with error", async () => {
+            expectVersions(["v1.15"]);
+            // M_UNKNOWN rather than M_UNRECOGNIZED, so no fallback fires.
+            httpBackend.when("GET", stablePrefix + "room_summary/").respond(errorBadreqStatus, errorBadreqBody);
 
             const prom = client.getRoomSummary("notAroom").then(
                 function (response) {
@@ -1818,8 +1888,7 @@ describe("MatrixClient", function () {
                 },
             );
 
-            httpBackend.flush("");
-            return prom;
+            await Promise.all([prom, httpBackend.flushAllExpected()]);
         });
     });
 

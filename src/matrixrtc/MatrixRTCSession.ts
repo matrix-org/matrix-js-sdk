@@ -105,6 +105,15 @@ export interface SessionConfig {
     callIntent?: RTCCallIntent;
 
     /**
+     * Application-specific data to publish in our membership alongside the
+     * application `type` and `m.call.intent`: in the `application` object of
+     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
+     * one. Keys should be namespaced. Read back through
+     * {@link CallMembership.applicationData}.
+     */
+    applicationData?: Record<string, unknown>;
+
+    /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
      * answer before the sender gives up and the call notification is considered timed out.
      */
@@ -725,6 +734,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Replace the application-specific data in our membership (see
+     * {@link SessionConfig.applicationData}), re-sending it if it changed.
+     */
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateApplicationData(applicationData);
+    }
+
+    /**
      * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
      * the keys.
      */
@@ -869,13 +890,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
+     *
+     * @deprecated use {@link ensureRecalculateSessionMembers} instead.
      */
-    // We allow this name schema since this function should only be used for testing purposes.
     public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.recalculateSessionMembers();
+        await this.ensureRecalculateSessionMembers();
     };
 
-    // helper variables to make sure we do not have parallel running recalculations.
+    // Recalculations are chained onto this promise, so they never run in parallel.
     private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
 
     /**
@@ -883,7 +905,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Also ensures that only one recalculation is made at a time.
      * @returns A promise resolving when the state has been recalculated.
      */
-    private ensureRecalculateSessionMembers(): Promise<void> {
+    public ensureRecalculateSessionMembers(): Promise<void> {
         if (this.membershipNeedsRecalculation) {
             // We have already requested recalcuation, don't attempt a new one.
             return this.recalculateSessionMembersPromise;

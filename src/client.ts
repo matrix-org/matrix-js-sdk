@@ -253,6 +253,7 @@ import {
 } from "./matrixrtc/index.ts";
 import { type IRTCDeclineContent, RTC_NOTIFICATION_MAX_LIFETIME_MS } from "./matrixrtc/types.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { fetchRoomSummary, type RoomSummary } from "./room-summary-api.ts";
 import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
 import { type PollingCachedValue } from "./pollingCachedValue.ts";
@@ -883,25 +884,8 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-/**
- * The summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
- * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
- */
-export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
-    /**
-     * The current membership of this user in the room.
-     * Usually "leave" if the room is fetched over federation.
-     */
-    "membership"?: Membership;
-    /**
-     * Version of the room.
-     */
-    "im.nheko.summary.room_version"?: string;
-    /**
-     * The encryption algorithm used for this room, if the room is encrypted.
-     */
-    "im.nheko.summary.encryption"?: string;
-}
+// Re-export for backwards compatibility
+export { type RoomSummary };
 
 interface IRoomHierarchy {
     rooms: IHierarchyRoom[];
@@ -8924,26 +8908,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
-     * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+     * Fetches the summary of a room.
+     * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
+     *
+     * Uses the initial version of MSC3266, as implemented in older versions of Synapse, unless the
+     * server advertises support for the spec version which stabilised it.
+     *
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
-     * @param via - The list of servers which know about the room if only an ID was provided.
+     * @param via - The servers to attempt to request the summary from, when the local server cannot
+     *              generate it (for instance, because it has no local user in the room).
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
-        const paramOpts = {
-            prefix: "/_matrix/client/unstable/im.nheko.summary",
-        };
-        try {
-            const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-            return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-                return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-            } else {
-                throw e;
-            }
-        }
+        return fetchRoomSummary(this.http, await this.getVersions(), roomIdOrAlias, via);
     }
 
     /**

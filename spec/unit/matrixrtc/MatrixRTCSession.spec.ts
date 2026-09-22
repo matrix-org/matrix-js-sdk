@@ -18,6 +18,7 @@ import { type Mock } from "vitest";
 
 import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
 import {
+    type CallMembership,
     type JoinSessionConfig,
     MatrixRTCSession,
     MatrixRTCSessionEvent,
@@ -661,7 +662,12 @@ describe("MatrixRTCSession", () => {
         let sentStateEvent: Promise<void>;
         beforeEach(async () => {
             sentStateEvent = new Promise((resolve) => {
-                sendStateEventMock = vi.fn(resolve);
+                // Has to return a promise with an event id: the membership manager awaits it, and
+                // shuts itself down with an unrecoverable error if the send does not resolve.
+                sendStateEventMock = vi.fn(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "$own-membership-event" });
+                });
             });
             sendEventMock = vi.fn().mockResolvedValue(undefined);
             sendStickyEventMock = vi.fn().mockResolvedValue(undefined);
@@ -669,10 +675,13 @@ describe("MatrixRTCSession", () => {
             client.sendEvent = sendEventMock;
             client._unstable_sendStickyEvent = sendStickyEventMock;
 
-            client._unstable_updateDelayedEvent = vi.fn();
-            client._unstable_cancelScheduledDelayedEvent = vi.fn();
-            client._unstable_restartScheduledDelayedEvent = vi.fn();
-            client._unstable_sendScheduledDelayedEvent = vi.fn();
+            // These all have to resolve: the membership manager chains off them, and treats a
+            // failure as unrecoverable, shutting down and no longer tracking our own membership.
+            client._unstable_sendDelayedStateEvent = vi.fn().mockResolvedValue({ delay_id: "$delay-id" });
+            client._unstable_updateDelayedEvent = vi.fn().mockResolvedValue(undefined);
+            client._unstable_cancelScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+            client._unstable_restartScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+            client._unstable_sendScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
 
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
@@ -716,6 +725,31 @@ describe("MatrixRTCSession", () => {
             sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { unstableSendStickyEvents: true });
             expect(sess!.isJoined()).toEqual(true);
             expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
+        });
+
+        it("publishes application data in the membership, and updates it once joined", async () => {
+            await expect(sess!.updateApplicationData({ "org.example.key": 1 })).rejects.toThrow("Not connected yet");
+            // The manager needs a real response to stay alive for the update
+            const sent = new Promise<void>((resolve) =>
+                sendStateEventMock.mockImplementation(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "$membership" });
+                }),
+            );
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                applicationData: { "org.example.key": 1 },
+            });
+            await sent;
+            expect((sendStateEventMock.mock.calls[0][2] as Record<string, unknown>)["org.example.key"]).toBe(1);
+            mockRoomState(mockRoom, [
+                { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "org.example.key": 1 } as any,
+            ]);
+            await sess!._onRTCSessionMemberUpdate();
+            expect(sess!.memberships[0].applicationData["org.example.key"]).toBe(1);
+
+            await sess!.updateApplicationData({ "org.example.key": 2 });
+            expect(sendStateEventMock).toHaveBeenCalledTimes(2);
+            expect((sendStateEventMock.mock.calls[1][2] as Record<string, unknown>)["org.example.key"]).toBe(2);
         });
 
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
@@ -952,6 +986,72 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, []);
             await sess._onRTCSessionMemberUpdate();
             expect(onMembershipsChanged).toHaveBeenCalled();
+        });
+
+        it("does not let an older recalculation overwrite a newer one", async () => {
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:example.org", device_id: "BBBBBBB" };
+            const mockRoom = makeMockRoom([sessionMembershipTemplate, bob]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(2);
+            const onMembershipsChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+            // Two membership state events land in one sync batch, so two updates are requested
+            // back to back before either recalculation has run: Bob leaves, then Alice leaves.
+            // Both requests have to be served by a recalculation that sees the final state,
+            // otherwise members who have since left linger until the next state change.
+            // `_onRTCSessionMemberUpdate` is the entry point that used to bypass the coalescing,
+            // so it is what this test drives; the session manager now calls the public method.
+            mockRoomState(mockRoom, [sessionMembershipTemplate]);
+            const first = sess._onRTCSessionMemberUpdate();
+            mockRoomState(mockRoom, []);
+            const second = sess._onRTCSessionMemberUpdate();
+            await Promise.all([first, second]);
+
+            expect(sess.memberships).toHaveLength(0);
+            // And the session emitted once, rather than also emitting a list still containing
+            // members who had left.
+            expect(onMembershipsChanged).toHaveBeenCalledTimes(1);
+            const [oldMemberships, newMemberships] = onMembershipsChanged.mock.calls[0];
+            expect(oldMemberships).toHaveLength(2);
+            expect(newMemberships).toEqual([]);
+        });
+
+        it("serializes a recalculation requested while one is already running", async () => {
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:example.org", device_id: "BBBBBBB" };
+            const mockRoom = makeMockRoom([sessionMembershipTemplate, bob]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(2);
+            const onMembershipsChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+            // Same as above, but the second update is requested once the first recalculation has
+            // started, so it cannot be coalesced into it and has to be chained after it instead.
+            // Both recalculations are stalled so that the newer one is ready to finish first: if
+            // they ran in parallel, the older one would land last and reinstate Bob.
+            const aliceOnly = sess.memberships.slice(0, 1);
+            const bobLeft = Promise.withResolvers<CallMembership[]>();
+            const aliceLeft = Promise.withResolvers<CallMembership[]>();
+            const membershipsForSlot = vi
+                .spyOn(MatrixRTCSession, "sessionMembershipsForSlot")
+                .mockReturnValueOnce(bobLeft.promise)
+                .mockReturnValueOnce(aliceLeft.promise);
+            try {
+                const first = sess._onRTCSessionMemberUpdate();
+                await flushPromises(); // the first recalculation is now started and stalled
+                const second = sess._onRTCSessionMemberUpdate();
+                aliceLeft.resolve([]);
+                await flushPromises();
+                bobLeft.resolve(aliceOnly);
+                await Promise.all([first, second]);
+            } finally {
+                membershipsForSlot.mockRestore();
+            }
+
+            expect(sess.memberships).toHaveLength(0);
+            expect(onMembershipsChanged).toHaveBeenLastCalledWith(expect.anything(), []);
         });
 
         // TODO: re-enable this test when expiry is implemented

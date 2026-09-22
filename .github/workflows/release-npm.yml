@@ -46,5 +46,25 @@ jobs:
                   fi
 
                   pnpm publish --provenance --access public --publish-branch staging --tag "$tag"
-                  release=$(jq -r '"\(.name)@\(.version)"' package.json)
+
+                  name=$(jq -r '.name' package.json)
+                  release="$name@$version"
+
+                  # NPM now scans published packages before they are made available for download
+                  # block here until the package is ready to be consumed.
+                  echo "Waiting for $release to become available for download..."
+                  tmpdir=$(mktemp -d)
+                  for i in $(seq 1 60); do
+                      if (cd "$tmpdir" && npm pack "$release" >/dev/null 2>&1); then
+                          echo "$release is available"
+                          break
+                      fi
+                      if [[ "$i" -eq 60 ]]; then
+                          echo "::error::Timed out waiting for $release to become available on npm"
+                          exit 1
+                      fi
+                      sleep 10
+                  done
+                  rm -rf "$tmpdir"
+
                   echo "id=$release" >> $GITHUB_OUTPUT
