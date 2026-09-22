@@ -637,7 +637,7 @@ describe("SlidingSyncSdk", () => {
     describe("ExtensionE2EE", () => {
         let ext: Extension<any, any>;
 
-        beforeAll(async () => {
+        beforeEach(async () => {
             await setupClient({
                 withCrypto: true,
             });

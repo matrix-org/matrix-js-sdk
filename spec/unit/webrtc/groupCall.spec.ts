@@ -188,7 +188,6 @@ describe("Group Call", function () {
         });
 
         it("does not start initializing local call feed twice", () => {
-            // @ts-expect-error TS2769
             const spy = vi.spyOn(groupCall, "initLocalCallFeedInternal");
             groupCall.initLocalCallFeed();
             // @ts-ignore Mock

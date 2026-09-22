@@ -649,6 +649,81 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("sendRtcDecline", () => {
+        const roomId = "!room:example.org";
+        const notificationEventId = "$notification:example.org";
+        const expectedContent = {
+            "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
+            "msc4354_sticky_key": notificationEventId,
+        };
+
+        const txnId = "txn";
+        const path = `/rooms/${encodeURIComponent(roomId)}/send/${EventType.RTCDecline}/${txnId}`;
+
+        beforeEach(() => {
+            unstableFeatures["org.matrix.msc4354"] = true;
+            vi.spyOn(client, "makeTxnId").mockReturnValue(txnId);
+        });
+
+        it("sends the decline as a sticky event keyed on the notification", async () => {
+            const eventId = "$decline:example.org";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: eventId },
+                    expectBody: expectedContent,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 120000 },
+                },
+            ];
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).resolves.toEqual({ event_id: eventId });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("uses the given sticky duration", async () => {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: "$decline:example.org" },
+                    expectBody: expectedContent,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 30000 },
+                },
+            ];
+
+            await client.sendRtcDecline(roomId, notificationEventId, 30_000);
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("falls back to a regular event when the server doesn't support sticky events", async () => {
+            unstableFeatures["org.matrix.msc4354"] = false;
+            const eventId = "$decline:example.org";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: eventId },
+                    expectBody: expectedContent,
+                    // The event is sent without a sticky duration, i.e. as a regular event.
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": undefined },
+                },
+            ];
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).resolves.toEqual({ event_id: eventId });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("does not fall back when sending the sticky event fails for another reason", async () => {
+            const error = new Error("network go boom");
+            vi.spyOn(client, "_unstable_sendStickyEvent").mockRejectedValue(error);
+            const sendEvent = vi.spyOn(client, "sendEvent");
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).rejects.toThrow(error);
+            expect(sendEvent).not.toHaveBeenCalled();
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
@@ -3873,20 +3948,40 @@ describe("MatrixClient", function () {
             await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
+    });
 
-        it("should use unstable prefix", async () => {
-            const metadata = makeDelegatedAuthMetadata();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    data: metadata,
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
+    describe("logout", () => {
+        const baseUrl = "https://logout-test.example.org";
+        const userId = "@alice:logout-test.example.org";
+        const accessToken = "test-access-token";
+        const refreshToken = "test-refresh-token";
 
-            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
-            expect(httpLookups.length).toEqual(0);
+        it("should call /logout for a non-OAuth2-native session", async () => {
+            fetchMock.postOnce(`${baseUrl}/_matrix/client/v3/logout`, {});
+
+            const client = createClient({ baseUrl, accessToken, userId });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(true);
+        });
+
+        it("should revoke tokens with the delegated auth server instead of calling /logout for an OAuth2-native session", async () => {
+            const authMetadata = makeDelegatedAuthMetadata("https://auth.logout-test.example.org/");
+            fetchMock.get(`${baseUrl}/_matrix/client/versions`, { versions: ["v1.15"] });
+            fetchMock.get(`${baseUrl}/_matrix/client/v1/auth_metadata`, authMetadata);
+            fetchMock.post(authMetadata.revocation_endpoint, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                refreshToken,
+                userId,
+                oauthClientId: "test-client-id",
+            });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(false);
+            expect(fetchMock.callHistory.calls(authMetadata.revocation_endpoint)).toHaveLength(2);
         });
     });
 

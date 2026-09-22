@@ -8,7 +8,7 @@
     "devEngines": {
         "packageManager": {
             "name": "pnpm",
-            "version": "11.9.0",
+            "version": "12.3.4",
             "onFail": "download"
         }
     },
@@ -86,8 +86,8 @@
         "@types/node": "22",
         "@types/sdp-transform": "^3.0.0",
         "@typescript/native": "npm:typescript@7.0.2",
-        "@vitest/coverage-v8": "^4.0.17",
-        "@vitest/ui": "^4.0.17",
+        "@vitest/coverage-v8": "^5.0.0",
+        "@vitest/ui": "^5.0.0",
         "concurrently": "^10.0.0",
         "debug": "^4.3.4",
         "fake-indexeddb": "^6.0.0",
@@ -97,7 +97,7 @@
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
-        "oxfmt": "^0.65.0",
+        "oxfmt": "^0.67.0",
         "oxlint": "^1.70.0",
         "oxlint-tsgolint": "^7.0.0",
         "typedoc": "^0.28.1",
@@ -105,6 +105,6 @@
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "npm:@typescript/typescript6@6.0.2",
-        "vitest": "^4.0.17"
+        "vitest": "^5.0.0"
     }
 }

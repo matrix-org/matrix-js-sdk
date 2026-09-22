@@ -14,7 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type AccessTokens, HTTPError, type TokenRefreshFunction, TokenRefreshLogoutError } from "../http-api/index.ts";
+import { HTTPError, TokenRefreshLogoutError } from "../http-api/errors.ts";
+import { type AccessTokens } from "../http-api/interface.ts";
 import { OAuth2HTTPError } from "./error.ts";
 import { type OAuth2 } from "./index.ts";
 
@@ -26,16 +27,15 @@ export class TokenRefresher {
 
     public constructor(
         private readonly auth: OAuth2,
-        private readonly onRefresh: (tokens: AccessTokens) => Promise<void>,
+        private readonly onRefresh: (tokens: AccessTokens) => void | Promise<void>,
     ) {}
 
     /**
      * Attempt token refresh using given refresh token
      * @param refreshToken - refresh token to use in request with token issuer
-     * @returns tokens - Promise that resolves with new access and refresh tokens
      * @throws when token refresh fails
      */
-    public tokenRefreshFunction: TokenRefreshFunction = async (refreshToken: string): Promise<AccessTokens> => {
+    public async refreshTokens(refreshToken: string): Promise<AccessTokens> {
         if (!this.inflightRefreshRequest) {
             this.inflightRefreshRequest = this.getNewTokens(refreshToken);
         }
@@ -52,7 +52,17 @@ export class TokenRefresher {
         } finally {
             this.inflightRefreshRequest = undefined;
         }
-    };
+    }
+
+    /**
+     * Revoke a token with the OP, e.g. as part of logging out.
+     * @param token - the token to revoke
+     * @param type - the type of token, acts as a hint to the OP
+     * @throws when revocation fails
+     */
+    public async revokeToken(token: string, type?: "access_token" | "refresh_token"): Promise<void> {
+        await this.auth.revokeToken(token, type);
+    }
 
     private shouldLogoutOnError(error: HTTPError): boolean {
         // Treat as logout as per https://spec.matrix.org/v1.18/client-server-api/#refresh-token-grant

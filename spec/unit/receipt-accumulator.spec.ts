@@ -173,6 +173,30 @@ describe("ReceiptAccumulator", function () {
             ]),
         );
     });
+
+    it.each([
+        { description: "unthreaded receipts", threadId: undefined },
+        { description: "threaded receipts in the same thread", threadId: "thread1" },
+    ])("Collects $description of different types for the same user", ({ threadId }) => {
+        const acc = new ReceiptAccumulator();
+        const receipts = [
+            newReceipt("$event1", ReceiptType.Read, "@alice:localhost", 2, threadId),
+            newReceipt("$event2", ReceiptType.ReadPrivate, "@alice:localhost", 1, threadId),
+        ];
+
+        acc.consumeEphemeralEvents(receipts);
+
+        const content = acc.buildAccumulatedReceiptEvent(roomId)?.content as Record<
+            string,
+            Record<string, Record<string, unknown>>
+        >;
+        expect(content["$event1"][ReceiptType.Read]["@alice:localhost"]).toEqual({ ts: 2, thread_id: threadId });
+        expect(content["$event2"][ReceiptType.ReadPrivate]["@alice:localhost"]).toEqual({
+            ts: 1,
+            thread_id: threadId,
+        });
+        expect(Object.keys(content)).toHaveLength(2);
+    });
 });
 
 const newReceipt = (
