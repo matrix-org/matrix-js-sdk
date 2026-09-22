@@ -661,24 +661,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     *
-     * @param fociPreferred
-     * @param multiSfuFocus
-     * @param joinConfig
-     * @deprecated use the joinRTCSession method instead
-     */
-    public joinRoomSession(
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
-        joinConfig?: JoinSessionConfig,
-    ): void {
-        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
-        // TODO this wants to become a UUID
-        const memberId = `${userId}:${deviceId}`;
-        this.joinRTCSession({ userId, deviceId, memberId }, fociPreferred, multiSfuFocus, joinConfig);
-    }
-
-    /**
      * Announces this user and device as having left the MatrixRTC session
      * and stops scheduled updates.
      * This will not unsubscribe from updates: remember to call unsubscribe() separately if
