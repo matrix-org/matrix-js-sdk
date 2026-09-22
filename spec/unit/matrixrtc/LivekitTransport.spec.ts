@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { isLivekitFocusSelection, isLivekitTransportConfig, } from "../../../src/matrixrtc/LivekitTransport";
+import { isLivekitFocusSelection, isLivekitTransport } from "../../../src/matrixrtc/LivekitTransport";
 
 describe("LivekitTransport", () => {
     it("isLivekitFocusActive", () => {
@@ -27,15 +27,15 @@ describe("LivekitTransport", () => {
         expect(isLivekitFocusSelection({ type: "livekit" })).toBeFalsy();
         expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
     });
-    it("isLivekitTransportConfig", () => {
+    it("isLivekitTransport", () => {
         expect(
-            isLivekitTransportConfig({
+            isLivekitTransport({
                 type: "livekit",
                 livekit_service_url: "http://test.com",
             }),
         ).toBeTruthy();
-        expect(isLivekitTransportConfig({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitTransportConfig({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
-        expect(isLivekitTransportConfig({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
     });
 });

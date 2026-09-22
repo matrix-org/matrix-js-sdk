@@ -16,12 +16,12 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
-export interface LivekitTransportConfig extends Transport {
+export interface LivekitTransport extends Transport {
     type: "livekit";
     livekit_service_url: string;
 }
 
-export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
+export const isLivekitTransport = (object: any): object is LivekitTransport =>
     object.type === "livekit" && "livekit_service_url" in object;
 
 /**
