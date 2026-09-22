@@ -19,6 +19,7 @@ import { type Mock } from "vitest";
 import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
 import {
     type CallMembership,
+    type JoinSessionConfig,
     MatrixRTCSession,
     MatrixRTCSessionEvent,
     MembershipManagerEvent,
@@ -43,6 +44,7 @@ import {
 } from "../../../src/matrixrtc/types.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
+import { UnsupportedStickyEventsEndpointError } from "../../../src/errors.ts";
 import {
     computeRtcIdentityRaw,
     type RtcMembershipData,
@@ -442,6 +444,25 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships[0].isExpired()).toEqual(false);
             expect(sess?.slotDescription.id).toEqual("ROOM");
         });
+        it("ignores left sticky memberships", async () => {
+            const mockRoom = makeMockRoom([]);
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                // Left memberships only contain the slot ID and the sticky key.
+                const ev = mockRTCEvent(
+                    { user_id: "@left:user.example", slot_id: "m.call#ROOM", msc4354_sticky_key: "MEMBER" },
+                    mockRoom.roomId,
+                    5000,
+                );
+                return [ev as StickyMatrixEvent];
+            });
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toEqual([]);
+        });
         it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
             const mockRoom = makeMockRoom([sessionMembershipTemplate]);
@@ -635,6 +656,7 @@ describe("MatrixRTCSession", () => {
     describe("joining", () => {
         let mockRoom: Room;
         let sendEventMock: Mock;
+        let sendStickyEventMock: Mock;
         let sendStateEventMock: Mock;
 
         let sentStateEvent: Promise<void>;
@@ -648,8 +670,10 @@ describe("MatrixRTCSession", () => {
                 });
             });
             sendEventMock = vi.fn().mockResolvedValue(undefined);
+            sendStickyEventMock = vi.fn().mockResolvedValue(undefined);
             client.sendStateEvent = sendStateEventMock;
             client.sendEvent = sendEventMock;
+            client._unstable_sendStickyEvent = sendStickyEventMock;
 
             // These all have to resolve: the membership manager chains off them, and treats a
             // failure as unrecoverable, shutting down and no longer tracking our own membership.
@@ -672,6 +696,21 @@ describe("MatrixRTCSession", () => {
                 throw new Error(`Unexpected leave result: wanted ${wasJoined}, got ${left}`);
             }
         });
+
+        /**
+         * Joins the session as its first member, which makes it send a call notification.
+         * @returns The event ID of our own membership, which the notification references.
+         */
+        async function joinAsFirstMember(
+            joinConfig: JoinSessionConfig,
+            ownMembership: Partial<SessionMembershipData> = {},
+        ): Promise<string> {
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, joinConfig);
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            mockRoomState(mockRoom, [{ ...sessionMembershipTemplate, user_id: client.getUserId()!, ...ownMembership }]);
+            await sess!._onRTCSessionMemberUpdate();
+            return sess!.memberships[0].eventId;
+        }
 
         it("starts un-joined", () => {
             expect(sess!.isJoined()).toEqual(false);
@@ -714,9 +753,8 @@ describe("MatrixRTCSession", () => {
         });
 
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
-            // Simulate a join, including the update to the room state
-            // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            // Ensure the send returns an event ID so the DidSendCallNotification payload includes it
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -724,31 +762,37 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { notificationType: "ring" });
-            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
-            mockRoomState(mockRoom, [{ ...sessionMembershipTemplate, user_id: client.getUserId()! }]);
-            await sess!._onRTCSessionMemberUpdate();
-            const ownMembershipId = sess?.memberships[0].eventId;
+            const ownMembershipId = await joinAsFirstMember({ notificationType: "ring" });
 
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
-                "m.mentions": { user_ids: [], room: true },
-                "notification_type": "ring",
-                "m.relates_to": {
-                    event_id: ownMembershipId,
-                    rel_type: "m.reference",
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                {
+                    "slot_id": "m.call#ROOM",
+                    "msc4354_sticky_key": "m.call#ROOM",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": "ring",
+                    "m.relates_to": {
+                        event_id: ownMembershipId,
+                        rel_type: "m.reference",
+                    },
+                    "lifetime": 90000,
+                    "sender_ts": expect.any(Number),
                 },
-                "lifetime": 90000,
-                "sender_ts": expect.any(Number),
-            });
+            );
 
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
                 "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
-                    event_id: expect.any(String),
+                    event_id: ownMembershipId,
                     rel_type: "m.reference",
                 },
                 "notification_type": "ring",
@@ -756,10 +800,80 @@ describe("MatrixRTCSession", () => {
             });
         });
 
+        it("falls back to a regular event when the server doesn't support sticky events", async () => {
+            sendStickyEventMock.mockRejectedValueOnce(
+                new UnsupportedStickyEventsEndpointError("nope", "sendStickyEvent"),
+            );
+            sendEventMock.mockResolvedValueOnce({ event_id: "regular-evt" });
+            const didSendNotification = new Promise((resolve) => {
+                sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
+            });
+
+            const ownMembershipId = await joinAsFirstMember({
+                notificationType: "ring",
+                notificationLifetimeMs: 30_000,
+            });
+            await didSendNotification;
+
+            const expectedContent = {
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": "ring",
+                "m.relates_to": {
+                    event_id: ownMembershipId,
+                    rel_type: "m.reference",
+                },
+                "lifetime": 30_000,
+                "sender_ts": expect.any(Number),
+            };
+            // The sticky duration exceeds the lifetime, to absorb clock skew between sender and server.
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                50_000,
+                null,
+                EventType.RTCNotification,
+                expectedContent,
+            );
+            expect(sendEventMock).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, expectedContent);
+        });
+
+        it("does not fall back when sending the sticky notification fails for another reason", async () => {
+            const error = new Error("network go boom");
+            sendStickyEventMock.mockRejectedValueOnce(error);
+            const errorLogSpy = vi.spyOn(console, "error");
+
+            await joinAsFirstMember({ notificationType: "ring" });
+            await flushPromises();
+
+            expect(sendEventMock).not.toHaveBeenCalled();
+            const loggedFailure = errorLogSpy.mock.calls.some(
+                (call) => call.includes("Failed to send call notification") && call.includes(error),
+            );
+            expect(loggedFailure).toBe(true);
+        });
+
+        it("logs an error when sending the notification fails", async () => {
+            const error = new Error("no notifications for you");
+            sendStickyEventMock.mockRejectedValueOnce(
+                new UnsupportedStickyEventsEndpointError("nope", "sendStickyEvent"),
+            );
+            sendEventMock.mockRejectedValueOnce(error);
+            const errorLogSpy = vi.spyOn(console, "error");
+
+            await joinAsFirstMember({ notificationType: "ring" });
+            await flushPromises();
+
+            const loggedFailure = errorLogSpy.mock.calls.some(
+                (call) => call.includes("Failed to send call notification") && call.includes(error),
+            );
+            expect(loggedFailure).toBe(true);
+        });
+
         it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -767,41 +881,39 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                notificationType: "ring",
-                callIntent: "audio",
-            });
-            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
-
-            mockRoomState(mockRoom, [
-                {
-                    ...sessionMembershipTemplate,
-                    "user_id": client.getUserId()!,
-                    // This is what triggers the intent type on the notification event.
-                    "m.call.intent": "audio",
-                },
-            ]);
-
-            await sess!._onRTCSessionMemberUpdate();
-            const ownMembershipEventId = sess?.memberships[0].eventId;
+            const ownMembershipEventId = await joinAsFirstMember(
+                { notificationType: "ring", callIntent: "audio" },
+                // This is what triggers the intent type on the notification event.
+                { "m.call.intent": "audio" },
+            );
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
-                "m.mentions": { user_ids: [], room: true },
-                "notification_type": "ring",
-                "m.call.intent": "audio",
-                "m.relates_to": {
-                    event_id: ownMembershipEventId,
-                    rel_type: "m.reference",
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                {
+                    "slot_id": "m.call#ROOM",
+                    "msc4354_sticky_key": "m.call#ROOM",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": "ring",
+                    "m.call.intent": "audio",
+                    "m.relates_to": {
+                        event_id: ownMembershipEventId,
+                        rel_type: "m.reference",
+                    },
+                    "lifetime": 90000,
+                    "sender_ts": expect.any(Number),
                 },
-                "lifetime": 90000,
-                "sender_ts": expect.any(Number),
-            });
+            );
 
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
                 "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
@@ -1075,13 +1187,14 @@ describe("MatrixRTCSession", () => {
             application: { type: "m.call" },
         };
 
-        it("getRtcSlot/isSlotClosed return undefined when no slot event is set for a room", async () => {
+        it("getRtcSlot/isSlotClosed/isSlotOpen return undefined when no slot event is set for a room", async () => {
             const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             await sess.initialMembershipCalculated;
 
             expect(sess.getRtcSlot()).toBeUndefined();
             expect(sess.isSlotClosed()).toBeUndefined();
+            expect(sess.isSlotOpen()).toBeUndefined();
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is false when the slot is open", () => {
@@ -1092,6 +1205,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.getRtcSlot()).toEqual(openSlotContent);
             expect(sess.isSlotClosed()).toBe(false);
+            expect(sess.isSlotOpen()).toBe(true);
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed", () => {
@@ -1102,6 +1216,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.getRtcSlot()).toEqual(closedSlotContent);
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed but application has been kept around", () => {
@@ -1112,6 +1227,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.getRtcSlot()).toEqual(closedSlotContentWithApplication);
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("isSlotClosed is true when status is missing (malformed content)", () => {
@@ -1121,6 +1237,7 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("isSlotClosed is true when application.type does not match", () => {
@@ -1134,6 +1251,7 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("isSlotClosed is true when application is missing", () => {
@@ -1143,6 +1261,7 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("ignores sticky RTC memberships once the slot has been closed", async () => {
