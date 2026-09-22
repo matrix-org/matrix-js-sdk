@@ -246,40 +246,58 @@ describe("initRustCrypto", () => {
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
     });
 
-    it("should initialize while a pending room key query stalls and later fails", async () => {
+    it("should initialize without waiting for pending room key bundles", async () => {
+        // Given a pending key bundle whose lookup never completes.
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+        const olmMachine = makeTestOlmMachine();
+        olmMachine.getAllRoomsPendingKeyBundles.mockResolvedValue([
+            {
+                roomId: new RustSdkCryptoJs.RoomId("!joined:example.com"),
+                inviterId: new RustSdkCryptoJs.UserId("@inviter:example.com"),
+                inviteAcceptedAtMillis: Date.now(),
+            } as RustSdkCryptoJs.RoomPendingKeyBundleDetails,
+        ]);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(olmMachine);
+        // No real store or HTTP request is opened, so there is nothing to clean up if startup blocks.
+        const acceptKeyBundle = vi
+            .spyOn(RustCrypto.prototype, "maybeAcceptKeyBundle")
+            .mockReturnValue(new Promise(() => {}));
+
+        // When crypto initialisation starts.
+        const crypto = await makeTestRustCrypto();
+
+        // Then it completes without waiting for the lookup.
+        expect(crypto).toBeInstanceOf(RustCrypto);
+        expect(acceptKeyBundle).toHaveBeenCalledWith("!joined:example.com", "@inviter:example.com");
+    });
+
+    it("should keep local crypto usable and the bundle pending after a startup key query fails", async () => {
         // Given a real crypto store with a pending key bundle from a recently accepted invitation.
         const roomId = "!joined:example.com";
         const inviterId = "@inviter:example.com";
+        let olmMachine: OlmMachine | undefined;
+        let crypto: RustCrypto | undefined;
         const initFromStore = OlmMachine.initFromStore;
         vi.spyOn(OlmMachine, "initFromStore").mockImplementationOnce(async (...args) => {
-            const machine = await initFromStore(...args);
-            await machine.storeRoomPendingKeyBundle(
+            olmMachine = await initFromStore(...args);
+            await olmMachine.storeRoomPendingKeyBundle(
                 new RustSdkCryptoJs.RoomId(roomId),
                 new RustSdkCryptoJs.UserId(inviterId),
             );
-            return machine;
+            return olmMachine;
         });
 
-        // Given the inviter's key query receives no response yet.
-        const response = Promise.withResolvers<Response>();
-        fetchMock.post("http://server/_matrix/client/v3/keys/query", () => response.promise);
-        const acceptKeyBundle = vi.spyOn(RustCrypto.prototype, "maybeAcceptKeyBundle");
+        // Given the inviter's key query fails.
+        fetchMock.post("http://server/_matrix/client/v3/keys/query", {
+            status: 403,
+            body: { errcode: "M_FORBIDDEN", error: "Key query failed" },
+        });
         const logError = vi.spyOn(DebugLogger.prototype, "error");
-        // When crypto initialisation starts.
-        const initialization = makeTestRustCrypto(makeMatrixHttpApi());
 
         try {
-            // Then local crypto is usable before the key query responds.
-            // Bound the wait so a blocking regression still reaches cleanup below.
-            const crypto = await waitFor(() => initialization);
-            expect(fetchMock).toHaveFetched("http://server/_matrix/client/v3/keys/query", {
-                body: { device_keys: { [inviterId]: [] } },
-            });
-            const deviceKeys = await crypto.getOwnDeviceKeys();
-            expect(deviceKeys.ed25519).toEqual(expect.any(String));
-
-            // When the outstanding key query fails.
-            response.resolve(Response.json({ errcode: "M_FORBIDDEN", error: "Key query failed" }, { status: 403 }));
+            // When crypto initialisation starts.
+            crypto = await makeTestRustCrypto(makeMatrixHttpApi());
 
             // Then the failure is logged, local keys stay usable, and the bundle remains pending for retry.
             await waitFor(() =>
@@ -288,15 +306,19 @@ describe("initRustCrypto", () => {
                     expect.objectContaining({ errcode: "M_FORBIDDEN" }),
                 ),
             );
-            expect(await crypto.getOwnDeviceKeys()).toEqual(deviceKeys);
-            const pending = await crypto["olmMachine"].getAllRoomsPendingKeyBundles();
+            expect(fetchMock).toHaveFetched("http://server/_matrix/client/v3/keys/query", {
+                body: { device_keys: { [inviterId]: [] } },
+            });
+            expect((await crypto.getOwnDeviceKeys()).ed25519).toEqual(expect.any(String));
+            const pending = await olmMachine!.getAllRoomsPendingKeyBundles();
             expect(pending.map((details) => details.roomId.toString())).toEqual([roomId]);
         } finally {
-            // Release the stalled request even on assertion failure, then drain it before closing the store.
-            response.resolve(Response.json({ device_keys: {} }));
-            const crypto = await initialization.catch(() => undefined);
-            await acceptKeyBundle.mock.results[0]?.value.catch(() => undefined);
-            crypto?.stop();
+            if (crypto) {
+                crypto.stop();
+            } else {
+                // Initialisation may have thrown before returning a RustCrypto instance.
+                olmMachine?.close();
+            }
         }
     });
 
