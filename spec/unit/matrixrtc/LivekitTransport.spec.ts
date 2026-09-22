@@ -34,8 +34,16 @@ describe("LivekitTransport", () => {
                 livekit_service_url: "http://test.com",
             }),
         ).toBeTruthy();
+        expect(
+            isLivekitTransport({
+                type: "livekit",
+                url: "ws://test.com",
+            }),
+        ).toBeTruthy();
         expect(isLivekitTransport({ type: "livekit" })).toBeFalsy();
         expect(isLivekitTransport({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
         expect(isLivekitTransport({ type: "livekit", other_service_url: "multi_sfu" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit", livekit_service_url: 3 })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit", url: 4 })).toBeFalsy();
     });
 });

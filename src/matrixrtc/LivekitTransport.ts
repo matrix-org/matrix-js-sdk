@@ -16,13 +16,33 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
-export interface LivekitTransport extends Transport {
-    type: "livekit";
-    livekit_service_url: string;
-}
+export type LivekitTransport =
+    // Latest MSC4195 variant
+    | {
+          type: "livekit";
+          /**
+           * WebSocket URL of the LiveKit server.
+           */
+          url: string;
+      }
+    // Legacy variant
+    | {
+          type: "livekit";
+          /**
+           * Base URL of the LiveKit JWT service.
+           */
+          livekit_service_url: string;
+      };
 
-export const isLivekitTransport = (object: any): object is LivekitTransport =>
-    object.type === "livekit" && "livekit_service_url" in object;
+export const isLivekitTransport = (object: unknown): object is LivekitTransport => {
+    if (typeof object !== "object" || object === null) return false;
+    const transport = object as Transport;
+    if (transport.type !== "livekit") return false;
+    if (!("url" in transport || "livekit_service_url" in transport)) return false;
+    if ("url" in transport && typeof transport.url !== "string") return false;
+    if ("livekit_service_url" in transport && typeof transport.livekit_service_url !== "string") return false;
+    return true;
+};
 
 /**
  * @alias
