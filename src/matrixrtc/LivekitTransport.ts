@@ -24,13 +24,6 @@ export interface LivekitTransportConfig extends Transport {
 export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
     object.type === "livekit" && "livekit_service_url" in object;
 
-export interface LivekitTransport extends LivekitTransportConfig {
-    livekit_alias: string;
-}
-
-export const isLivekitTransport = (object: any): object is LivekitTransport =>
-    isLivekitTransportConfig(object) && "livekit_alias" in object;
-
 /**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.
  * Not needed for new implementations.
