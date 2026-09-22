@@ -51,7 +51,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { computeSlotId, getSlotEventContent, isSlotClosed } from "./utils.ts";
+import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -368,6 +368,16 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public isSlotClosed(): boolean | undefined {
         return isSlotClosed(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Whether this session's slot is open.
+     *
+     * @returns `true` if the slot is open, `false` if the slot is closed or `undefined`
+     * if no slot exists.
+     */
+    public isSlotOpen(): boolean | undefined {
+        return isSlotOpen(this.roomSubset, this.slotDescription);
     }
 
     /**

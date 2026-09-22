@@ -109,3 +109,14 @@ export function isSlotClosed(
         content.application?.type !== slotDescription.application
     );
 }
+
+/**
+ * Whether the given slot is open.
+ *
+ * @returns `true` if the slot is open, `false` if the slot is closed or `undefined`
+ * if no slot exists.
+ */
+export function isSlotOpen(room: Pick<Room, "getLiveTimeline">, slotDescription: SlotDescription): boolean | undefined {
+    const closed = isSlotClosed(room, slotDescription);
+    return closed === undefined ? undefined : !closed;
+}

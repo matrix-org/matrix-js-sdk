@@ -22,7 +22,7 @@ import { EventType, RelationType } from "../@types/event.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 import { isLeftMembershipContent } from "./membershipData/index.ts";
-import { isSlotClosed, slotIdToDescription } from "./utils.ts";
+import { isSlotOpen, slotIdToDescription } from "./utils.ts";
 
 export type EncryptionKeyMapKey = string;
 
@@ -340,9 +340,9 @@ async function checkCallNotificationReceivingRules(
         }
     }
 
-    // `isSlotClosed` returns undefined when no slot event exists at all, which is just as disqualifying.
-    if (isSlotClosed(room, slotIdToDescription(slotId)) !== false) {
-        throw new Error(`Slot ${slotId} does not exist or is not open`);
+    // `isSlotOpen` returns undefined when no slot event exists at all, which is just as disqualifying.
+    if (!isSlotOpen(room, slotIdToDescription(slotId))) {
+        throw new Error(`Slot ${slotId} does not exist or is closed`);
     }
     const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);
 

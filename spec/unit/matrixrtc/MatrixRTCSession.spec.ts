@@ -1187,13 +1187,14 @@ describe("MatrixRTCSession", () => {
             application: { type: "m.call" },
         };
 
-        it("getRtcSlot/isSlotClosed return undefined when no slot event is set for a room", async () => {
+        it("getRtcSlot/isSlotClosed/isSlotOpen return undefined when no slot event is set for a room", async () => {
             const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             await sess.initialMembershipCalculated;
 
             expect(sess.getRtcSlot()).toBeUndefined();
             expect(sess.isSlotClosed()).toBeUndefined();
+            expect(sess.isSlotOpen()).toBeUndefined();
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is false when the slot is open", () => {
@@ -1204,6 +1205,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.getRtcSlot()).toEqual(openSlotContent);
             expect(sess.isSlotClosed()).toBe(false);
+            expect(sess.isSlotOpen()).toBe(true);
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed", () => {
@@ -1214,6 +1216,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.getRtcSlot()).toEqual(closedSlotContent);
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed but application has been kept around", () => {
@@ -1224,6 +1227,7 @@ describe("MatrixRTCSession", () => {
 
             expect(sess.getRtcSlot()).toEqual(closedSlotContentWithApplication);
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("isSlotClosed is true when status is missing (malformed content)", () => {
@@ -1233,6 +1237,7 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("isSlotClosed is true when application.type does not match", () => {
@@ -1246,6 +1251,7 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("isSlotClosed is true when application is missing", () => {
@@ -1255,6 +1261,7 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
         });
 
         it("ignores sticky RTC memberships once the slot has been closed", async () => {
