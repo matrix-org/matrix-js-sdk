@@ -30,7 +30,7 @@ export const isLivekitTransport = (object: any): object is LivekitTransport =>
  */
 export interface LivekitFocusSelection extends Transport {
     type: "livekit";
-    focus_selection: "oldest_membership" | "multi_sfu";
+    focus_selection: "multi_sfu";
 }
 /**
  * @deprecated see LivekitFocusSelection

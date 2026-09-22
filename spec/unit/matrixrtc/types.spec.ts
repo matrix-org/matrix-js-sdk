@@ -249,7 +249,7 @@ describe("parseCallNotificationContent", () => {
             call_id: "",
             device_id: "DEVICE",
             scope: "m.room",
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+            focus_active: { type: "livekit", focus_selection: "multi_sfu" },
             foci_preferred: [],
         };
 
@@ -527,7 +527,7 @@ describe("parseCallNotificationContent", () => {
                 call_id: "",
                 device_id: "DEVICE",
                 scope: "m.room",
-                focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+                focus_active: { type: "livekit", focus_selection: "multi_sfu" },
                 foci_preferred: [],
             };
 

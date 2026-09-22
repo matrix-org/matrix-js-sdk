@@ -40,7 +40,7 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     user_id: "@mock:user.example",
     device_id: "AAAAAAA",
     scope: "m.room",
-    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+    focus_active: { type: "livekit", focus_selection: "multi_sfu" },
     foci_preferred: [
         {
             livekit_alias: "!alias:something.org",
@@ -71,7 +71,7 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         published: [
             {
                 type: "livekit",
-                focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+                focus_active: { type: "livekit", focus_selection: "multi_sfu" },
                 foci_preferred: [
                     {
                         livekit_alias: "!alias:something.org",

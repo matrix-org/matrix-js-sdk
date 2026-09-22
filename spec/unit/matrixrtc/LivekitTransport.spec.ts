@@ -21,11 +21,11 @@ describe("LivekitTransport", () => {
         expect(
             isLivekitFocusSelection({
                 type: "livekit",
-                focus_selection: "oldest_membership",
+                focus_selection: "multi_sfu",
             }),
         ).toBeTruthy();
         expect(isLivekitFocusSelection({ type: "livekit" })).toBeFalsy();
-        expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "multi_sfu" })).toBeFalsy();
     });
     it("isLivekitTransport", () => {
         expect(
@@ -36,6 +36,6 @@ describe("LivekitTransport", () => {
         ).toBeTruthy();
         expect(isLivekitTransport({ type: "livekit" })).toBeFalsy();
         expect(isLivekitTransport({ type: "not-livekit", livekit_service_url: "http://test.com" })).toBeFalsy();
-        expect(isLivekitTransport({ type: "livekit", other_service_url: "oldest_membership" })).toBeFalsy();
+        expect(isLivekitTransport({ type: "livekit", other_service_url: "multi_sfu" })).toBeFalsy();
     });
 });

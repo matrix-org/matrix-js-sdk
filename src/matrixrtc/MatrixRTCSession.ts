@@ -587,17 +587,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * This method will return immediately and the session will be joined in the background.
      * @param ownMembershipIdentity the identity of the user and device joining the session.
      * This will be put into the content.member.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @param joinConfig - Additional configuration for the joined session.
      */
     public joinRTCSession(
         ownMembershipIdentity: CallMembershipIdentityParts,
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
+        publishedTransports: Transport[],
         joinConfig?: JoinSessionConfig,
     ): void {
         if (this.isJoined()) {
@@ -650,7 +645,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager.join(fociPreferred, multiSfuFocus, (e) => {
+        this.membershipManager.join(publishedTransports, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
@@ -684,19 +679,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         return await leavePromise;
-    }
-    /**
-     * This returns the focus in use by the oldest membership.
-     * Do not use since this might be just the focus for the oldest membership. others might use a different focus.
-     * @deprecated use `member.getTransport(session.getOldestMembership())` instead for the specific member you want to get the focus for.
-     */
-    public getFocusInUse(): Transport | undefined {
-        const oldestMembership = this.getOldestMembership();
-        return oldestMembership?.getTransport(oldestMembership);
-    }
-
-    public getOldestMembership(): CallMembership | undefined {
-        return this.memberships[0];
     }
 
     /**
