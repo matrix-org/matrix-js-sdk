@@ -77,6 +77,8 @@ export type LivekitGetTokenRequest = {
     /**
      * The MatrixRTC membership to obtain a token for.
      */
+    // TODO: Replace with `member_id` when stabilised. For now this is
+    // documented in MSC4143 as an implementation difference.
     member: LivekitRtcMember;
     /**
      * The server name of the `m.rtc.member` event's sender. If omitted, the homeserver uses its own
@@ -117,6 +119,8 @@ export type LivekitDelegateDelayedLeaveRequest = {
     /**
      * The MatrixRTC membership the delayed leave event belongs to.
      */
+    // TODO: Replace with `member_id` when stabilised. For now this is
+    // documented in MSC4143 as an implementation difference.
     member: LivekitRtcMember;
     /**
      * The delay ID of the delayed leave event to hand over to the homeserver.
