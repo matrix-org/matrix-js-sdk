@@ -649,6 +649,104 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("MSC4306 thread subscriptions", () => {
+        const roomId = "!room:example.org";
+        const threadId = "$root:example.org";
+        const prefix = "/_matrix/client/unstable/io.element.msc4306";
+        const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(threadId)}/subscription`;
+
+        let onUpdate: MockInstance;
+
+        beforeEach(() => {
+            onUpdate = vi.fn();
+            client.on(ClientEvent.ThreadSubscriptionUpdate, onUpdate);
+        });
+
+        afterEach(() => {
+            client.off(ClientEvent.ThreadSubscriptionUpdate, onUpdate);
+        });
+
+        it("has no cached state before any request", () => {
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBeUndefined();
+        });
+
+        it("fetches an existing subscription", async () => {
+            httpLookups = [{ method: "GET", path, prefix, data: { automatic: true } }];
+
+            await expect(client.getThreadSubscription(roomId, threadId)).resolves.toEqual({ automatic: true });
+            expect(httpLookups.length).toEqual(0);
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBe(true);
+            expect(onUpdate).toHaveBeenCalledWith(roomId, threadId, true);
+        });
+
+        it("treats a 404 as not subscribed", async () => {
+            httpLookups = [{ method: "GET", path, prefix, error: { errcode: "M_NOT_FOUND", httpStatus: 404 } }];
+
+            await expect(client.getThreadSubscription(roomId, threadId)).resolves.toBeNull();
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBe(false);
+            expect(onUpdate).toHaveBeenCalledWith(roomId, threadId, false);
+        });
+
+        it("propagates other errors without touching the cache", async () => {
+            httpLookups = [{ method: "GET", path, prefix, error: { errcode: "M_UNKNOWN", httpStatus: 500 } }];
+
+            await expect(client.getThreadSubscription(roomId, threadId)).rejects.toThrow();
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBeUndefined();
+            expect(onUpdate).not.toHaveBeenCalled();
+        });
+
+        it("subscribes manually with an empty body", async () => {
+            httpLookups = [{ method: "PUT", path, prefix, data: {}, expectBody: {} }];
+
+            await client.subscribeToThread(roomId, threadId);
+            expect(httpLookups.length).toEqual(0);
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBe(true);
+            expect(onUpdate).toHaveBeenCalledWith(roomId, threadId, true);
+        });
+
+        it("subscribes automatically with the cause event", async () => {
+            httpLookups = [{ method: "PUT", path, prefix, data: {}, expectBody: { automatic: "$cause" } }];
+
+            await client.subscribeToThread(roomId, threadId, "$cause");
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("does not update the cache when an automatic subscription is skipped", async () => {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    prefix,
+                    error: { errcode: "IO.ELEMENT.MSC4306.M_CONFLICTING_UNSUBSCRIPTION", httpStatus: 409 },
+                },
+            ];
+
+            await expect(client.subscribeToThread(roomId, threadId, "$cause")).rejects.toThrow();
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBeUndefined();
+            expect(onUpdate).not.toHaveBeenCalled();
+        });
+
+        it("unsubscribes", async () => {
+            httpLookups = [{ method: "DELETE", path, prefix, data: {} }];
+
+            await client.unsubscribeFromThread(roomId, threadId);
+            expect(httpLookups.length).toEqual(0);
+            expect(client.getCachedThreadSubscription(roomId, threadId)).toBe(false);
+            expect(onUpdate).toHaveBeenCalledWith(roomId, threadId, false);
+        });
+
+        it("only emits when the cached state changes", async () => {
+            httpLookups = [
+                { method: "PUT", path, prefix, data: {} },
+                { method: "GET", path, prefix, data: { automatic: false } },
+            ];
+
+            await client.subscribeToThread(roomId, threadId);
+            await client.getThreadSubscription(roomId, threadId);
+            expect(onUpdate).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe("sendRtcDecline", () => {
         const roomId = "!room:example.org";
         const notificationEventId = "$notification:example.org";

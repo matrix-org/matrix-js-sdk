@@ -641,10 +641,7 @@ export class PushProcessor {
         return val.includes(cond.value);
     }
 
-    private eventFulfillsThreadSubscriptionCondition(
-        cond: IThreadSubscriptionCondition,
-        ev: MatrixEvent,
-    ): boolean {
+    private eventFulfillsThreadSubscriptionCondition(cond: IThreadSubscriptionCondition, ev: MatrixEvent): boolean {
         const roomId = ev.getRoomId();
         const rootId = ev.threadRootId;
         if (!roomId || !rootId) {

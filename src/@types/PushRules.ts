@@ -116,8 +116,9 @@ export interface ICallStartedPrefixCondition extends IPushRuleCondition<Conditio
 }
 
 /** MSC4306: matches when the event is in a thread the user is (or isn't) subscribed to. */
-export interface IThreadSubscriptionCondition
-    extends IPushRuleCondition<ConditionKind.ThreadSubscription | ConditionKind.ThreadSubscriptionUnstable> {
+export interface IThreadSubscriptionCondition extends IPushRuleCondition<
+    ConditionKind.ThreadSubscription | ConditionKind.ThreadSubscriptionUnstable
+> {
     subscribed: boolean;
 }
 

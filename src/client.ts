@@ -1112,6 +1112,12 @@ export enum ClientEvent {
     TurnServersError = "turnServers.error",
     UserProfileUpdate = "userProfileUpdate",
     RtcTransportsUpdated = "rtcTransportsUpdated",
+    /**
+     * MSC4306: Fires when the client's knowledge of the user's subscription to a thread changes,
+     * e.g. after {@link MatrixClient#subscribeToThread}, {@link MatrixClient#unsubscribeFromThread}
+     * or {@link MatrixClient#getThreadSubscription}.
+     */
+    ThreadSubscriptionUpdate = "threadSubscriptionUpdate",
 }
 
 type RoomEvents =
@@ -1189,6 +1195,12 @@ export type ClientEventHandlerMap = {
      * @param profile - the updated profile information
      */
     [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown> | null) => void;
+    /**
+     * @param roomId - the room the thread is in
+     * @param threadRootId - the event ID of the thread root
+     * @param subscribed - whether the user is now subscribed to the thread
+     */
+    [ClientEvent.ThreadSubscriptionUpdate]: (roomId: string, threadRootId: string, subscribed: boolean) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
@@ -8036,10 +8048,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param eventId - The thread root event ID.
      * @returns Subscription details, or `null` if the user is not subscribed.
      */
-    public async getThreadSubscription(
-        roomId: string,
-        eventId: string,
-    ): Promise<{ automatic: boolean } | null> {
+    public async getThreadSubscription(roomId: string, eventId: string): Promise<{ automatic: boolean } | null> {
         const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
         try {
             const result = await this.http.authedRequest<{ automatic: boolean }>(
@@ -8049,11 +8058,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 undefined,
                 { prefix: MSC4306_PREFIX },
             );
-            this.threadSubscriptionCache.set(`${roomId}|${eventId}`, true);
+            this.setCachedThreadSubscription(roomId, eventId, true);
             return result;
         } catch (err) {
             if ((err as MatrixError).httpStatus === 404) {
-                this.threadSubscriptionCache.set(`${roomId}|${eventId}`, false);
+                this.setCachedThreadSubscription(roomId, eventId, false);
                 return null;
             }
             throw err;
@@ -8075,14 +8084,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<EmptyObject> {
         const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
         const body = automaticCauseEventId ? { automatic: automaticCauseEventId } : {};
-        const result = await this.http.authedRequest<EmptyObject>(
-            Method.Put,
-            path,
-            undefined,
-            body,
-            { prefix: MSC4306_PREFIX },
-        );
-        this.threadSubscriptionCache.set(`${roomId}|${eventId}`, true);
+        const result = await this.http.authedRequest<EmptyObject>(Method.Put, path, undefined, body, {
+            prefix: MSC4306_PREFIX,
+        });
+        this.setCachedThreadSubscription(roomId, eventId, true);
         return result;
     }
 
@@ -8092,14 +8097,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async unsubscribeFromThread(roomId: string, eventId: string): Promise<EmptyObject> {
         const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
-        const result = await this.http.authedRequest<EmptyObject>(
-            Method.Delete,
-            path,
-            undefined,
-            undefined,
-            { prefix: MSC4306_PREFIX },
-        );
-        this.threadSubscriptionCache.set(`${roomId}|${eventId}`, false);
+        const result = await this.http.authedRequest<EmptyObject>(Method.Delete, path, undefined, undefined, {
+            prefix: MSC4306_PREFIX,
+        });
+        this.setCachedThreadSubscription(roomId, eventId, false);
         return result;
     }
 
@@ -8111,6 +8112,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getCachedThreadSubscription(roomId: string, eventId: string): boolean | undefined {
         return this.threadSubscriptionCache.get(`${roomId}|${eventId}`);
+    }
+
+    private setCachedThreadSubscription(roomId: string, eventId: string, subscribed: boolean): void {
+        const key = `${roomId}|${eventId}`;
+        if (this.threadSubscriptionCache.get(key) === subscribed) return;
+        this.threadSubscriptionCache.set(key, subscribed);
+        this.emit(ClientEvent.ThreadSubscriptionUpdate, roomId, eventId, subscribed);
     }
 
     /**
