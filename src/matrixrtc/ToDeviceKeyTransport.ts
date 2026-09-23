@@ -88,8 +88,8 @@ export class ToDeviceKeyTransport
         const targets = members
             .map((member) => {
                 return {
-                    userId: member.userId!,
-                    deviceId: member.deviceId!,
+                    userId: member.userId,
+                    deviceId: member.deviceId,
                 };
             })
             // filter out me
@@ -137,7 +137,7 @@ export class ToDeviceKeyTransport
             // TODO userId this is claimed information, deviceId is claimed information
             {
                 userId: fromUser,
-                deviceId: content.member.claimed_device_id!,
+                deviceId: content.member.claimed_device_id,
                 memberId: content.member.id ?? hardcodedMemberIdAlternative,
             },
             content.keys.key,

@@ -22,11 +22,13 @@ import {
     sessionMembershipTemplate,
     mockRoomState,
     mockRTCEvent,
+    mockSlotEvent,
     rtcMembershipTemplate,
 } from "./mocks.ts";
 import { logger } from "../../../src/logger";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
+import { type RtcSlotEventContent } from "../../../src/matrixrtc/types";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
@@ -185,3 +187,98 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
         });
     },
 );
+
+describe("MatrixRTCSessionManager slots", () => {
+    const defaultSlotDescription = { application: "m.call", id: "ROOM" };
+    const openSlotContent: RtcSlotEventContent = { status: "open", application: { type: "m.call" } };
+    const closedSlotContent: RtcSlotEventContent = { status: "closed" };
+
+    let client: MatrixClient;
+
+    beforeEach(() => {
+        client = new MatrixClient({ baseUrl: "base_url" });
+        client.matrixRTC.start();
+    });
+
+    afterEach(() => {
+        client.stopClient();
+        client.matrixRTC.stop();
+        vi.resetAllMocks();
+    });
+
+    it("getRtcSlot/isSlotClosed delegate to the room's session", () => {
+        const room = makeMockRoom([], false);
+        const slotEvent = mockSlotEvent(defaultSlotDescription, openSlotContent, room.roomId);
+        mockRoomState(room, [], slotEvent);
+
+        expect(client.matrixRTC.getRtcSlot(room)).toEqual(openSlotContent);
+        expect(client.matrixRTC.isSlotClosed(room)).toBe(false);
+    });
+
+    it("Fires session ended when an active sticky-only session's slot is closed", async () => {
+        const membershipData: MembershipData[] = [rtcMembershipTemplate];
+        const room1 = makeMockRoom(membershipData, true);
+        vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+        vi.spyOn(client, "getRoom").mockReturnValue(room1);
+
+        const sessionStartedPromise = new Promise((resolve) =>
+            client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve),
+        );
+        client.emit(ClientEvent.Room, room1);
+        await sessionStartedPromise;
+
+        const sessionEndedPromise = new Promise((resolve) =>
+            client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionEnded, (...params) => resolve(params)),
+        );
+
+        const slotEvent = mockSlotEvent(defaultSlotDescription, closedSlotContent, room1.roomId);
+        mockRoomState(room1, [], slotEvent);
+        client.emit(RoomStateEvent.Events, slotEvent, {} as any, null);
+
+        await expect(sessionEndedPromise).resolves.toStrictEqual([
+            room1.roomId,
+            client.matrixRTC.getActiveRoomSession(room1),
+        ]);
+        expect(client.matrixRTC.getRtcSlot(room1)).toEqual(closedSlotContent);
+        expect(client.matrixRTC.isSlotClosed(room1)).toBe(true);
+    });
+
+    it("Fires session started again when a closed slot is reopened", async () => {
+        const membershipData: MembershipData[] = [rtcMembershipTemplate];
+        const room1 = makeMockRoom(membershipData, true);
+        vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+        vi.spyOn(client, "getRoom").mockReturnValue(room1);
+
+        const sessionStartedPromise = new Promise((resolve) =>
+            client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, resolve),
+        );
+        client.emit(ClientEvent.Room, room1);
+        await sessionStartedPromise;
+
+        // Close the slot.
+        const sessionEndedPromise = new Promise((resolve) =>
+            client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionEnded, resolve),
+        );
+        const closedSlotEvent = mockSlotEvent(defaultSlotDescription, closedSlotContent, room1.roomId);
+        mockRoomState(room1, [], closedSlotEvent);
+        client.emit(RoomStateEvent.Events, closedSlotEvent, {} as any, null);
+        await sessionEndedPromise;
+        expect(client.matrixRTC.getRtcSlot(room1)).toEqual(closedSlotContent);
+        expect(client.matrixRTC.isSlotClosed(room1)).toBe(true);
+
+        // Reopen the slot.
+        const reopenedSessionStartedPromise = new Promise((resolve) =>
+            client.matrixRTC.once(MatrixRTCSessionManagerEvents.SessionStarted, (...params) => resolve(params)),
+        );
+        const openSlotEvent = mockSlotEvent(defaultSlotDescription, openSlotContent, room1.roomId);
+        mockRoomState(room1, [], openSlotEvent);
+        client.emit(RoomStateEvent.Events, openSlotEvent, {} as any, null);
+
+        await expect(reopenedSessionStartedPromise).resolves.toStrictEqual([
+            room1.roomId,
+            client.matrixRTC.getActiveRoomSession(room1),
+        ]);
+        expect(client.matrixRTC.getRtcSlot(room1)).toEqual(openSlotContent);
+        expect(client.matrixRTC.isSlotClosed(room1)).toBe(false);
+    });
+});

@@ -30,12 +30,11 @@ import {
 import { type CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
- * Create a new `RustCrypto` implementation
+ * The arguments used to initialise RustCrypto, passed in to initRustCrypto.
  *
- * @param args - Parameter object
  * @internal
  */
-export async function initRustCrypto(args: {
+export interface InitRustCryptoArgs {
     /** A `Logger` instance that will be used for debug output. */
     logger: Logger;
 
@@ -96,7 +95,42 @@ export async function initRustCrypto(args: {
      * Whether to enable support for encrypting state events.
      */
     enableEncryptedStateEvents?: boolean;
-}): Promise<RustCrypto> {
+
+    /**
+     * Optional PEM-formatted string that provides CA certificates. These will
+     * be used to check X.509 signatures on user identities. Any user identity
+     * that has a valid signature according to the supplied CAs will be
+     * considered verified, without any manual verification taking place.
+     */
+    caCertsPem?: string;
+
+    /**
+     * Optional async function for signing some data with an X.509 certificate.
+     * Used to sign the user's identity so compatible clients will recognise
+     * this user as verified without manual verification taking place. If you
+     * supply this you must also supply {@link InitRustCryptoArgs#x509Validity}.
+     */
+    x509Signer?: (item: Uint8Array) => Promise<{
+        signature_bytes: Uint8Array;
+        certificate_chain: string;
+        signature_scheme: "RsaPssSha512";
+    }>;
+
+    /**
+     * Optional function returning the validity period of the X.509 certificate
+     * used for signing, as the number of milliseconds since the Unix epoch. If
+     * you supply this you must also supply {@link InitRustCryptoArgs#x509Signer}.
+     */
+    x509Validity?: () => number;
+}
+
+/**
+ * Create a new `RustCrypto` implementation
+ *
+ * @param args - InitRustCryptoArgs
+ * @internal
+ */
+export async function initRustCrypto(args: InitRustCryptoArgs): Promise<RustCrypto> {
     const { logger } = args;
 
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
@@ -124,17 +158,7 @@ export async function initRustCrypto(args: {
         });
     }
 
-    const rustCrypto = await initOlmMachine(
-        logger,
-        args.http,
-        args.userId,
-        args.deviceId,
-        args.secretStorage,
-        args.cryptoCallbacks,
-        storeHandle,
-        args.legacyCryptoStore,
-        args.enableEncryptedStateEvents,
-    );
+    const rustCrypto = await initOlmMachine(args, storeHandle);
 
     storeHandle.free();
 
@@ -143,15 +167,20 @@ export async function initRustCrypto(args: {
 }
 
 async function initOlmMachine(
-    logger: Logger,
-    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    userId: string,
-    deviceId: string,
-    secretStorage: ServerSideSecretStorage,
-    cryptoCallbacks: CryptoCallbacks,
+    {
+        logger,
+        http,
+        userId,
+        deviceId,
+        secretStorage,
+        cryptoCallbacks,
+        legacyCryptoStore,
+        enableEncryptedStateEvents,
+        caCertsPem,
+        x509Signer,
+        x509Validity,
+    }: InitRustCryptoArgs,
     storeHandle: StoreHandle,
-    legacyCryptoStore?: CryptoStore,
-    enableEncryptedStateEvents?: boolean,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
@@ -160,6 +189,9 @@ async function initOlmMachine(
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
         logger,
+        caCertsPem,
+        x509Signer,
+        x509Validity,
     );
 
     // A final migration step, now that we have an OlmMachine.
@@ -185,23 +217,23 @@ async function initOlmMachine(
         enableEncryptedStateEvents,
     );
 
-    await olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
+    olmMachine.registerRoomKeyUpdatedCallback((sessions: RustSdkCryptoJs.RoomKeyInfo[]) =>
         rustCrypto.onRoomKeysUpdated(sessions),
     );
-    await olmMachine.registerRoomKeysWithheldCallback((withheld: RustSdkCryptoJs.RoomKeyWithheldInfo[]) =>
+    olmMachine.registerRoomKeysWithheldCallback((withheld: RustSdkCryptoJs.RoomKeyWithheldInfo[]) =>
         rustCrypto.onRoomKeysWithheld(withheld),
     );
-    await olmMachine.registerUserIdentityUpdatedCallback((userId: RustSdkCryptoJs.UserId) =>
+    olmMachine.registerUserIdentityUpdatedCallback((userId: RustSdkCryptoJs.UserId) =>
         rustCrypto.onUserIdentityUpdated(userId),
     );
-    await olmMachine.registerDevicesUpdatedCallback((userIds: string[]) => rustCrypto.onDevicesUpdated(userIds));
+    olmMachine.registerDevicesUpdatedCallback((userIds: string[]) => rustCrypto.onDevicesUpdated(userIds));
 
     // Check if there are any key backup secrets pending processing. There may be multiple secrets to process if several devices have gossiped them.
     // The `registerReceiveSecretCallback` function will only be triggered for new secrets. If the client is restarted before processing them, the secrets will need to be manually handled.
-    rustCrypto.checkSecrets("m.megolm_backup.v1");
+    void rustCrypto.checkSecrets("m.megolm_backup.v1");
 
     // Register a callback to be notified when a new secret is received, as for now only the key backup secret is supported (the cross signing secrets are handled automatically by the OlmMachine)
-    await olmMachine.registerReceiveSecretCallback((name: string, _value: string) =>
+    olmMachine.registerReceiveSecretCallback((name: string, _value: string) =>
         // Instead of directly checking the secret value, we poll the inbox to get all values for that secret type.
         // Once we have all the values, we can safely clear the secret inbox.
         rustCrypto.checkSecrets(name),

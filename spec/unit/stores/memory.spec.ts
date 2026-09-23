@@ -43,8 +43,8 @@ describe("MemoryStore", () => {
             store.storeAccountDataEvents([event1, event2, event4]);
             // remove event1, add event3
             store.storeAccountDataEvents([event1Empty, event3, event4Updated]);
-            // removed
-            expect(store.getAccountData(event1.getType())).toEqual(undefined);
+            // "removed"
+            expect(store.getAccountData(event1.getType())?.getContent()).toEqual({});
             // not removed
             expect(store.getAccountData(event2.getType())).toEqual(event2);
             // added

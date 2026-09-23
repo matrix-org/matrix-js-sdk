@@ -38,25 +38,26 @@ jobs:
     bump-downstreams:
         name: Update npm dependency in downstream projects
         needs: release
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         strategy:
             matrix:
                 include:
                     - repo: element-hq/element-web
                       path: apps/web
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   repository: ${{ matrix.repo }}
                   ref: staging
                   token: ${{ secrets.ELEMENT_BOT_TOKEN }}
                   persist-credentials: true
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version: "lts/*"
+                  runtime: node
+                  cache: true
+                  install: false
 
             - name: Bump dependency
               env:
@@ -65,7 +66,7 @@ jobs:
               run: |
                   git config --global user.email "releases@riot.im"
                   git config --global user.name "RiotRobot"
-                  pnpm add -C "$DIR" "$DEPENDENCY" --save-exact
+                  pnpm add -C "$DIR" "$DEPENDENCY" --save-exact --ignore-scripts
                   git add "$DIR"/package.json pnpm-lock.yaml
                   git commit -am"Upgrade dependency to $DEPENDENCY"
                   git push origin staging
@@ -74,28 +75,25 @@ jobs:
         name: Publish Documentation
         needs: release
         if: inputs.docs
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - name: 🧮 Checkout code
-              uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+              uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - name: 🔧 pnpm cache
-              uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: 🔨 Install dependencies
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: 📖 Generate docs
               run: pnpm gendoc
 
             - name: Upload artifact
-              uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+              uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
               with:
                   path: _docs
 
@@ -103,7 +101,7 @@ jobs:
         environment:
             name: github-pages
             url: ${{ steps.deployment.outputs.page_url }}
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         needs: docs
         # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
         permissions:
@@ -113,4 +111,4 @@ jobs:
         steps:
             - name: Deploy to GitHub Pages
               id: deployment
-              uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4
+              uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5

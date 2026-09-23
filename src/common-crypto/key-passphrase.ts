@@ -16,7 +16,6 @@
 
 import { deriveRecoveryKeyFromPassphrase } from "../crypto-api/index.ts";
 
-/* eslint-disable camelcase */
 interface IAuthData {
     private_key_salt?: string;
     private_key_iterations?: number;
@@ -31,7 +30,7 @@ interface IAuthData {
  */
 export function keyFromAuthData(authData: IAuthData, passphrase: string): Promise<Uint8Array> {
     if (!authData.private_key_salt || !authData.private_key_iterations) {
-        throw new Error("Salt and/or iterations not found: " + "this backup cannot be restored with a passphrase");
+        throw new Error("Salt and/or iterations not found: this backup cannot be restored with a passphrase");
     }
 
     return deriveRecoveryKeyFromPassphrase(

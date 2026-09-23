@@ -55,9 +55,6 @@ const featureSupportResolver: Record<string, FeatureSupportCondition> = {
     [Feature.RelationBasedRedactions]: {
         unstablePrefixes: ["org.matrix.msc3912"],
     },
-    [Feature.AccountDataDeletion]: {
-        unstablePrefixes: ["org.matrix.msc3391"],
-    },
     [Feature.RelationsRecursion]: {
         unstablePrefixes: ["org.matrix.msc3981"],
         matrixVersion: "v1.10",

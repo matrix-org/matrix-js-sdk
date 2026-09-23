@@ -26,6 +26,7 @@ import { getMockClientWithEventEmitter, mockClientMethodsUser } from "../../test
 import { ReEmitter } from "../../../src/ReEmitter";
 import { Feature, ServerSupport } from "../../../src/feature";
 import { eventMapperFor } from "../../../src/event-mapper";
+import { sleep } from "../../../src/utils.ts";
 
 describe("Thread", () => {
     describe("constructor", () => {
@@ -609,7 +610,7 @@ describe("Thread", () => {
                 room: room.roomId,
                 ts: message1Ts,
             });
-            await thread.addEvent(message1, false, true);
+            thread.addEvent(message1, false, true);
             await awaitTimelineEvent;
 
             // Sanity: the thread now has a properly-added event, so this event
@@ -625,7 +626,7 @@ describe("Thread", () => {
                 room: room.roomId,
                 ts: message2Ts,
             });
-            await thread.addEvent(message2, false, true);
+            thread.addEvent(message2, false, true);
             await awaitTimelineEvent;
 
             return { thread, message1, message2 };
@@ -664,8 +665,9 @@ describe("Thread", () => {
                 // When a message and an edit are added to the thread
                 const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
                 const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
-                await thread.addEvent(messageToEdit, false);
-                await thread.addEvent(editEvent, false);
+                thread.addEvent(messageToEdit, false);
+                thread.addEvent(editEvent, false);
+                await sleep(0); // wait for events to update
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
@@ -697,7 +699,8 @@ describe("Thread", () => {
                         return { events: [] };
                     }
                 });
-                await thread.addEvent(messageToEdit, false);
+                thread.addEvent(messageToEdit, false);
+                await sleep(0); // wait for events to update
 
                 // Then both events end up in the timeline
                 const lastEvent = thread.timeline.at(-1)!;
@@ -737,8 +740,8 @@ describe("Thread", () => {
                 const message2 = createThreadMessage(thread.id, user, room, "message2");
                 message2.localTimestamp -= 10000;
 
-                await thread.addEvent(message1, false);
-                await thread.addEvent(message2, false);
+                thread.addEvent(message1, false);
+                thread.addEvent(message2, false);
 
                 // Then both events end up in the timeline
                 expect(thread.timeline.length - prevNumEvents).toEqual(2);
@@ -761,8 +764,8 @@ describe("Thread", () => {
                 const message2 = createThreadMessage(thread.id, user, room, "message2");
                 message2.localTimestamp -= 10000;
 
-                await thread.addEvent(message1, false);
-                await thread.addEvent(message2, true);
+                thread.addEvent(message1, false);
+                thread.addEvent(message2, true);
 
                 // Then both events end up in the timeline
                 expect(thread.timeline.length - prevNumEvents).toEqual(2);
@@ -830,7 +833,7 @@ describe("Thread", () => {
 
                 // CRITICAL: Add edits while thread is NOT initialized
                 // They will be queued in replayEvents and aggregation will be attempted but fail
-                await thread.addEvent(edit1, false);
+                thread.addEvent(edit1, false);
 
                 // Check the aggregation state after adding first edit
                 // With our fix: edits should NOT be aggregated yet (thread not initialized)
@@ -846,8 +849,8 @@ describe("Thread", () => {
                 expect(relationsAfterFirstEdit).toBeUndefined();
 
                 // Add remaining edits
-                await thread.addEvent(edit2, false);
-                await thread.addEvent(edit3, false);
+                thread.addEvent(edit2, false);
+                thread.addEvent(edit3, false);
 
                 // Check that edits went to replayEvents
                 expect(thread.replayEvents).toHaveLength(3);
@@ -860,7 +863,7 @@ describe("Thread", () => {
                 thread.replayEvents = [];
 
                 // Add original message first
-                await thread.addEvent(originalMessage, false);
+                thread.addEvent(originalMessage, false);
 
                 // At this point, the original message should NOT have the edits aggregated yet
                 // because they were attempted when the target wasn't in timeline
@@ -870,8 +873,9 @@ describe("Thread", () => {
 
                 // Then replay the edits
                 for (const event of replayEvents) {
-                    await thread.addEvent(event, false);
+                    thread.addEvent(event, false);
                 }
+                await sleep(0); // wait for events to update
 
                 // After replay, check aggregation
                 const replacingEvent = originalMessage.replacingEvent();
@@ -883,7 +887,7 @@ describe("Thread", () => {
                 expect(originalMessage.getContent().body).toBe("Final edit");
 
                 // Relations for replaces should now exist and include all edits in order
-                const replaceRels = thread.timelineSet.relations!.getChildEventsForEvent(
+                const replaceRels = thread.timelineSet.relations.getChildEventsForEvent(
                     originalMessage.getId()!,
                     RelationType.Replace,
                     EventType.RoomMessage,
@@ -893,6 +897,86 @@ describe("Thread", () => {
                 expect(replaceIds[0]).toBe(edit1.getId());
                 expect(replaceIds[1]).toBe(edit2.getId());
                 expect(replaceIds[2]).toBe(edit3.getId());
+            });
+
+            it("aggregates edits while initialization is pending when their target is already known", async () => {
+                const previousSupport = Thread.hasServerSideSupport;
+                Thread.setServerSideSupport(FeatureSupport.Stable);
+
+                const myUserId = "@alice:example.org";
+                const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                    timelineSupport: false,
+                });
+                const client = testClient.client;
+                client.supportsThreads = vi.fn().mockReturnValue(true);
+
+                const room = new Room("!room:z", client, myUserId, {
+                    pendingEventOrdering: PendingEventOrdering.Detached,
+                });
+                vi.spyOn(client, "getRoom").mockReturnValue(room);
+
+                const rootEvent = mkMessage({ room: room.roomId, user: myUserId, msg: "Root", event: true });
+                const originalMessage = mkMessage({
+                    room: room.roomId,
+                    user: myUserId,
+                    msg: "Thinking…",
+                    relatesTo: {
+                        "rel_type": THREAD_RELATION_TYPE.name,
+                        "event_id": rootEvent.getId()!,
+                        "m.in_reply_to": { event_id: rootEvent.getId()! },
+                    },
+                    event: true,
+                });
+                rootEvent.setUnsigned({
+                    "m.relations": {
+                        [THREAD_RELATION_TYPE.name]: {
+                            count: 1,
+                            current_user_participated: true,
+                            latest_event: originalMessage.event,
+                        },
+                    },
+                });
+
+                vi.spyOn(client, "fetchRoomEvent").mockResolvedValue(rootEvent.event);
+                const paginationStarted = Promise.withResolvers<void>();
+                const finishPagination = Promise.withResolvers<void>();
+                const freshOriginalMessage = new MatrixEvent({ ...originalMessage.event });
+                vi.spyOn(client, "paginateEventTimeline").mockImplementation(async (timeline) => {
+                    paginationStarted.resolve();
+                    await finishPagination.promise;
+                    timeline.getTimelineSet().addEventToTimeline(freshOriginalMessage, timeline, {
+                        toStartOfTimeline: false,
+                        roomState: room.currentState,
+                        addToState: false,
+                    });
+                    return true;
+                });
+
+                const thread = room.createThread(rootEvent.getId()!, rootEvent, [originalMessage], false);
+
+                try {
+                    await paginationStarted.promise;
+                    const onUpdate = vi.fn();
+                    thread.on(ThreadEvent.Update, onUpdate);
+                    const edit1 = mkEdit(originalMessage, client, myUserId, room.roomId, "First chunk", 1);
+                    const edit2 = mkEdit(originalMessage, client, myUserId, room.roomId, "Complete answer", 2);
+
+                    thread.addEvent(edit1, false);
+                    thread.addEvent(edit2, false);
+
+                    await vi.waitFor(() => expect(originalMessage.replacingEvent()).toBe(edit2));
+                    expect(onUpdate).toHaveBeenCalled();
+
+                    const initialized = emitPromise(thread, RoomEvent.TimelineReset);
+                    finishPagination.resolve();
+                    await initialized;
+
+                    await vi.waitFor(() => expect(freshOriginalMessage.replacingEvent()).toBe(edit2));
+                    expect(freshOriginalMessage.getContent().body).toBe("Complete answer");
+                } finally {
+                    finishPagination.resolve();
+                    Thread.setServerSideSupport(previousSupport);
+                }
             });
 
             it("Reactions aggregate pre-init and remain idempotent on replay", async () => {
@@ -945,7 +1029,7 @@ describe("Thread", () => {
                     thread.addEvent(reaction2, false);
 
                     // Relations should already include the reactions pre-init
-                    const relsBefore = thread.timelineSet.relations!.getChildEventsForEvent(
+                    const relsBefore = thread.timelineSet.relations.getChildEventsForEvent(
                         originalMessage.getId()!,
                         RelationType.Annotation,
                         EventType.Reaction,
@@ -967,7 +1051,7 @@ describe("Thread", () => {
                     for (const ev of replay) thread.addEvent(ev, false);
 
                     // Ensure no duplicates after replay (idempotent aggregation)
-                    const relsAfter = thread.timelineSet.relations!.getChildEventsForEvent(
+                    const relsAfter = thread.timelineSet.relations.getChildEventsForEvent(
                         originalMessage.getId()!,
                         RelationType.Annotation,
                         EventType.Reaction,
@@ -980,6 +1064,60 @@ describe("Thread", () => {
                     Thread.setServerSideSupport(prevSupport);
                 }
             });
+        });
+    });
+
+    describe("hasCurrentUserParticipated", () => {
+        const myUserId = "@bob:example.org";
+        const otherUserId = "@alice:example.org";
+        const roomId = "!room:example.org";
+
+        let previousThreadHasServerSideSupport: FeatureSupport;
+
+        beforeAll(() => {
+            previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+        });
+
+        afterAll(() => {
+            Thread.setServerSideSupport(previousThreadHasServerSideSupport);
+        });
+
+        /**
+         * Create a client whose user is `myUserId`, plus a thread rooted by someone else which
+         * the current user has not participated in (the root carries no bundled relation, so the
+         * server's `current_user_participated` flag is absent).
+         */
+        async function createThreadWithoutMe(): Promise<{ client: MatrixClient; thread: Thread }> {
+            const client = createClient();
+            vi.spyOn(client, "getUserId").mockReturnValue(myUserId);
+            const thread = await createThread(client, otherUserId, roomId);
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+            return { client, thread };
+        }
+
+        it("is set when the current user replies in the thread", async () => {
+            const { thread } = await createThreadWithoutMe();
+
+            thread.addEvent(createThreadMessage(thread.id, myUserId, roomId, "my reply"), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(true);
+        });
+
+        it("is not set when another user replies in the thread", async () => {
+            const { thread } = await createThreadWithoutMe();
+
+            thread.addEvent(createThreadMessage(thread.id, otherUserId, roomId, "their reply"), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+        });
+
+        it("is not set by the current user's reaction to a thread event", async () => {
+            const { client, thread } = await createThreadWithoutMe();
+
+            thread.addEvent(mkReaction(thread.rootEvent!, client, myUserId, roomId), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(false);
         });
     });
 });

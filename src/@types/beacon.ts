@@ -30,7 +30,7 @@ import { type MAssetEvent, type MLocationEvent, type MTimestampEvent } from "./l
  * 2. a user can have an arbitrary number of beacon_info events
  *
  * 1. is achieved by setting the state_key to the owners mxid.
- * Event keys in room state are a combination of `type` + `state_key`.
+ * Event keys in room state are a combination of `typestate_key`.
  * To achieve an arbitrary number of only owner-writable state events
  * we introduce a variable suffix to the event type
  *

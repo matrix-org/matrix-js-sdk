@@ -196,6 +196,17 @@ describe("CallMembership", () => {
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
             });
+            it("returns the application's own top-level data in applicationData", () => {
+                const withData = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "org.example.key": { nested: true },
+                });
+                expect(withData.applicationData).toStrictEqual({
+                    "org.example.key": { nested: true },
+                    "type": "m.call",
+                    "m.call.intent": "voice",
+                });
+            });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe("m.room");
             });
@@ -246,7 +257,7 @@ describe("CallMembership", () => {
             slot_id: "m.call#",
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
-            rtc_transports: [{ type: "livekit" }],
+            transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
             versions: [],
             msc4354_sticky_key: "abc123",
         };
@@ -322,6 +333,19 @@ describe("CallMembership", () => {
                 });
             }).toThrow();
         });
+
+        it("rejects membership with incorrect transports", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { can_subscribe: [1] } });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { wrong_key: [] } });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: "not an object" });
+            }).toThrow();
+        });
+
         it("rejects membership with incorrect sticky_key", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), membershipTemplate);
@@ -374,7 +398,7 @@ describe("CallMembership", () => {
             it("gets the correct active transport with oldest_membership", () => {
                 const oldestMembership = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
-                    rtc_transports: [{ type: "oldest_transport" }],
+                    transports: { ...membershipTemplate.transports, published: [{ type: "oldest_transport" }] },
                 });
                 const membership = createCallMembership(makeMockEvent(), membershipTemplate);
 
@@ -427,7 +451,7 @@ describe("CallMembership", () => {
         });
         it("uses unpadded base64 for RTC backend identities", async () => {
             const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
-            expect(membership.rtcBackendIdentity).toBe("j9N1u04ZbvI9qKf3cxrf2NauD-fIGJ4uAcYkfI9V7SY");
+            expect(membership.rtcBackendIdentity).toBe("jUZ0Q1yF5nV3LlAI5xfD1I7BPnAytJaPEAR57EXjJ6s");
         });
     });
 });

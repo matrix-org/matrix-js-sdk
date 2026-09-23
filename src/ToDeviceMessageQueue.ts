@@ -77,7 +77,7 @@ export class ToDeviceMessageQueue {
         }
 
         await this.client.store.saveToDeviceBatches(batches);
-        this.sendQueue();
+        void this.sendQueue();
     }
 
     public sendQueue = async (): Promise<void> => {
@@ -105,8 +105,6 @@ export class ToDeviceMessageQueue {
             this.logger.debug("All queued to-device messages sent");
         } catch (e) {
             ++this.retryAttempts;
-            // eslint-disable-next-line @typescript-eslint/naming-convention
-            // eslint-disable-next-line new-cap
             const retryDelay = MatrixScheduler.RETRY_BACKOFF_RATELIMIT(null, this.retryAttempts, <MatrixError>e);
             if (retryDelay === -1) {
                 // the scheduler function doesn't differentiate between fatal errors and just getting
@@ -150,7 +148,7 @@ export class ToDeviceMessageQueue {
     private onResumedSync = (state: SyncState | null, oldState: SyncState | null): void => {
         if (state === SyncState.Syncing && oldState !== SyncState.Syncing) {
             this.logger.info(`Resuming queue after resumed sync`);
-            this.sendQueue();
+            void this.sendQueue();
         }
     };
 }

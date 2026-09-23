@@ -1,0 +1,258 @@
+{
+    "$schema": "./node_modules/oxlint/configuration_schema.json",
+    "plugins": ["eslint", "typescript", "unicorn", "import", "jsdoc", "node", "promise", "vitest"],
+    "categories": {
+        "correctness": "error",
+        "perf": "error",
+        "restriction": "error",
+        "suspicious": "error",
+    },
+    "options": {
+        "typeAware": true,
+        "reportUnusedDisableDirectives": "warn",
+        "denyWarnings": true,
+    },
+    "env": {
+        "es6": true,
+    },
+    "ignorePatterns": ["**/_docs"],
+    "settings": {
+        "jsdoc": {
+            "tagNamePreference": {
+                "remark": "remarks",
+                "privateRemarks": "privateRemarks",
+                "experimental": "experimental",
+                "deprecated": "deprecated",
+                "typeParam": "typeParam",
+                "defaultValue": "defaultValue",
+                "packageDocumentation": "packageDocumentation",
+            },
+        },
+    },
+    "rules": {
+        "no-constant-condition": ["error", { "checkLoops": "allExceptWhileTrue" }],
+        "typescript/unbound-method": ["error", { "ignoreStatic": true }],
+        "typescript/no-empty-object-type": [
+            "error",
+            {
+                "allowInterfaces": "always",
+            },
+        ],
+        "prefer-const": ["error"],
+        "import/first": "error",
+
+        "unicorn/no-instanceof-array": "error",
+        "no-restricted-imports": [
+            "error",
+            {
+                "name": "events",
+                "message": "Please use TypedEventEmitter instead",
+            },
+        ],
+        "no-restricted-properties": [
+            "error",
+            {
+                "object": "window",
+                "property": "setImmediate",
+                "message": "Use setTimeout instead.",
+            },
+        ],
+        "no-restricted-globals": [
+            "error",
+            {
+                "name": "setImmediate",
+                "message": "Use setTimeout instead.",
+            },
+            {
+                "name": "global",
+                "message": "Use globalThis instead.",
+            },
+        ],
+
+        // Allow the use of underscore to show args are not used.
+        // This is helpful for seeing that a function implements
+        // an interface but won't be using one of it's arguments.
+        "typescript/no-unused-vars": ["error", { "args": "none", "ignoreRestSiblings": true }],
+
+        // Require method signatures to be explicit to help make signature changes more obvious in review
+        "typescript/explicit-function-return-type": ["error"],
+        "typescript/explicit-member-accessibility": ["error"],
+
+        // Require us to be more explicit about type conversions to help prevent bugs
+        "typescript/no-base-to-string": ["error"],
+
+        // Prevent invalid non-type re-exports of types, these can cause downstream build failures
+        "typescript/consistent-type-exports": ["error"],
+
+        // Prevent unnecessary runtime dependencies between files
+        "typescript/consistent-type-imports": ["error", { "fixStyle": "inline-type-imports" }],
+
+        // Disable some perf rules
+        "no-await-in-loop": "off",
+
+        // Disable some opinionated rules
+        "unicorn/switch-case-braces": "off",
+        "sort-keys": "off",
+        "import/no-relative-parent-imports": "off",
+        "no-undefined": "off",
+        "no-plusplus": "off",
+        "vitest/require-test-timeout": "off",
+        "unicorn/no-array-reduce": "off",
+        "typescript/no-dynamic-delete": "off",
+        "import/no-default-export": "off",
+        "import/unambiguous": "off",
+        "class-methods-use-this": "off",
+        "no-void": "off",
+        "no-bitwise": "off",
+        "no-eq-null": "off",
+        "unicorn/no-array-sort": "off",
+        "unicorn/no-array-reverse": "off",
+        "typescript/no-unnecessary-type-parameters": "off",
+        "typescript/no-unnecessary-boolean-literal-compare": "off",
+        "typescript/no-extraneous-class": "off",
+        "promise/always-return": "off",
+        "unicorn/prefer-add-event-listener": "off",
+
+        // Disable some rules by default for them to be enabled for `src` via overrides
+        "no-console": "off",
+
+        // These would be nice to enable at some point
+        "unicorn/prefer-set-has": "off",
+        "unicorn/prefer-string-slice": "off",
+        "unicorn/prefer-number-properties": "off",
+        "unicorn/prefer-at": "off",
+        "unicorn/no-new-array": "off",
+        "unicorn/no-array-for-each": "off",
+        "unicorn/explicit-length-check": "off",
+        "unicorn/catch-error-name": "off",
+        "require-unicode-regexp": "off",
+        "typescript/restrict-template-expressions": "off",
+        "typescript/no-redundant-type-constituents": "off",
+        "typescript/no-useless-default-assignment": "off",
+        "typescript/no-duplicate-type-constituents": "off",
+        "no-unused-vars": "off",
+        "typescript/no-floating-promises": "off",
+        "typescript/no-implied-eval": "off",
+        "typescript/no-misused-spread": "off",
+        "promise/valid-params": "off",
+        "typescript/explicit-module-boundary-types": "off",
+        "typescript/promise-function-async": "off",
+        "typescript/no-non-null-assertion": "off",
+        "typescript/no-import-type-side-effects": "off",
+        "typescript/use-unknown-in-catch-callback-variable": "off",
+        "typescript/no-invalid-void-type": "off", // https://github.com/oxc-project/oxc/issues/20280
+        "typescript/no-unsafe-enum-comparison": "off",
+        "typescript/no-unnecessary-type-conversion": "off",
+        "no-param-reassign": "off",
+        "typescript/no-explicit-any": "off",
+        "import/no-cycle": "off",
+        "default-case": "off",
+        "promise/catch-or-return": "off",
+        "no-use-before-define": "off",
+        "guard-for-in": "error",
+        "complexity": "off",
+        "no-empty-function": "off",
+        "no-underscore-dangle": "off",
+        "no-shadow": "off",
+        "unicorn/consistent-function-scoping": "off",
+        "typescript/no-unsafe-type-assertion": "off",
+        "typescript/consistent-return": "off",
+    },
+    "overrides": [
+        {
+            "files": ["src/**/*"],
+            "rules": {
+                "no-console": "error",
+                "no-extra-boolean-cast": "error",
+                "unicorn/prefer-node-protocol": "off",
+
+                // Require extensions on imports to maintain Node compatibility and avoid issues with ESM resolution
+                "import/extensions": ["error", "ignorePackages"],
+            },
+        },
+        {
+            "files": ["spec/**/*"],
+            "rules": {
+                // Tests can be linted a little more flexibly
+                // We don't need super strict typing in test utilities
+                "typescript/explicit-function-return-type": "off",
+                "typescript/explicit-member-accessibility": "off",
+                "typescript/explicit-module-boundary-types": "off",
+                "typescript/no-empty-object-type": "off",
+                "typescript/unbound-method": "off",
+                "typescript/no-floating-promises": "off",
+                "typescript/no-misused-spread": "off",
+                "typescript/consistent-return": "off",
+                "vitest/require-mock-type-parameters": "off",
+                "vitest/no-disabled-tests": "off",
+                "vitest/no-conditional-expect": "off",
+                "vitest/warn-todo": "off",
+                "vitest/require-to-throw-message": "off",
+                "vitest/no-standalone-expect": [
+                    "error",
+                    {
+                        "additionalTestBlockFunctions": ["beforeAll", "beforeEach"],
+                    },
+                ],
+                "vitest/expect-expect": [
+                    "error",
+                    {
+                        "assertFunctionNames": [
+                            "expect",
+                            "expectDevices",
+                            "assert.isTrue",
+                            "assert.isFalse",
+                            "passwordTest",
+                            "compareHeaders",
+                            "doTest",
+                            "assertEventsExpected",
+                            "expectStickyEvents",
+                        ],
+                    },
+                ],
+                "unicorn/consistent-function-scoping": "off",
+                "jsdoc/check-tag-names": "off",
+                "no-shadow": "off",
+                "import/no-unassigned-import": [
+                    "error",
+                    {
+                        "allow": ["fake-indexeddb/auto"],
+                    },
+                ],
+                "promise/no-promise-in-callback": "off",
+                "no-new": "off",
+                "unicorn/prefer-add-event-listener": "off",
+            },
+        },
+        {
+            // Enable stricter promise rules for the MatrixRTC codebase
+            "files": ["src/matrixrtc/**/*.ts", "spec/unit/matrixrtc/*.ts"],
+            "rules": {
+                // Encourage proper usage of Promises:
+                "typescript/no-floating-promises": "error",
+                "typescript/no-misused-promises": "error",
+                "typescript/require-await": "error",
+                "typescript/await-thenable": "error",
+            },
+        },
+        {
+            "files": ["examples/**/*"],
+            "rules": {
+                "no-var": "off",
+                "unicorn/prefer-node-protocol": "off",
+                "no-implicit-globals": "off",
+            },
+        },
+        { "files": ["*.ts", "spec/setupTests.ts", "scripts/**/*"], "rules": { "node/no-process-env": "off" } },
+        {
+            "files": ["**/*.cjs"],
+            "rules": {
+                "import/no-commonjs": "off",
+                "typescript/no-require-imports": "off",
+                "typescript/no-var-requires": "off",
+                "unicorn/prefer-module": "off",
+            },
+        },
+        { "files": ["**/*.d.ts"], "rules": { "unicorn/require-module-specifiers": "off" } },
+    ],
+}

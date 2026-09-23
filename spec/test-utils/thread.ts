@@ -33,8 +33,8 @@ export const makeThreadEvent = ({
     mkMessage({
         ...props,
         relatesTo: {
-            event_id: rootEventId,
-            rel_type: THREAD_RELATION_TYPE.name,
+            "event_id": rootEventId,
+            "rel_type": THREAD_RELATION_TYPE.name,
             ["m.in_reply_to"]: {
                 event_id: replyToEventId,
             },

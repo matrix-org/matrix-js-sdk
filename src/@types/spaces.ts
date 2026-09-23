@@ -20,7 +20,6 @@ import { type IStrippedState } from "../sync-accumulator.ts";
 
 // Types relating to Rooms of type `m.space` and related APIs
 
-/* eslint-disable camelcase */
 export interface IHierarchyRelation extends IStrippedState {
     origin_server_ts: number;
     content: {
@@ -34,4 +33,3 @@ export interface IHierarchyRoom extends IPublicRoomsChunkRoom {
     room_type?: RoomType | string;
     children_state: IHierarchyRelation[];
 }
-/* eslint-enable camelcase */

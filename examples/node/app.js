@@ -94,7 +94,7 @@ rl.on("line", function (line) {
             );
         } else if (line.indexOf("/file ") === 0) {
             var filename = line.split(" ")[1].trim();
-            let buffer = fs.readFileSync("./your_file_name");
+            const buffer = fs.readFileSync("./your_file_name");
             matrixClient.uploadContent(new Blob([buffer])).then(function (response) {
                 matrixClient.sendMessage(viewingRoom.roomId, {
                     msgtype: MsgType.File,

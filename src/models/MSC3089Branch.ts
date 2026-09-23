@@ -198,7 +198,7 @@ export class MSC3089Branch {
         additionalContent?: IContent,
     ): Promise<ISendEventResponse> {
         const fileEventResponse = await this.directory.createFile(name, encryptedContents, info, {
-            ...(additionalContent ?? {}),
+            ...additionalContent,
             "m.new_content": true,
             "m.relates_to": {
                 rel_type: RelationType.Replace,

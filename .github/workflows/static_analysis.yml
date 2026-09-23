@@ -12,40 +12,36 @@ permissions: {} # No permissions needed
 jobs:
     ts_lint:
         name: "Typescript Syntax Check"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Typecheck
               run: "pnpm run lint:types"
 
     js_lint:
-        name: "ESLint"
-        runs-on: ubuntu-24.04
+        name: "Oxc"
+        runs-on: ubuntu-26.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Run Linter
               run: "pnpm run lint:js"
@@ -54,18 +50,16 @@ jobs:
         name: "Node.js example"
         runs-on: ubuntu-latest
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Build Types
               run: "pnpm build:types"
@@ -84,51 +78,47 @@ jobs:
 
     workflow_lint:
         name: "Workflow Lint"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             security-events: write
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Run Linter
               run: "pnpm lint:workflows"
 
             - name: Run zizmor
-              uses: zizmorcore/zizmor-action@0dce2577a4760a2749d8cfb7a84b7d5585ebcb7d # v0.5.0
+              uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
 
     docs:
         name: "JSDoc Checker"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Generate Docs
               run: "pnpm run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
 
             - name: Upload Artifact
-              uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7
+              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
               with:
                   name: docs
                   path: _docs
@@ -137,20 +127,18 @@ jobs:
 
     analyse_dead_code:
         name: "Analyse Dead Code"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version-file: package.json
-
-            - name: Install Deps
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: Run linter
               run: "pnpm run lint:knip"
@@ -158,18 +146,19 @@ jobs:
     element-web:
         name: Downstream tsc element-web
         if: github.event_name == 'merge_group'
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
-            - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   repository: element-hq/element-web
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@41ff72655975bd51cab0327fa583b6e92b6d3061 # v4
-            - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  node-version: "lts/*"
+                  runtime: node
+                  cache: true
+                  install: false
 
             - name: Install Dependencies
               run: "./scripts/layered.sh"
@@ -192,7 +181,7 @@ jobs:
             - analyse_dead_code
             - element-web
         name: Static Analysis
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         if: always()
         steps:
             - if: contains(needs.*.result , 'failure') || contains(needs.*.result, 'cancelled')

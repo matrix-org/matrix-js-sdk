@@ -37,6 +37,7 @@ const interns = new Map<string, string>();
 export function internaliseString(str: string): string {
     // Unwrap strings before entering the map, if we somehow got a wrapped
     // string as our input. This should only happen from tests.
+    // oxlint-disable-next-line unicorn/no-instanceof-builtins
     if ((str as unknown) instanceof String) {
         str = str.toString();
     }
@@ -682,7 +683,7 @@ export function recursivelyAssign<T1 extends T2, T2 extends Record<string, any>>
             continue;
         }
     }
-    return target as T1 & T2;
+    return target;
 }
 
 function getContentTimestampWithFallback(event: MatrixEvent): number {
@@ -740,7 +741,7 @@ export function recursiveMapToObject(map: Map<any, any>): Record<any, any> {
     return Object.fromEntries(targetMap.entries());
 }
 
-export function unsafeProp<K extends keyof any | undefined>(prop: K): boolean {
+export function unsafeProp(prop: keyof any | undefined): boolean {
     return prop === "__proto__" || prop === "prototype" || prop === "constructor";
 }
 

@@ -33,7 +33,7 @@ export interface EncryptedFile {
      */
     key: {
         alg: string;
-        key_ops: string[]; // eslint-disable-line camelcase
+        key_ops: string[];
         kty: string;
         k: string;
         ext: boolean;

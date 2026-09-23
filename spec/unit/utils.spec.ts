@@ -149,11 +149,9 @@ describe("utils", function () {
     describe("deepCompare", function () {
         const assert = {
             isTrue: function (x: any) {
-                // eslint-disable-next-line @vitest/no-standalone-expect
                 expect(x).toBe(true);
             },
             isFalse: function (x: any) {
-                // eslint-disable-next-line @vitest/no-standalone-expect
                 expect(x).toBe(false);
             },
         };
@@ -686,7 +684,7 @@ describe("utils", function () {
 
         it.each(["__proto__", "prototype", "constructor"])("should raise an error when setting »%s«", (prop) => {
             expect(() => {
-                safeSet(<Record<string, string>>{}, prop, "teset value");
+                safeSet<Record<string, string>, string>({}, prop, "teset value");
             }).toThrow("Trying to modify prototype or constructor");
         });
     });

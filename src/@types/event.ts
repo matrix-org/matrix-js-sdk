@@ -58,6 +58,7 @@ import {
     type IRTCDeclineContent,
     type EncryptionKeysEventContent,
     type ICallNotifyContent,
+    type RtcSlotEventContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
 import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membershipData/index.ts";
@@ -65,6 +66,7 @@ import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
 import { type POLICIES_ACCOUNT_EVENT_TYPE } from "../models/invites-ignorer-types.ts";
+import type { ROOM_RETENTION_TYPE, RoomRetentionContent } from "./retention.ts";
 
 export enum EventType {
     // Room state events
@@ -155,6 +157,7 @@ export enum EventType {
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events
+    RTCSlot = "org.matrix.msc4143.rtc.slot",
     RTCMembership = "org.matrix.msc4143.rtc.member",
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
@@ -162,6 +165,10 @@ export enum EventType {
 
     // Policy servers
     RoomPolicy = "org.matrix.msc4284.policy",
+
+    // Retention
+    RetentionPolicy = "m.room.retention",
+    RetentionPolicyUnstable = "org.matrix.msc1763.retention",
 }
 
 export enum RelationType {
@@ -354,7 +361,7 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
-    [EventType.RTCMembership]: RtcMembershipData | { msc4354_sticky_key: string }; // An object containing just the sticky key is empty.
+    [EventType.RTCMembership]: RtcMembershipData | { slot_id: string; msc4354_sticky_key: string };
 }
 
 /**
@@ -391,11 +398,16 @@ export interface StateEvents {
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
     [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
     [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
+    [EventType.RTCSlot]: RtcSlotEventContent | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
 
     // MSC3672
     [M_BEACON_INFO.name]: MBeaconInfoEventContent;
+
+    // MSC1763
+    [ROOM_RETENTION_TYPE.name]: RoomRetentionContent | EmptyObject;
+    [ROOM_RETENTION_TYPE.altName]: RoomRetentionContent | EmptyObject;
 }
 
 /**
@@ -416,9 +428,12 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [EventType.Direct]: { [userId: string]: string[] };
     [EventType.IgnoredUserList]: { ignored_users: { [userId: string]: EmptyObject } };
     "m.secret_storage.default_key": { key: string };
-    // Flag set by the rust SDK (Element X) and also used by us to mark that the user opted out of backup
-    // (I don't know why it's m.org.matrix...)
+
+    // MSC4287: Sharing key backup preference between clients - used to mark that the user opted out of key storage
+    "m.key_backup": { enabled: boolean };
+    // MSC4287 unstable prefix (note the boolean property has the opposite sense)
     "m.org.matrix.custom.backup_disabled": { disabled: boolean };
+
     "m.identity_server": { base_url: string | null };
     [key: `${typeof LOCAL_NOTIFICATION_SETTINGS_PREFIX.name}.${string}`]: LocalNotificationSettings;
     [key: `m.secret_storage.key.${string}`]: SecretStorageKeyDescription;
@@ -428,6 +443,15 @@ export interface AccountDataEvents extends SecretStorageAccountDataEvents {
     [POLICIES_ACCOUNT_EVENT_TYPE.altName]: { [key: string]: any };
 
     [EventType.InvitePermissionConfig]: { default_action?: string };
+
+    // List of recently used reaction emojis
+    // https://spec.matrix.org/v1.18/client-server-api/#mrecent_emoji
+    "m.recent_emoji": {
+        recent_emoji: Array<{
+            emoji: string;
+            total: number;
+        }>;
+    };
 }
 
 /**

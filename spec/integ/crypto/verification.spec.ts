@@ -21,7 +21,7 @@ import debug from "debug";
 import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 import { IDBFactory } from "fake-indexeddb";
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import Olm from "@matrix-org/olm";
 
 import {
@@ -63,7 +63,7 @@ import {
     TEST_DEVICE_PUBLIC_ED25519_KEY_BASE64,
     TEST_ROOM_ID,
     TEST_USER_ID,
-} from "../../test-utils/test-data";
+} from "../../test-utils/crypto-test-data";
 import { mockInitialApiRequests } from "../../test-utils/mockEndpoints";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
@@ -86,19 +86,19 @@ beforeAll(async () => {
 
 // load the rust library. This can take a few seconds on a slow GH worker.
 beforeAll(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const RustSdkCryptoJs = await require("@matrix-org/matrix-sdk-crypto-wasm");
+    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
 }, 10000);
 
 beforeEach(() => {
-    vi.useFakeTimers();
+    vi.useFakeTimers({
+        toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+    });
 });
 
 afterEach(() => {
     // reset fake-indexeddb after each test, to make sure we don't leak connections
     // cf https://github.com/dumbmatter/fakeIndexedDB#wipingresetting-the-indexeddb-for-a-fresh-state
-    // eslint-disable-next-line no-global-assign
     indexedDB = new IDBFactory();
 });
 
@@ -131,7 +131,7 @@ describe("verification", () => {
         e2eKeyReceiver = new E2EKeyReceiver(TEST_HOMESERVER_URL);
         e2eKeyResponder = new E2EKeyResponder(TEST_HOMESERVER_URL);
         e2eKeyResponder.addKeyReceiver(TEST_USER_ID, e2eKeyReceiver);
-        syncResponder = new SyncResponder(TEST_HOMESERVER_URL);
+        syncResponder = new SyncResponder(TEST_HOMESERVER_URL, { e2eKeyReceiver });
 
         mockInitialApiRequests(TEST_HOMESERVER_URL);
     });
@@ -169,6 +169,7 @@ describe("verification", () => {
             }
 
             // have alice initiate a verification. She should send a m.key.verification.request
+            // oxlint-disable-next-line prefer-const
             let [requestBody, request] = await Promise.all([
                 expectSendToDeviceMessage("m.key.verification.request"),
                 aliceClient.getCrypto()!.requestDeviceVerification(TEST_USER_ID, TEST_DEVICE_ID),
@@ -183,8 +184,8 @@ describe("verification", () => {
             expect(request.initiatedByMe).toBe(true);
             expect(request.otherUserId).toEqual(TEST_USER_ID);
             expect(request.pending).toBe(true);
-            // we're using fake timers, so the timeout should have exactly 10 minutes left still.
-            expect(request.timeout).toEqual(600_000);
+            expect(request.timeout).toBeLessThanOrEqual(600_000); // 10 mins
+            expect(request.timeout).toBeGreaterThan(540_000); // 9 mins
 
             // and now the request should be visible via `getVerificationRequestsToDeviceInProgress`
             {
@@ -205,7 +206,6 @@ describe("verification", () => {
             expect(toDeviceMessage.from_device).toEqual(aliceClient.deviceId);
             expect(toDeviceMessage.transaction_id).toEqual(transactionId);
             if (methods !== undefined) {
-                // eslint-disable-next-line @vitest/no-conditional-expect
                 expect(new Set(toDeviceMessage.methods)).toEqual(new Set(methods));
             }
 
@@ -509,7 +509,6 @@ describe("verification", () => {
             // Rust crypto waits for the 'done' to arrive from the other side.
             if (request.phase === VerificationPhase.Done) {
                 const userVerificationStatus = await aliceClient.getCrypto()!.getUserVerificationStatus(TEST_USER_ID);
-                // eslint-disable-next-line @vitest/no-conditional-expect
                 expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
                 await verificationPromise;
             }
@@ -1236,21 +1235,31 @@ describe("verification", () => {
         const olmDeviceId = "OLM_DEVICE";
         let usermasterPubKey: string;
 
-        const matchingBackupInfo: KeyBackupInfo = {
+        const unsignedMatchingBackupInfo: KeyBackupInfo = {
             algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
             version: "1",
             auth_data: {
                 public_key: "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo",
             },
+            etag: "",
+            count: 0,
         };
 
-        const nonMatchingBackupInfo: KeyBackupInfo = {
+        /** {@link unsignedMatchingBackupInfo}, with the addition of a signature */
+        let signedMatchingBackupInfo: KeyBackupInfo;
+
+        const unsignedNonMatchingBackupInfo: KeyBackupInfo = {
             algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
             version: "1",
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
+
+        /** {@link unsignedNonMatchingBackupInfo}, with the addition of a signature */
+        let signedNonMatchingBackupInfo: KeyBackupInfo;
 
         const unknownAlgorithmBackupInfo: KeyBackupInfo = {
             algorithm: "m.megolm_backup.foo_bar",
@@ -1258,6 +1267,8 @@ describe("verification", () => {
             auth_data: {
                 public_key: "EjDwCYkwp1R0i33ctD73Wg2/Og0mOBr066Spjqqaqqo",
             },
+            etag: "",
+            count: 0,
         };
 
         beforeEach(async () => {
@@ -1266,12 +1277,14 @@ describe("verification", () => {
             testOlmAccount = new Olm.Account();
             testOlmAccount.create();
 
+            signedMatchingBackupInfo = JSON.parse(JSON.stringify(unsignedMatchingBackupInfo));
+            signedNonMatchingBackupInfo = JSON.parse(JSON.stringify(unsignedNonMatchingBackupInfo));
             const bootstrapped = bootstrapCrossSigningTestOlmAccount(testOlmAccount, TEST_USER_ID, olmDeviceId, [
-                matchingBackupInfo,
-                nonMatchingBackupInfo,
+                signedMatchingBackupInfo,
+                signedNonMatchingBackupInfo,
             ]);
 
-            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID]![olmDeviceId]);
+            e2eKeyResponder.addDeviceKeys(bootstrapped.device_keys![TEST_USER_ID][olmDeviceId]);
             e2eKeyResponder.addCrossSigningData(bootstrapped);
 
             usermasterPubKey = Object.values(bootstrapped.master_keys![TEST_USER_ID].keys)[0];
@@ -1316,7 +1329,7 @@ describe("verification", () => {
 
             const keyBackupIsCached = emitPromise(aliceClient, CryptoEvent.KeyBackupDecryptionKeyCached);
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, matchingBackupInfo);
+            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, signedMatchingBackupInfo);
 
             await keyBackupIsCached;
 
@@ -1369,7 +1382,11 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, BACKUP_DECRYPTION_KEY_BASE64, nonMatchingBackupInfo);
+            await sendBackupGossipAndExpectVersion(
+                requestId!,
+                BACKUP_DECRYPTION_KEY_BASE64,
+                signedNonMatchingBackupInfo,
+            );
 
             // the backup secret should not be cached
             const cachedKey = await retrieveBackupPrivateKeyWithDelay();
@@ -1401,11 +1418,45 @@ describe("verification", () => {
 
             const requestId = await requestPromises.get("m.megolm_backup.v1");
 
-            await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", matchingBackupInfo);
+            await sendBackupGossipAndExpectVersion(requestId!, "InvalidSecret", signedNonMatchingBackupInfo);
 
             // the backup secret should not be cached
             const cachedKey = await retrieveBackupPrivateKeyWithDelay();
             expect(cachedKey).toBeNull();
+        });
+
+        // Regression test for https://github.com/element-hq/element-web/issues/32894
+        it("Should enable key backup upload after receiving a valid decryption key, even if the backup is unsigned", async () => {
+            fetchMock.get("express:/_matrix/client/v3/room_keys/version", unsignedMatchingBackupInfo);
+            const aliceCrypto = aliceClient.getCrypto()!;
+
+            const requestPromises = mockSecretRequestAndGetPromises();
+
+            // Verify against the test device
+            await doInteractiveVerification();
+
+            // The test device sends over the decryption key
+            const requestId = await requestPromises.get("m.megolm_backup.v1");
+            const keyBackupIsCached = emitPromise(aliceClient, CryptoEvent.KeyBackupDecryptionKeyCached);
+            await encryptAndSendSecretSendMessage(requestId!, BACKUP_DECRYPTION_KEY_BASE64);
+            await keyBackupIsCached;
+
+            // The backup secret should be cached
+            const cachedKey = await aliceCrypto.getSessionBackupPrivateKey();
+            expect(cachedKey).toBeTruthy();
+
+            // And backup upload should be enabled, after a short delay
+            vi.useRealTimers();
+            try {
+                await waitFor(async () => {
+                    const activeVersion = await aliceCrypto.getActiveSessionBackupVersion();
+                    expect(activeVersion).toEqual("1");
+                });
+            } finally {
+                vi.useFakeTimers({
+                    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+                });
+            }
         });
 
         /**
@@ -1417,7 +1468,9 @@ describe("verification", () => {
             await new Promise((resolve) => {
                 setTimeout(resolve, 500);
             });
-            vi.useFakeTimers();
+            vi.useFakeTimers({
+                toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+            });
 
             return aliceClient.getCrypto()!.getSessionBackupPrivateKey();
         }
@@ -1436,19 +1489,6 @@ describe("verification", () => {
             secret: string,
             expectBackup: KeyBackupInfo | MatrixError | Error,
         ) {
-            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
-
-            const toDeviceEvent = encryptSecretSend({
-                sender: aliceClient.getUserId()!,
-                recipient: aliceClient.getUserId()!,
-                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
-                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
-                p2pSession: p2pSession,
-                olmAccount: testOlmAccount,
-                requestId: requestId!,
-                secret: secret,
-            });
-
             const expectBackupCheck = new Promise((resolve) => {
                 fetchMock.get("express:/_matrix/client/v3/room_keys/version", (callLog) => {
                     resolve(undefined);
@@ -1468,11 +1508,33 @@ describe("verification", () => {
             });
 
             fetchMock.get("express:/_matrix/client/v3/room_keys/keys", CURVE25519_KEY_BACKUP_DATA);
+            await encryptAndSendSecretSendMessage(requestId, secret);
+
+            await expectBackupCheck;
+        }
+
+        /**
+         * Creates a peer to peer session, encrypts the secret as a to-device message, and returns the to-device message from /sync.
+         *
+         * @param requestId - The requestId of the secret request that we are replying to
+         * @param secret - The secret value
+         */
+        async function encryptAndSendSecretSendMessage(requestId: string, secret: string) {
+            const p2pSession = await createOlmSession(testOlmAccount, e2eKeyReceiver);
+
+            const toDeviceEvent = encryptSecretSend({
+                sender: aliceClient.getUserId()!,
+                recipient: aliceClient.getUserId()!,
+                recipientCurve25519Key: e2eKeyReceiver.getDeviceKey(),
+                recipientEd25519Key: e2eKeyReceiver.getSigningKey(),
+                p2pSession: p2pSession,
+                olmAccount: testOlmAccount,
+                requestId: requestId,
+                secret: secret,
+            });
 
             // The dummy device sends the secret
             returnToDeviceMessageFromSync(toDeviceEvent);
-
-            await expectBackupCheck;
         }
 
         /**

@@ -526,9 +526,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 // that would happen, so I'm going to ignore it for now.
                 //
                 if (existingTimeline == neighbour) {
-                    debuglog("Event " + eventId + " in neighbouring timeline - " + "switching to " + existingTimeline);
+                    debuglog("Event " + eventId + " in neighbouring timeline - switching to " + existingTimeline);
                 } else {
-                    debuglog("Event " + eventId + " already in a different " + "timeline " + existingTimeline);
+                    debuglog("Event " + eventId + " already in a different timeline " + existingTimeline);
                 }
                 timeline = existingTimeline;
                 continue;
@@ -582,7 +582,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             if (direction === EventTimeline.FORWARDS && timeline === this.liveTimeline) {
                 logger.warn({ lastEventWasNew, didUpdate }); // for debugging
                 logger.warn(
-                    `Refusing to set forwards pagination token of live timeline ` + `${timeline} to ${paginationToken}`,
+                    `Refusing to set forwards pagination token of live timeline ${timeline} to ${paginationToken}`,
                 );
                 return;
             }

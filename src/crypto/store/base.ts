@@ -196,7 +196,6 @@ export interface IDeviceData {
 }
 
 export interface IWithheld {
-    // eslint-disable-next-line camelcase
     room_id: string;
     code: string;
     reason: string;
@@ -272,7 +271,7 @@ export enum MigrationState {
 export const SESSION_BATCH_SIZE = 50;
 
 export interface InboundGroupSessionData {
-    room_id: string; // eslint-disable-line camelcase
+    room_id: string;
     /** pickled Olm.InboundGroupSession */
     session: string;
     keysClaimed?: Record<string, string>;
@@ -290,14 +289,11 @@ export interface ICrossSigningInfo {
     crossSigningVerifiedBefore: boolean;
 }
 
-/* eslint-disable camelcase */
 export interface IRoomEncryption {
     algorithm: string;
     rotation_period_ms?: number;
     rotation_period_msgs?: number;
 }
-/* eslint-enable camelcase */
-
 export enum TrackingStatus {
     NotTracked,
     PendingDownload,
@@ -348,7 +344,6 @@ export enum RoomKeyRequestState {
     CancellationPendingAndWillResend,
 }
 
-/* eslint-disable camelcase */
 interface IRoomKey {
     room_id: string;
     algorithm: string;
@@ -363,8 +358,6 @@ export interface IRoomKeyRequestBody extends IRoomKey {
     session_id: string;
     sender_key: string;
 }
-
-/* eslint-enable camelcase */
 
 export interface IRoomKeyRequestRecipient {
     userId: string;

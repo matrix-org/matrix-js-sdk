@@ -32,7 +32,13 @@ import {
     UnstableApiVersion,
 } from "matrix-widget-api";
 
-import { MatrixEvent, type IEvent, type IContent, EventStatus } from "./models/event.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "./matrixrtc/index.ts";
+import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
 import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
@@ -40,7 +46,7 @@ import {
     UpdateDelayedEventAction,
     isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
-import { EventType, type StateEvents } from "./@types/event.ts";
+import { EventType, type StateEvents, type TimelineEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
 import {
     MatrixClient,
@@ -58,7 +64,12 @@ import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { MapWithDefault, type QueryDict, recursiveMapToObject } from "./utils.ts";
-import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
+import {
+    type EmptyObject,
+    TypedEventEmitter,
+    UnsupportedDelayedEventsEndpointError,
+    UnsupportedStickyEventsEndpointError,
+} from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -137,6 +148,28 @@ export interface ICapabilities {
      * @defaultValue false
      */
     receiveSticky?: boolean;
+
+    /**
+     * Whether this client needs to be able to discover the RTC transports the host can reach.
+     * @experimental Part of MSC4515
+     * @defaultValue false
+     */
+    rtcTransports?: boolean;
+
+    /**
+     * Whether this client needs to be able to obtain LiveKit SFU tokens through the host.
+     * @experimental Part of MSC4195 & MSC4533
+     * @defaultValue false
+     */
+    rtcLivekitGetToken?: boolean;
+
+    /**
+     * Whether this client needs to be able to hand delayed MatrixRTC leave events over to the
+     * homeserver through the host.
+     * @experimental Part of MSC4195 & MSC4533
+     * @defaultValue false
+     */
+    rtcLivekitDelegateDelayedLeave?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -285,6 +318,15 @@ export class RoomWidgetClient extends MatrixClient {
         if (capabilities.turnServers) {
             this.widgetApi.requestCapability(MatrixCapabilities.MSC3846TurnServers);
         }
+        if (capabilities.rtcTransports) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4515RtcTransports);
+        }
+        if (capabilities.rtcLivekitGetToken) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        }
+        if (capabilities.rtcLivekitDelegateDelayedLeave) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
+        }
     }
 
     public async supportUpdateState(): Promise<boolean> {
@@ -346,11 +388,10 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
+        // Only poll the client well-known when a poll period was configured: leaving
+        // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
         if (opts.clientWellKnownPollPeriod !== undefined) {
-            this.clientWellKnownIntervalID = setInterval(() => {
-                this.fetchClientWellKnown();
-            }, 1000 * opts.clientWellKnownPollPeriod);
-            this.fetchClientWellKnown();
+            this.cachedWellKnown.start(1000 * opts.clientWellKnownPollPeriod);
         }
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
@@ -408,7 +449,7 @@ export class RoomWidgetClient extends MatrixClient {
         // We need the additional as assertion for the EW linter to be happy.
         // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
         // above
-        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs as number | undefined;
+        const stickyDurationMsAsNumber: number | undefined = stickyDurationMs;
 
         // We need to extend the content with the redacts parameter
         // The js sdk uses event.redacts but the widget api uses event.content.redacts
@@ -476,7 +517,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
         delayOpts: SendDelayedEventRequestOpts,
@@ -504,6 +544,60 @@ export class RoomWidgetClient extends MatrixClient {
         return this.validateSendDelayedEventResponse(response);
     }
 
+    /**
+     * Sends a sticky timeline event through the widget API.
+     *
+     * A widget can't probe the homeserver for MSC4354 support and doesn't need to: the host either granted it
+     * the capability to send sticky events or it didn't. A missing capability is reported the same way a
+     * missing server feature is, so that callers fall back to a regular event in both cases alike.
+     *
+     * The host may still refuse the request, typically because its own homeserver turns out not to support
+     * sticky events. Such a refusal reaches the widget without Matrix API error details, as those only accompany
+     * errors from requests the host actually made to the homeserver. It is therefore reported as unsupported too,
+     * with the host's error as `cause`. A refusal that does carry Matrix API error details came from the
+     * homeserver itself and is rethrown as is.
+     */
+    public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        stickDuration: number,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K] & { msc4354_sticky_key?: string },
+        txnId?: string,
+    ): Promise<ISendEventResponse> {
+        if (!this.widgetApi.hasCapability(MatrixCapabilities.MSC4407SendStickyEvent)) {
+            throw new UnsupportedStickyEventsEndpointError(
+                "Widget was not granted the capability to send sticky events",
+                "sendStickyEvent",
+            );
+        }
+
+        this.addThreadRelationIfNeeded(content, threadId, roomId);
+        txnId ??= this.makeTxnId();
+        try {
+            return await this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                txnId,
+            });
+        } catch (error) {
+            if (!(error instanceof WidgetApiResponseError) || error.data.matrix_api_error !== undefined) throw error;
+
+            // Callers fall back to sending a regular event, so drop the local echo of the failed sticky one
+            // rather than leaving it in the timeline as unsent.
+            const localEvent = this.getRoom(roomId)?.getEventForTxnId(txnId);
+            if (localEvent?.status === EventStatus.NOT_SENT) this.cancelPendingEvent(localEvent);
+
+            throw new UnsupportedStickyEventsEndpointError(
+                `Host could not send the sticky event: ${error.message}`,
+                "sendStickyEvent",
+                { cause: error },
+            );
+        }
+    }
+
     private validateSendDelayedEventResponse(response: ISendEventFromWidgetResponseData): SendDelayedEventResponse {
         if (response.delay_id === undefined) {
             throw new Error("'delay_id' absent from response to a delayed event request");
@@ -518,7 +612,6 @@ export class RoomWidgetClient extends MatrixClient {
      * - {@link _unstable_restartScheduledDelayedEvent}
      * - {@link _unstable_sendScheduledDelayedEvent}
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -527,26 +620,23 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        let updateDelayedEvent: (delayId: string) => Promise<unknown>;
         switch (action) {
             case UpdateDelayedEventAction.Cancel:
-                updateDelayedEvent = this.widgetApi.cancelScheduledDelayedEvent;
+                await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
             case UpdateDelayedEventAction.Restart:
-                updateDelayedEvent = this.widgetApi.cancelScheduledDelayedEvent;
+                await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
             case UpdateDelayedEventAction.Send:
-                updateDelayedEvent = this.widgetApi.sendScheduledDelayedEvent;
+                await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
                 break;
         }
-        await updateDelayedEvent.call(this.widgetApi, delayId).catch(timeoutToConnectionError);
         return {};
     }
 
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -562,7 +652,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_restartScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -578,7 +667,6 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * @experimental This currently relies on an unstable MSC (MSC4140).
      */
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     public async _unstable_sendScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -627,6 +715,56 @@ export class RoomWidgetClient extends MatrixClient {
             matrix_server_name: token.matrix_server_name,
             token_type: token.token_type,
         };
+    }
+
+    /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_getRTCTransports} (MSC4143):
+     * a widget cannot make authenticated homeserver calls itself, so we ask the host over the
+     * widget API instead (MSC4515). Requires the `rtcTransports` capability and a host that
+     * advertises the `org.matrix.msc4515` API version (otherwise the request throws).
+     */
+    public override async _unstable_getRTCTransports(): Promise<Transport[]> {
+        const { rtc_transports: rtcTransports } = await this.widgetApi
+            .getRtcTransports()
+            .catch(timeoutToConnectionError);
+        return rtcTransports;
+    }
+
+    /**
+     * Requests a token to authenticate against a LiveKit SFU with.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_getLivekitToken} (MSC4195): a widget
+     * cannot make authenticated homeserver calls itself, so we ask the host to make the call on our
+     * behalf over the widget API instead (MSC4533). Requires the `rtcLivekitGetToken` capability and a
+     * host that advertises the `org.matrix.msc4533` API version (otherwise the request throws).
+     *
+     * `server_name` defaults to our own homeserver, matching what the endpoint would do server-side.
+     */
+    public override async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        const serverName = body.server_name ?? this.getDomain();
+        if (serverName === null) throw new Error("Cannot determine the server name to request a token from");
+        const { jwt } = await this.widgetApi
+            .getRtcLivekitToken({ ...body, server_name: serverName })
+            .catch(timeoutToConnectionError);
+        return { jwt };
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_delegateDelayedLeave} (MSC4195): a
+     * widget cannot make authenticated homeserver calls itself, so we ask the host to make the call on
+     * our behalf over the widget API instead (MSC4533). Requires the `rtcLivekitDelegateDelayedLeave`
+     * capability and a host that advertises the `org.matrix.msc4533` API version (otherwise the request
+     * throws).
+     */
+    public override async _unstable_delegateDelayedLeave(
+        body: LivekitDelegateDelayedLeaveRequest,
+    ): Promise<EmptyObject> {
+        await this.widgetApi.delegateRtcLivekitDelayedLeave(body).catch(timeoutToConnectionError);
+        return {};
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
@@ -682,7 +820,7 @@ export class RoomWidgetClient extends MatrixClient {
     }
 
     private async ack(ev: CustomEvent<IWidgetApiRequest>): Promise<void> {
-        await this.widgetApi.transport.reply<IWidgetApiAcknowledgeResponseData>(ev.detail, {});
+        this.widgetApi.transport.reply<IWidgetApiAcknowledgeResponseData>(ev.detail, {});
     }
 
     private updateTxId = async (event: MatrixEvent): Promise<void> => {
@@ -733,7 +871,7 @@ export class RoomWidgetClient extends MatrixClient {
         // Verify the room ID matches, since it's possible for the client to
         // send us events from other rooms if this widget is always on screen
         if (ev.detail.data.room_id === this.roomId) {
-            const event = new MatrixEvent(ev.detail.data as Partial<IEvent>);
+            const event = new MatrixEvent(ev.detail.data);
 
             // Only inject once we have update the txId
             await this.updateTxId(event);
@@ -775,7 +913,7 @@ export class RoomWidgetClient extends MatrixClient {
         const event = new MatrixEvent({
             type: ev.detail.data.type,
             sender: ev.detail.data.sender,
-            content: ev.detail.data.content as IContent,
+            content: ev.detail.data.content,
         });
         // Mark the event as encrypted if it was, using fake contents and keys since those are unknown to us
         if (ev.detail.data.encrypted) event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
@@ -798,7 +936,7 @@ export class RoomWidgetClient extends MatrixClient {
             // send us state updates from other rooms if this widget is always
             // on screen
             if (rawEvent.room_id === this.roomId) {
-                const event = new MatrixEvent(rawEvent as Partial<IEvent>);
+                const event = new MatrixEvent(rawEvent);
 
                 if (this.syncApi instanceof SyncApi) {
                     await this.syncApi.injectRoomEvents(this.room!, undefined, [event]);
@@ -806,7 +944,7 @@ export class RoomWidgetClient extends MatrixClient {
                     // Sliding Sync
                     await this.syncApi!.injectRoomEvents(this.room!, [event]);
                 }
-                logger.info(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
+                logger.debug(`Updated state entry ${event.getType()} ${event.getStateKey()} to ${event.getId()}`);
             } else {
                 const { event_id: eventId, room_id: roomId } = ev.detail.data;
                 logger.info(`Received state entry ${eventId} for a different room ${roomId}; discarding`);

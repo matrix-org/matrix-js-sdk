@@ -16,15 +16,13 @@ limitations under the License.
 
 // We have to use EventEmitter here to mock part of the matrix-widget-api
 // project, which doesn't know about our TypeEventEmitter implementation at all
-// eslint-disable-next-line no-restricted-imports
-import { EventEmitter } from "events";
-import { type MockedObject } from "vitest";
+import { EventEmitter } from "node:events";
+import { type MockedObject, type MockInstance } from "vitest";
 import {
     type WidgetApi,
     WidgetApiToWidgetAction,
     MatrixCapabilities,
     type ITurnServer,
-    type IOpenIDCredentials,
     type ISendEventFromWidgetResponseData,
     WidgetApiResponseError,
     UnstableApiVersion,
@@ -34,13 +32,20 @@ import {
 
 import {
     createRoomWidgetClient,
+    EventStatus,
     EventType,
     type IEvent,
     MatrixError,
     MsgType,
     UpdateDelayedEventAction,
 } from "../../src/matrix";
-import { MatrixClient, ClientEvent, type ITurnServer as IClientTurnServer } from "../../src/client";
+import {
+    MatrixClient,
+    ClientEvent,
+    type IStartClientOpts,
+    type ITurnServer as IClientTurnServer,
+} from "../../src/client";
+import { AutoDiscovery } from "../../src/autodiscovery";
 import { SyncState } from "../../src/sync";
 import { type ICapabilities, type RoomWidgetClient } from "../../src/embedded";
 import { MatrixEvent } from "../../src/models/event";
@@ -48,6 +53,8 @@ import { type ToDeviceBatch } from "../../src/models/ToDeviceMessage";
 import { sleep } from "../../src/utils";
 import { SlidingSync } from "../../src/sliding-sync";
 import { logger } from "../../src/logger";
+import { ConnectionError } from "../../src/http-api/errors";
+import { UnsupportedStickyEventsEndpointError } from "../../src/errors";
 import { flushPromises } from "../test-utils/flushPromises";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../../src/models/room-sticky-events";
 
@@ -62,6 +69,7 @@ class MockWidgetApi extends EventEmitter {
     public start = vi.fn().mockResolvedValue(undefined);
     public getClientVersions = vi.fn();
     public requestCapability = vi.fn().mockResolvedValue(undefined);
+    public hasCapability = vi.fn().mockReturnValue(true);
     public requestCapabilities = vi.fn().mockResolvedValue(undefined);
     public requestCapabilityForRoomTimeline = vi.fn().mockResolvedValue(undefined);
     public requestCapabilityToSendEvent = vi.fn().mockResolvedValue(undefined);
@@ -97,12 +105,14 @@ class MockWidgetApi extends EventEmitter {
     public sendToDevice = vi.fn().mockResolvedValue(undefined);
     public requestOpenIDConnectToken = vi.fn(async () => {
         return testOIDCToken;
-        return new Promise<IOpenIDCredentials>(() => {
-            return testOIDCToken;
-        });
     });
     public readStateEvents = vi.fn(async () => []);
     public getTurnServers = vi.fn(async () => []);
+    public getRtcTransports = vi.fn(async () => ({ rtc_transports: [] }));
+    public requestCapabilityToGetRtcLivekitToken = vi.fn().mockResolvedValue(undefined);
+    public requestCapabilityToDelegateRtcLivekitDelayedLeave = vi.fn().mockResolvedValue(undefined);
+    public getRtcLivekitToken = vi.fn(async () => ({ jwt: "" }));
+    public delegateRtcLivekitDelayedLeave = vi.fn(async () => ({}));
     public sendContentLoaded = vi.fn().mockResolvedValue(undefined);
 
     public transport = {
@@ -186,7 +196,7 @@ describe("RoomWidgetClient", () => {
             await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
             widgetApi.sendRoomEvent.mockResolvedValueOnce({
                 room_id: "!1:example.org",
-                delay_id: `id-${Math.random}`,
+                delay_id: `id-${Math.random()}`,
             });
             await expect(
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 123 }),
@@ -269,7 +279,7 @@ describe("RoomWidgetClient", () => {
             });
             it("get response then local echo", async () => {
                 await sleep(600);
-                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+                const { injectSpy, resolveWidgetSend } = setupRemoteEcho();
 
                 // Begin by sending an event:
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
@@ -293,10 +303,15 @@ describe("RoomWidgetClient", () => {
 
             it("get local echo then response", async () => {
                 await sleep(600);
-                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+                const { injectSpy, resolveWidgetSend } = setupRemoteEcho();
 
                 // Begin by sending an event:
-                client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
+                void client.sendEvent(
+                    "!1:example.org",
+                    "org.matrix.rageshake_request",
+                    { request_id: 12 },
+                    "widgetTxId",
+                );
                 // we do not expect it to be send -- until we call `resolveWidgetSend`
                 expect(injectSpy).not.toHaveBeenCalled();
 
@@ -318,7 +333,7 @@ describe("RoomWidgetClient", () => {
             });
             it("__ local echo then response", async () => {
                 await sleep(600);
-                const { injectSpy, resolveWidgetSend } = await setupRemoteEcho();
+                const { injectSpy, resolveWidgetSend } = setupRemoteEcho();
 
                 // Begin by sending an event:
                 client.sendEvent("!1:example.org", "org.matrix.rageshake_request", { request_id: 12 }, "widgetTxId");
@@ -557,7 +572,7 @@ describe("RoomWidgetClient", () => {
                             updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
                             break;
                         case UpdateDelayedEventAction.Restart:
-                            updateDelayedEvent = widgetApi.cancelScheduledDelayedEvent;
+                            updateDelayedEvent = widgetApi.restartScheduledDelayedEvent;
                             break;
                         case UpdateDelayedEventAction.Send:
                             updateDelayedEvent = widgetApi.sendScheduledDelayedEvent;
@@ -703,7 +718,7 @@ describe("RoomWidgetClient", () => {
             await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
             widgetApi.sendStateEvent.mockResolvedValueOnce({
                 room_id: "!1:example.org",
-                delay_id: `id-${Math.random}`,
+                delay_id: `id-${Math.random()}`,
             });
             await expect(
                 client.sendStateEvent("!1:example.org", "org.example.foo", { hello: "world" }, "bar"),
@@ -902,17 +917,22 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
                 expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith(EventType.RTCMembership);
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
+                doesServerSupportUnstableFeatureMock.mockClear();
                 await client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                    slot_id: "m.call#ROOM",
                     msc4354_sticky_key: "test",
                 });
                 expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
                     EventType.RTCMembership,
-                    { msc4354_sticky_key: "test" },
+                    { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                     "!1:example.org",
                     undefined,
                     undefined,
                     2000,
                 );
+                // The host's capability grant is what matters for a widget, not the homeserver's feature list.
+                expect(widgetApi.hasCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
+                expect(doesServerSupportUnstableFeatureMock).not.toHaveBeenCalled();
             });
 
             it("receives (adds, updates, then removes when redacted)", async () => {
@@ -958,7 +978,7 @@ describe("RoomWidgetClient", () => {
                     room_id: "!1:example.org",
                     sender: "@alice:example.org",
                     msc4354_sticky: { duration_ms: 1200000 },
-                    content: { msc4354_sticky_key: "test" },
+                    content: { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                 }).getEffectiveEvent();
                 await sendAndExpectStickyUpdate(event1, [event1], [], []);
                 // It should remain cached in the sticky map
@@ -971,7 +991,7 @@ describe("RoomWidgetClient", () => {
                     room_id: "!1:example.org",
                     sender: "@alice:example.org",
                     msc4354_sticky: { duration_ms: 1200000 },
-                    content: { msc4354_sticky_key: "test" },
+                    content: { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
                 }).getEffectiveEvent();
                 await sendAndExpectStickyUpdate(event2, [], [{ current: event2, previous: event1 }], []);
                 expectStickyEvents([event2]);
@@ -1004,23 +1024,86 @@ describe("RoomWidgetClient", () => {
         });
 
         describe("when unsupported", () => {
-            const doesServerSupportUnstableFeatureMock = vi.fn().mockResolvedValue(false);
-
-            beforeAll(() => {
-                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
-            });
-
-            afterAll(() => {
-                doesServerSupportUnstableFeatureMock.mockReset();
-            });
-
-            it("fails to send", async () => {
+            it("fails to send when the host withheld the capability", async () => {
+                // For a widget, support is decided by the host's capability grant rather than by the
+                // homeserver, and a missing grant is reported like a missing server feature.
                 await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                widgetApi.hasCapability.mockReturnValue(false);
                 await expect(
                     client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                        slot_id: "m.call#ROOM",
                         msc4354_sticky_key: "test",
                     }),
-                ).rejects.toThrow("Server does not support");
+                ).rejects.toThrow(UnsupportedStickyEventsEndpointError);
+                expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
+            });
+
+            it("fails as unsupported when the host refuses without Matrix API error details", async () => {
+                // The host granted the capability but can't actually send sticky events, e.g. because its
+                // homeserver lacks MSC4354. No request reached the homeserver, so the error carries no
+                // Matrix API error details.
+                const hostError = new WidgetApiResponseError("Error sending event", {});
+                vi.mocked(widgetApi.transport.send).mockRejectedValue(hostError);
+
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
+                const cancelPendingEvent = vi.spyOn(client, "cancelPendingEvent");
+
+                const promise = client._unstable_sendStickyEvent(
+                    "!1:example.org",
+                    2000,
+                    null,
+                    EventType.RTCMembership,
+                    { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
+                );
+                await expect(promise).rejects.toThrow(UnsupportedStickyEventsEndpointError);
+                await expect(promise).rejects.toMatchObject({ clientEndpoint: "sendStickyEvent", cause: hostError });
+
+                // The local echo of the failed sticky event was dropped rather than left behind as unsent,
+                // since callers send a regular event in its place.
+                expect(cancelPendingEvent).toHaveBeenCalledTimes(1);
+                const room = client.getRoom("!1:example.org")!;
+                expect(
+                    room
+                        .getLiveTimeline()
+                        .getEvents()
+                        .filter((e) => e.status === EventStatus.NOT_SENT),
+                ).toEqual([]);
+            });
+
+            it("rethrows a refusal that carries Matrix API error details", async () => {
+                // Matrix API error details only accompany errors from requests the host made to the
+                // homeserver, so this one came from the homeserver rather than from a host unable to
+                // send sticky events. It must not trigger a fallback to a regular event.
+                const errorStatusCode = 403;
+                const errorUrl = "http://example.org";
+                const errorData = { errcode: "M_FORBIDDEN", error: "Forbidden" };
+                const widgetError = new WidgetApiResponseError("Error sending event", {
+                    matrix_api_error: {
+                        http_status: errorStatusCode,
+                        http_headers: {},
+                        url: errorUrl,
+                        response: errorData,
+                    },
+                });
+                const matrixError = new MatrixError(
+                    errorData,
+                    errorStatusCode,
+                    errorUrl,
+                    undefined,
+                    expect.any(Headers),
+                );
+                vi.mocked(widgetApi.transport.send).mockRejectedValue(widgetError);
+
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
+
+                await expect(
+                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                        slot_id: "m.call#ROOM",
+                        msc4354_sticky_key: "test",
+                    }),
+                ).rejects.toStrictEqual(matrixError);
             });
         });
     });
@@ -1138,8 +1221,8 @@ describe("RoomWidgetClient", () => {
         });
     });
 
-    describe("oidc token", () => {
-        it("requests an oidc token", async () => {
+    describe("oauth2 token", () => {
+        it("requests an oauth2 token", async () => {
             await makeClient({});
             expect(await client.getOpenIdToken()).toStrictEqual(testOIDCToken);
         });
@@ -1231,5 +1314,182 @@ describe("RoomWidgetClient", () => {
         emitServer2!();
         expect(await emittedServer).toEqual([clientServer2]);
         expect(client.getTurnServers()).toEqual([clientServer2]);
+    });
+
+    describe("RTC transports", () => {
+        const transport = { type: "livekit", livekit_service_url: "https://livekit-jwt.example.com" };
+
+        it("requests the capability when opted in", async () => {
+            await makeClient({ rtcTransports: true });
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4515RtcTransports);
+        });
+
+        it("does not request the capability when not opted in", async () => {
+            await makeClient({});
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4515RtcTransports);
+        });
+
+        it("gets RTC transports from the host", async () => {
+            widgetApi.getRtcTransports.mockResolvedValue({ rtc_transports: [transport] });
+
+            await makeClient({ rtcTransports: true });
+            expect(await client._unstable_getRTCTransports()).toEqual([transport]);
+            expect(widgetApi.getRtcTransports).toHaveBeenCalled();
+        });
+
+        it("propagates errors from the host", async () => {
+            const error = new Error("Missing capability");
+            widgetApi.getRtcTransports.mockRejectedValue(error);
+
+            await makeClient({ rtcTransports: true });
+            await expect(client._unstable_getRTCTransports()).rejects.toThrow(error);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.getRtcTransports.mockRejectedValue(new Error("Request timed out"));
+
+            await makeClient({ rtcTransports: true });
+            await expect(client._unstable_getRTCTransports()).rejects.toThrow(ConnectionError);
+        });
+    });
+
+    describe("LiveKit token", () => {
+        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
+        const body = {
+            url: "wss://livekit.example.org",
+            room_id: "!1:example.org",
+            slot_id: "m.call#ROOM",
+            member,
+        };
+
+        it("requests the capability when opted in", async () => {
+            await makeClient({ rtcLivekitGetToken: true });
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        });
+
+        it("does not request the capability when not opted in", async () => {
+            await makeClient({});
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        });
+
+        it("gets a token from the host", async () => {
+            widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            expect(await client._unstable_getLivekitToken({ ...body, server_name: "remote.example.org" })).toEqual({
+                jwt: "thejwt",
+            });
+            expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "remote.example.org" });
+        });
+
+        it("defaults the server name to our own homeserver", async () => {
+            widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+            expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "example.org" });
+        });
+
+        it("throws if the server name cannot be determined", async () => {
+            await makeClient({ rtcLivekitGetToken: true });
+            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow("server name");
+            expect(widgetApi.getRtcLivekitToken).not.toHaveBeenCalled();
+        });
+
+        it("propagates errors from the host", async () => {
+            const error = new Error("Missing capability");
+            widgetApi.getRtcLivekitToken.mockRejectedValue(error);
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(error);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.getRtcLivekitToken.mockRejectedValue(new Error("Request timed out"));
+
+            await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
+            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(ConnectionError);
+        });
+    });
+
+    describe("delegated delayed leave", () => {
+        const body = {
+            url: "wss://livekit.example.org",
+            room_id: "!1:example.org",
+            slot_id: "m.call#ROOM",
+            member: { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" },
+            delay_id: "1234567890",
+        };
+
+        it("requests the capability when opted in", async () => {
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            expect(widgetApi.requestCapability).toHaveBeenCalledWith(
+                MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave,
+            );
+        });
+
+        it("does not request the capability when not opted in", async () => {
+            await makeClient({});
+            expect(widgetApi.requestCapability).not.toHaveBeenCalledWith(
+                MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave,
+            );
+        });
+
+        it("delegates the delayed leave event via the host", async () => {
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+            expect(widgetApi.delegateRtcLivekitDelayedLeave).toHaveBeenCalledWith(body);
+        });
+
+        it("propagates errors from the host", async () => {
+            const error = new Error("Missing capability");
+            widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(error);
+
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(error);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(new Error("Request timed out"));
+
+            await makeClient({ rtcLivekitDelegateDelayedLeave: true });
+            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
+        });
+    });
+
+    describe("well-known", () => {
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue({});
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
+        const startClient = async (opts: IStartClientOpts): Promise<void> => {
+            client = createRoomWidgetClient(widgetApi, {}, "!1:example.org", {
+                baseUrl: "https://example.org",
+                userId: "@alice:example.org",
+            });
+            widgetApi.emit("ready");
+            await client.startClient(opts);
+            await flushPromises();
+        };
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await startClient({});
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known when clientWellKnownPollPeriod is set", async () => {
+            await startClient({ clientWellKnownPollPeriod: 3600 });
+
+            expect(getRawClientConfig).toHaveBeenCalledWith("example.org");
+            expect(client.getClientWellKnown()).toStrictEqual({});
+        });
     });
 });

@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// allow camelcase as these are things that go onto the wire
-/* eslint-disable camelcase */
-
 export enum PushRuleActionName {
     DontNotify = "dont_notify",
     Notify = "notify",
@@ -169,6 +166,8 @@ export enum RuleId {
     PollStartOneToOneUnstable = ".org.matrix.msc3930.rule.poll_start_one_to_one",
     PollEndOneToOne = ".m.rule.poll_end_one_to_one",
     PollEndOneToOneUnstable = ".org.matrix.msc3930.rule.poll_end_one_to_one",
+    RtcInviteForMe = ".org.matrix.msc4075.rule.rtc.invite_for_me",
+    RtcInviteForRoom = ".org.matrix.msc4075.rule.rtc.invite_for_room",
 }
 
 export type PushRuleSet = {
@@ -215,5 +214,3 @@ export interface IPusher {
 export interface IPusherRequest extends Omit<IPusher, "device_id" | "org.matrix.msc3881.device_id"> {
     append?: boolean;
 }
-
-/* eslint-enable camelcase */

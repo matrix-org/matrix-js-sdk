@@ -174,7 +174,7 @@ describe("PollStartEvent", () => {
                     kind: M_POLL_KIND_DISCLOSED.name,
                     max_selections: 2,
                     answers: [],
-                } as any, // force invalid type
+                },
             },
         };
         expect(() => new PollStartEvent(input)).toThrow(new InvalidEventError("No answers available"));
