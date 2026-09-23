@@ -251,7 +251,9 @@ import {
     type LivekitGetTokenResponse,
     type Transport,
 } from "./matrixrtc/index.ts";
+import { type IRTCDeclineContent, RTC_NOTIFICATION_MAX_LIFETIME_MS } from "./matrixrtc/types.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { fetchRoomSummary, type RoomSummary } from "./room-summary-api.ts";
 import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
 import { type PollingCachedValue } from "./pollingCachedValue.ts";
@@ -882,25 +884,8 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-/**
- * The summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
- * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
- */
-export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
-    /**
-     * The current membership of this user in the room.
-     * Usually "leave" if the room is fetched over federation.
-     */
-    "membership"?: Membership;
-    /**
-     * Version of the room.
-     */
-    "im.nheko.summary.room_version"?: string;
-    /**
-     * The encryption algorithm used for this room, if the room is encrypted.
-     */
-    "im.nheko.summary.encryption"?: string;
-}
+// Re-export for backwards compatibility
+export { type RoomSummary };
 
 interface IRoomHierarchy {
     rooms: IHierarchyRoom[];
@@ -2793,7 +2778,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * If we expect that an event is part of a thread but is missing the relation
      * we need to add it manually, as well as the reply fallback
      */
-    private addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
+    protected addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
         if (threadId && !content["m.relates_to"]?.rel_type) {
             const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
             content["m.relates_to"] = {
@@ -2818,12 +2803,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     * Sends an event, adding it to the local echo and encrypting it if the room requires it.
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the sent event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2832,13 +2823,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }): Promise<ISendEventResponse>;
     /**
      * Sends a delayed event (MSC4140).
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param delayOpts - Properties of the delay for this event.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.delayOpts - Properties of the delay for this event.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the scheduled delayed event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2846,7 +2842,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict;
         txnId?: string;
     }): Promise<SendDelayedEventResponse>;
-    private sendCompleteEvent({
+    protected sendCompleteEvent({
         roomId,
         threadId,
         eventObject,
@@ -3976,17 +3972,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Declines a MatrixRTC notification.
      *
-     * @param roomId
-     * @param notificationEventId
-     * @returns
+     * The decline is sent as a sticky event (MSC4354) keyed on the notification's event ID, so that the
+     * user's other devices stop notifying. If the server doesn't support sticky events, a regular event is
+     * sent instead. That one still counts as a decline for any device that receives it, but it isn't
+     * re-delivered after a gappy or initial sync the way a sticky event is, so a device that was offline
+     * when it was sent keeps notifying until the notification's lifetime elapses.
+     *
+     * @param roomId The room the notification was received in.
+     * @param notificationEventId The event ID of the notification being declined.
+     * @param stickyDurationMs How long (in milliseconds) the decline should stay sticky. Must not be smaller
+     * than the notification's `lifetime`, otherwise the notification can become valid again once the decline
+     * expires. Defaults to the maximum lifetime a notification may have.
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    public sendRtcDecline(roomId: string, notificationEventId: string): Promise<ISendEventResponse> {
-        return this.sendEvent(roomId, EventType.RTCDecline, {
+    public async sendRtcDecline(
+        roomId: string,
+        notificationEventId: string,
+        stickyDurationMs: number = RTC_NOTIFICATION_MAX_LIFETIME_MS,
+    ): Promise<ISendEventResponse> {
+        const content: IRTCDeclineContent = {
             "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
-        });
+            "msc4354_sticky_key": notificationEventId,
+        };
+        try {
+            return await this._unstable_sendStickyEvent(roomId, stickyDurationMs, null, EventType.RTCDecline, content);
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending decline as a regular event");
+            return await this.sendEvent(roomId, EventType.RTCDecline, content);
+        }
     }
 
     /**
@@ -8891,26 +8908,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
-     * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+     * Fetches the summary of a room.
+     * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
+     *
+     * Uses the initial version of MSC3266, as implemented in older versions of Synapse, unless the
+     * server advertises support for the spec version which stabilised it.
+     *
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
-     * @param via - The list of servers which know about the room if only an ID was provided.
+     * @param via - The servers to attempt to request the summary from, when the local server cannot
+     *              generate it (for instance, because it has no local user in the room).
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
-        const paramOpts = {
-            prefix: "/_matrix/client/unstable/im.nheko.summary",
-        };
-        try {
-            const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-            return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-                return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-            } else {
-                throw e;
-            }
-        }
+        return fetchRoomSummary(this.http, await this.getVersions(), roomIdOrAlias, via);
     }
 
     /**
