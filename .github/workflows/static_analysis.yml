@@ -12,7 +12,7 @@ permissions: {} # No permissions needed
 jobs:
     ts_lint:
         name: "Typescript Syntax Check"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
@@ -30,7 +30,7 @@ jobs:
 
     js_lint:
         name: "Oxc"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
@@ -78,7 +78,7 @@ jobs:
 
     workflow_lint:
         name: "Workflow Lint"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             security-events: write
         steps:
@@ -101,7 +101,7 @@ jobs:
 
     docs:
         name: "JSDoc Checker"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
@@ -127,7 +127,7 @@ jobs:
 
     analyse_dead_code:
         name: "Analyse Dead Code"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
@@ -146,7 +146,7 @@ jobs:
     element-web:
         name: Downstream tsc element-web
         if: github.event_name == 'merge_group'
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
@@ -181,7 +181,7 @@ jobs:
             - analyse_dead_code
             - element-web
         name: Static Analysis
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         if: always()
         steps:
             - if: contains(needs.*.result , 'failure') || contains(needs.*.result, 'cancelled')
