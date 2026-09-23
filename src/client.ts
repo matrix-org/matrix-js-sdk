@@ -8071,6 +8071,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * MSC4306: Subscribe to a thread.
+     *
+     * If an automatic subscription is skipped by the server because the user unsubscribed after
+     * the cause event (409 `M_CONFLICTING_UNSUBSCRIPTION`), this resolves without changing the
+     * cached state: the server's knowledge of the earlier unsubscription is more accurate.
+     *
      * @param roomId - The room the thread is in.
      * @param eventId - The thread root event ID.
      * @param automaticCauseEventId - When set, marks the subscription as automatic
@@ -8084,11 +8089,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<EmptyObject> {
         const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
         const body = automaticCauseEventId ? { automatic: automaticCauseEventId } : {};
-        const result = await this.http.authedRequest<EmptyObject>(Method.Put, path, undefined, body, {
-            prefix: MSC4306_PREFIX,
-        });
-        this.setCachedThreadSubscription(roomId, eventId, true);
-        return result;
+        try {
+            const result = await this.http.authedRequest<EmptyObject>(Method.Put, path, undefined, body, {
+                prefix: MSC4306_PREFIX,
+            });
+            this.setCachedThreadSubscription(roomId, eventId, true);
+            return result;
+        } catch (err) {
+            if (
+                automaticCauseEventId &&
+                err instanceof MatrixError &&
+                err.errcode === "IO.ELEMENT.MSC4306.M_CONFLICTING_UNSUBSCRIPTION"
+            ) {
+                return {};
+            }
+            throw err;
+        }
     }
 
     /**

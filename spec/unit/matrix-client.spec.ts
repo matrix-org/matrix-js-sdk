@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import fetchMock from "@fetch-mock/vitest";
-import { type MockedObject, type Mocked, type MockInstance } from "vitest";
+import { type Mock, type MockedObject, type Mocked, type MockInstance } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
@@ -655,7 +655,7 @@ describe("MatrixClient", function () {
         const prefix = "/_matrix/client/unstable/io.element.msc4306";
         const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(threadId)}/subscription`;
 
-        let onUpdate: MockInstance;
+        let onUpdate: Mock<(roomId: string, threadRootId: string, subscribed: boolean) => void>;
 
         beforeEach(() => {
             onUpdate = vi.fn();
@@ -721,7 +721,7 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await expect(client.subscribeToThread(roomId, threadId, "$cause")).rejects.toThrow();
+            await expect(client.subscribeToThread(roomId, threadId, "$cause")).resolves.toEqual({});
             expect(client.getCachedThreadSubscription(roomId, threadId)).toBeUndefined();
             expect(onUpdate).not.toHaveBeenCalled();
         });
