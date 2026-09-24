@@ -33,7 +33,7 @@ export class MSC4388RendezvousSession {
      */
     public id?: string;
     private readonly client: MatrixClient;
-    private readonly onFailure?: RendezvousFailureListener;
+    public onFailure?: RendezvousFailureListener;
     private sequenceToken?: string;
     private lastSequenceTokenSent?: string;
     private lastSequenceTokenReceived?: string;

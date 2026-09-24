@@ -14,7 +14,14 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixClient, OAuthGrantType, type ValidatedAuthMetadata } from "../matrix.ts";
+import {
+    ClientPrefix,
+    type MatrixClient,
+    MatrixError,
+    Method,
+    OAuthGrantType,
+    type ValidatedAuthMetadata,
+} from "../matrix.ts";
 import { MSC4108FailureReason, type RendezvousFailureListener } from "./RendezvousFailureReason.ts";
 import { MSC4108SignInWithQR } from "./MSC4108SignInWithQR.ts";
 import { MSC4108RendezvousSession } from "./transports/MSC4108RendezvousSession.ts";
@@ -22,6 +29,10 @@ import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";
 import { RendezvousIntent } from "./RendezvousIntent.ts";
 import { logger } from "../logger.ts";
 import { type SignInWithQRFlow } from "./SignInWithQRFlow.ts";
+import { MSC4388RendezvousSession } from "./transports/MSC4388RendezvousSession.ts";
+import { MSC4388SecureChannel } from "./channels/MSC4388SecureChannel.ts";
+import { QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { MSC4108v2025SignInWithQR } from "./MSC4108v2025SignInWithQR.ts";
 
 export * from "./MSC4108SignInWithQR.ts";
 export type * from "./SignInWithQRFlow.ts";
@@ -34,6 +45,56 @@ export type * from "./RendezvousTransport.ts";
 export * from "./transports/index.ts";
 export * from "./channels/index.ts";
 
+type SupportedVersion = "v2024" | "v2025";
+
+async function getSupportedVersions(client: MatrixClient): Promise<SupportedVersion[]> {
+    // check for support of device authoriation grant
+    let metadata: ValidatedAuthMetadata;
+    try {
+        metadata = await client.getAuthMetadata();
+    } catch (e) {
+        logger.warn("Failed to fetch auth metadata, assuming sign-in with QR is unavailable", e);
+        return [];
+    }
+
+    if (!metadata.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
+        return [];
+    }
+
+    const supportedVersions: SupportedVersion[] = [];
+
+    // check for unstable support for MSC4108 2024 version
+    if (await client.doesServerSupportUnstableFeature("org.matrix.msc4108")) {
+        supportedVersions.push("v2024");
+    }
+
+    // check for support of MSC4388 rendezvous endpoint from 2025 version
+    try {
+        // 200 OK means supported
+        const discoveryBody = await client.http.authedRequest<{ create_available: boolean }>(
+            Method.Get,
+            "/io.element.msc4388/rendezvous",
+            undefined,
+            undefined,
+            {
+                prefix: ClientPrefix.Unstable,
+            },
+        );
+
+        if (typeof discoveryBody.create_available === "boolean" ? discoveryBody.create_available : false) {
+            supportedVersions.push("v2025");
+        }
+    } catch (e) {
+        // 404 and 403 are expected
+        if (e instanceof MatrixError && (e.httpStatus === 404 || e.httpStatus === 403)) {
+            // not supported
+        }
+        logger.warn("Failed to check support for MSC4388 rendezvous endpoint", e);
+    }
+
+    return supportedVersions;
+}
+
 /**
  * Check if the homeserver that the client is connected to supports a variant of sign-in with QR that we can use.
  *
@@ -41,21 +102,8 @@ export * from "./channels/index.ts";
  * @returns true if the homeserver that the client is connected to supports a variant of sign-in with QR that we can use, false otherwise.
  */
 export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boolean> {
-    let metadata: ValidatedAuthMetadata;
-    try {
-        metadata = await client.getAuthMetadata();
-    } catch (e) {
-        logger.warn("Failed to fetch auth metadata, assuming sign-in with QR is unavailable", e);
-        return false;
-    }
-
-    // check for support of device authorization grant
-    if (!metadata.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
-        return false;
-    }
-
-    // check for unstable support for MSC4108 2024 version
-    return client.doesServerSupportUnstableFeature("org.matrix.msc4108");
+    const supportedVersions = await getSupportedVersions(client);
+    return supportedVersions.length > 0;
 }
 
 /**
@@ -109,17 +157,41 @@ async function initGenerateQrFlow(
     onFailure: RendezvousFailureListener,
     abortSignal: AbortSignal,
 ): Promise<SignInWithQRFlow> {
-    const session = new MSC4108RendezvousSession({
-        onFailure,
-        client,
-    });
-    const channel = new MSC4108SecureChannel(session, undefined, onFailure);
-    const flow = new MSC4108SignInWithQR(
-        channel,
-        false,
-        intent === RendezvousIntent.LOGIN_ON_NEW_DEVICE ? undefined : client,
-        onFailure,
-    );
+    const supportedVersions = await getSupportedVersions(client);
+    if (supportedVersions.length === 0) {
+        throw new Error("No supported MSC4108 versions available");
+    }
+
+    let session: MSC4108RendezvousSession | MSC4388RendezvousSession;
+    let channel: MSC4108SecureChannel | MSC4388SecureChannel;
+    let flow: SignInWithQRFlow;
+
+    if (supportedVersions.includes("v2025")) {
+        // Use MSC4108v2025 if supported
+        session = new MSC4388RendezvousSession({
+            onFailure,
+            client,
+        });
+        channel = new MSC4388SecureChannel(
+            session,
+            intent === RendezvousIntent.LOGIN_ON_NEW_DEVICE ? QrCodeIntent.Login : QrCodeIntent.Reciprocate,
+            onFailure,
+        );
+        flow = new MSC4108v2025SignInWithQR(channel, false, client, onFailure);
+    } else {
+        // Use 2024 version
+        session = new MSC4108RendezvousSession({
+            onFailure,
+            client,
+        });
+        channel = new MSC4108SecureChannel(session, undefined, onFailure);
+        flow = new MSC4108SignInWithQR(
+            channel,
+            false,
+            intent === RendezvousIntent.LOGIN_ON_NEW_DEVICE ? undefined : client,
+            onFailure,
+        );
+    }
 
     if (abortSignal.aborted) return flow;
 

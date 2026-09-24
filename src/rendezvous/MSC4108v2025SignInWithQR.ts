@@ -25,8 +25,7 @@ import {
 } from "./index.ts";
 import { type MatrixClient } from "../client.ts";
 import { logger } from "../logger.ts";
-import { MSC4388SecureChannel } from "./channels/MSC4388SecureChannel.ts";
-import { ClientPrefix, MatrixError, Method } from "../http-api/index.ts";
+import { MatrixError } from "../http-api/index.ts";
 import { sleep } from "../utils.ts";
 import {
     OAuthGrantType,
@@ -38,7 +37,8 @@ import {
     type DeviceAuthorizationResponse,
 } from "../oauth/index.ts";
 import { type CryptoApi } from "../crypto-api/index.ts";
-import { MSC4388RendezvousSession } from "./transports/MSC4388RendezvousSession.ts";
+import { type SignInWithQR } from "./SignInWithQR.ts";
+import { type MSC4388SecureChannel } from "./channels/MSC4388SecureChannel.ts";
 
 /**
  * Enum representing the payload types transmissible over [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
@@ -118,7 +118,7 @@ interface SecretsPayload
  * sign in with QR + OIDC flow.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export class MSC4108v2025SignInWithQR {
+export class MSC4108v2025SignInWithQR implements SignInWithQR {
     private _code?: Uint8Array;
     private expectingNewDeviceId?: string;
     private metadata?: ValidatedAuthMetadata;
@@ -546,73 +546,4 @@ export class MSC4108v2025SignInWithQR {
     public async close(): Promise<void> {
         await this.channel.close();
     }
-}
-
-export async function isSignInWithQRAvailable(client: MatrixClient): Promise<boolean> {
-    // check for support of device authoriation grant
-    const metadata = await client.getAuthMetadata();
-    if (!metadata.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
-        return false;
-    }
-
-    // check for support of MSC4388 rendezvous endpoint
-    try {
-        // 200 OK means supported
-        const discoveryBody = await client.http.authedRequest<{ create_available: boolean }>(
-            Method.Get,
-            "/io.element.msc4388/rendezvous",
-            undefined,
-            undefined,
-            {
-                prefix: ClientPrefix.Unstable,
-            },
-        );
-
-        return typeof discoveryBody.create_available === "boolean" ? discoveryBody.create_available : false;
-    } catch (e) {
-        // 404 and 403 are expected
-        if (e instanceof MatrixError && (e.httpStatus === 404 || e.httpStatus === 403)) {
-            return false;
-        }
-
-        throw e;
-    }
-}
-
-export async function linkNewDeviceByGeneratingQR(
-    client: MatrixClient,
-    onFailure: RendezvousFailureListener,
-): Promise<MSC4108v2025SignInWithQR> {
-    const session = new MSC4388RendezvousSession({
-        onFailure,
-        client,
-    });
-    await session.send("");
-    const channel = new MSC4388SecureChannel(session, QrCodeIntent.Reciprocate, onFailure);
-    const flow = new MSC4108v2025SignInWithQR(channel, false, client, onFailure);
-
-    await flow.generateCode();
-
-    return flow;
-}
-
-export async function signInByGeneratingQR(
-    tempClient: MatrixClient,
-    onFailure: RendezvousFailureListener,
-): Promise<MSC4108v2025SignInWithQR> {
-    // ensure rust crypto is initialized as needed for the secure channel
-    const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
-    await RustSdkCryptoJs.initAsync();
-
-    const session = new MSC4388RendezvousSession({
-        onFailure,
-        client: tempClient,
-    });
-    await session.send("");
-    const channel = new MSC4388SecureChannel(session, QrCodeIntent.Login, onFailure);
-    const flow = new MSC4108v2025SignInWithQR(channel, false, tempClient, onFailure);
-
-    await flow.generateCode();
-
-    return flow;
 }
