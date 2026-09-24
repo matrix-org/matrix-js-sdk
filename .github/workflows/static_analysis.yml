@@ -12,14 +12,14 @@ permissions: {} # No permissions needed
 jobs:
     ts_lint:
         name: "Typescript Syntax Check"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -30,14 +30,14 @@ jobs:
 
     js_lint:
         name: "Oxc"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -55,7 +55,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -78,7 +78,7 @@ jobs:
 
     workflow_lint:
         name: "Workflow Lint"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             security-events: write
         steps:
@@ -87,7 +87,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -97,18 +97,18 @@ jobs:
               run: "pnpm lint:workflows"
 
             - name: Run zizmor
-              uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+              uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
 
     docs:
         name: "JSDoc Checker"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -127,14 +127,14 @@ jobs:
 
     analyse_dead_code:
         name: "Analyse Dead Code"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -146,7 +146,7 @@ jobs:
     element-web:
         name: Downstream tsc element-web
         if: github.event_name == 'merge_group'
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         steps:
             - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
               with:
@@ -154,7 +154,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -181,7 +181,7 @@ jobs:
             - analyse_dead_code
             - element-web
         name: Static Analysis
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         if: always()
         steps:
             - if: contains(needs.*.result , 'failure') || contains(needs.*.result, 'cancelled')

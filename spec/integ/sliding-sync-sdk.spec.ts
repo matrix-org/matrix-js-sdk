@@ -637,7 +637,7 @@ describe("SlidingSyncSdk", () => {
     describe("ExtensionE2EE", () => {
         let ext: Extension<any, any>;
 
-        beforeAll(async () => {
+        beforeEach(async () => {
             await setupClient({
                 withCrypto: true,
             });
@@ -656,31 +656,74 @@ describe("SlidingSyncSdk", () => {
             });
         });
 
-        it("can update device lists", () => {
-            syncCryptoCallback!.processDeviceLists = vi.fn();
-            ext.onResponse({
+        it("passes device lists, OTK counts and fallback keys to crypto in a single call once the response is complete", async () => {
+            syncCryptoCallback!.processSyncChanges = vi.fn().mockResolvedValue([]);
+            syncCryptoCallback!.onSyncCompleted = vi.fn();
+            await ext.onResponse({
                 device_lists: {
                     changed: ["@alice:localhost"],
                     left: ["@bob:localhost"],
                 },
-            });
-            expect(syncCryptoCallback!.processDeviceLists).toHaveBeenCalledWith({
-                changed: ["@alice:localhost"],
-                left: ["@bob:localhost"],
-            });
-        });
-
-        it("can update OTK counts and unused fallback keys", () => {
-            syncCryptoCallback!.processKeyCounts = vi.fn();
-            ext.onResponse({
                 device_one_time_keys_count: {
                     signed_curve25519: 42,
                 },
                 device_unused_fallback_key_types: ["signed_curve25519"],
             });
-            expect(syncCryptoCallback!.processKeyCounts).toHaveBeenCalledWith({ signed_curve25519: 42 }, [
-                "signed_curve25519",
-            ]);
+            // nothing should happen until all extensions in this response have been processed
+            expect(syncCryptoCallback!.processSyncChanges).not.toHaveBeenCalled();
+
+            await ext.onResponseComplete!();
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledWith({
+                toDeviceEvents: [],
+                deviceLists: { changed: ["@alice:localhost"], left: ["@bob:localhost"] },
+                oneTimeKeysCounts: { signed_curve25519: 42 },
+                unusedFallbackKeys: ["signed_curve25519"],
+                useMsc4186: true,
+            });
+            expect(syncCryptoCallback!.onSyncCompleted).toHaveBeenCalledTimes(1);
+        });
+
+        it("passes omitted OTK counts and fallback keys through as undefined", async () => {
+            // In sliding sync, omitted counts mean "unchanged since the last response". That is for the crypto layer
+            // to interpret (via `useMsc4186`): we must not replay stale values ourselves.
+            syncCryptoCallback!.processSyncChanges = vi.fn().mockResolvedValue([]);
+            syncCryptoCallback!.onSyncCompleted = vi.fn();
+            await ext.onResponse({
+                device_one_time_keys_count: { signed_curve25519: 7 },
+                device_unused_fallback_key_types: [],
+            });
+            await ext.onResponseComplete!();
+
+            await ext.onResponse({ device_lists: { changed: ["@carol:localhost"] } });
+            await ext.onResponseComplete!();
+
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledTimes(2);
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenLastCalledWith({
+                toDeviceEvents: [],
+                deviceLists: { changed: ["@carol:localhost"] },
+                oneTimeKeysCounts: undefined,
+                unusedFallbackKeys: undefined,
+                useMsc4186: true,
+            });
+        });
+
+        it("combines to-device events with the e2ee extension data into a single call", async () => {
+            const toDeviceExt = findExtension("to_device");
+            syncCryptoCallback!.processSyncChanges = vi.fn().mockResolvedValue([]);
+            syncCryptoCallback!.onSyncCompleted = vi.fn();
+            const events = [{ type: "m.dummy", sender: "@alice:localhost", content: {} }];
+
+            await toDeviceExt.onResponse({ next_batch: "tdb", events });
+            await ext.onResponse({ device_one_time_keys_count: { signed_curve25519: 3 } });
+            await toDeviceExt.onResponseComplete!();
+            await ext.onResponseComplete!();
+
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledTimes(1);
+            expect(syncCryptoCallback!.processSyncChanges).toHaveBeenCalledWith(
+                expect.objectContaining({ toDeviceEvents: events, oneTimeKeysCounts: { signed_curve25519: 3 } }),
+            );
+            expect(syncCryptoCallback!.onSyncCompleted).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -837,10 +880,11 @@ describe("SlidingSyncSdk", () => {
         });
 
         it("updates the since value", async () => {
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "12345",
                 events: [],
             });
+            await ext.onResponseComplete!();
             expect(await ext.onRequest(false)).toMatchObject({
                 since: "12345",
             });
@@ -848,10 +892,11 @@ describe("SlidingSyncSdk", () => {
 
         // eslint-disable-next-line @vitest/expect-expect
         it("can handle missing fields", async () => {
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "23456",
                 // no events array
             });
+            await ext.onResponseComplete!();
         });
 
         it("emits to-device events on the client", async () => {
@@ -865,7 +910,7 @@ describe("SlidingSyncSdk", () => {
                 expect(ev.getType()).toEqual(toDeviceType);
                 called = true;
             });
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "34567",
                 events: [
                     {
@@ -874,7 +919,26 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
+            await ext.onResponseComplete!();
             expect(called).toBe(true);
+        });
+
+        it("drops to-device events with unsafe properties", async () => {
+            const received: string[] = [];
+            const listener = (ev: MatrixEvent): void => {
+                received.push(ev.getType());
+            };
+            client!.on(ClientEvent.ToDeviceEvent, listener);
+            await ext.onResponse({
+                next_batch: "34568",
+                events: [
+                    { type: "safe", sender: "@alice:localhost", content: {} },
+                    { type: "unsafe", sender: "__proto__", content: {} },
+                ],
+            });
+            await ext.onResponseComplete!();
+            client!.off(ClientEvent.ToDeviceEvent, listener);
+            expect(received).toEqual(["safe"]);
         });
 
         it("can cancel key verification requests", async () => {
@@ -887,7 +951,7 @@ describe("SlidingSyncSdk", () => {
                     evType === "m.key.verification.start" || evType === "m.key.verification.request",
                 );
             });
-            ext.onResponse({
+            await ext.onResponse({
                 next_batch: "45678",
                 events: [
                     // someone tries to verify keys
@@ -912,6 +976,12 @@ describe("SlidingSyncSdk", () => {
                     },
                 ],
             });
+            await ext.onResponseComplete!();
+            expect(Object.keys(seen).sort()).toEqual([
+                "m.key.verification.cancel",
+                "m.key.verification.request",
+                "m.key.verification.start",
+            ]);
         });
     });
 
@@ -1101,6 +1171,102 @@ describe("SlidingSyncSdk", () => {
             const alice = "@alice:alice";
             const eventId = "$something";
             ext.onResponse(generateReceiptResponse(alice, roomId, eventId, "m.read", 1234567));
+            // we expect it not to crash
+        });
+    });
+
+    describe("ExtensionStickyEvents", () => {
+        let ext: Extension<any, any>;
+
+        const stickyEvent = (durationMs: number, stickyKey: string) => ({
+            type: "m.test.sticky",
+            sender: selfUserId,
+            event_id: `$sticky_${stickyKey}`,
+            origin_server_ts: Date.now(),
+            msc4354_sticky: { duration_ms: durationMs },
+            content: { msc4354_sticky_key: stickyKey },
+        });
+
+        beforeAll(async () => {
+            await setupClient();
+            const hasSynced = sdk!.sync();
+            await httpBackend!.flushAllExpected();
+            await hasSynced;
+            ext = findExtension("org.matrix.msc4354.sticky_events");
+        });
+
+        it("gets enabled all the time", async () => {
+            let reqJson: any = await ext.onRequest(true);
+            expect(reqJson.enabled).toEqual(true);
+            expect(reqJson.limit).toBeGreaterThan(0);
+            expect(reqJson.since).toBeUndefined();
+            reqJson = await ext.onRequest(false);
+            expect(reqJson.enabled).toEqual(true);
+            expect(reqJson.since).toBeUndefined();
+        });
+
+        it("updates the since value", async () => {
+            await ext.onResponse({ next_batch: "12345" });
+            expect(await ext.onRequest(false)).toMatchObject({ since: "12345" });
+        });
+
+        it("keeps the previous since value when there are no changes", async () => {
+            await ext.onResponse({ next_batch: "23456" });
+            await ext.onResponse({});
+            expect(await ext.onRequest(false)).toMatchObject({ since: "23456" });
+        });
+
+        it("adds sticky events to the room", async () => {
+            const roomId = "!sticky:localhost";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with sticky events",
+                required_state: [
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                ],
+                timeline: [mkOwnEvent(EventType.RoomMessage, { body: "hello" })],
+                initial: true,
+            });
+            await emitPromise(client!, ClientEvent.Room);
+            const room = client!.getRoom(roomId)!;
+            expect(room).toBeTruthy();
+
+            await ext.onResponse({
+                next_batch: "34567",
+                rooms: { [roomId]: { events: [stickyEvent(300000, "key1")] } },
+            });
+
+            const events = Array.from(room._unstable_getStickyEvents());
+            expect(events.map((e) => e.getId())).toEqual(["$sticky_key1"]);
+        });
+
+        it("adds sticky events that arrived in the timeline", async () => {
+            const roomId = "!sticky_timeline:localhost";
+            mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                name: "Room with a sticky timeline event",
+                required_state: [
+                    mkOwnStateEvent(EventType.RoomCreate, {}, ""),
+                    mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
+                    mkOwnStateEvent(EventType.RoomPowerLevels, { users: { [selfUserId]: 100 } }, ""),
+                ],
+                timeline: [stickyEvent(300000, "from_timeline") as unknown as IRoomEvent],
+                initial: true,
+            });
+            await emitPromise(client!, ClientEvent.Room);
+
+            const room = client!.getRoom(roomId)!;
+            const events = Array.from(room._unstable_getStickyEvents());
+            expect(events.map((e) => e.getId())).toEqual(["$sticky_from_timeline"]);
+        });
+
+        // eslint-disable-next-line @vitest/expect-expect
+        it("gracefully handles missing rooms and fields", async () => {
+            await ext.onResponse({
+                next_batch: "45678",
+                rooms: { "!unknown:localhost": { events: [stickyEvent(300000, "key2")] } },
+            });
+            await ext.onResponse({ next_batch: "56789", rooms: {} });
             // we expect it not to crash
         });
     });

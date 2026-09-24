@@ -127,7 +127,6 @@ describe("Poll", () => {
 
         it("waits for existing relations request to finish when getting responses", async () => {
             const poll = new Poll(basePollStartEvent, mockClient, room);
-            // @ts-expect-error TS2769
             const spy = vi.spyOn(poll, "fetchResponses");
             const firstResponsePromise = poll.getResponses();
             const secondResponsePromise = poll.getResponses();

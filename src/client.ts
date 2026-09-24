@@ -73,7 +73,7 @@ import {
     MediaPrefix,
     Method,
     retryNetworkOperation,
-    type TokenRefreshFunction,
+    type TokenRefreshCallback,
     type Upload,
     type UploadOpts,
     type UploadResponse,
@@ -245,8 +245,15 @@ import { sha256 } from "./digest.ts";
 import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
-import { type Transport } from "./matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "./matrixrtc/index.ts";
+import { type IRTCDeclineContent, RTC_NOTIFICATION_MAX_LIFETIME_MS } from "./matrixrtc/types.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { fetchRoomSummary, type RoomSummary } from "./room-summary-api.ts";
 import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
 import { type PollingCachedValue } from "./pollingCachedValue.ts";
@@ -314,15 +321,32 @@ export interface ICreateClientOpts {
      */
     deviceId?: string;
 
+    /**
+     * The access token to use. Can be omitted if to call only unauthenticated APIs, or provided to
+     * create an authenticated client.
+     */
     accessToken?: string;
+
+    /**
+     * The current refresh token, or omit if the session has no refresh token in which case the tokens
+     * will not be refreshed.
+     */
     refreshToken?: string;
 
     /**
-     * Function used to attempt refreshing access and refresh tokens
-     * Called by http-api when a possibly expired token is encountered
-     * and a refreshToken is found
+     * Called when the access tokens are refreshed.
+     * The client must replace the tokens it had stored previously which will no
+     * longer be valid.
+     *
+     * Required if a {@link refreshToken} is provided.
      */
-    tokenRefreshFunction?: TokenRefreshFunction;
+    onTokenRefresh?: TokenRefreshCallback;
+
+    /**
+     * If this is an OAuth2-native session (as per MSC2965/MSC3861), the OAuth client ID this
+     * application is registered with the delegated auth server under.
+     */
+    oauthClientId?: string;
 
     /**
      * Identity server provider to retrieve the user's access token when accessing
@@ -525,6 +549,10 @@ export interface IStartClientOpts {
     /**
      * The number of seconds between polls to /.well-known/matrix/client, undefined to disable.
      * This should be in the order of hours. Default: undefined.
+     *
+     * When disabled, the client never requests the well-known on its own: nothing is fetched on
+     * startup and {@link MatrixClient.getClientWellKnown} stays undefined. Callers that still need
+     * it can fetch it on demand via {@link MatrixClient.waitForClientWellKnown}.
      */
     clientWellKnownPollPeriod?: number;
 
@@ -856,25 +884,8 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-/**
- * The summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
- * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
- */
-export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
-    /**
-     * The current membership of this user in the room.
-     * Usually "leave" if the room is fetched over federation.
-     */
-    "membership"?: Membership;
-    /**
-     * Version of the room.
-     */
-    "im.nheko.summary.room_version"?: string;
-    /**
-     * The encryption algorithm used for this room, if the room is encrypted.
-     */
-    "im.nheko.summary.encryption"?: string;
-}
+// Re-export for backwards compatibility
+export { type RoomSummary };
 
 interface IRoomHierarchy {
     rooms: IHierarchyRoom[];
@@ -1349,7 +1360,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             idBaseUrl: opts.idBaseUrl,
             accessToken: opts.accessToken,
             refreshToken: opts.refreshToken,
-            tokenRefreshFunction: opts.tokenRefreshFunction,
+            onTokenRefresh: opts.onTokenRefresh,
+            oauth2ClientConfig: opts.oauthClientId
+                ? {
+                      clientId: opts.oauthClientId,
+                      deviceId: this.deviceId ?? undefined,
+                  }
+                : undefined,
+            authMetadataCallback: this.getAuthMetadata.bind(this),
             prefix: ClientPrefix.V3,
             onlyData: true,
             extraParams: opts.queryParams,
@@ -1518,11 +1536,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
 
-        this.cachedWellKnown.start(
-            this.clientOpts.clientWellKnownPollPeriod !== undefined
-                ? 1000 * this.clientOpts.clientWellKnownPollPeriod
-                : undefined,
-        );
+        // Only poll the client well-known when a poll period was configured: leaving
+        // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
+        if (this.clientOpts.clientWellKnownPollPeriod !== undefined) {
+            this.cachedWellKnown.start(1000 * this.clientOpts.clientWellKnownPollPeriod);
+        }
 
         this.toDeviceMessageQueue.start();
         this.serverCapabilitiesService.start();
@@ -1980,7 +1998,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param args.caCertsPem - Optional PEM-formatted string that provides CA certificates. These will be used to check
      *    X.509 signatures on user identities. Any user identity that has a valid signature according to the supplied
      *    CAs will be considered verified, without any manual verification taking place.
-     *
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     * @param args.x509Signer - Optional async function for signing some data with an X.509 certificate. Used to sign
+     *    the user's identity so compatible clients will recognise this user as verified without manual verification
+     *    taking place. If you supply this you must also supply `x509Validity`.
+     *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
+     * @param args.x509Validity - Optional function returning the validity period of the X.509 certificate used for
+     *    signing, as the number of milliseconds since the Unix epoch. If you supply this you must also supply
+     *    `x509Signer`.
      *    NOTE: this is an unspecified extension to Matrix. Applications should exercise caution when using it.
      *
      * @returns a Promise which will resolve when the crypto layer has been
@@ -1993,6 +2018,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             storageKey?: Uint8Array;
             storagePassword?: string;
             caCertsPem?: string;
+            x509Signer?: (item: Uint8Array) => Promise<{
+                signature_bytes: Uint8Array;
+                certificate_chain: string;
+                signature_scheme: "RsaPssSha512";
+            }>;
+            x509Validity?: () => number;
         } = {},
     ): Promise<void> {
         if (this.cryptoBackend) {
@@ -2040,6 +2071,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             enableEncryptedStateEvents: this.enableEncryptedStateEvents,
 
             caCertsPem: args.caCertsPem,
+            x509Signer: args.x509Signer,
+            x509Validity: args.x509Validity,
         });
 
         rustCrypto.setSupportedVerificationMethods(this.verificationMethods);
@@ -2745,7 +2778,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * If we expect that an event is part of a thread but is missing the relation
      * we need to add it manually, as well as the reply fallback
      */
-    private addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
+    protected addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
         if (threadId && !content["m.relates_to"]?.rel_type) {
             const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
             content["m.relates_to"] = {
@@ -2770,12 +2803,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     * Sends an event, adding it to the local echo and encrypting it if the room requires it.
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the sent event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2784,13 +2823,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }): Promise<ISendEventResponse>;
     /**
      * Sends a delayed event (MSC4140).
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param delayOpts - Properties of the delay for this event.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.delayOpts - Properties of the delay for this event.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the scheduled delayed event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2798,7 +2842,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict;
         txnId?: string;
     }): Promise<SendDelayedEventResponse>;
-    private sendCompleteEvent({
+    protected sendCompleteEvent({
         roomId,
         threadId,
         eventObject,
@@ -3608,6 +3652,45 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Get information about a specified delayed event owned by the requesting user.
+     *
+     * Note: This endpoint is unstable, and can throw an `Error`.
+     *   Check progress on [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) for more details.
+     */
+    public async _unstable_getDelayedEvent(delayId: string): Promise<{
+        delay_id: string;
+        room_id: string;
+        type: string;
+        state_key?: string;
+        delay_ms: number;
+        delayed_since_ts: number;
+        content: IContent;
+        finalised?: {
+            error?: MatrixError["data"];
+            event_id?: string;
+            finalised_ts: number;
+        };
+    }> {
+        // TODO: define a type/interface for the return shape once MSC4140 has become stable
+        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+            throw new UnsupportedDelayedEventsEndpointError(
+                "Server does not support the delayed events API",
+                "getDelayedEvents",
+            );
+        }
+
+        return await this.http.authedRequest(
+            Method.Get,
+            utils.encodeUri("/delayed_events/$delayId", { $delayId: delayId }),
+            undefined,
+            undefined,
+            {
+                prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+            },
+        );
+    }
+
+    /**
      * Get information about delayed events owned by the requesting user.
      *
      * Note: This endpoint is unstable, and can throw an `Error`.
@@ -3889,17 +3972,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Declines a MatrixRTC notification.
      *
-     * @param roomId
-     * @param notificationEventId
-     * @returns
+     * The decline is sent as a sticky event (MSC4354) keyed on the notification's event ID, so that the
+     * user's other devices stop notifying. If the server doesn't support sticky events, a regular event is
+     * sent instead. That one still counts as a decline for any device that receives it, but it isn't
+     * re-delivered after a gappy or initial sync the way a sticky event is, so a device that was offline
+     * when it was sent keeps notifying until the notification's lifetime elapses.
+     *
+     * @param roomId The room the notification was received in.
+     * @param notificationEventId The event ID of the notification being declined.
+     * @param stickyDurationMs How long (in milliseconds) the decline should stay sticky. Must not be smaller
+     * than the notification's `lifetime`, otherwise the notification can become valid again once the decline
+     * expires. Defaults to the maximum lifetime a notification may have.
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    public sendRtcDecline(roomId: string, notificationEventId: string): Promise<ISendEventResponse> {
-        return this.sendEvent(roomId, EventType.RTCDecline, {
+    public async sendRtcDecline(
+        roomId: string,
+        notificationEventId: string,
+        stickyDurationMs: number = RTC_NOTIFICATION_MAX_LIFETIME_MS,
+    ): Promise<ISendEventResponse> {
+        const content: IRTCDeclineContent = {
             "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
-        });
+            "msc4354_sticky_key": notificationEventId,
+        };
+        try {
+            return await this._unstable_sendStickyEvent(roomId, stickyDurationMs, null, EventType.RTCDecline, content);
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending decline as a regular event");
+            return await this.sendEvent(roomId, EventType.RTCDecline, content);
+        }
     }
 
     /**
@@ -6182,8 +6286,61 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Requests a token to authenticate against a LiveKit SFU with (MSC4195).
+     *
+     * The homeserver checks that we are joined to `room_id` before obtaining a token from the SFU. If
+     * `server_name` names a remote homeserver, our homeserver forwards the request to it over federation,
+     * which is how a token for another homeserver's SFU is obtained.
+     *
+     * Requires homeserver support for MSC4195.
+     *
+     * @param body - The details of the `m.rtc.member` event to obtain a token for, and the SFU to obtain it from.
+     * @returns The JWT to authenticate with when connecting to the SFU.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
+     * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
+     * of the answering server's SFUs.
+     */
+    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        // There is no /versions flag to check for support, so we just have to attempt a request.
+        return await this.http.authedRequest<LivekitGetTokenResponse>(
+            Method.Post,
+            "/rtc/livekit/get_token",
+            undefined,
+            body,
+            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+        );
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver (MSC4195).
+     *
+     * The homeserver restarts the delayed event for as long as it observes our connection to the SFU, and
+     * sends it once we disconnect, so the client does not have to restart it itself. This is more reliable
+     * than client-side restarts under poor network conditions.
+     *
+     * large timeouts are recommended for delayed delegation (in the range of hours)
+     * Requires homeserver support for MSC4195.
+     *
+     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate, and the SFU
+     * we are connected to.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
+     * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
+     */
+    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        // There is no /versions flag to check for support, so we just have to attempt a request.
+        return await this.http.authedRequest<EmptyObject>(
+            Method.Post,
+            "/rtc/livekit/delegate_delayed_leave",
+            undefined,
+            body,
+            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+        );
+    }
+
+    /**
      * Get the API versions supported by the server, along with any
      * unstable APIs it supports
+     *
      * @returns The server /versions response
      */
     public async getVersions(): Promise<IServerVersions> {
@@ -6732,13 +6889,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * method is called. The state of the MatrixClient object is not affected:
      * it is up to the caller to either reset or destroy the MatrixClient after
      * this method succeeds.
-     * @param stopClient - whether to stop the client before calling /logout to prevent invalid token errors.
+     *
+     * For an OAuth2-native session (ie. one created with `oauth2ClientConfig`), this revokes the access
+     * and refresh tokens directly with the delegated auth server instead of calling the `/logout` API,
+     * since the homeserver does not own the tokens in that case.
+     *
+     * @param stopClient - whether to stop the client before logging out to prevent invalid token errors.
      * @returns Promise which resolves: On success, the empty object `{}`
      */
     public async logout(stopClient = false): Promise<EmptyObject> {
         if (stopClient) {
             this.stopClient();
             this.http.abort();
+        }
+
+        if (this.http.opts.oauth2ClientConfig) {
+            await this.http.revokeOAuthTokens();
+            return {};
         }
 
         return this.http.authedRequest(Method.Post, "/logout");
@@ -6907,7 +7074,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * @param includeMembership - the membership type to include in the response
      * @param excludeMembership - the membership type to exclude from the response
-     * @param atEventId - the id of the event for which moment in the timeline the members should be returned for
+     * @param atSyncToken - the point in time, as a sync pagination token, for when the members should be returned for
      * @returns Promise which resolves: dictionary of userid to profile information
      * @returns Rejects: with an error response.
      */
@@ -6915,7 +7082,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         roomId: string,
         includeMembership?: string,
         excludeMembership?: string,
-        atEventId?: string,
+        atSyncToken?: string,
     ): Promise<{ [userId: string]: IStateEventWithRoomId[] }> {
         const queryParams: Record<string, string> = {};
         if (includeMembership) {
@@ -6924,8 +7091,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (excludeMembership) {
             queryParams.not_membership = excludeMembership;
         }
-        if (atEventId) {
-            queryParams.at = atEventId;
+        if (atSyncToken) {
+            queryParams.at = atSyncToken;
         }
 
         const queryString = utils.encodeParams(queryParams);
@@ -7379,10 +7546,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @see https://github.com/tcpipuk/matrix-spec-proposals/blob/main/proposals/4133-extended-profiles.md
      * @param userId The user ID to fetch the profile of.
      * @param key The key of the property to fetch.
-     * @returns The property value.
+     * @returns The property value, or `undefined` if the key was not set OR the profile could not be found.
      *
      * @throws An error if the server does not support MSC4133.
-     * @throws A M_NOT_FOUND error if the key was not set OR the profile could not be found.
      */
     public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
@@ -7394,15 +7560,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (storedProfile?.[key] !== undefined) {
             return storedProfile[key];
         }
-        const profile = (await this.http.authedRequest(
-            Method.Get,
-            utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
-            undefined,
-            undefined,
-            {
-                prefix: await this.getExtendedProfileRequestPrefix(),
-            },
-        )) as SyncUserProfile;
+        let profile: SyncUserProfile;
+        try {
+            profile = (await this.http.authedRequest(
+                Method.Get,
+                utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
+                undefined,
+                undefined,
+                {
+                    prefix: await this.getExtendedProfileRequestPrefix(),
+                },
+            )) as SyncUserProfile;
+        } catch (e) {
+            if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
+                // The key is not set on the profile (or the profile does not exist).
+                return undefined;
+            }
+            throw e;
+        }
 
         // write through to the cache
         await this.store.storeUserProfiles(
@@ -8733,26 +8908,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
-     * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+     * Fetches the summary of a room.
+     * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
+     *
+     * Uses the initial version of MSC3266, as implemented in older versions of Synapse, unless the
+     * server advertises support for the spec version which stabilised it.
+     *
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
-     * @param via - The list of servers which know about the room if only an ID was provided.
+     * @param via - The servers to attempt to request the summary from, when the local server cannot
+     *              generate it (for instance, because it has no local user in the room).
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
-        const paramOpts = {
-            prefix: "/_matrix/client/unstable/im.nheko.summary",
-        };
-        try {
-            const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-            return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-                return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-            } else {
-                throw e;
-            }
-        }
+        return fetchRoomSummary(this.http, await this.getVersions(), roomIdOrAlias, via);
     }
 
     /**
@@ -8859,9 +9026,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws when delegated auth config is invalid or unreachable
      */
     public async getAuthMetadata(): Promise<ValidatedAuthMetadata> {
-        const useStable = await this.isVersionSupported("v1.15");
         const authMetadata = await this.http.request(Method.Get, "/auth_metadata", undefined, undefined, {
-            prefix: useStable ? ClientPrefix.V1 : ClientPrefix.Unstable + "/org.matrix.msc2965",
+            prefix: ClientPrefix.V1,
         });
 
         if (isValidAuthMetadata(authMetadata)) {

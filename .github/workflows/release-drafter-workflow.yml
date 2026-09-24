@@ -11,7 +11,7 @@ concurrency: release-drafter-action
 permissions: {}
 jobs:
     draft:
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             contents: write
         steps:
@@ -23,7 +23,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true

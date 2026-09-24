@@ -16,6 +16,12 @@ export function getEncryptionKeyMapKey(membership: CallMembershipIdentityParts):
  */
 export interface IEncryptionManager {
     /**
+     * Whether the key rotation is currently halted.
+     * @see EncryptionConfig.keyRotationParticipantLimit
+     */
+    readonly isKeyRotationSuppressed: boolean;
+
+    /**
      * Joins the encryption manager with the provided configuration.
      *
      * @param joinConfig - The configuration for joining encryption, or undefined

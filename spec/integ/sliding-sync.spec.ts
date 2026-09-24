@@ -818,6 +818,7 @@ describe("SlidingSync", () => {
         const preExtName = "foobar";
         let onPreExtensionRequest: Extension<any, any>["onRequest"];
         let onPreExtensionResponse: Extension<any, any>["onResponse"];
+        let onPreExtensionResponseComplete: () => Promise<void> = async () => {};
 
         // Post-extensions get called AFTER processing the sync response
         const postExtName = "foobar2";
@@ -831,6 +832,9 @@ describe("SlidingSync", () => {
             },
             onResponse: (res) => {
                 return onPreExtensionResponse(res);
+            },
+            onResponseComplete: () => {
+                return onPreExtensionResponseComplete();
             },
             when: () => ExtensionState.PreProcess,
         };
@@ -922,6 +926,64 @@ describe("SlidingSync", () => {
             await httpBackend!.flushAllExpected();
             await p;
             expect(responseCalled).toBe(false);
+        });
+
+        it("calls onResponseComplete after onResponse, and before the response body is processed", async () => {
+            const callbackOrder: string[] = [];
+            onPreExtensionRequest = async () => extReq;
+            onPreExtensionResponse = async () => {
+                callbackOrder.push("onResponse");
+            };
+            onPreExtensionResponseComplete = async () => {
+                callbackOrder.push("onResponseComplete");
+            };
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "b",
+                ops: [],
+                counts: [],
+                extensions: {
+                    [preExtName]: extResp,
+                },
+            });
+            slidingSync.resend();
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                if (state === SlidingSyncState.Complete) {
+                    callbackOrder.push("Lifecycle");
+                    return true;
+                }
+            });
+            await httpBackend!.flushAllExpected();
+            await p;
+            expect(callbackOrder).toEqual(["onResponse", "onResponseComplete", "Lifecycle"]);
+        });
+
+        it("calls onResponseComplete even when the extension is absent from the response", async () => {
+            let responseCalled = false;
+            let completeCalled = false;
+            onPreExtensionRequest = async () => extReq;
+            onPreExtensionResponse = async () => {
+                responseCalled = true;
+            };
+            onPreExtensionResponseComplete = async () => {
+                completeCalled = true;
+            };
+            httpBackend!.when("POST", syncUrl).respond(200, {
+                pos: "c",
+                ops: [],
+                counts: [],
+                extensions: {},
+            });
+            slidingSync.resend();
+            const p = listenUntil(slidingSync, "SlidingSync.Lifecycle", (state) => {
+                return state === SlidingSyncState.Complete;
+            });
+            await httpBackend!.flushAllExpected();
+            await p;
+            expect(responseCalled).toBe(false);
+            expect(completeCalled).toBe(true);
+            // restore the state the following tests expect (no pre-extension request, no completion callback)
+            onPreExtensionRequest = async () => undefined;
+            onPreExtensionResponseComplete = async () => {};
         });
 
         it("is possible to register extensions after start() has been called", async () => {

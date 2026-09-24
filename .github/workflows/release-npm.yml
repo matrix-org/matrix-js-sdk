@@ -14,7 +14,7 @@ permissions: {}
 jobs:
     npm:
         name: Publish to npm
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             contents: read
             id-token: write
@@ -28,7 +28,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2 # v2.0.2
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node
                   cache: true
@@ -46,5 +46,25 @@ jobs:
                   fi
 
                   pnpm publish --provenance --access public --publish-branch staging --tag "$tag"
-                  release=$(jq -r '"\(.name)@\(.version)"' package.json)
+
+                  name=$(jq -r '.name' package.json)
+                  release="$name@$version"
+
+                  # NPM now scans published packages before they are made available for download
+                  # block here until the package is ready to be consumed.
+                  echo "Waiting for $release to become available for download..."
+                  tmpdir=$(mktemp -d)
+                  for i in $(seq 1 60); do
+                      if (cd "$tmpdir" && npm pack "$release" >/dev/null 2>&1); then
+                          echo "$release is available"
+                          break
+                      fi
+                      if [[ "$i" -eq 60 ]]; then
+                          echo "::error::Timed out waiting for $release to become available on npm"
+                          exit 1
+                      fi
+                      sleep 10
+                  done
+                  rm -rf "$tmpdir"
+
                   echo "id=$release" >> $GITHUB_OUTPUT

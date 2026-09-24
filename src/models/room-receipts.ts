@@ -158,13 +158,22 @@ export class RoomReceipts {
             }
         }
 
-        // TODO: what if they sent the second-last event in the thread?
-        if (this.userSentLatestEventInThread(threadId, userId)) {
-            // The user sent the latest message in this event's thread, so we
-            // consider everything in the thread to be read.
+        if (this.userSentEventAfterOrSame(threadId, userId, eventId)) {
+            // The user sent an event at or after this one, so they must have
+            // seen this one: we consider it read.
             //
-            // Note: maybe we don't need this because synthetic receipts should
-            // do this job for us?
+            // Note: the synthetic receipts we create when we see an event
+            // usually do this job for us, but not always - e.g. we don't create
+            // them for events we paginated in.
+            return true;
+        }
+
+        if (event.isThreadRoot && this.userRepliedInThread(eventId, userId)) {
+            // The user replied in the thread rooted at this event, and you
+            // can't reply to a thread without seeing its root. We have to check
+            // this separately because their reply is in the thread's timeline
+            // whereas the root is in the main one, so no receipt of theirs can
+            // cover the root.
             return true;
         }
 
@@ -173,17 +182,52 @@ export class RoomReceipts {
     }
 
     /**
-     * @returns true if the thread with this ID can be found, and the supplied
-     *          user sent the latest message in it.
+     * @returns true if the timeline for this thread ID can be found, and the
+     *          supplied user sent an event in it that is the same as, or after,
+     *          the event with the supplied ID.
      */
-    private userSentLatestEventInThread(threadId: string, userId: string): boolean {
+    private userSentEventAfterOrSame(threadId: string, userId: string, eventId: string): boolean {
         const timeline =
             threadId === MAIN_ROOM_TIMELINE
                 ? this.room.getLiveTimeline().getEvents()
                 : this.room.getThread(threadId)?.timeline;
 
-        return !!(timeline && timeline.length > 0 && timeline[timeline.length - 1].getSender() === userId);
+        const latestEventId = latestEventIdSentByUser(timeline, userId);
+        return !!latestEventId && isAfterOrSame(latestEventId, eventId, this.room);
     }
+
+    /**
+     * @returns true if the thread rooted at the event with the supplied ID can
+     *          be found, and the supplied user sent a reply in it.
+     */
+    private userRepliedInThread(rootEventId: string, userId: string): boolean {
+        // The root is part of the thread's timeline, but it is not a reply to
+        // the thread, so leave it out.
+        const replies = this.room.getThread(rootEventId)?.timeline.filter((event) => event.getId() !== rootEventId);
+        return !!latestEventIdSentByUser(replies, userId);
+    }
+}
+
+/**
+ * Find the last event in the supplied timeline that was sent by this user.
+ *
+ * Events that are still on their way to the server (or failed to get there) are
+ * ignored: they have no place in the timeline yet, and a failed send tells us
+ * nothing about what the user has seen.
+ *
+ * @returns the ID of the found event, or undefined if there is no such event.
+ */
+function latestEventIdSentByUser(timeline: Array<MatrixEvent> | undefined, userId: string): string | undefined {
+    if (!timeline) return undefined;
+
+    for (let index = timeline.length - 1; index >= 0; index--) {
+        const event = timeline[index];
+        if (event.getSender() === userId && !event.status) {
+            return event.getId();
+        }
+    }
+
+    return undefined;
 }
 
 // --- implementation details ---

@@ -249,6 +249,15 @@ export interface Extension<Req extends object, Res extends object> {
      * @returns The state when it should be called.
      */
     when(): ExtensionState;
+    /**
+     * An optional function which is called once per sync response, after `onResponse` has been called on all of
+     * the extensions (of the same `when()` stage) which were present in the response. It is called even if this
+     * extension was not itself present in the response.
+     *
+     * This allows extensions which need to combine their data with that of other extensions (such as `e2ee` and
+     * `to_device`) to act once the whole response has been seen.
+     */
+    onResponseComplete?(): Promise<void>;
 }
 
 /**
@@ -487,23 +496,31 @@ export class SlidingSync extends TypedEventEmitter<SlidingSyncEvent, SlidingSync
     }
 
     private async onPreExtensionsResponse(ext: Record<string, object>): Promise<void> {
-        await Promise.all(
-            Object.keys(ext).map(async (extName) => {
-                if (this.extensions[extName].when() == ExtensionState.PreProcess) {
-                    await this.extensions[extName].onResponse(ext[extName]);
-                }
-            }),
-        );
+        await this.onExtensionsResponse(ext, ExtensionState.PreProcess);
     }
 
     private async onPostExtensionsResponse(ext: Record<string, object>): Promise<void> {
-        await Promise.all(
-            Object.keys(ext).map(async (extName) => {
-                if (this.extensions[extName].when() == ExtensionState.PostProcess) {
-                    await this.extensions[extName].onResponse(ext[extName]);
-                }
-            }),
-        );
+        await this.onExtensionsResponse(ext, ExtensionState.PostProcess);
+    }
+
+    /**
+     * Call `onResponse` on each registered extension of the given stage which is present in the response, and then
+     * `onResponseComplete` on every registered extension of that stage.
+     *
+     * Extensions are processed sequentially, in registration order, so that extensions whose data must be combined
+     * (such as `e2ee` and `to_device`) see a deterministic order.
+     */
+    private async onExtensionsResponse(ext: Record<string, object>, state: ExtensionState): Promise<void> {
+        const extensions = Object.values(this.extensions).filter((extension) => extension.when() === state);
+        for (const extension of extensions) {
+            const data = ext[extension.name()];
+            if (data !== undefined) {
+                await extension.onResponse(data);
+            }
+        }
+        for (const extension of extensions) {
+            await extension.onResponseComplete?.();
+        }
     }
 
     /**

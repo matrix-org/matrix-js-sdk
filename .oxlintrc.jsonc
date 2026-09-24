@@ -249,6 +249,8 @@
             "rules": {
                 "import/no-commonjs": "off",
                 "typescript/no-require-imports": "off",
+                "typescript/no-var-requires": "off",
+                "unicorn/prefer-module": "off",
             },
         },
         { "files": ["**/*.d.ts"], "rules": { "unicorn/require-module-specifiers": "off" } },

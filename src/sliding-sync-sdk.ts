@@ -28,16 +28,18 @@ import {
     defaultClientOpts,
     defaultSyncApiOpts,
     type SetPresence,
-    processToDeviceMessages,
+    processSyncCryptoChanges,
 } from "./sync.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import {
     type IMinimalEvent,
     type IRoomEvent,
     type IStateEvent,
+    type IStickyEvent,
+    type IStickyStateEvent,
     type IStrippedState,
     type ISyncResponse,
-    type ReceivedToDeviceMessage,
+    type IToDeviceEvent,
 } from "./sync-accumulator.ts";
 import { MatrixError } from "./http-api/index.ts";
 import {
@@ -72,8 +74,63 @@ type ExtensionE2EEResponse = Pick<
     | "org.matrix.msc2732.device_unused_fallback_key_types"
 >;
 
+/**
+ * Collects the encryption-relevant parts of a sliding sync response, which arrive via two separate extensions
+ * (`e2ee` and `to_device`), so that they can be passed to the crypto layer in a single call once the whole response
+ * has been processed. See {@link SyncCryptoCallbacks.processSyncChanges} for why this matters.
+ */
+class E2EESyncChangesCollector {
+    private toDeviceEvents: IToDeviceEvent[] = [];
+    private e2ee?: ExtensionE2EEResponse;
+    private hasChanges = false;
+
+    public constructor(
+        private readonly client: MatrixClient,
+        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
+    ) {}
+
+    public onToDeviceEvents(events: IToDeviceEvent[]): void {
+        this.toDeviceEvents = events;
+        this.hasChanges = true;
+    }
+
+    public onE2EEChanges(data: ExtensionE2EEResponse): void {
+        this.e2ee = data;
+        this.hasChanges = true;
+    }
+
+    /**
+     * Pass the collected changes to the crypto layer, and emit the resulting to-device messages on the client.
+     *
+     * A no-op if nothing has been collected since the last flush, so it is safe to call once per extension.
+     */
+    public async flush(): Promise<void> {
+        if (!this.hasChanges) return;
+        const toDeviceEvents = this.toDeviceEvents;
+        const e2ee = this.e2ee;
+        this.toDeviceEvents = [];
+        this.e2ee = undefined;
+        this.hasChanges = false;
+
+        // Fields omitted from the `e2ee` extension are unchanged since the last response; the crypto layer knows to
+        // interpret them that way given `useMsc4186`.
+        await processSyncCryptoChanges(this.client, this.cryptoCallbacks, {
+            toDeviceEvents,
+            deviceLists: e2ee?.device_lists,
+            oneTimeKeysCounts: e2ee?.device_one_time_keys_count,
+            unusedFallbackKeys:
+                e2ee?.device_unused_fallback_key_types ?? e2ee?.["org.matrix.msc2732.device_unused_fallback_key_types"],
+            useMsc4186: true,
+        });
+        this.cryptoCallbacks?.onSyncCompleted({});
+    }
+}
+
 class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResponse> {
-    public constructor(private readonly crypto: SyncCryptoCallbacks) {}
+    public constructor(
+        private readonly crypto: SyncCryptoCallbacks,
+        private readonly collector: E2EESyncChangesCollector,
+    ) {}
 
     public name(): string {
         return "e2ee";
@@ -100,18 +157,11 @@ class ExtensionE2EE implements Extension<ExtensionE2EERequest, ExtensionE2EEResp
     }
 
     public async onResponse(data: ExtensionE2EEResponse): Promise<void> {
-        // Handle device list updates
-        if (data.device_lists) {
-            await this.crypto.processDeviceLists(data.device_lists);
-        }
+        this.collector.onE2EEChanges(data);
+    }
 
-        // Handle one_time_keys_count and unused_fallback_key_types
-        await this.crypto.processKeyCounts(
-            data.device_one_time_keys_count,
-            data["device_unused_fallback_key_types"] || data["org.matrix.msc2732.device_unused_fallback_key_types"],
-        );
-
-        this.crypto.onSyncCompleted({});
+    public async onResponseComplete(): Promise<void> {
+        await this.collector.flush();
     }
 }
 
@@ -129,10 +179,7 @@ type ExtensionToDeviceResponse = {
 class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, ExtensionToDeviceResponse> {
     private nextBatch: string | null = null;
 
-    public constructor(
-        private readonly client: MatrixClient,
-        private readonly cryptoCallbacks?: SyncCryptoCallbacks,
-    ) {}
+    public constructor(private readonly collector: E2EESyncChangesCollector) {}
 
     public name(): string {
         return "to_device";
@@ -151,20 +198,12 @@ class ExtensionToDevice implements Extension<ExtensionToDeviceRequest, Extension
     }
 
     public async onResponse(data: ExtensionToDeviceResponse): Promise<void> {
-        const events = data["events"] || [];
-        let receivedToDeviceMessages: ReceivedToDeviceMessage[];
-        if (this.cryptoCallbacks) {
-            receivedToDeviceMessages = await this.cryptoCallbacks.preprocessToDeviceMessages(events);
-        } else {
-            // Crypto is not enabled, so we just return the events.
-            receivedToDeviceMessages = events.map((rawEvent) => ({
-                message: rawEvent,
-                encryptionInfo: null,
-            }));
-        }
-        processToDeviceMessages(receivedToDeviceMessages, this.client);
-
+        this.collector.onToDeviceEvents(data["events"] || []);
         this.nextBatch = data.next_batch;
+    }
+
+    public async onResponseComplete(): Promise<void> {
+        await this.collector.flush();
     }
 }
 
@@ -311,6 +350,73 @@ class ExtensionReceipts implements Extension<ExtensionReceiptsRequest, Extension
     }
 }
 
+type ExtensionStickyEventsRequest = {
+    enabled: boolean;
+    /** Max events per response; the server may return fewer. */
+    limit?: number;
+    /** The `next_batch` of the previous response. */
+    since?: string;
+};
+
+type ExtensionStickyEventsResponse = {
+    /** Only sent when there were changes. */
+    next_batch?: string;
+    rooms?: Record<string, { events: Array<IStickyEvent | IStickyStateEvent> }>;
+};
+
+/**
+ * Delivers sticky events (MSC4354) over sliding sync.
+ * https://github.com/matrix-org/matrix-spec-proposals/pull/4480
+ *
+ * Sticky events expire after a duration instead of living in the timeline forever, and the server
+ * re-sends the unexpired ones (e.g. on join) so late joiners still see them.
+ *
+ * The server sends them for every room matched by a list or subscription, even rooms currently
+ * outside the list window. Sticky events already in a room's timeline are excluded here, so
+ * `processRoomData` picks those up separately.
+ */
+class ExtensionStickyEvents implements Extension<ExtensionStickyEventsRequest, ExtensionStickyEventsResponse> {
+    private nextBatch?: string;
+
+    public constructor(private readonly client: MatrixClient) {}
+
+    public name(): string {
+        // Keeps MSC4354's number, as the extension was originally specified there.
+        return "org.matrix.msc4354.sticky_events";
+    }
+
+    public when(): ExtensionState {
+        // Sticky events are stored on a Room, so the room has to exist first.
+        return ExtensionState.PostProcess;
+    }
+
+    public async onRequest(isInitial: boolean): Promise<ExtensionStickyEventsRequest> {
+        return {
+            enabled: true,
+            limit: 100,
+            // Undefined until the first response, which asks for all unexpired sticky events.
+            since: this.nextBatch,
+        };
+    }
+
+    public async onResponse(data: ExtensionStickyEventsResponse): Promise<void> {
+        for (const [roomId, roomData] of Object.entries(data?.rooms ?? {})) {
+            const room = this.client.getRoom(roomId);
+            if (!room) {
+                // Dropping is safe: unexpired sticky events are re-sent once we know the room.
+                logger.debug(`Ignoring sticky events for unknown room ${roomId}`);
+                continue;
+            }
+            room._unstable_addStickyEvents(mapEvents(this.client, roomId, roomData.events ?? []));
+        }
+
+        // next_batch is only returned when there were changes, and must be echoed back as `since`.
+        if (data?.next_batch) {
+            this.nextBatch = data.next_batch;
+        }
+    }
+}
+
 /**
  * A copy of SyncApi such that it can be used as a drop-in replacement for sync v2. For the actual
  * sliding sync API, see sliding-sync.ts or the class SlidingSync.
@@ -339,14 +445,18 @@ export class SlidingSyncSdk {
 
         this.slidingSync.on(SlidingSyncEvent.Lifecycle, this.onLifecycle.bind(this));
         this.slidingSync.on(SlidingSyncEvent.RoomData, this.onRoomData.bind(this));
+        // The `e2ee` and `to_device` extensions feed a shared collector, so that the crypto layer sees all the
+        // encryption-relevant data from a response in a single call.
+        const e2eeCollector = new E2EESyncChangesCollector(this.client, this.syncOpts.cryptoCallbacks);
         const extensions: Extension<any, any>[] = [
-            new ExtensionToDevice(this.client, this.syncOpts.cryptoCallbacks),
+            new ExtensionToDevice(e2eeCollector),
             new ExtensionAccountData(this.client),
             new ExtensionTyping(this.client),
             new ExtensionReceipts(this.client),
+            new ExtensionStickyEvents(this.client),
         ];
         if (this.syncOpts.cryptoCallbacks) {
-            extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks));
+            extensions.push(new ExtensionE2EE(this.syncOpts.cryptoCallbacks, e2eeCollector));
         }
         extensions.forEach((ext) => {
             this.slidingSync.registerExtension(ext);
@@ -704,6 +814,10 @@ export class SlidingSyncSdk {
         room.updateMyMembership(KnownMembership.Join);
 
         room.setMSC4186SummaryData(roomData.heroes, roomData.joined_count, roomData.invited_count);
+
+        // The MSC4480 extension excludes sticky events already present in the timeline, so we have
+        // to pick those up here. See ExtensionStickyEvents for the rest.
+        room._unstable_addStickyEvents(timelineEvents.filter((e) => e.unstableStickyInfo !== undefined));
 
         room.recalculate();
         if (roomData.initial) {

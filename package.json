@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "42.1.0",
+    "version": "42.3.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -8,7 +8,7 @@
     "devEngines": {
         "packageManager": {
             "name": "pnpm",
-            "version": "11.9.0",
+            "version": "12.3.4",
             "onFail": "download"
         }
     },
@@ -56,13 +56,13 @@
     ],
     "dependencies": {
         "@babel/runtime": "^8.0.0",
-        "@matrix-org/matrix-sdk-crypto-wasm": "^18.4.0",
+        "@matrix-org/matrix-sdk-crypto-wasm": "^18.7.0",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
-        "content-type": "^2.0.0",
+        "content-type": "^3.0.0",
         "loglevel": "^1.9.2",
         "matrix-events-sdk": "0.0.1",
-        "matrix-widget-api": "^1.18.0",
+        "matrix-widget-api": "^1.19.0",
         "p-retry": "8",
         "sdp-transform": "^3.0.0",
         "unhomoglyph": "^1.0.6"
@@ -86,8 +86,8 @@
         "@types/node": "22",
         "@types/sdp-transform": "^3.0.0",
         "@typescript/native": "npm:typescript@7.0.2",
-        "@vitest/coverage-v8": "^4.0.17",
-        "@vitest/ui": "^4.0.17",
+        "@vitest/coverage-v8": "^5.0.0",
+        "@vitest/ui": "^5.0.0",
         "concurrently": "^10.0.0",
         "debug": "^4.3.4",
         "fake-indexeddb": "^6.0.0",
@@ -97,7 +97,7 @@
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
-        "oxfmt": "^0.62.0",
+        "oxfmt": "^0.68.0",
         "oxlint": "^1.70.0",
         "oxlint-tsgolint": "^7.0.0",
         "typedoc": "^0.28.1",
@@ -105,6 +105,6 @@
         "typedoc-plugin-mdn-links": "^5.0.0",
         "typedoc-plugin-missing-exports": "^4.0.0",
         "typescript": "npm:@typescript/typescript6@6.0.2",
-        "vitest": "^4.0.17"
+        "vitest": "^5.0.0"
     }
 }

@@ -32,7 +32,12 @@ import {
     UnstableApiVersion,
 } from "matrix-widget-api";
 
-import { type Transport } from "./matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "./matrixrtc/index.ts";
 import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
 import {
     type ISendEventResponse,
@@ -41,7 +46,7 @@ import {
     UpdateDelayedEventAction,
     isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
-import { EventType, type StateEvents } from "./@types/event.ts";
+import { EventType, type StateEvents, type TimelineEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
 import {
     MatrixClient,
@@ -59,7 +64,12 @@ import { User } from "./models/user.ts";
 import { type Room } from "./models/room.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { MapWithDefault, type QueryDict, recursiveMapToObject } from "./utils.ts";
-import { type EmptyObject, TypedEventEmitter, UnsupportedDelayedEventsEndpointError } from "./matrix.ts";
+import {
+    type EmptyObject,
+    TypedEventEmitter,
+    UnsupportedDelayedEventsEndpointError,
+    UnsupportedStickyEventsEndpointError,
+} from "./matrix.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -145,6 +155,21 @@ export interface ICapabilities {
      * @defaultValue false
      */
     rtcTransports?: boolean;
+
+    /**
+     * Whether this client needs to be able to obtain LiveKit SFU tokens through the host.
+     * @experimental Part of MSC4195 & MSC4533
+     * @defaultValue false
+     */
+    rtcLivekitGetToken?: boolean;
+
+    /**
+     * Whether this client needs to be able to hand delayed MatrixRTC leave events over to the
+     * homeserver through the host.
+     * @experimental Part of MSC4195 & MSC4533
+     * @defaultValue false
+     */
+    rtcLivekitDelegateDelayedLeave?: boolean;
 }
 
 export enum RoomWidgetClientEvent {
@@ -296,6 +321,12 @@ export class RoomWidgetClient extends MatrixClient {
         if (capabilities.rtcTransports) {
             this.widgetApi.requestCapability(MatrixCapabilities.MSC4515RtcTransports);
         }
+        if (capabilities.rtcLivekitGetToken) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4533RtcLivekitGetToken);
+        }
+        if (capabilities.rtcLivekitDelegateDelayedLeave) {
+            this.widgetApi.requestCapability(MatrixCapabilities.MSC4533RtcLivekitDelegateDelayedLeave);
+        }
     }
 
     public async supportUpdateState(): Promise<boolean> {
@@ -357,9 +388,11 @@ export class RoomWidgetClient extends MatrixClient {
             );
         }
 
-        this.cachedWellKnown.start(
-            opts.clientWellKnownPollPeriod !== undefined ? 1000 * opts.clientWellKnownPollPeriod : undefined,
-        );
+        // Only poll the client well-known when a poll period was configured: leaving
+        // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
+        if (opts.clientWellKnownPollPeriod !== undefined) {
+            this.cachedWellKnown.start(1000 * opts.clientWellKnownPollPeriod);
+        }
         this.setSyncState(SyncState.Syncing);
         logger.info("Finished initial sync");
 
@@ -511,6 +544,60 @@ export class RoomWidgetClient extends MatrixClient {
         return this.validateSendDelayedEventResponse(response);
     }
 
+    /**
+     * Sends a sticky timeline event through the widget API.
+     *
+     * A widget can't probe the homeserver for MSC4354 support and doesn't need to: the host either granted it
+     * the capability to send sticky events or it didn't. A missing capability is reported the same way a
+     * missing server feature is, so that callers fall back to a regular event in both cases alike.
+     *
+     * The host may still refuse the request, typically because its own homeserver turns out not to support
+     * sticky events. Such a refusal reaches the widget without Matrix API error details, as those only accompany
+     * errors from requests the host actually made to the homeserver. It is therefore reported as unsupported too,
+     * with the host's error as `cause`. A refusal that does carry Matrix API error details came from the
+     * homeserver itself and is rethrown as is.
+     */
+    public async _unstable_sendStickyEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        stickDuration: number,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K] & { msc4354_sticky_key?: string },
+        txnId?: string,
+    ): Promise<ISendEventResponse> {
+        if (!this.widgetApi.hasCapability(MatrixCapabilities.MSC4407SendStickyEvent)) {
+            throw new UnsupportedStickyEventsEndpointError(
+                "Widget was not granted the capability to send sticky events",
+                "sendStickyEvent",
+            );
+        }
+
+        this.addThreadRelationIfNeeded(content, threadId, roomId);
+        txnId ??= this.makeTxnId();
+        try {
+            return await this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                txnId,
+            });
+        } catch (error) {
+            if (!(error instanceof WidgetApiResponseError) || error.data.matrix_api_error !== undefined) throw error;
+
+            // Callers fall back to sending a regular event, so drop the local echo of the failed sticky one
+            // rather than leaving it in the timeline as unsent.
+            const localEvent = this.getRoom(roomId)?.getEventForTxnId(txnId);
+            if (localEvent?.status === EventStatus.NOT_SENT) this.cancelPendingEvent(localEvent);
+
+            throw new UnsupportedStickyEventsEndpointError(
+                `Host could not send the sticky event: ${error.message}`,
+                "sendStickyEvent",
+                { cause: error },
+            );
+        }
+    }
+
     private validateSendDelayedEventResponse(response: ISendEventFromWidgetResponseData): SendDelayedEventResponse {
         if (response.delay_id === undefined) {
             throw new Error("'delay_id' absent from response to a delayed event request");
@@ -643,6 +730,41 @@ export class RoomWidgetClient extends MatrixClient {
             .getRtcTransports()
             .catch(timeoutToConnectionError);
         return rtcTransports;
+    }
+
+    /**
+     * Requests a token to authenticate against a LiveKit SFU with.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_getLivekitToken} (MSC4195): a widget
+     * cannot make authenticated homeserver calls itself, so we ask the host to make the call on our
+     * behalf over the widget API instead (MSC4533). Requires the `rtcLivekitGetToken` capability and a
+     * host that advertises the `org.matrix.msc4533` API version (otherwise the request throws).
+     *
+     * `server_name` defaults to our own homeserver, matching what the endpoint would do server-side.
+     */
+    public override async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        const serverName = body.server_name ?? this.getDomain();
+        if (serverName === null) throw new Error("Cannot determine the server name to request a token from");
+        const { jwt } = await this.widgetApi
+            .getRtcLivekitToken({ ...body, server_name: serverName })
+            .catch(timeoutToConnectionError);
+        return { jwt };
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver.
+     *
+     * Overrides the homeserver-side {@link MatrixClient._unstable_delegateDelayedLeave} (MSC4195): a
+     * widget cannot make authenticated homeserver calls itself, so we ask the host to make the call on
+     * our behalf over the widget API instead (MSC4533). Requires the `rtcLivekitDelegateDelayedLeave`
+     * capability and a host that advertises the `org.matrix.msc4533` API version (otherwise the request
+     * throws).
+     */
+    public override async _unstable_delegateDelayedLeave(
+        body: LivekitDelegateDelayedLeaveRequest,
+    ): Promise<EmptyObject> {
+        await this.widgetApi.delegateRtcLivekitDelayedLeave(body).catch(timeoutToConnectionError);
+        return {};
     }
 
     public async queueToDevice({ eventType, batch }: ToDeviceBatch): Promise<void> {
