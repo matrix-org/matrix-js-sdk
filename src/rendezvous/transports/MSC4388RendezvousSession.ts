@@ -88,6 +88,8 @@ export class MSC4388RendezvousSession {
             requestBody.sequence_token = this.sequenceToken;
         }
 
+        const txnId = this.client.makeTxnId();
+
         try {
             const responseBody = await this.client.http.authedRequest<{
                 id?: string;
@@ -95,7 +97,7 @@ export class MSC4388RendezvousSession {
                 expires_in_ms: number;
             }>(
                 this.id ? Method.Put : Method.Post,
-                this.id ? `${API_PREFIX}/${this.id}` : API_PREFIX,
+                this.id ? `${API_PREFIX}/${this.id}/${txnId}` : API_PREFIX,
                 undefined,
                 requestBody,
                 {
