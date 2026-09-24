@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type MockedObject } from "vitest";
 
-import { EventType, type MatrixClient, MatrixEvent, Room, RoomEvent, RoomStateEvent } from "../../../src";
+import { EventType, Filter, type MatrixClient, MatrixEvent, Room, RoomEvent, RoomStateEvent } from "../../../src";
 import type { RoomRetentionPolicy } from "../../../src/models/room-retention";
 import { flushPromises } from "../../test-utils/flushPromises";
 
@@ -473,6 +473,41 @@ describe("RoomRetentionPolicy", () => {
 
             // processTimeline ran once; no expired events
             expect(redactSpy).not.toHaveBeenCalled();
+        });
+
+        it("does not expose expired events paginated into a filtered timeline", async () => {
+            getCachedMock.mockReturnValue({
+                policies: {
+                    [ROOM_ID]: { max_lifetime: ONE_DAY_MS },
+                },
+            });
+            await applyPolicy();
+
+            const filter = new Filter(USER_ID, "test_filter");
+            filter.setDefinition({});
+
+            const timelineSet = room.getOrCreateFilteredTimelineSet(filter, {
+                prepopulateTimeline: false,
+                useSyncEvents: false,
+            });
+
+            const expiredEvent = makeMessageEvent(
+                Date.now() - 2 * ONE_DAY_MS,
+            );
+
+            timelineSet.addEventsToTimeline(
+                [expiredEvent],
+                true,
+                false,
+                timelineSet.getLiveTimeline(),
+                null,
+            );
+
+            await vi.advanceTimersByTimeAsync(201);
+
+            expect(
+                timelineSet.getLiveTimeline().getEvents(),
+            ).toHaveLength(0);
         });
     });
 });

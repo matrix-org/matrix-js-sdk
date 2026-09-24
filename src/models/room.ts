@@ -1870,8 +1870,6 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         timeline: EventTimeline,
         paginationToken?: string,
     ): void {
-        // ALWAYS filter out any events that are past retention
-        events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
         timeline.getTimelineSet().addEventsToTimeline(events, toStartOfTimeline, addToState, timeline, paginationToken);
     }
 

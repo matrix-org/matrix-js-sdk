@@ -410,6 +410,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
+        // ALWAYS filter out any events that are past retention
+        events = events.filter((e) => this.room?.retention?.shouldEventBeRetained(e) ?? true);
+
         if (this.filter) {
             events = this.filter.filterRoomTimeline(events);
             if (!events.length) {
