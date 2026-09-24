@@ -714,6 +714,69 @@ describe("Thread", () => {
         });
     });
 
+    describe("initial events fetch", () => {
+        it("fetches the initial events of at most 3 threads at a time", async () => {
+            const previousSupport = Thread.hasServerSideSupport;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+            try {
+                const myUserId = "@alice:example.org";
+                const testClient = new TestClient(myUserId, "DEVICE", "ACCESS_TOKEN", undefined, {
+                    timelineSupport: false,
+                });
+                const client = testClient.client;
+                client.supportsThreads = vi.fn().mockReturnValue(true);
+                const room = new Room("!room:z", client, myUserId, {
+                    pendingEventOrdering: PendingEventOrdering.Detached,
+                });
+                vi.spyOn(client, "getRoom").mockReturnValue(room);
+                const roots = new Map<string, MatrixEvent>();
+                vi.spyOn(client, "fetchRoomEvent").mockImplementation(
+                    async (_roomId, eventId) => roots.get(eventId)!.event,
+                );
+                const pending: (() => void)[] = [];
+                vi.spyOn(client, "paginateEventTimeline").mockImplementation(
+                    () => new Promise((resolve) => pending.push(() => resolve(true))),
+                );
+
+                // Opening a thread list creates every thread in the room at once; each wants its initial events.
+                for (let i = 0; i < 5; i++) {
+                    const root = mkMessage({ room: room.roomId, user: myUserId, msg: `Root ${i}`, event: true });
+                    roots.set(root.getId()!, root);
+                    const reply = mkMessage({
+                        room: room.roomId,
+                        user: myUserId,
+                        msg: "Reply",
+                        relatesTo: { rel_type: THREAD_RELATION_TYPE.name, event_id: root.getId()! },
+                        event: true,
+                    });
+                    root.setUnsigned({
+                        "m.relations": {
+                            [THREAD_RELATION_TYPE.name]: {
+                                count: 1,
+                                current_user_participated: true,
+                                latest_event: reply.event,
+                            },
+                        },
+                    });
+                    room.createThread(root.getId()!, root, [], false);
+                }
+                await sleep(0);
+                expect(client.paginateEventTimeline).toHaveBeenCalledTimes(3);
+                pending.shift()!();
+                await sleep(0);
+                expect(client.paginateEventTimeline).toHaveBeenCalledTimes(4);
+                pending.shift()!();
+                pending.shift()!();
+                await sleep(0);
+                expect(client.paginateEventTimeline).toHaveBeenCalledTimes(5);
+                for (const finish of pending) finish();
+                await sleep(0);
+            } finally {
+                Thread.setServerSideSupport(previousSupport);
+            }
+        });
+    });
+
     describe("addEvent", () => {
         describe("Given server support for threads", () => {
             let previousThreadHasServerSideSupport: FeatureSupport;
@@ -1064,6 +1127,60 @@ describe("Thread", () => {
                     Thread.setServerSideSupport(prevSupport);
                 }
             });
+        });
+    });
+
+    describe("hasCurrentUserParticipated", () => {
+        const myUserId = "@bob:example.org";
+        const otherUserId = "@alice:example.org";
+        const roomId = "!room:example.org";
+
+        let previousThreadHasServerSideSupport: FeatureSupport;
+
+        beforeAll(() => {
+            previousThreadHasServerSideSupport = Thread.hasServerSideSupport;
+            Thread.setServerSideSupport(FeatureSupport.Stable);
+        });
+
+        afterAll(() => {
+            Thread.setServerSideSupport(previousThreadHasServerSideSupport);
+        });
+
+        /**
+         * Create a client whose user is `myUserId`, plus a thread rooted by someone else which
+         * the current user has not participated in (the root carries no bundled relation, so the
+         * server's `current_user_participated` flag is absent).
+         */
+        async function createThreadWithoutMe(): Promise<{ client: MatrixClient; thread: Thread }> {
+            const client = createClient();
+            vi.spyOn(client, "getUserId").mockReturnValue(myUserId);
+            const thread = await createThread(client, otherUserId, roomId);
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+            return { client, thread };
+        }
+
+        it("is set when the current user replies in the thread", async () => {
+            const { thread } = await createThreadWithoutMe();
+
+            thread.addEvent(createThreadMessage(thread.id, myUserId, roomId, "my reply"), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(true);
+        });
+
+        it("is not set when another user replies in the thread", async () => {
+            const { thread } = await createThreadWithoutMe();
+
+            thread.addEvent(createThreadMessage(thread.id, otherUserId, roomId, "their reply"), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(false);
+        });
+
+        it("is not set by the current user's reaction to a thread event", async () => {
+            const { client, thread } = await createThreadWithoutMe();
+
+            thread.addEvent(mkReaction(thread.rootEvent!, client, myUserId, roomId), false);
+
+            expect(thread.hasCurrentUserParticipated).toBe(false);
         });
     });
 });

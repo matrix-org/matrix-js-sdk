@@ -1,3 +1,18 @@
+Changes in [42.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.3.0) (2026-09-01)
+==================================================================================================
+## ✨ Features
+
+* Don't treat Matrix-shaped errors as OAuth token refresh grant logouts ([#5473](https://github.com/matrix-org/matrix-js-sdk/pull/5473)). Contributed by @hughns.
+* Update MatrixRTCSession to increase push notification arrival time on mobile clients for element-call ([#5398](https://github.com/matrix-org/matrix-js-sdk/pull/5398)). Contributed by @escix.
+* Add sticky events support to sliding sync (MSC4480) ([#5458](https://github.com/matrix-org/matrix-js-sdk/pull/5458)). Contributed by @eleboucher.
+* Validate that an error from OAuth token refresh looks like an OAuth error before treating as logout ([#5472](https://github.com/matrix-org/matrix-js-sdk/pull/5472)). Contributed by @hughns.
+
+## 🐛 Bug Fixes
+
+* Make setExtendedProfileProperty not throw if the requested property isn't set ([#5484](https://github.com/matrix-org/matrix-js-sdk/pull/5484)). Contributed by @dbkr.
+* make sure `setDefaultKeyId` resolves even if no change is made ([#5485](https://github.com/matrix-org/matrix-js-sdk/pull/5485)). Contributed by @uhoreg.
+
+
 Changes in [42.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.2.0) (2026-08-18)
 ==================================================================================================
 ## 🐛 Bug Fixes

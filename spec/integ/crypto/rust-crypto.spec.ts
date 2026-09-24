@@ -155,7 +155,7 @@ eXmIj7ZEOIsufPdiYuKDp/aUdgUHmuCGyegfoCJze36SdFX5q6z8Aq5nKPtz+FM=
 -----END CERTIFICATE-----
 `;
 
-    it("should pass on the caCertsPem if supplied", async () => {
+    it("should pass on the caCertsPem and sign function if supplied", async () => {
         // Given a Matrix client
         const matrixClient = createClient({
             baseUrl: "http://test.server",
@@ -165,8 +165,18 @@ eXmIj7ZEOIsufPdiYuKDp/aUdgUHmuCGyegfoCJze36SdFX5q6z8Aq5nKPtz+FM=
 
         const initFromStore = vi.spyOn(OlmMachine, "initFromStore");
 
+        const x509Signer = async (item: Uint8Array) => {
+            return {
+                signature_bytes: item,
+                certificate_chain: "MYCHAIN",
+                signature_scheme: "RsaPssSha512" as const,
+            };
+        };
+
+        const x509Validity = () => 12000.3;
+
         // When we init Rust crypto and pass a PEM for the CA certs
-        await matrixClient.initRustCrypto({ caCertsPem: CA_PEM });
+        await matrixClient.initRustCrypto({ caCertsPem: CA_PEM, x509Signer, x509Validity });
 
         // Then that PEM was passed in to the Olm machine
         expect(initFromStore).toHaveBeenCalledWith(
@@ -175,6 +185,8 @@ eXmIj7ZEOIsufPdiYuKDp/aUdgUHmuCGyegfoCJze36SdFX5q6z8Aq5nKPtz+FM=
             expect.anything(),
             expect.anything(),
             CA_PEM,
+            x509Signer,
+            x509Validity,
         );
     });
 
