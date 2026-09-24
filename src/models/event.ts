@@ -436,17 +436,17 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // of space if we don't intern it.
         (["state_key", "type", "sender", "room_id", "membership"] as const).forEach((prop) => {
             if (typeof event[prop] !== "string") return;
-            event[prop] = internaliseString(event[prop]!);
+            event[prop] = internaliseString(event[prop]);
         });
 
         (["membership", "avatar_url", "displayname"] as const).forEach((prop) => {
             if (typeof event.content?.[prop] !== "string") return;
-            event.content[prop] = internaliseString(event.content[prop]!);
+            event.content[prop] = internaliseString(event.content[prop]);
         });
 
         (["rel_type"] as const).forEach((prop) => {
             if (typeof event.content?.["m.relates_to"]?.[prop] !== "string") return;
-            event.content["m.relates_to"][prop] = internaliseString(event.content["m.relates_to"][prop]!);
+            event.content["m.relates_to"][prop] = internaliseString(event.content["m.relates_to"][prop]);
         });
 
         this.txnId = event.txn_id;
@@ -827,7 +827,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
         // if this is a state event, pack cleartext type and statekey
         if (this.isState()) {
-            this.event.state_key = `${this.clearEvent!.type}:${this.clearEvent!.state_key}`;
+            this.event.state_key = `${this.clearEvent.type}:${this.clearEvent.state_key}`;
         }
     }
 
@@ -948,7 +948,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
                 this.setClearData(res);
                 this._decryptionFailureReason = null;
             } catch (e) {
-                const detailedError = e instanceof DecryptionError ? (<DecryptionError>e).detailedString : String(e);
+                const detailedError = e instanceof DecryptionError ? e.detailedString : String(e);
 
                 err = e as Error;
 
@@ -981,7 +981,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
 
                 this.setClearDataForDecryptionFailure(String(e));
                 this._decryptionFailureReason =
-                    e instanceof DecryptionError ? (<DecryptionError>e).code : DecryptionFailureCode.UNKNOWN_ERROR;
+                    e instanceof DecryptionError ? e.code : DecryptionFailureCode.UNKNOWN_ERROR;
             }
 
             // Make sure we clear 'decryptionPromise' before sending the 'Event.decrypted' event,
@@ -1254,10 +1254,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             this.clearEvent = undefined;
         }
 
-        const keeps =
-            this.getType() in REDACT_KEEP_CONTENT_MAP
-                ? REDACT_KEEP_CONTENT_MAP[this.getType() as keyof typeof REDACT_KEEP_CONTENT_MAP]
-                : {};
+        const keeps = this.getType() in REDACT_KEEP_CONTENT_MAP ? REDACT_KEEP_CONTENT_MAP[this.getType()] : {};
         const content = this.getContent();
         for (const key in content) {
             if (content.hasOwnProperty(key) && !keeps[key]) {

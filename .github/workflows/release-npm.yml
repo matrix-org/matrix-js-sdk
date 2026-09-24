@@ -14,7 +14,7 @@ permissions: {}
 jobs:
     npm:
         name: Publish to npm
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             contents: read
             id-token: write
@@ -27,23 +27,44 @@ jobs:
                   ref: staging
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - name: 🔧 pnpm cache
-              uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  cache: "pnpm"
-                  registry-url: "https://registry.npmjs.org"
-                  node-version-file: ${{ inputs.dir }}/package.json
-
-            - name: 🔨 Install dependencies
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - name: 🚀 Publish to npm
               id: npm-publish
               working-directory: ${{ inputs.dir }}
               run: |
-                  pnpm publish --provenance --access public --publish-branch staging --tag "$TAG"
-                  release=$(jq -r '"\(.name)@\(.version)"' package.json)
+                  version=$(jq -r '.version' package.json)
+                  if [[ "$version" == *-rc.* ]]; then
+                      tag=next
+                  else
+                      tag=latest
+                  fi
+
+                  pnpm publish --provenance --access public --publish-branch staging --tag "$tag"
+
+                  name=$(jq -r '.name' package.json)
+                  release="$name@$version"
+
+                  # NPM now scans published packages before they are made available for download
+                  # block here until the package is ready to be consumed.
+                  echo "Waiting for $release to become available for download..."
+                  tmpdir=$(mktemp -d)
+                  for i in $(seq 1 60); do
+                      if (cd "$tmpdir" && npm pack "$release" >/dev/null 2>&1); then
+                          echo "$release is available"
+                          break
+                      fi
+                      if [[ "$i" -eq 60 ]]; then
+                          echo "::error::Timed out waiting for $release to become available on npm"
+                          exit 1
+                      fi
+                      sleep 10
+                  done
+                  rm -rf "$tmpdir"
+
                   echo "id=$release" >> $GITHUB_OUTPUT
-              env:
-                  TAG: ${{ contains(steps.npm-publish.outputs.id, '-rc.') && 'next' || 'latest' }}

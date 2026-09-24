@@ -90,15 +90,15 @@ describe("RemoteIndexedDBStoreBackend", () => {
 
         it("calls the worker factory only once across multiple connect() calls", async () => {
             const factory = vi.fn().mockReturnValue({
-                postMessage: mockPostMessage,
-                terminate: mockTerminate,
+                postMessage: mockPostMessage as Worker["postMessage"],
+                terminate: mockTerminate as Worker["terminate"],
                 get onmessage() {
                     return workerMessageHandler ?? null;
                 },
                 set onmessage(fn: ((ev: MessageEvent) => void) | null) {
                     workerMessageHandler = fn ?? undefined;
                 },
-            } as unknown as Worker);
+            } satisfies Partial<Worker>);
             backend = new RemoteIndexedDBStoreBackend(factory, "test-db");
 
             await backend.connect();

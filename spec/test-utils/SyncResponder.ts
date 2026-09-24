@@ -19,6 +19,8 @@ import { type Debugger } from "debug";
 import fetchMock from "@fetch-mock/vitest";
 import { type RouteResponse } from "fetch-mock";
 
+import { type E2EKeyReceiver } from "./E2EKeyReceiver";
+
 /** Interface implemented by classes that intercept `/sync` requests from test clients
  *
  * Common interface implemented by {@link TestClient} and {@link SyncResponder}
@@ -72,8 +74,17 @@ export class SyncResponder implements ISyncResponder {
      * client and have overlapping /sync requests.
      *
      * @param homeserverUrl - the Homeserver Url of the client under test.
+     * @param opts - optional settings:
+     *   * `e2eKeyReceiver`: the {@link E2EKeyReceiver} which is intercepting the client's `/keys/upload` requests.
+     *     If supplied, responses which do not specify `device_one_time_keys_count` have it filled in with the number
+     *     of one-time keys uploaded so far, as a real homeserver would. (Per the spec, an absent
+     *     `device_one_time_keys_count` means that there are *zero* one-time keys on the server, which would cause the
+     *     client to upload a new batch after every sync.)
      */
-    public constructor(homeserverUrl: string) {
+    public constructor(
+        homeserverUrl: string,
+        private readonly opts: { e2eKeyReceiver?: E2EKeyReceiver } = {},
+    ) {
         this.debug = debugFunc(`sync-responder:[${homeserverUrl}]`);
         fetchMock.get("begin:" + new URL("/_matrix/client/v3/sync?", homeserverUrl).toString(), (callLog) =>
             this.onSyncRequest(),
@@ -81,31 +92,42 @@ export class SyncResponder implements ISyncResponder {
     }
 
     private async onSyncRequest(): Promise<RouteResponse> {
+        let response: object;
         switch (this.state) {
             case SyncResponderState.IDLE: {
                 this.debug("Got /sync request: waiting for response to be ready");
-                const res = await new Promise<object>((resolve) => {
+                response = await new Promise<object>((resolve) => {
                     this.onResponseReceived = resolve;
                     this.state = SyncResponderState.WAITING_FOR_RESPONSE;
                 });
                 this.debug("Responding to /sync");
                 this.state = SyncResponderState.IDLE;
                 this.onResponseReceived = null;
-                return res;
+                break;
             }
 
             case SyncResponderState.WAITING_FOR_REQUEST: {
                 this.debug("Got /sync request: responding immediately with queued response");
-                const res = this.pendingResponse!;
+                response = this.pendingResponse!;
                 this.state = SyncResponderState.IDLE;
                 this.pendingResponse = null;
-                return res;
+                break;
             }
 
             default:
                 // we must already be in WAITING_FOR_RESPONSE, ie we already have a /sync request in progress
                 throw new Error(`Got unexpected /sync request in state ${this.state}`);
         }
+
+        // Fill in `device_one_time_keys_count` from the E2EKeyReceiver, if we have one and the response does not
+        // already specify it. This is evaluated when the response is served, so it reflects the keys uploaded so far.
+        if (this.opts.e2eKeyReceiver && !("device_one_time_keys_count" in response)) {
+            return {
+                ...response,
+                device_one_time_keys_count: { signed_curve25519: this.opts.e2eKeyReceiver.getOneTimeKeyCount() },
+            };
+        }
+        return response;
     }
 
     /** Next time we see a sync request (or immediately, if there is one waiting), send the given response

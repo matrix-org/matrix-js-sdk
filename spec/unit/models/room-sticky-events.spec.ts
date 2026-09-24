@@ -2,6 +2,7 @@ import { type Mock } from "vitest";
 
 import { type IStickyEvent, MatrixEvent } from "../../../src";
 import { RoomStickyEventsStore, RoomStickyEventsEvent } from "../../../src/models/room-sticky-events";
+import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
 
 describe("RoomStickyEvents", () => {
     let stickyEvents: RoomStickyEventsStore;
@@ -259,6 +260,64 @@ describe("RoomStickyEvents", () => {
             stickyEvents.addStickyEvents([ev]);
             vi.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
+        });
+    });
+
+    describe("encrypted events", () => {
+        /**
+         * Builds a sticky event that is still encrypted, i.e. whose type and sticky key aren't readable yet.
+         */
+        function makeEncryptedStickyEvent(): MatrixEvent {
+            return new MatrixEvent({
+                event_id: "$encrypted",
+                room_id: "!roomId",
+                type: "m.room.encrypted",
+                content: { ciphertext: "secrets" },
+                msc4354_sticky: { duration_ms: 15000 },
+                sender: "@alice:example.org",
+                origin_server_ts: Date.now(),
+                unsigned: {},
+            });
+        }
+
+        function cryptoDecryptingTo(type: string, content: object): CryptoBackend {
+            return {
+                decryptEvent: vi.fn().mockResolvedValue({ clearEvent: { type, content } }),
+            } as unknown as CryptoBackend;
+        }
+
+        it("should index an encrypted event only once it is decrypted", async () => {
+            const event = makeEncryptedStickyEvent();
+            stickyEvents.addStickyEvents([event]);
+
+            // Indexing it now would file it under `m.room.encrypted` with no sticky key.
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+            expect(emitSpy).not.toHaveBeenCalled();
+
+            await event.attemptDecryption(cryptoDecryptingTo("org.example.any_type", { msc4354_sticky_key: "foobar" }));
+
+            expect(stickyEvents.getKeyedStickyEvent("@alice:example.org", "org.example.any_type", "foobar")).toBe(
+                event,
+            );
+            expect(emitSpy).toHaveBeenCalledWith([event], [], []);
+        });
+
+        it("should keep waiting when decryption fails", async () => {
+            const event = makeEncryptedStickyEvent();
+            stickyEvents.addStickyEvents([event]);
+
+            const failing = {
+                decryptEvent: vi.fn().mockRejectedValue(new Error("no keys")),
+            } as unknown as CryptoBackend;
+            await event.attemptDecryption(failing);
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+
+            // The keys arrive later and the event is decrypted after all.
+            await event.attemptDecryption(
+                cryptoDecryptingTo("org.example.any_type", { msc4354_sticky_key: "foobar" }),
+                { isRetry: true },
+            );
+            expect([...stickyEvents.getStickyEvents()]).toEqual([event]);
         });
     });
 

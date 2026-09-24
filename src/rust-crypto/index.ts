@@ -30,12 +30,11 @@ import {
 import { type CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
- * Create a new `RustCrypto` implementation
+ * The arguments used to initialise RustCrypto, passed in to initRustCrypto.
  *
- * @param args - Parameter object
  * @internal
  */
-export async function initRustCrypto(args: {
+export interface InitRustCryptoArgs {
     /** A `Logger` instance that will be used for debug output. */
     logger: Logger;
 
@@ -96,7 +95,42 @@ export async function initRustCrypto(args: {
      * Whether to enable support for encrypting state events.
      */
     enableEncryptedStateEvents?: boolean;
-}): Promise<RustCrypto> {
+
+    /**
+     * Optional PEM-formatted string that provides CA certificates. These will
+     * be used to check X.509 signatures on user identities. Any user identity
+     * that has a valid signature according to the supplied CAs will be
+     * considered verified, without any manual verification taking place.
+     */
+    caCertsPem?: string;
+
+    /**
+     * Optional async function for signing some data with an X.509 certificate.
+     * Used to sign the user's identity so compatible clients will recognise
+     * this user as verified without manual verification taking place. If you
+     * supply this you must also supply {@link InitRustCryptoArgs#x509Validity}.
+     */
+    x509Signer?: (item: Uint8Array) => Promise<{
+        signature_bytes: Uint8Array;
+        certificate_chain: string;
+        signature_scheme: "RsaPssSha512";
+    }>;
+
+    /**
+     * Optional function returning the validity period of the X.509 certificate
+     * used for signing, as the number of milliseconds since the Unix epoch. If
+     * you supply this you must also supply {@link InitRustCryptoArgs#x509Signer}.
+     */
+    x509Validity?: () => number;
+}
+
+/**
+ * Create a new `RustCrypto` implementation
+ *
+ * @param args - InitRustCryptoArgs
+ * @internal
+ */
+export async function initRustCrypto(args: InitRustCryptoArgs): Promise<RustCrypto> {
     const { logger } = args;
 
     // initialise the rust matrix-sdk-crypto-wasm, if it hasn't already been done
@@ -124,17 +158,7 @@ export async function initRustCrypto(args: {
         });
     }
 
-    const rustCrypto = await initOlmMachine(
-        logger,
-        args.http,
-        args.userId,
-        args.deviceId,
-        args.secretStorage,
-        args.cryptoCallbacks,
-        storeHandle,
-        args.legacyCryptoStore,
-        args.enableEncryptedStateEvents,
-    );
+    const rustCrypto = await initOlmMachine(args, storeHandle);
 
     storeHandle.free();
 
@@ -143,15 +167,20 @@ export async function initRustCrypto(args: {
 }
 
 async function initOlmMachine(
-    logger: Logger,
-    http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    userId: string,
-    deviceId: string,
-    secretStorage: ServerSideSecretStorage,
-    cryptoCallbacks: CryptoCallbacks,
+    {
+        logger,
+        http,
+        userId,
+        deviceId,
+        secretStorage,
+        cryptoCallbacks,
+        legacyCryptoStore,
+        enableEncryptedStateEvents,
+        caCertsPem,
+        x509Signer,
+        x509Validity,
+    }: InitRustCryptoArgs,
     storeHandle: StoreHandle,
-    legacyCryptoStore?: CryptoStore,
-    enableEncryptedStateEvents?: boolean,
 ): Promise<RustCrypto> {
     logger.debug("Init OlmMachine");
 
@@ -160,6 +189,9 @@ async function initOlmMachine(
         new RustSdkCryptoJs.DeviceId(deviceId),
         storeHandle,
         logger,
+        caCertsPem,
+        x509Signer,
+        x509Validity,
     );
 
     // A final migration step, now that we have an OlmMachine.

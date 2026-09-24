@@ -82,6 +82,7 @@ async function setupClients(n: number, options = { setupNewCrossSigning: true })
         const userId = TEST_USER_IDS[i];
         const routePrefix = `${userId.split(":")[0].slice(1)}-`; // e.g. @alice:example.com -> alice-
         const homeserverUrl = `https://${routePrefix}server.com`; // e.g. @alice:example.com -> https://alice-homeserver.com
+        const keyReceiver = new E2EKeyReceiver(homeserverUrl, routePrefix);
 
         return {
             client: createClient({
@@ -93,10 +94,10 @@ async function setupClients(n: number, options = { setupNewCrossSigning: true })
             }),
             userId,
             homeserverUrl,
-            keyReceiver: new E2EKeyReceiver(homeserverUrl, routePrefix),
+            keyReceiver,
             keyResponder: new E2EKeyResponder(homeserverUrl),
             keyClaimResponder: new E2EOTKClaimResponder(homeserverUrl),
-            syncResponder: new SyncResponder(homeserverUrl),
+            syncResponder: new SyncResponder(homeserverUrl, { e2eKeyReceiver: keyReceiver }),
         };
     });
 
@@ -709,7 +710,7 @@ describe("History Sharing", () => {
                 sender: aliceClient.getSafeUserId(),
                 content: firstMessage,
                 event_id: "$event_id",
-            }) as any,
+            }),
         );
         bobSyncResponder.sendOrQueueSyncResponse(bobSyncResponse);
         await syncPromise(bobClient);
@@ -797,7 +798,7 @@ describe("History Sharing", () => {
                     sender: bobClient.getSafeUserId(),
                     content: bobEventM1Content,
                     event_id: "$event_id_m1",
-                }) as any,
+                }),
             );
             syncResponse.to_device = {
                 events: [
@@ -873,7 +874,7 @@ describe("History Sharing", () => {
                     sender: bobClient.getSafeUserId(),
                     content: bobEventM1Content,
                     event_id: "$event_id_m1",
-                }) as any,
+                }),
             );
             charlieSyncResponder.sendOrQueueSyncResponse(syncResponse);
             await syncPromise(charlieClient);
@@ -939,7 +940,7 @@ describe("History Sharing", () => {
                             type: EventType.RoomMember,
                             sender: charlieClient.getSafeUserId(),
                             state_key: charlieClient.getSafeUserId(),
-                        }) as any,
+                        }),
                     ],
                 };
             } else {
@@ -949,13 +950,13 @@ describe("History Sharing", () => {
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }) as any,
+                    }),
                     mkEventCustom({
                         content: { membership: config.leftState },
                         type: EventType.RoomMember,
                         sender: charlieClient.getSafeUserId(),
                         state_key: charlieClient.getSafeUserId(),
-                    }) as any,
+                    }),
                 );
             }
             // Bob syncs to learn about Charlie's leaving (and joining if non-gappy).

@@ -328,7 +328,7 @@ describe("NotificationService", function () {
 
     describe("group call started push rule", () => {
         beforeEach(() => {
-            matrixClient.pushRules!.global!.underride!.find((r) => r.rule_id === ".m.rule.fallback")!.enabled = false;
+            matrixClient.pushRules!.global.underride!.find((r) => r.rule_id === ".m.rule.fallback")!.enabled = false;
         });
 
         const getActionsForEvent = (prevContent: IContent, content: IContent): IActionsObject => {
@@ -499,7 +499,7 @@ describe("NotificationService", function () {
             { value: null, eventValue: [], expected: false },
             { value: null, eventValue: {}, expected: false },
         ])("test $value against $eventValue", ({ value, eventValue, expected }) => {
-            matrixClient.pushRules! = {
+            matrixClient.pushRules = {
                 global: {
                     override: [
                         {
@@ -568,7 +568,7 @@ describe("NotificationService", function () {
             { value: null, eventValue: null, expected: false },
             { value: null, eventValue: undefined, expected: false },
         ])("test $value against $eventValue", ({ value, eventValue, expected }) => {
-            matrixClient.pushRules! = {
+            matrixClient.pushRules = {
                 global: {
                     override: [
                         {

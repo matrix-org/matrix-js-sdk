@@ -17,19 +17,34 @@ limitations under the License.
 import { type Mock } from "vitest";
 
 import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
-import { MatrixRTCSession, MatrixRTCSessionEvent, MembershipManagerEvent, Status } from "../../../src/matrixrtc";
+import {
+    type CallMembership,
+    type JoinSessionConfig,
+    MatrixRTCSession,
+    MatrixRTCSessionEvent,
+    MembershipManagerEvent,
+    Status,
+} from "../../../src/matrixrtc";
 import {
     makeMockRoom,
     type MembershipData,
     mockRoomState,
     mockRTCEvent,
+    mockSlotEvent,
     owmMemberIdentity,
     rtcMembershipTemplate,
     sessionMembershipTemplate,
 } from "./mocks";
 import { RoomStickyEventsEvent, type StickyMatrixEvent } from "../../../src/models/room-sticky-events.ts";
+import { RoomStateEvent } from "../../../src/models/room-state.ts";
+import {
+    RTC_SLOT_ENCRYPTION_PER_MEMBER,
+    type RtcSlotEncryptionContent,
+    type RtcSlotEventContent,
+} from "../../../src/matrixrtc/types.ts";
 import { StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
 import { flushPromises } from "../../test-utils/flushPromises.ts";
+import { UnsupportedStickyEventsEndpointError } from "../../../src/errors.ts";
 import {
     computeRtcIdentityRaw,
     type RtcMembershipData,
@@ -282,7 +297,10 @@ describe("MatrixRTCSession", () => {
                     getState: vi.fn().mockReturnValue({
                         on: vi.fn(),
                         off: vi.fn(),
-                        getStateEvents: (_type: string, _stateKey: string) => [event],
+                        getStateEvents: (type: string, stateKey?: string) => {
+                            if (type !== EventType.GroupCallMemberPrefix) return stateKey === undefined ? [] : null;
+                            return stateKey === undefined ? [event] : null;
+                        },
                         events: new Map([
                             [
                                 EventType.GroupCallMemberPrefix,
@@ -318,7 +336,10 @@ describe("MatrixRTCSession", () => {
                     getState: vi.fn().mockReturnValue({
                         on: vi.fn(),
                         off: vi.fn(),
-                        getStateEvents: (_type: string, _stateKey: string) => [event],
+                        getStateEvents: (type: string, stateKey?: string) => {
+                            if (type !== EventType.GroupCallMemberPrefix) return stateKey === undefined ? [] : null;
+                            return stateKey === undefined ? [event] : null;
+                        },
                         events: new Map([
                             [
                                 EventType.GroupCallMemberPrefix,
@@ -422,6 +443,25 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
             expect(sess?.slotDescription.id).toEqual("ROOM");
+        });
+        it("ignores left sticky memberships", async () => {
+            const mockRoom = makeMockRoom([]);
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                // Left memberships only contain the slot ID and the sticky key.
+                const ev = mockRTCEvent(
+                    { user_id: "@left:user.example", slot_id: "m.call#ROOM", msc4354_sticky_key: "MEMBER" },
+                    mockRoom.roomId,
+                    5000,
+                );
+                return [ev as StickyMatrixEvent];
+            });
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toEqual([]);
         });
         it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
@@ -616,21 +656,32 @@ describe("MatrixRTCSession", () => {
     describe("joining", () => {
         let mockRoom: Room;
         let sendEventMock: Mock;
+        let sendStickyEventMock: Mock;
         let sendStateEventMock: Mock;
 
         let sentStateEvent: Promise<void>;
         beforeEach(async () => {
             sentStateEvent = new Promise((resolve) => {
-                sendStateEventMock = vi.fn(resolve);
+                // Has to return a promise with an event id: the membership manager awaits it, and
+                // shuts itself down with an unrecoverable error if the send does not resolve.
+                sendStateEventMock = vi.fn(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "$own-membership-event" });
+                });
             });
             sendEventMock = vi.fn().mockResolvedValue(undefined);
+            sendStickyEventMock = vi.fn().mockResolvedValue(undefined);
             client.sendStateEvent = sendStateEventMock;
             client.sendEvent = sendEventMock;
+            client._unstable_sendStickyEvent = sendStickyEventMock;
 
-            client._unstable_updateDelayedEvent = vi.fn();
-            client._unstable_cancelScheduledDelayedEvent = vi.fn();
-            client._unstable_restartScheduledDelayedEvent = vi.fn();
-            client._unstable_sendScheduledDelayedEvent = vi.fn();
+            // These all have to resolve: the membership manager chains off them, and treats a
+            // failure as unrecoverable, shutting down and no longer tracking our own membership.
+            client._unstable_sendDelayedStateEvent = vi.fn().mockResolvedValue({ delay_id: "$delay-id" });
+            client._unstable_updateDelayedEvent = vi.fn().mockResolvedValue(undefined);
+            client._unstable_cancelScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+            client._unstable_restartScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
+            client._unstable_sendScheduledDelayedEvent = vi.fn().mockResolvedValue(undefined);
 
             mockRoom = makeMockRoom([]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
@@ -645,6 +696,21 @@ describe("MatrixRTCSession", () => {
                 throw new Error(`Unexpected leave result: wanted ${wasJoined}, got ${left}`);
             }
         });
+
+        /**
+         * Joins the session as its first member, which makes it send a call notification.
+         * @returns The event ID of our own membership, which the notification references.
+         */
+        async function joinAsFirstMember(
+            joinConfig: JoinSessionConfig,
+            ownMembership: Partial<SessionMembershipData> = {},
+        ): Promise<string> {
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, joinConfig);
+            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
+            mockRoomState(mockRoom, [{ ...sessionMembershipTemplate, user_id: client.getUserId()!, ...ownMembership }]);
+            await sess!._onRTCSessionMemberUpdate();
+            return sess!.memberships[0].eventId;
+        }
 
         it("starts un-joined", () => {
             expect(sess!.isJoined()).toEqual(false);
@@ -661,10 +727,34 @@ describe("MatrixRTCSession", () => {
             expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
 
+        it("publishes application data in the membership, and updates it once joined", async () => {
+            await expect(sess!.updateApplicationData({ "org.example.key": 1 })).rejects.toThrow("Not connected yet");
+            // The manager needs a real response to stay alive for the update
+            const sent = new Promise<void>((resolve) =>
+                sendStateEventMock.mockImplementation(() => {
+                    resolve();
+                    return Promise.resolve({ event_id: "$membership" });
+                }),
+            );
+            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                applicationData: { "org.example.key": 1 },
+            });
+            await sent;
+            expect((sendStateEventMock.mock.calls[0][2] as Record<string, unknown>)["org.example.key"]).toBe(1);
+            mockRoomState(mockRoom, [
+                { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "org.example.key": 1 } as any,
+            ]);
+            await sess!._onRTCSessionMemberUpdate();
+            expect(sess!.memberships[0].applicationData["org.example.key"]).toBe(1);
+
+            await sess!.updateApplicationData({ "org.example.key": 2 });
+            expect(sendStateEventMock).toHaveBeenCalledTimes(2);
+            expect((sendStateEventMock.mock.calls[1][2] as Record<string, unknown>)["org.example.key"]).toBe(2);
+        });
+
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
-            // Simulate a join, including the update to the room state
-            // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            // Ensure the send returns an event ID so the DidSendCallNotification payload includes it
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -672,31 +762,37 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { notificationType: "ring" });
-            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
-            mockRoomState(mockRoom, [{ ...sessionMembershipTemplate, user_id: client.getUserId()! }]);
-            await sess!._onRTCSessionMemberUpdate();
-            const ownMembershipId = sess?.memberships[0].eventId;
+            const ownMembershipId = await joinAsFirstMember({ notificationType: "ring" });
 
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
-                "m.mentions": { user_ids: [], room: true },
-                "notification_type": "ring",
-                "m.relates_to": {
-                    event_id: ownMembershipId,
-                    rel_type: "m.reference",
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                {
+                    "slot_id": "m.call#ROOM",
+                    "msc4354_sticky_key": "m.call#ROOM",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": "ring",
+                    "m.relates_to": {
+                        event_id: ownMembershipId,
+                        rel_type: "m.reference",
+                    },
+                    "lifetime": 90000,
+                    "sender_ts": expect.any(Number),
                 },
-                "lifetime": 30000,
-                "sender_ts": expect.any(Number),
-            });
+            );
 
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
-                "lifetime": 30000,
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
+                "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
-                    event_id: expect.any(String),
+                    event_id: ownMembershipId,
                     rel_type: "m.reference",
                 },
                 "notification_type": "ring",
@@ -704,10 +800,80 @@ describe("MatrixRTCSession", () => {
             });
         });
 
+        it("falls back to a regular event when the server doesn't support sticky events", async () => {
+            sendStickyEventMock.mockRejectedValueOnce(
+                new UnsupportedStickyEventsEndpointError("nope", "sendStickyEvent"),
+            );
+            sendEventMock.mockResolvedValueOnce({ event_id: "regular-evt" });
+            const didSendNotification = new Promise((resolve) => {
+                sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
+            });
+
+            const ownMembershipId = await joinAsFirstMember({
+                notificationType: "ring",
+                notificationLifetimeMs: 30_000,
+            });
+            await didSendNotification;
+
+            const expectedContent = {
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
+                "m.mentions": { user_ids: [], room: true },
+                "notification_type": "ring",
+                "m.relates_to": {
+                    event_id: ownMembershipId,
+                    rel_type: "m.reference",
+                },
+                "lifetime": 30_000,
+                "sender_ts": expect.any(Number),
+            };
+            // The sticky duration exceeds the lifetime, to absorb clock skew between sender and server.
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                50_000,
+                null,
+                EventType.RTCNotification,
+                expectedContent,
+            );
+            expect(sendEventMock).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, expectedContent);
+        });
+
+        it("does not fall back when sending the sticky notification fails for another reason", async () => {
+            const error = new Error("network go boom");
+            sendStickyEventMock.mockRejectedValueOnce(error);
+            const errorLogSpy = vi.spyOn(console, "error");
+
+            await joinAsFirstMember({ notificationType: "ring" });
+            await flushPromises();
+
+            expect(sendEventMock).not.toHaveBeenCalled();
+            const loggedFailure = errorLogSpy.mock.calls.some(
+                (call) => call.includes("Failed to send call notification") && call.includes(error),
+            );
+            expect(loggedFailure).toBe(true);
+        });
+
+        it("logs an error when sending the notification fails", async () => {
+            const error = new Error("no notifications for you");
+            sendStickyEventMock.mockRejectedValueOnce(
+                new UnsupportedStickyEventsEndpointError("nope", "sendStickyEvent"),
+            );
+            sendEventMock.mockRejectedValueOnce(error);
+            const errorLogSpy = vi.spyOn(console, "error");
+
+            await joinAsFirstMember({ notificationType: "ring" });
+            await flushPromises();
+
+            const loggedFailure = errorLogSpy.mock.calls.some(
+                (call) => call.includes("Failed to send call notification") && call.includes(error),
+            );
+            expect(loggedFailure).toBe(true);
+        });
+
         it("sends a notification with a intent when starting a call and emits DidSendCallNotification", async () => {
             // Simulate a join, including the update to the room state
             // Ensure sendEvent returns event IDs so the DidSendCallNotification payload includes them
-            sendEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
             const didSendEventFn = vi.fn();
             sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, didSendEventFn);
             // Create an additional listener to create a promise that resolves after the emission.
@@ -715,42 +881,40 @@ describe("MatrixRTCSession", () => {
                 sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
             });
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
-                notificationType: "ring",
-                callIntent: "audio",
-            });
-            await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
-
-            mockRoomState(mockRoom, [
-                {
-                    ...sessionMembershipTemplate,
-                    "user_id": client.getUserId()!,
-                    // This is what triggers the intent type on the notification event.
-                    "m.call.intent": "audio",
-                },
-            ]);
-
-            await sess!._onRTCSessionMemberUpdate();
-            const ownMembershipEventId = sess?.memberships[0].eventId;
+            const ownMembershipEventId = await joinAsFirstMember(
+                { notificationType: "ring", callIntent: "audio" },
+                // This is what triggers the intent type on the notification event.
+                { "m.call.intent": "audio" },
+            );
             expect(sess!.getConsensusCallIntent()).toEqual("audio");
 
-            expect(client.sendEvent).toHaveBeenCalledWith(mockRoom!.roomId, EventType.RTCNotification, {
-                "m.mentions": { user_ids: [], room: true },
-                "notification_type": "ring",
-                "m.call.intent": "audio",
-                "m.relates_to": {
-                    event_id: ownMembershipEventId,
-                    rel_type: "m.reference",
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                {
+                    "slot_id": "m.call#ROOM",
+                    "msc4354_sticky_key": "m.call#ROOM",
+                    "m.mentions": { user_ids: [], room: true },
+                    "notification_type": "ring",
+                    "m.call.intent": "audio",
+                    "m.relates_to": {
+                        event_id: ownMembershipEventId,
+                        rel_type: "m.reference",
+                    },
+                    "lifetime": 90000,
+                    "sender_ts": expect.any(Number),
                 },
-                "lifetime": 30000,
-                "sender_ts": expect.any(Number),
-            });
+            );
 
             await didSendNotification;
             // And ensure we emitted the DidSendCallNotification event with both payloads
             expect(didSendEventFn).toHaveBeenCalledWith({
                 "event_id": "new-evt",
-                "lifetime": 30000,
+                "slot_id": "m.call#ROOM",
+                "msc4354_sticky_key": "m.call#ROOM",
+                "lifetime": 90000,
                 "m.mentions": { room: true, user_ids: [] },
                 "m.relates_to": {
                     event_id: expect.any(String),
@@ -824,6 +988,72 @@ describe("MatrixRTCSession", () => {
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
 
+        it("does not let an older recalculation overwrite a newer one", async () => {
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:example.org", device_id: "BBBBBBB" };
+            const mockRoom = makeMockRoom([sessionMembershipTemplate, bob]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(2);
+            const onMembershipsChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+            // Two membership state events land in one sync batch, so two updates are requested
+            // back to back before either recalculation has run: Bob leaves, then Alice leaves.
+            // Both requests have to be served by a recalculation that sees the final state,
+            // otherwise members who have since left linger until the next state change.
+            // `_onRTCSessionMemberUpdate` is the entry point that used to bypass the coalescing,
+            // so it is what this test drives; the session manager now calls the public method.
+            mockRoomState(mockRoom, [sessionMembershipTemplate]);
+            const first = sess._onRTCSessionMemberUpdate();
+            mockRoomState(mockRoom, []);
+            const second = sess._onRTCSessionMemberUpdate();
+            await Promise.all([first, second]);
+
+            expect(sess.memberships).toHaveLength(0);
+            // And the session emitted once, rather than also emitting a list still containing
+            // members who had left.
+            expect(onMembershipsChanged).toHaveBeenCalledTimes(1);
+            const [oldMemberships, newMemberships] = onMembershipsChanged.mock.calls[0];
+            expect(oldMemberships).toHaveLength(2);
+            expect(newMemberships).toEqual([]);
+        });
+
+        it("serializes a recalculation requested while one is already running", async () => {
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:example.org", device_id: "BBBBBBB" };
+            const mockRoom = makeMockRoom([sessionMembershipTemplate, bob]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(2);
+            const onMembershipsChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
+
+            // Same as above, but the second update is requested once the first recalculation has
+            // started, so it cannot be coalesced into it and has to be chained after it instead.
+            // Both recalculations are stalled so that the newer one is ready to finish first: if
+            // they ran in parallel, the older one would land last and reinstate Bob.
+            const aliceOnly = sess.memberships.slice(0, 1);
+            const bobLeft = Promise.withResolvers<CallMembership[]>();
+            const aliceLeft = Promise.withResolvers<CallMembership[]>();
+            const membershipsForSlot = vi
+                .spyOn(MatrixRTCSession, "sessionMembershipsForSlot")
+                .mockReturnValueOnce(bobLeft.promise)
+                .mockReturnValueOnce(aliceLeft.promise);
+            try {
+                const first = sess._onRTCSessionMemberUpdate();
+                await flushPromises(); // the first recalculation is now started and stalled
+                const second = sess._onRTCSessionMemberUpdate();
+                aliceLeft.resolve([]);
+                await flushPromises();
+                bobLeft.resolve(aliceOnly);
+                await Promise.all([first, second]);
+            } finally {
+                membershipsForSlot.mockRestore();
+            }
+
+            expect(sess.memberships).toHaveLength(0);
+            expect(onMembershipsChanged).toHaveBeenLastCalledWith(expect.anything(), []);
+        });
+
         // TODO: re-enable this test when expiry is implemented
         it.skip("emits an event at the time a membership event expires", () => {
             vi.useFakeTimers();
@@ -880,32 +1110,459 @@ describe("MatrixRTCSession", () => {
 
             await sess.leaveRoomSession();
         });
+
+        it("reports and emits when the key rotation participant limit is reached", async () => {
+            client.encryptAndSendToDevice = vi.fn().mockResolvedValue(undefined);
+            const ownMembership = {
+                ...sessionMembershipTemplate,
+                user_id: client.getUserId()!,
+                device_id: client.getDeviceId()!,
+            };
+            const bob = { ...sessionMembershipTemplate, user_id: "@bob:user.example", device_id: "BBBBBB" };
+            const carl = { ...sessionMembershipTemplate, user_id: "@carl:user.example", device_id: "CCCCCC" };
+
+            const mockRoom = makeMockRoom([ownMembership, bob]);
+            const sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, {
+                manageMediaKeys: true,
+                keyRotationParticipantLimit: 3,
+            });
+            await flushPromises();
+
+            const onKeyRotationSuppressedChanged = vi.fn();
+            sess.on(MatrixRTCSessionEvent.KeyRotationSuppressedChanged, onKeyRotationSuppressedChanged);
+
+            expect(sess.isKeyRotationSuppressed).toBe(false);
+
+            // A third participant takes us to the limit
+            mockRoomState(mockRoom, [ownMembership, bob, carl]);
+            await sess._onRTCSessionMemberUpdate();
+
+            expect(sess.isKeyRotationSuppressed).toBe(true);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenCalledExactlyOnceWith(true);
+
+            // Back below the limit
+            mockRoomState(mockRoom, [ownMembership, bob]);
+            await sess._onRTCSessionMemberUpdate();
+
+            expect(sess.isKeyRotationSuppressed).toBe(false);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenLastCalledWith(false);
+            expect(onKeyRotationSuppressedChanged).toHaveBeenCalledTimes(2);
+
+            await sess.leaveRoomSession();
+        });
     });
 
     describe("read status", () => {
         it("returns the correct probablyLeft status", () => {
             const mockRoom = makeMockRoom([sessionMembershipTemplate]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            expect(sess!.probablyLeft).toBe(undefined);
+            expect(sess.probablyLeft).toBe(undefined);
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-            expect(sess!.probablyLeft).toBe(false);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess.probablyLeft).toBe(false);
 
             // Simulate the membership manager believing the user has left
             const accessPrivateFieldsSession = sess as unknown as {
                 membershipManager: { state: { probablyLeft: boolean } };
             };
             accessPrivateFieldsSession.membershipManager.state.probablyLeft = true;
-            expect(sess!.probablyLeft).toBe(true);
+            expect(sess.probablyLeft).toBe(true);
         });
 
         it("returns membershipStatus once joinRTCSession got called", () => {
             const mockRoom = makeMockRoom([rtcMembershipTemplate]);
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            expect(sess!.membershipStatus).toBe(undefined);
+            expect(sess.membershipStatus).toBe(undefined);
 
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
-            expect(sess!.membershipStatus).toBe(Status.Connecting);
+            sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus, { manageMediaKeys: true });
+            expect(sess.membershipStatus).toBe(Status.Connecting);
+        });
+    });
+    describe("slots", () => {
+        const openSlotContent: RtcSlotEventContent = { status: "open", application: { type: "m.call" } };
+        const closedSlotContent: RtcSlotEventContent = { status: "closed" };
+        const closedSlotContentWithApplication: RtcSlotEventContent = {
+            status: "closed",
+            application: { type: "m.call" },
+        };
+
+        it("getRtcSlot/isSlotClosed/isSlotOpen return undefined when no slot event is set for a room", async () => {
+            const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+
+            expect(sess.getRtcSlot()).toBeUndefined();
+            expect(sess.isSlotClosed()).toBeUndefined();
+            expect(sess.isSlotOpen()).toBeUndefined();
+        });
+
+        it("getRtcSlot returns the raw content and isSlotClosed is false when the slot is open", () => {
+            const mockRoom = makeMockRoom([], false);
+            const slotEvent = mockSlotEvent(callSession, openSlotContent, mockRoom.roomId);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            expect(sess.getRtcSlot()).toEqual(openSlotContent);
+            expect(sess.isSlotClosed()).toBe(false);
+            expect(sess.isSlotOpen()).toBe(true);
+        });
+
+        it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed", () => {
+            const mockRoom = makeMockRoom([], false);
+            const slotEvent = mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            expect(sess.getRtcSlot()).toEqual(closedSlotContent);
+            expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
+        });
+
+        it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed but application has been kept around", () => {
+            const mockRoom = makeMockRoom([], false);
+            const slotEvent = mockSlotEvent(callSession, closedSlotContentWithApplication, mockRoom.roomId);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            expect(sess.getRtcSlot()).toEqual(closedSlotContentWithApplication);
+            expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
+        });
+
+        it("isSlotClosed is true when status is missing (malformed content)", () => {
+            const mockRoom = makeMockRoom([], false);
+            const slotEvent = mockSlotEvent(callSession, {}, mockRoom.roomId);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
+        });
+
+        it("isSlotClosed is true when application.type does not match", () => {
+            const mockRoom = makeMockRoom([], false);
+            const mismatchedContent: RtcSlotEventContent = {
+                status: "open",
+                application: { type: "m.not_call" },
+            };
+            const slotEvent = mockSlotEvent(callSession, mismatchedContent, mockRoom.roomId);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
+        });
+
+        it("isSlotClosed is true when application is missing", () => {
+            const mockRoom = makeMockRoom([], false);
+            const slotEvent = mockSlotEvent(callSession, { status: "open" }, mockRoom.roomId);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            expect(sess.isSlotClosed()).toBe(true);
+            expect(sess.isSlotOpen()).toBe(false);
+        });
+
+        it("ignores sticky RTC memberships once the slot has been closed", async () => {
+            const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
+            const slotEvent = mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+
+            expect(sess.memberships).toHaveLength(0);
+        });
+
+        it("slots do not affect legacy state membership", async () => {
+            const mockRoom = makeMockRoom([], false);
+
+            // Closed slot
+            const slotEvent = mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId);
+            mockRoomState(mockRoom, [sessionMembershipTemplate], slotEvent);
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+
+            // Should see members in legacy mode even if slot is closed
+            expect(sess.memberships).toHaveLength(1);
+        });
+
+        it("ignores sticky RTC memberships when closed even if application has been kept around", async () => {
+            const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
+            const slotEvent = mockSlotEvent(callSession, closedSlotContentWithApplication, mockRoom.roomId);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+
+            expect(sess.memberships).toHaveLength(0);
+        });
+
+        it("keeps sticky RTC memberships while the slot is open", async () => {
+            const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
+            const slotEvent = mockSlotEvent(callSession, openSlotContent, mockRoom.roomId);
+            mockRoomState(mockRoom, [], slotEvent);
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+
+            expect(sess.memberships).toHaveLength(1);
+        });
+
+        it("recalculates memberships when the slot is closed via a room state update", async () => {
+            const mockRoom = makeMockRoom([rtcMembershipTemplate], true);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(1);
+
+            const slotEvent = mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId);
+            mockRoomState(mockRoom, [], slotEvent);
+            const membershipRecalculated = new Promise((r) => sess?.once(MatrixRTCSessionEvent.MembershipsChanged, r));
+            mockRoom.emit(RoomStateEvent.Events, slotEvent, {} as any, null);
+            await membershipRecalculated;
+
+            expect(sess.memberships).toHaveLength(0);
+            expect(sess.isSlotClosed()).toBe(true);
+        });
+
+        describe("ensureRtcSlotOpen", () => {
+            const perMemberEncryption: RtcSlotEncryptionContent = { type: RTC_SLOT_ENCRYPTION_PER_MEMBER };
+            let mockRoom: Room;
+
+            beforeEach(() => {
+                client.sendStateEvent = vi.fn().mockResolvedValue({ event_id: "success" });
+                mockRoom = makeMockRoom([], false);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            });
+
+            it("creates the slot from the slot description when no slot event exists", async () => {
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" } },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("declares the given encryption when creating the slot", async () => {
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" }, encryption: perMemberEncryption },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("reopens a closed slot, rewriting application from the slot description", async () => {
+                const existingContent: RtcSlotEventContent = {
+                    status: "closed",
+                    application: { type: "m.call", foo: "bar" },
+                };
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, existingContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" } },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("adds encryption when reopening a closed slot that had none", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(callSession, closedSlotContentWithApplication, mockRoom.roomId),
+                );
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" }, encryption: perMemberEncryption },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("removes encryption when reopening a closed slot without it", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...closedSlotContentWithApplication, encryption: perMemberEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen();
+
+                const sentContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as RtcSlotEventContent;
+                expect(sentContent.status).toBe("open");
+                expect(sentContent.encryption).toBeUndefined();
+            });
+
+            it("replaces already-declared encryption when reopening a closed slot", async () => {
+                const existingEncryption: RtcSlotEncryptionContent = { ...perMemberEncryption, extra: "old" };
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...closedSlotContentWithApplication, encryption: existingEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    expect.objectContaining({ encryption: perMemberEncryption }),
+                    "m.call#ROOM",
+                );
+            });
+
+            it("does nothing when the slot is already open with matching application and no encryption", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, openSlotContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("does nothing when the slot is already open with matching application and encryption", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...openSlotContent, encryption: perMemberEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("rewrites an open slot whose application differs from the slot description", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { status: "open", application: { type: "m.call", foo: "bar" } },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { status: "open", application: { type: "m.call" } },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("rewrites an open slot to add encryption", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, openSlotContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotOpen({ encryption: perMemberEncryption });
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { ...openSlotContent, encryption: perMemberEncryption },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("rewrites an open slot to remove encryption", async () => {
+                mockRoomState(
+                    mockRoom,
+                    [],
+                    mockSlotEvent(
+                        callSession,
+                        { ...openSlotContent, encryption: perMemberEncryption },
+                        mockRoom.roomId,
+                    ),
+                );
+
+                await sess!.ensureRtcSlotOpen();
+
+                const sentContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as RtcSlotEventContent;
+                expect(sentContent.status).toBe("open");
+                expect(sentContent.encryption).toBeUndefined();
+            });
+
+            it("propagates errors from sending the state event", async () => {
+                client.sendStateEvent = vi.fn().mockRejectedValue(new Error("M_FORBIDDEN"));
+
+                await expect(sess!.ensureRtcSlotOpen()).rejects.toThrow("M_FORBIDDEN");
+            });
+        });
+
+        describe("ensureRtcSlotClosed", () => {
+            let mockRoom: Room;
+
+            beforeEach(() => {
+                client.sendStateEvent = vi.fn().mockResolvedValue({ event_id: "success" });
+                mockRoom = makeMockRoom([], false);
+                sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            });
+
+            it("closes an open slot preserving its other content", async () => {
+                const existingContent: RtcSlotEventContent = {
+                    status: "open",
+                    application: { type: "m.call" },
+                    encryption: { type: RTC_SLOT_ENCRYPTION_PER_MEMBER },
+                };
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, existingContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotClosed();
+
+                expect(client.sendStateEvent).toHaveBeenCalledWith(
+                    mockRoom.roomId,
+                    EventType.RTCSlot,
+                    { ...existingContent, status: "closed" },
+                    "m.call#ROOM",
+                );
+            });
+
+            it("does nothing when no slot event exists", async () => {
+                await sess!.ensureRtcSlotClosed();
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("does nothing when the slot is already closed", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, closedSlotContent, mockRoom.roomId));
+
+                await sess!.ensureRtcSlotClosed();
+
+                expect(client.sendStateEvent).not.toHaveBeenCalled();
+            });
+
+            it("propagates errors from sending the state event", async () => {
+                mockRoomState(mockRoom, [], mockSlotEvent(callSession, openSlotContent, mockRoom.roomId));
+                client.sendStateEvent = vi.fn().mockRejectedValue(new Error("M_FORBIDDEN"));
+
+                await expect(sess!.ensureRtcSlotClosed()).rejects.toThrow("M_FORBIDDEN");
+            });
         });
     });
     it("ensureRecalculateSessionMembers still runs after a rejected promise (React Native / Hermes regression)", async () => {
@@ -942,7 +1599,7 @@ describe("MatrixRTCSession", () => {
         const probablyLeftChanged = vi.fn();
         sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
 
-        sess!.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
+        sess.joinRTCSession(owmMemberIdentity, [mockFocus], mockFocus);
 
         const membershipManager = sess["membershipManager"]!;
         membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");

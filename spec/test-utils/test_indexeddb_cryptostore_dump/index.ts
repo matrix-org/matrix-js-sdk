@@ -127,6 +127,7 @@ async function importData(db: IDBDatabase, dumpPath: string) {
                         `Error populating '${storeName}' with key ${JSON.stringify(key)}, value ${JSON.stringify(
                             value,
                         )}: ${e}`,
+                        { cause: e },
                     );
                 }
             }

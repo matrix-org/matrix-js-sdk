@@ -16,20 +16,23 @@ limitations under the License.
 
 import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
+/** Return type of `SecretsBundle.to_json` */
+type SecretsBundleJson = {
+    cross_signing: {
+        master_key: string;
+        self_signing_key: string;
+        user_signing_key: string;
+    };
+    backup?: {
+        algorithm: string;
+        key: string;
+        backup_version: string;
+    };
+};
+
 declare module "@matrix-org/matrix-sdk-crypto-wasm" {
     interface SecretsBundle {
-        to_json(): Promise<{
-            cross_signing: {
-                master_key: string;
-                self_signing_key: string;
-                user_signing_key: string;
-            };
-            backup?: {
-                algorithm: string;
-                key: string;
-                backup_version: string;
-            };
-        }>;
+        to_json(): Promise<SecretsBundleJson>;
     }
 
     interface Device {

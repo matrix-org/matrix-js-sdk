@@ -11,7 +11,7 @@ concurrency: release-drafter-action
 permissions: {}
 jobs:
     draft:
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             contents: write
         steps:
@@ -22,14 +22,12 @@ jobs:
                   fetch-depth: 0
                   persist-credentials: false
 
-            - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
-            - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+            - name: 🔨 Setup pnpm & node
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
-                  node-version-file: package.json
-                  cache: "pnpm"
-
-            - name: Install Deps
-              run: "pnpm install --frozen-lockfile"
+                  runtime: node
+                  cache: true
+                  install: true
 
             - uses: t3chguy/release-drafter@105e541c2c3d857f032bd522c0764694758fabad
               id: draft-release

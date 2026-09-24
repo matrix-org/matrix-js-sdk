@@ -23,7 +23,7 @@ limitations under the License.
  * for HTTP and WS at some point.
  */
 
-import type { SyncCryptoCallbacks } from "./common-crypto/CryptoBackend.ts";
+import type { SyncCryptoCallbacks, SyncCryptoChanges } from "./common-crypto/CryptoBackend.ts";
 import { type SyncUserProfile, User } from "./models/user.ts";
 import { NotificationCountType, Room, RoomEvent } from "./models/room.ts";
 import { deepCopy, noUnsafeEventProps, unsafeProp } from "./utils.ts";
@@ -1119,7 +1119,8 @@ export class SyncApi {
 
         // handle presence events (User objects)
         if (Array.isArray(data.presence?.events)) {
-            data.presence!.events.filter(noUnsafeEventProps)
+            data.presence.events
+                .filter(noUnsafeEventProps)
                 .map(client.getEventMapper())
                 .forEach(function (presenceEvent) {
                     let user = client.store.getUser(presenceEvent.getSender()!);
@@ -1138,7 +1139,7 @@ export class SyncApi {
         if (Array.isArray(data.account_data?.events)) {
             const events = data.account_data.events.filter(noUnsafeEventProps).map(client.getEventMapper());
             const prevEventsMap = events.reduce<Record<string, MatrixEvent | undefined>>((m, c) => {
-                m[c.getType()!] = client.store.getAccountData(c.getType());
+                m[c.getType()] = client.store.getAccountData(c.getType());
                 return m;
             }, {});
             client.store.storeAccountDataEvents(events);
@@ -1151,7 +1152,7 @@ export class SyncApi {
                     const rules = accountDataEvent.getContent<IPushRules>();
                     client.setPushRules(rules);
                 }
-                const prevEvent = prevEventsMap[accountDataEvent.getType()!];
+                const prevEvent = prevEventsMap[accountDataEvent.getType()];
                 client.emit(ClientEvent.AccountData, accountDataEvent, prevEvent);
                 return accountDataEvent;
             });
@@ -1184,24 +1185,29 @@ export class SyncApi {
             }
         }
 
-        // handle to-device events
-        if (data.to_device && Array.isArray(data.to_device.events) && data.to_device.events.length > 0) {
-            const toDeviceMessages: IToDeviceEvent[] = data.to_device.events.filter(noUnsafeEventProps);
+        // Handle to-device events, device list changes, one-time key counts and unused fallback keys.
+        //
+        // These are passed to the crypto layer together, in a single call: see the documentation of
+        // `SyncCryptoCallbacks.processSyncChanges` for why they must not be split up. This has to happen before we
+        // process the room events, so that any room keys received in to-device messages can be used to decrypt them.
+        const toDeviceEvents: IToDeviceEvent[] = Array.isArray(data.to_device?.events) ? data.to_device.events : [];
 
-            let receivedToDeviceMessages: ReceivedToDeviceMessage[];
-            if (this.syncOpts.cryptoCallbacks) {
-                receivedToDeviceMessages =
-                    await this.syncOpts.cryptoCallbacks.preprocessToDeviceMessages(toDeviceMessages);
-            } else {
-                // Crypto is not enabled, so we just return the events.
-                receivedToDeviceMessages = toDeviceMessages.map((rawEvent) => ({
-                    message: rawEvent,
-                    encryptionInfo: null,
-                }));
-            }
+        // A cached sync (see `syncFromCache`) carries no E2EE data at all, so we skip the crypto layer for it: an
+        // absent `device_one_time_keys_count` would otherwise be taken to mean that there are no one-time keys on the
+        // server, triggering a spurious key upload on every restart.
+        if (!syncEventData.fromCache) {
+            await processSyncCryptoChanges(client, this.syncOpts.cryptoCallbacks, {
+                toDeviceEvents,
+                deviceLists: data.device_lists,
+                // Per the spec, an absent `device_one_time_keys_count` means there are no one-time keys on the server.
+                oneTimeKeysCounts: data.device_one_time_keys_count ?? {},
+                unusedFallbackKeys:
+                    data.device_unused_fallback_key_types ??
+                    data["org.matrix.msc2732.device_unused_fallback_key_types"],
+            });
+        }
 
-            processToDeviceMessages(receivedToDeviceMessages, client);
-        } else {
+        if (toDeviceEvents.length === 0) {
             // no more to-device events: we can stop polling with a short timeout.
             this.catchingUp = false;
         }
@@ -1480,7 +1486,15 @@ export class SyncApi {
                 // this fires a couple of times for some events. (eg state events are in the timeline and the state)
                 // should this get a sync section as an additional event emission param (e, syncSection))?
                 stateEvents.forEach(emitEvent);
-                timelineEvents.forEach(emitEvent);
+                stateAfterEvents.forEach(emitEvent);
+                // have to filter out all state events from the timeline when MSC4222 is enabled, in this case:
+                // all state events are emitted by "state_after"
+                // all state events in the timeline are either duplicates or are outdated and should be ignored
+                const filteredTimelineEvents =
+                    "org.matrix.msc4222.state_after" in joinObj
+                        ? timelineEvents.filter((timelineEvent) => !timelineEvent.isState())
+                        : timelineEvents;
+                filteredTimelineEvents.forEach(emitEvent);
                 ephemeralEvents.forEach(emitEvent);
                 accountDataEvents.forEach(emitEvent);
                 stickyEvents
@@ -1566,23 +1580,6 @@ export class SyncApi {
                 client.getNotifTimelineSet()?.addLiveEvent(event, { addToState: true });
             });
         }
-
-        // Handle device list updates
-        if (data.device_lists) {
-            if (this.syncOpts.cryptoCallbacks) {
-                await this.syncOpts.cryptoCallbacks.processDeviceLists(data.device_lists);
-            } else {
-                // FIXME if we *don't* have a crypto module, we still need to
-                // invalidate the device lists. But that would require a
-                // substantial bit of rework :/.
-            }
-        }
-
-        // Handle one_time_keys_count and unused fallback keys
-        await this.syncOpts.cryptoCallbacks?.processKeyCounts(
-            data.device_one_time_keys_count,
-            data.device_unused_fallback_key_types ?? data["org.matrix.msc2732.device_unused_fallback_key_types"],
-        );
     }
 
     /**
@@ -1998,6 +1995,41 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
     });
 
     return room;
+}
+
+/**
+ * Pass the encryption-relevant parts of a sync response to the crypto layer, and dispatch the resulting to-device
+ * messages on the client.
+ *
+ * `changes.toDeviceEvents` is first filtered with {@link noUnsafeEventProps}. If crypto is not enabled, the to-device
+ * messages are dispatched as received.
+ */
+export async function processSyncCryptoChanges(
+    client: MatrixClient,
+    cryptoCallbacks: SyncCryptoCallbacks | undefined,
+    changes: SyncCryptoChanges,
+): Promise<void> {
+    const toDeviceEvents = changes.toDeviceEvents.filter(noUnsafeEventProps);
+
+    let receivedToDeviceMessages: ReceivedToDeviceMessage[];
+    if (cryptoCallbacks) {
+        try {
+            receivedToDeviceMessages = await cryptoCallbacks.processSyncChanges({ ...changes, toDeviceEvents });
+        } catch (e) {
+            // Don't let a failure in the crypto layer stop the rest of the sync response from being processed: the
+            // sync token has already been advanced, so the room data would otherwise be lost.
+            logger.error("Error passing sync changes to the crypto layer", e);
+            return;
+        }
+    } else {
+        // Crypto is not enabled, so we just return the events.
+        //
+        // FIXME if we *don't* have a crypto module, we still need to invalidate the device lists. But that would
+        // require a substantial bit of rework :/.
+        receivedToDeviceMessages = toDeviceEvents.map((message) => ({ message, encryptionInfo: null }));
+    }
+
+    processToDeviceMessages(receivedToDeviceMessages, client);
 }
 
 /**

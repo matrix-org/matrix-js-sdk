@@ -671,11 +671,12 @@ function makeRequestLoop(
     ): Promise<any> {
         const resp = (await customHandler?.(request)) ?? defaultHandler(request);
         if (!(request instanceof RustSdkCryptoJs.UploadSigningKeysRequest) && request.id) {
-            await ourOlmMachine.markRequestAsSent(request.id!, request.type, JSON.stringify(resp));
+            await ourOlmMachine.markRequestAsSent(request.id, request.type, JSON.stringify(resp));
         }
     }
 
     async function runLoop() {
+        // oxlint-disable-next-line no-unmodified-loop-condition
         while (!stopRequestLoop) {
             const requests = await ourOlmMachine.outgoingRequests();
             for (const request of requests) {

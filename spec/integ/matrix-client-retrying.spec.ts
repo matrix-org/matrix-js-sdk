@@ -33,7 +33,7 @@ describe("MatrixClient retrying", function () {
         const httpBackend = testClient.httpBackend;
         const client = testClient.client;
         const room = new Room(roomId, client, userId);
-        client!.store.storeRoom(room);
+        client.store.storeRoom(room);
 
         return [client, httpBackend, room];
     };

@@ -17,7 +17,6 @@ limitations under the License.
 import { type IMinimalEvent } from "./sync-accumulator.ts";
 import { EventType } from "./@types/event.ts";
 import { isSupportedReceiptType, MapWithDefault, recursiveMapToObject } from "./utils.ts";
-import { type IContent } from "./models/event.ts";
 import { type ReceiptContent, type ReceiptType } from "./@types/read_receipts.ts";
 
 interface AccumulatedReceipt {
@@ -38,50 +37,57 @@ interface AccumulatedReceipt {
  * the most recently received receipt in each thread.
  */
 export class ReceiptAccumulator {
-    /** user_id -\> most-recently-received unthreaded receipt */
-    private unthreadedReadReceipts: Map<string, AccumulatedReceipt> = new Map();
-
-    /** thread_id -\> user_id -\> most-recently-received receipt for this thread */
-    private threadedReadReceipts: MapWithDefault<string, Map<string, AccumulatedReceipt>> = new MapWithDefault(
+    /** user_id -\> receipt_type -\> most-recently-received unthreaded receipt */
+    private unthreadedReadReceipts: MapWithDefault<string, Map<ReceiptType, AccumulatedReceipt>> = new MapWithDefault(
         () => new Map(),
     );
 
+    /** thread_id -\> user_id -\> receipt_type -\> most-recently-received receipt for this thread */
+    private threadedReadReceipts: MapWithDefault<string, MapWithDefault<string, Map<ReceiptType, AccumulatedReceipt>>> =
+        new MapWithDefault(() => new MapWithDefault(() => new Map()));
+
     /**
      * Provide an unthreaded receipt for this user. Overwrites any other
-     * unthreaded receipt we have for this user.
+     * unthreaded receipt of this type we have for this user.
      */
     private setUnthreaded(userId: string, receipt: AccumulatedReceipt): void {
-        this.unthreadedReadReceipts.set(userId, receipt);
+        this.unthreadedReadReceipts.getOrCreate(userId).set(receipt.type, receipt);
     }
 
     /**
      * Provide a receipt for this user in this thread. Overwrites any other
-     * receipt we have for this user in this thread.
+     * receipt of this type we have for this user in this thread.
      */
     private setThreaded(threadId: string, userId: string, receipt: AccumulatedReceipt): void {
-        this.threadedReadReceipts.getOrCreate(threadId).set(userId, receipt);
+        this.threadedReadReceipts.getOrCreate(threadId).getOrCreate(userId).set(receipt.type, receipt);
     }
 
     /**
-     * @returns an iterator of pairs of [userId, AccumulatedReceipt] - all the
-     *          most recently-received unthreaded receipts for each user.
-     * @yields pairs of [userId, AccumulatedReceipt]
+     * @yields pairs of [userId, AccumulatedReceipt] for every receipt type.
      */
-    private allUnthreaded(): IterableIterator<[string, AccumulatedReceipt]> {
-        return this.unthreadedReadReceipts.entries();
+    private *allForUsers(
+        receiptsByUser: ReadonlyMap<string, ReadonlyMap<ReceiptType, AccumulatedReceipt>>,
+    ): IterableIterator<[string, AccumulatedReceipt]> {
+        for (const [userId, receiptsForUser] of receiptsByUser) {
+            for (const receipt of receiptsForUser.values()) {
+                yield [userId, receipt];
+            }
+        }
     }
 
     /**
-     * @returns an iterator of pairs of [userId, AccumulatedReceipt] - all the
-     *          most recently-received threaded receipts for each user, in all
-     *          threads.
-     * @yields pairs of [userId, AccumulatedReceipt]
+     * @yields all unthreaded receipts of each type for each user.
+     */
+    private *allUnthreaded(): IterableIterator<[string, AccumulatedReceipt]> {
+        yield* this.allForUsers(this.unthreadedReadReceipts);
+    }
+
+    /**
+     * @yields all threaded receipts of each type for each user, in all threads.
      */
     private *allThreaded(): IterableIterator<[string, AccumulatedReceipt]> {
         for (const receiptsForThread of this.threadedReadReceipts.values()) {
-            for (const e of receiptsForThread.entries()) {
-                yield e;
-            }
+            yield* this.allForUsers(receiptsForThread);
         }
     }
 
@@ -102,11 +108,8 @@ export class ReceiptAccumulator {
             // but they are keyed in the event as:
             //   content:{ $event_id: { $receipt_type: { $user_id: {json} }}}
             // so store them in the former so we can accumulate receipt deltas
-            // quickly and efficiently (we expect a lot of them). Fold the
-            // receipt type into the key name since we only have 1 at the
-            // moment (m.read) and nested JSON objects are slower and more
-            // of a hassle to work with. We'll inflate this back out when
-            // getJSON() is called.
+            // quickly and efficiently (we expect a lot of them). We'll inflate
+            // this back out when getJSON() is called.
             Object.keys(e.content).forEach((eventId) => {
                 Object.entries<ReceiptContent>(e.content[eventId]).forEach(([key, value]) => {
                     if (!isSupportedReceiptType(key)) return;
@@ -162,7 +165,7 @@ export class ReceiptAccumulator {
             room_id: roomId,
             content: {
                 // $event_id: { "m.read": { $user_id: $json } }
-            } as IContent,
+            },
         };
 
         const receiptEventContent: MapWithDefault<

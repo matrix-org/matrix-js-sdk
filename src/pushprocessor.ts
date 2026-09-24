@@ -294,7 +294,7 @@ export class PushProcessor {
         // These lines are mostly to make the tests happy. We shouldn't run into these
         // properties missing in practice.
         if (!newRules) newRules = {} as IPushRules;
-        if (!newRules.global) newRules.global = {} as PushRuleSet;
+        if (!newRules.global) newRules.global = {};
         if (!newRules.global.override) newRules.global.override = [];
         if (!newRules.global.underride) newRules.global.underride = [];
 
@@ -349,7 +349,7 @@ export class PushProcessor {
         // These lines are mostly to make the tests happy. We shouldn't run into these
         // properties missing in practice.
         if (!newRules) newRules = {} as IPushRules;
-        if (!newRules.global) newRules.global = {} as PushRuleSet;
+        if (!newRules.global) newRules.global = {};
         if (!newRules.global.override) newRules.global.override = [];
         if (!newRules.global.room) newRules.global.room = [];
         if (!newRules.global.sender) newRules.global.sender = [];
@@ -846,7 +846,7 @@ export class PushProcessor {
             for (const kind of RULEKINDS_IN_ORDER) {
                 if (this.client.pushRules[scope][kind] === undefined) continue;
 
-                for (const rule of this.client.pushRules[scope][kind]!) {
+                for (const rule of this.client.pushRules[scope][kind]) {
                     if (rule.rule_id === ruleId) return { rule, kind };
                 }
             }
