@@ -56,7 +56,7 @@
     ],
     "dependencies": {
         "@babel/runtime": "^8.0.0",
-        "@matrix-org/matrix-sdk-crypto-wasm": "matrix-org/matrix-sdk-crypto-wasm#poljar/hpke",
+        "@matrix-org/matrix-sdk-crypto-wasm": "matrix-org/matrix-sdk-crypto-wasm#e64b393e562ae4dee00624c5cbacf8834040bba0",
         "another-json": "^0.2.0",
         "bs58": "^6.0.0",
         "content-type": "^3.0.0",
