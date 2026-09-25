@@ -1183,6 +1183,30 @@ describe("MembershipManager", () => {
             );
             expect(client.sendStateEvent).not.toHaveBeenCalled();
         });
+        it("does not carry network error retries over to a new membership after re-joining", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager(
+                { delayedLeaveEventRestartMs: 1000, networkErrorRetryMs: 1000, maximumNetworkErrorRetryCount: 6 },
+                room,
+                client,
+                callSession,
+            );
+            manager.join([focus], focusActive, onError);
+            await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
+            client._unstable_restartScheduledDelayedEvent = vi.fn((_) => Promise.reject(new HTTPError("unknown", 501)));
+            await vi.advanceTimersByTimeAsync(3000);
+            expect(onError).not.toHaveBeenCalled();
+            const rejoined = waitForMockCall(client.sendStateEvent);
+            await manager.onRTCSessionMemberUpdate([]);
+            await rejoined;
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            // The new membership gets the full retry budget rather than the remainder left over from the previous
+            // one (which would give up after ~4s here).
+            await vi.advanceTimersByTimeAsync(5000);
+            expect(onError).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(2000);
+            expect(onError).toHaveBeenCalled();
+        });
         it("does not give up when delayed event restarts keep hitting the local timeout", async () => {
             const onError = vi.fn();
             const manager = new MembershipManager({ maximumNetworkErrorRetryCount: 3 }, room, client, callSession);
