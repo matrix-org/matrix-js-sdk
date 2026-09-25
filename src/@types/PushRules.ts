@@ -155,6 +155,8 @@ export enum RuleId {
     PollStartOneToOneUnstable = ".org.matrix.msc3930.rule.poll_start_one_to_one",
     PollEndOneToOne = ".m.rule.poll_end_one_to_one",
     PollEndOneToOneUnstable = ".org.matrix.msc3930.rule.poll_end_one_to_one",
+    RtcInviteForMe = ".org.matrix.msc4075.rule.rtc.invite_for_me",
+    RtcInviteForRoom = ".org.matrix.msc4075.rule.rtc.invite_for_room",
 }
 
 export type PushRuleSet = {

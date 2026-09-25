@@ -599,6 +599,74 @@ describe("Room", function () {
             await room.addLiveEvents([remoteEvent], { addToState: false });
             expect(room.timeline.length).toEqual(1);
         });
+
+        it("should not wait for missing relation parents while restoring cached events", async () => {
+            room.client.supportsThreads = () => true;
+            const parent = mkMessage();
+            const reaction = utils.mkReaction(parent, room.client, userA, roomId);
+            const recentMessage = mkMessage();
+            const fetchParent = vi.spyOn(room.client, "fetchRoomEvent").mockImplementation(() => new Promise(() => {}));
+
+            const replayPromise = room.addLiveEvents([reaction, recentMessage], {
+                addToState: false,
+                fromCache: true,
+            });
+            await flushPromises();
+
+            expect(room.timeline).toContain(recentMessage);
+            expect(room.relations.getAllChildEventsForEvent(parent.getId()!)).toEqual([reaction]);
+            expect(fetchParent).not.toHaveBeenCalled();
+            await replayPromise;
+        });
+
+        it.each(["room", "thread"] as const)(
+            "should attach cached orphan relations when their parent arrives in a %s timeline",
+            async (surface) => {
+                room.client.supportsThreads = () => true;
+                const threadRoot = mkMessage();
+                const parent =
+                    surface === "thread" ? mkThreadResponse(threadRoot) : mkMessage({ msg: "Original message" });
+                const reaction = utils.mkReaction(parent, room.client, userA, roomId);
+                const edit = mkEdit(parent);
+                const fetchParent = vi.spyOn(room.client, "fetchRoomEvent").mockResolvedValue(parent.event);
+
+                await room.addLiveEvents([reaction, edit], { addToState: false, fromCache: true });
+                if (surface === "thread") {
+                    const thread = room.createThread(threadRoot.getId()!, threadRoot, [], false);
+                    room.addEventsToTimeline([parent], true, false, thread.liveTimeline);
+                    expect(thread.liveTimeline.getEvents()).toContain(parent);
+                } else {
+                    await room.addLiveEvents([parent], { addToState: false });
+                }
+
+                await vi.waitFor(() => expect(parent.replacingEvent()).toBe(edit));
+                expect(
+                    room.relations
+                        .getChildEventsForEvent(parent.getId()!, RelationType.Annotation, EventType.Reaction)
+                        ?.getRelations(),
+                ).toEqual([reaction]);
+                expect(fetchParent).not.toHaveBeenCalled();
+            },
+        );
+
+        it("should fetch missing relation parents for new live events", async () => {
+            room.client.supportsThreads = () => true;
+            const warn = vi.mocked(logger.warn);
+            warn.mockImplementation(() => {});
+            const parent = mkMessage();
+            const reaction = utils.mkReaction(parent, room.client, userA, roomId);
+            const fetchParent = vi.spyOn(room.client, "fetchRoomEvent").mockResolvedValue(parent.event);
+
+            try {
+                await room.addLiveEvents([reaction], { addToState: false, fromCache: false });
+            } finally {
+                warn.mockRestore();
+            }
+
+            expect(fetchParent).toHaveBeenCalledOnce();
+            expect(fetchParent).toHaveBeenCalledWith(roomId, parent.getId());
+            expect(room.relations.getAllChildEventsForEvent(parent.getId()!)).toEqual([reaction]);
+        });
     });
 
     describe("addEphemeralEvents", () => {
