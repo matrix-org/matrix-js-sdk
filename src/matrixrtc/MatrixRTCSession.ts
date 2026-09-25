@@ -26,7 +26,7 @@ import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
-import { logDurationSync } from "../utils.ts";
+import { deepCompare, logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
@@ -36,7 +36,11 @@ import type {
     Transport,
     SlotDescription,
     RtcSlotEventContent,
+    RtcSlotEncryptionContent,
 } from "./types.ts";
+import { RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS } from "./types.ts";
+import { isLeftMembershipContent } from "./membershipData/index.ts";
+import { UnsupportedStickyEventsEndpointError } from "../errors.ts";
 import {
     MembershipManagerEvent,
     type MembershipManagerEventHandlerMap,
@@ -47,7 +51,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { computeSlotId } from "./utils.ts";
+import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -99,6 +103,15 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
+
+    /**
+     * Application-specific data to publish in our membership alongside the
+     * application `type` and `m.call.intent`: in the `application` object of
+     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
+     * one. Keys should be namespaced. Read back through
+     * {@link CallMembership.applicationData}.
+     */
+    applicationData?: Record<string, unknown>;
 
     /**
      * How long (in milliseconds) the callee's client should keep ringing/waiting for an
@@ -355,6 +368,65 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public isSlotClosed(): boolean | undefined {
         return isSlotClosed(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Whether this session's slot is open.
+     *
+     * @returns `true` if the slot is open, `false` if the slot is closed or `undefined`
+     * if no slot exists.
+     */
+    public isSlotOpen(): boolean | undefined {
+        return isSlotOpen(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Ensures this session's slot is open, sending a slot state event to open (or create) it if needed.
+     *
+     * The event's `application` is set from this session's slot description and its `encryption` from
+     * `opts.encryption`, replacing whatever an existing slot event declares. Other content is preserved.
+     * No-op if the slot is already open with matching `application` and `encryption`.
+     *
+     * @param opts.encryption - The encryption to declare on the slot, or `undefined` for none.
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotOpen(opts: { encryption?: RtcSlotEncryptionContent } = {}): Promise<void> {
+        const application = { type: this.slotDescription.application };
+        const existingContent = this.getRtcSlot();
+        if (
+            existingContent?.status === "open" &&
+            deepCompare(existingContent.application, application) &&
+            deepCompare(existingContent.encryption, opts.encryption)
+        ) {
+            return;
+        }
+        await this.sendRtcSlot({
+            ...existingContent,
+            status: "open",
+            application,
+            encryption: opts.encryption,
+        });
+    }
+
+    /**
+     * Ensures this session's slot is closed, sending a slot state event to close it if needed.
+     * The other content of the existing slot event is preserved. No-op if no slot event exists.
+     *
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotClosed(): Promise<void> {
+        const existingContent = this.getRtcSlot();
+        if (!existingContent || existingContent.status === "closed") return;
+        await this.sendRtcSlot({ ...existingContent, status: "closed" });
+    }
+
+    private async sendRtcSlot(content: RtcSlotEventContent): Promise<void> {
+        await this.client.sendStateEvent(
+            this.roomSubset.roomId,
+            EventType.RTCSlot,
+            content,
+            computeSlotId(this.slotDescription),
+        );
     }
 
     /**
@@ -672,6 +744,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Replace the application-specific data in our membership (see
+     * {@link SessionConfig.applicationData}), re-sending it if it changed.
+     */
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateApplicationData(applicationData);
+    }
+
+    /**
      * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
      * the keys.
      */
@@ -726,11 +810,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         callIntent?: RTCCallIntent,
     ): void {
         const lifetime = this.joinConfig?.notificationLifetimeMs ?? 90_000;
+        const slotId = computeSlotId(this.slotDescription);
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
         }> => {
             const content: IRTCNotificationContent = {
+                "slot_id": slotId,
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": notificationType,
                 "m.relates_to": {
@@ -739,12 +825,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 },
                 "sender_ts": Date.now(),
                 "lifetime": lifetime,
+                "msc4354_sticky_key": slotId,
             };
             if (callIntent) {
                 content["m.call.intent"] = callIntent;
             }
-            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);
-            return { response, content };
+            return { response: await this.sendNotificationEvent(content), content };
         };
 
         void sendNotificationEvent()
@@ -753,9 +839,30 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 const newResult = { ...notification.response, ...notification.content };
                 this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult);
             })
-            .catch(([errorLegacy, errorNew]) =>
-                this.logger.error("Failed to send call notification", errorLegacy, errorNew),
+            .catch((error) => this.logger.error("Failed to send call notification", error));
+    }
+
+    /**
+     * Sends a notification event, as a sticky event (MSC4354) where the server supports it.
+     */
+    private async sendNotificationEvent(content: IRTCNotificationContent): Promise<ISendEventResponse> {
+        const roomId = this.roomSubset.roomId;
+        try {
+            // Stay sticky slightly longer than the lifetime, since the server measures the sticky duration
+            // from `origin_server_ts` while receivers measure the lifetime from `sender_ts`.
+            const stickyDurationMs = content.lifetime + RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS;
+            return await this.client._unstable_sendStickyEvent(
+                roomId,
+                stickyDurationMs,
+                null,
+                EventType.RTCNotification,
+                content,
             );
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending notification as a regular event");
+            return await this.client.sendEvent(roomId, EventType.RTCNotification, content);
+        }
     }
 
     /**
@@ -793,13 +900,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
     /**
      * Call this when something changed that may impacts the current MatrixRTC members in this session.
+     *
+     * @deprecated use {@link ensureRecalculateSessionMembers} instead.
      */
-    // We allow this name schema since this function should only be used for testing purposes.
     public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.recalculateSessionMembers();
+        await this.ensureRecalculateSessionMembers();
     };
 
-    // helper variables to make sure we do not have parallel running recalculations.
+    // Recalculations are chained onto this promise, so they never run in parallel.
     private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
 
     /**
@@ -807,7 +915,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Also ensures that only one recalculation is made at a time.
      * @returns A promise resolving when the state has been recalculated.
      */
-    private ensureRecalculateSessionMembers(): Promise<void> {
+    public ensureRecalculateSessionMembers(): Promise<void> {
         if (this.membershipNeedsRecalculation) {
             // We have already requested recalcuation, don't attempt a new one.
             return this.recalculateSessionMembersPromise;
@@ -902,7 +1010,7 @@ async function computeBackendIdentityAndVerifyMemberEvents(
         const content = memberEvent.getContent();
 
         // Quick filter to avoid unneeded processing of invalid events or left events.
-        if (!quickFilterNonRelevantContents(content, logger)) {
+        if (!quickFilterNonRelevantContents(content)) {
             continue;
         }
 
@@ -920,11 +1028,12 @@ async function computeBackendIdentityAndVerifyMemberEvents(
     return callMemberships;
 }
 
-function quickFilterNonRelevantContents(content: IContent, logger: Logger): boolean {
+function quickFilterNonRelevantContents(content: IContent): boolean {
+    // Don't even bother about left memberships (saves us from costly type/"key in" checks in bigger rooms)
+    if (isLeftMembershipContent(content)) return false;
+
     // Ignore sticky keys for the count
     const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
-    // Don't even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-    if (eventKeysCount === 0) return false;
 
     // We first decide if it's a MSC4143 event (per device state key)
     if (eventKeysCount > 1 && "application" in content) {
@@ -964,42 +1073,6 @@ function isValidMembership(
     }
 
     return true;
-}
-
-/**
- * Reads the slot state event's content for the given slot description.
- *
- * @returns The slot event's content, or `undefined` if no slot event exists for the given description.
- */
-function getSlotEventContent(
-    room: Pick<Room, "getLiveTimeline">,
-    slotDescription: SlotDescription,
-): RtcSlotEventContent | undefined {
-    const slotId = computeSlotId(slotDescription);
-    const slotEvent = room
-        .getLiveTimeline()
-        .getState(EventTimeline.FORWARDS)
-        ?.getStateEvents(EventType.RTCSlot, slotId);
-    if (!slotEvent) return undefined;
-
-    return slotEvent.getContent<RtcSlotEventContent>();
-}
-
-/**
- * Whether the given slot is closed.
- *
- * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
- * if no slot exists.
- */
-function isSlotClosed(room: Pick<Room, "getLiveTimeline">, slotDescription: SlotDescription): boolean | undefined {
-    const content = getSlotEventContent(room, slotDescription) as Partial<RtcSlotEventContent> | undefined;
-    if (content === undefined) return undefined;
-
-    return (
-        content.status !== "open" ||
-        typeof content.application !== "object" ||
-        content.application?.type !== slotDescription.application
-    );
 }
 
 /**

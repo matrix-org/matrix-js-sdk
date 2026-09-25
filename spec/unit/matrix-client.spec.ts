@@ -19,7 +19,7 @@ limitations under the License.
  */
 
 import fetchMock from "@fetch-mock/vitest";
-import { type MockedObject, type Mocked } from "vitest";
+import { type MockedObject, type Mocked, type MockInstance } from "vitest";
 
 import { logger } from "../../src/logger";
 import {
@@ -46,6 +46,7 @@ import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 import { makeBeaconInfoContent } from "../../src/content-helpers";
 import { M_BEACON_INFO } from "../../src/@types/beacon";
 import {
@@ -89,7 +90,12 @@ import { makeDelegatedAuthMetadata } from "../test-utils/auth.ts";
 import { type CryptoBackend } from "../../src/common-crypto/CryptoBackend";
 import { SyncResponder } from "../test-utils/SyncResponder.ts";
 import { mockInitialApiRequests } from "../test-utils/mockEndpoints.ts";
-import { type Transport } from "../../src/matrixrtc/index.ts";
+import {
+    type LivekitDelegateDelayedLeaveRequest,
+    type LivekitGetTokenRequest,
+    type LivekitGetTokenResponse,
+    type Transport,
+} from "../../src/matrixrtc/index.ts";
 import { type IStore } from "../../src/store/index.ts";
 
 vi.useFakeTimers();
@@ -643,6 +649,81 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("sendRtcDecline", () => {
+        const roomId = "!room:example.org";
+        const notificationEventId = "$notification:example.org";
+        const expectedContent = {
+            "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
+            "msc4354_sticky_key": notificationEventId,
+        };
+
+        const txnId = "txn";
+        const path = `/rooms/${encodeURIComponent(roomId)}/send/${EventType.RTCDecline}/${txnId}`;
+
+        beforeEach(() => {
+            unstableFeatures["org.matrix.msc4354"] = true;
+            vi.spyOn(client, "makeTxnId").mockReturnValue(txnId);
+        });
+
+        it("sends the decline as a sticky event keyed on the notification", async () => {
+            const eventId = "$decline:example.org";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: eventId },
+                    expectBody: expectedContent,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 120000 },
+                },
+            ];
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).resolves.toEqual({ event_id: eventId });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("uses the given sticky duration", async () => {
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: "$decline:example.org" },
+                    expectBody: expectedContent,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 30000 },
+                },
+            ];
+
+            await client.sendRtcDecline(roomId, notificationEventId, 30_000);
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("falls back to a regular event when the server doesn't support sticky events", async () => {
+            unstableFeatures["org.matrix.msc4354"] = false;
+            const eventId = "$decline:example.org";
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path,
+                    data: { event_id: eventId },
+                    expectBody: expectedContent,
+                    // The event is sent without a sticky duration, i.e. as a regular event.
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": undefined },
+                },
+            ];
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).resolves.toEqual({ event_id: eventId });
+            expect(httpLookups.length).toEqual(0);
+        });
+
+        it("does not fall back when sending the sticky event fails for another reason", async () => {
+            const error = new Error("network go boom");
+            vi.spyOn(client, "_unstable_sendStickyEvent").mockRejectedValue(error);
+            const sendEvent = vi.spyOn(client, "sendEvent");
+
+            await expect(client.sendRtcDecline(roomId, notificationEventId)).rejects.toThrow(error);
+            expect(sendEvent).not.toHaveBeenCalled();
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
@@ -818,6 +899,7 @@ describe("MatrixClient", function () {
             ).rejects.toThrow(errorMessage);
 
             await expect(client._unstable_getDelayedEvents()).rejects.toThrow(errorMessage);
+            await expect(client._unstable_getDelayedEvent("anyDelayId")).rejects.toThrow(errorMessage);
 
             await expect(
                 client._unstable_updateDelayedEvent("anyDelayId", UpdateDelayedEventAction.Send),
@@ -1105,6 +1187,20 @@ describe("MatrixClient", function () {
                 ];
 
                 await client._unstable_getDelayedEvents(status, delayId);
+            });
+
+            // eslint-disable-next-line @vitest/expect-expect
+            it("can look up a single delayed event", async () => {
+                const delayId = "id";
+                httpLookups = [
+                    {
+                        method: "GET",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/delayed_events/${encodeURIComponent(delayId)}`,
+                    },
+                ];
+
+                await client._unstable_getDelayedEvent(delayId);
             });
         });
 
@@ -3852,20 +3948,40 @@ describe("MatrixClient", function () {
             await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
             expect(httpLookups.length).toEqual(0);
         });
+    });
 
-        it("should use unstable prefix", async () => {
-            const metadata = makeDelegatedAuthMetadata();
-            httpLookups = [
-                {
-                    method: "GET",
-                    path: `/auth_metadata`,
-                    data: metadata,
-                    prefix: "/_matrix/client/unstable/org.matrix.msc2965",
-                },
-            ];
+    describe("logout", () => {
+        const baseUrl = "https://logout-test.example.org";
+        const userId = "@alice:logout-test.example.org";
+        const accessToken = "test-access-token";
+        const refreshToken = "test-refresh-token";
 
-            await expect(client.getAuthMetadata()).resolves.toEqual(metadata);
-            expect(httpLookups.length).toEqual(0);
+        it("should call /logout for a non-OAuth2-native session", async () => {
+            fetchMock.postOnce(`${baseUrl}/_matrix/client/v3/logout`, {});
+
+            const client = createClient({ baseUrl, accessToken, userId });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(true);
+        });
+
+        it("should revoke tokens with the delegated auth server instead of calling /logout for an OAuth2-native session", async () => {
+            const authMetadata = makeDelegatedAuthMetadata("https://auth.logout-test.example.org/");
+            fetchMock.get(`${baseUrl}/_matrix/client/versions`, { versions: ["v1.15"] });
+            fetchMock.get(`${baseUrl}/_matrix/client/v1/auth_metadata`, authMetadata);
+            fetchMock.post(authMetadata.revocation_endpoint, 200);
+
+            const client = createClient({
+                baseUrl,
+                accessToken,
+                refreshToken,
+                userId,
+                oauthClientId: "test-client-id",
+            });
+            await expect(client.logout()).resolves.toEqual({});
+
+            expect(fetchMock.callHistory.called(`${baseUrl}/_matrix/client/v3/logout`)).toBe(false);
+            expect(fetchMock.callHistory.calls(authMetadata.revocation_endpoint)).toHaveLength(2);
         });
     });
 
@@ -3929,26 +4045,166 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("MSC4195 LiveKit endpoints", () => {
+        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
+
+        describe("_unstable_getLivekitToken", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "thejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("passes on the server name of a remote homeserver", async () => {
+                const body = {
+                    url: "wss://livekit.remote.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    server_name: "remote.example.com",
+                } satisfies LivekitGetTokenRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: { jwt: "theremotejwt" } satisfies LivekitGetTokenResponse,
+                    },
+                ];
+                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "theremotejwt" });
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/get_token",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
+                    },
+                ];
+                await expect(
+                    client._unstable_getLivekitToken({
+                        url: "wss://not-an-sfu.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+
+        describe("_unstable_delegateDelayedLeave", () => {
+            it("makes a well-formed request", async () => {
+                const body = {
+                    url: "wss://livekit.example.com",
+                    room_id: "!room:example.com",
+                    slot_id: "m.call#ROOM",
+                    member,
+                    delay_id: "1234567890",
+                } satisfies LivekitDelegateDelayedLeaveRequest;
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        expectBody: body,
+                        data: {},
+                    },
+                ];
+                expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+                expect(httpLookups.length).toEqual(0);
+            });
+
+            it("propagates errors from the homeserver", async () => {
+                httpLookups = [
+                    {
+                        method: "POST",
+                        path: "/rtc/livekit/delegate_delayed_leave",
+                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
+                    },
+                ];
+                await expect(
+                    client._unstable_delegateDelayedLeave({
+                        url: "wss://livekit.example.com",
+                        room_id: "!room:example.com",
+                        slot_id: "m.call#ROOM",
+                        member,
+                        delay_id: "1234567890",
+                    }),
+                ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
+                expect(httpLookups.length).toEqual(0);
+            });
+        });
+    });
+
     describe("Well-known", () => {
+        const A_WELLKNOWN: IClientWellKnown = {
+            "m.homeserver": {
+                base_url: "https://hs.org",
+            },
+            "m.identity_server": {
+                base_url: "https://is.org",
+            },
+        };
+
+        let getRawClientConfig: MockInstance<typeof AutoDiscovery.getRawClientConfig>;
+
+        beforeEach(() => {
+            getRawClientConfig = vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
+        });
+
+        afterEach(() => {
+            getRawClientConfig.mockRestore();
+        });
+
         it("caches the well-known value", async () => {
-            const A_WELLKNOWN: IClientWellKnown = {
-                "m.homeserver": {
-                    base_url: "https://hs.org",
-                },
-                "m.identity_server": {
-                    base_url: "https://is.org",
-                },
-            };
-
             void client.startClient();
-
-            vi.spyOn(AutoDiscovery, "getRawClientConfig").mockResolvedValue(A_WELLKNOWN);
 
             const value = await client.waitForClientWellKnown();
             expect(value).toStrictEqual(A_WELLKNOWN);
 
             const cached = client.getClientWellKnown();
             expect(cached).toStrictEqual(A_WELLKNOWN);
+        });
+
+        it("does not fetch the well-known when clientWellKnownPollPeriod is undefined", async () => {
+            await client.startClient();
+            await flushPromises();
+
+            expect(getRawClientConfig).not.toHaveBeenCalled();
+            expect(client.getClientWellKnown()).toBeUndefined();
+        });
+
+        it("fetches the well-known on startup and polls it when clientWellKnownPollPeriod is set", async () => {
+            await client.startClient({ clientWellKnownPollPeriod: 3600 });
+            await flushPromises();
+
+            expect(getRawClientConfig).toHaveBeenCalledTimes(1);
+            expect(client.getClientWellKnown()).toStrictEqual(A_WELLKNOWN);
+
+            await vi.advanceTimersByTimeAsync(3600 * 1000);
+            expect(getRawClientConfig).toHaveBeenCalledTimes(2);
+
+            client.stopClient();
         });
     });
 
