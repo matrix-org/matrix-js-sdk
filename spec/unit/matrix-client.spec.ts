@@ -917,10 +917,10 @@ describe("MatrixClient", function () {
             const timeoutDelayTxnId = client.makeTxnId();
             httpLookups.push({
                 method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
+                prefix: unstableMSC4140Prefix,
+                path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
                 data: { delay_id: "id1" },
-                expectBody: content,
+                expectBody: { delay_ms: 2000, content },
             });
 
             const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
@@ -967,10 +967,10 @@ describe("MatrixClient", function () {
             const timeoutDelayTxnId = client.makeTxnId();
             httpLookups.push({
                 method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
+                prefix: unstableMSC4140Prefix,
+                path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
                 data: { delay_id: "id1" },
-                expectBody,
+                expectBody: { delay_ms: 2000, content: expectBody },
             });
 
             const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
@@ -1026,10 +1026,10 @@ describe("MatrixClient", function () {
             const timeoutDelayTxnId = client.makeTxnId();
             httpLookups.push({
                 method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
+                prefix: unstableMSC4140Prefix,
+                path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
                 data: { delay_id: "id1" },
-                expectBody,
+                expectBody: { delay_ms: 2000, content: expectBody },
             });
 
             const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
@@ -1095,10 +1095,10 @@ describe("MatrixClient", function () {
             const timeoutDelayTxnId = client.makeTxnId();
             httpLookups.push({
                 method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
+                prefix: unstableMSC4140Prefix,
+                path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
                 data: { delay_id: "id1" },
-                expectBody,
+                expectBody: { delay_ms: 2000, content: expectBody },
             });
 
             const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
@@ -1130,16 +1130,21 @@ describe("MatrixClient", function () {
         });
 
         // eslint-disable-next-line @vitest/expect-expect
-        it("can send a delayed state event", async () => {
+        it.each([
+            ["without a state key", undefined, ""],
+            ["with a state key", "@alice:bar", "@alice:bar"],
+        ])("can send a delayed state event %s", async (_name, stateKey, expectedStateKey) => {
             httpLookups = [];
             const content = { topic: "The year 2000" };
+            const txnId = "txn1";
+            vi.spyOn(client, "makeTxnId").mockReturnValue(txnId);
 
             httpLookups.push({
                 method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
-                expectQueryParams: realTimeoutDelayOpts,
+                prefix: unstableMSC4140Prefix,
+                path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.topic/${txnId}`,
                 data: { delay_id: "id1" },
-                expectBody: content,
+                expectBody: { delay_ms: 2000, state_key: expectedStateKey, content },
             });
 
             const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedStateEvent(
@@ -1147,11 +1152,12 @@ describe("MatrixClient", function () {
                 timeoutDelayOpts,
                 EventType.RoomTopic,
                 { ...content },
+                stateKey,
             );
 
             httpLookups.push({
                 method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/${encodeURIComponent(expectedStateKey)}`,
                 expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
                 data: { delay_id: "id2" },
                 expectBody: content,
@@ -1162,7 +1168,175 @@ describe("MatrixClient", function () {
                 { parent_delay_id: timeoutDelayId },
                 EventType.RoomTopic,
                 { ...content },
+                stateKey,
             );
+        });
+
+        it("keeps the sticky duration as a query parameter", async () => {
+            unstableFeatures["org.matrix.msc4354"] = true;
+            const txnId = client.makeTxnId();
+            httpLookups = [
+                {
+                    method: "PUT",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 5000 },
+                    data: { delay_id: "id1" },
+                    expectBody: { delay_ms: 2000, content },
+                },
+            ];
+
+            await expect(
+                client._unstable_sendStickyDelayedEvent(
+                    roomId,
+                    5000,
+                    timeoutDelayOpts,
+                    null,
+                    EventType.RoomMessage,
+                    { ...content },
+                    txnId,
+                ),
+            ).resolves.toEqual({ delay_id: "id1" });
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        describe("when the server does not recognise the dedicated endpoint", () => {
+            const unrecognised = { httpStatus: 404, errcode: "M_UNRECOGNIZED" };
+
+            it("falls back to the query parameter, and only tries the dedicated endpoint once", async () => {
+                const txnId1 = client.makeTxnId();
+                const txnId2 = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId1}`,
+                        error: unrecognised,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId1}`,
+                        expectQueryParams: realTimeoutDelayOpts,
+                        data: { delay_id: "id1" },
+                        expectBody: content,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId2}`,
+                        expectQueryParams: realTimeoutDelayOpts,
+                        data: { delay_id: "id2" },
+                        expectBody: content,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                        expectQueryParams: realTimeoutDelayOpts,
+                        data: { delay_id: "id3" },
+                        expectBody: { topic: "topic" },
+                    },
+                ];
+
+                for (const [txnId, delayId] of [
+                    [txnId1, "id1"],
+                    [txnId2, "id2"],
+                ]) {
+                    await expect(
+                        client._unstable_sendDelayedEvent(
+                            roomId,
+                            timeoutDelayOpts,
+                            null,
+                            EventType.RoomMessage,
+                            { ...content },
+                            txnId,
+                        ),
+                    ).resolves.toEqual({ delay_id: delayId });
+                }
+                await expect(
+                    client._unstable_sendDelayedStateEvent(roomId, timeoutDelayOpts, EventType.RoomTopic, {
+                        topic: "topic",
+                    }),
+                ).resolves.toEqual({ delay_id: "id3" });
+                expect(httpLookups).toHaveLength(0);
+            });
+
+            it("falls back for sticky events", async () => {
+                unstableFeatures["org.matrix.msc4354"] = true;
+                const txnId = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
+                        error: unrecognised,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                        expectQueryParams: {
+                            ...realTimeoutDelayOpts,
+                            "org.matrix.msc4354.sticky_duration_ms": 5000,
+                        },
+                        data: { delay_id: "id1" },
+                        expectBody: content,
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendStickyDelayedEvent(
+                        roomId,
+                        5000,
+                        timeoutDelayOpts,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId,
+                    ),
+                ).resolves.toEqual({ delay_id: "id1" });
+                expect(httpLookups).toHaveLength(0);
+            });
+
+            it("does not fall back on other errors", async () => {
+                const txnId1 = client.makeTxnId();
+                const txnId2 = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId1}`,
+                        error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
+                    },
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId2}`,
+                        data: { delay_id: "id2" },
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        timeoutDelayOpts,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId1,
+                    ),
+                ).rejects.toMatchObject({ errcode: "M_INVALID_PARAM" });
+
+                // The dedicated endpoint is still the one in use afterwards
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        timeoutDelayOpts,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId2,
+                    ),
+                ).resolves.toEqual({ delay_id: "id2" });
+                expect(httpLookups).toHaveLength(0);
+            });
         });
 
         describe("lookups", () => {
