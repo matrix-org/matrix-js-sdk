@@ -22,6 +22,7 @@ import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
+import { type Capabilities } from "../serverCapabilities.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
 import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
 import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
@@ -181,6 +182,8 @@ type MembershipManagerClient = Pick<
     MatrixClient,
     | "getUserId"
     | "getDeviceId"
+    | "getCapabilities"
+    | "getCachedCapabilities"
     | "sendStateEvent"
     | "_unstable_sendDelayedStateEvent"
     | "_unstable_updateDelayedEvent"
@@ -420,6 +423,8 @@ export class MembershipManager
 
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
+    /** Set once fetching the server capabilities failed (widget mode), so we do not try again on every retry. */
+    private capabilitiesUnreachable = false;
 
     private get networkErrorRetryMs(): number {
         return this.joinConfig?.networkErrorRetryMs ?? 3_000;
@@ -523,6 +528,14 @@ export class MembershipManager
         // or during a call if the state event canceled our delayed event or caused by an unexpected error that removed our delayed event.
         // (Another client could have canceled it, the homeserver might have removed/lost it due to a restart, ...)
         // In the `then` and `catch` block we treat both cases differently. "if (this.state.hasMemberStateEvent) {} else {}"
+
+        // Clamp the delay to the advertised maximum before the first attempt, so that the server never has to reject it.
+        // The capabilities are not available in widget mode. In that case we rely on the error handling below.
+        if (!this.applyDelayedEventsCapability(this.client.getCachedCapabilities())) {
+            this.logger.info("Not using delayed event because the server capabilities say they are disabled");
+            if (this.state.hasMemberStateEvent) return {};
+            return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
+        }
         return await this.clientSendDelayedDisconnectMembership()
             .then((response) => {
                 this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
@@ -542,9 +555,9 @@ export class MembershipManager
                     return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
                 }
             })
-            .catch((e) => {
+            .catch(async (e) => {
                 const repeatActionType = MembershipActionType.SendDelayedEvent;
-                if (this.manageMaxDelayExceededSituation(e)) {
+                if (await this.manageMaxDelayExceededSituation(e)) {
                     return createInsertActionUpdate(repeatActionType);
                 }
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "_unstable_sendDelayedStateEvent");
@@ -554,8 +567,9 @@ export class MembershipManager
                     // This action was scheduled because the previous delayed event was cancelled
                     // due to lack of https://github.com/element-hq/synapse/pull/17810
 
-                    // Don't do any other delayed event work if its not supported.
-                    if (this.isUnsupportedDelayedEndpoint(e)) return {};
+                    // Don't do any other delayed event work if its not supported,
+                    // or if we gave up on finding a delay that the server accepts.
+                    if (this.isUnsupportedDelayedEndpoint(e) || this.isDelayTooLargeError(e)) return {};
                     throw Error("Could not send delayed event, even though delayed events are supported. " + e);
                 } else {
                     // This action was scheduled because we are in the process of joining
@@ -1050,19 +1064,83 @@ export class MembershipManager
     }
 
     /**
+     * Check if the server rejected the delay of a delayed event for exceeding its maximum
+     * @param error the error causing this handler check/execution
+     * @returns true if its a delay too large error
+     */
+    private isDelayTooLargeError(error: unknown): boolean {
+        return (
+            error instanceof MatrixError &&
+            (error.errcode === "M_DELAY_TOO_LARGE" || error.errcode === "ORG.MATRIX.MSC4140_DELAY_TOO_LARGE")
+        );
+    }
+
+    /**
+     * Apply the limits of the delayed events capability ([MSC4140](https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md))
+     * by clamping the delay of the delayed leave event to the advertised maximum.
+     * @param capabilities the homeserver capabilities, or undefined if they are not known.
+     * @returns false if the capabilities say that delayed events are disabled, true otherwise
+     * (also if the capabilities are not known).
+     */
+    private applyDelayedEventsCapability(capabilities: Capabilities | undefined): boolean {
+        if (!capabilities) return true;
+        const capability = capabilities["m.delayed_events"] ?? capabilities["org.matrix.msc4140.delayed_events"];
+        // The MSC says to treat an absent capability as disabled. We do not: Synapse before 1.157.0 supports delayed
+        // events without advertising the capability, so we attempt the request and rely on the error handling instead.
+        // TODO: Treat an absent capability as disabled once Synapse before 1.157.0 is no longer deployed
+        // (to revisit from 2026-11-18).
+        if (!capability) return true;
+        // A `0` in either field means that delayed events are disabled.
+        if (capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
+
+        const maxDelayAllowed = capability.max_delay_ms;
+        if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
+            this.logger.info(`Clamping the delayed leave event delay to the server maximum of ${maxDelayAllowed}ms`);
+            this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
+        }
+        return true;
+    }
+
+    /**
      * Check if this is a DelayExceeded timeout and update the TimeoutOverride for the next try
      * @param error the error causing this handler check/execution
      * @returns true if its a delay exceeded error and we updated the local TimeoutOverride
      */
-    private manageMaxDelayExceededSituation(error: unknown): boolean {
-        if (
-            error instanceof MatrixError &&
-            error.errcode === "M_UNKNOWN" &&
-            error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
-        ) {
+    private async manageMaxDelayExceededSituation(error: unknown): Promise<boolean> {
+        if (!(error instanceof MatrixError)) return false;
+
+        if (error.errcode === "M_UNKNOWN" && error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED") {
+            // Error format of Synapse before 1.157.0, which carries the limit.
+            // TODO: Remove this branch once Synapse before 1.157.0 is no longer deployed (to revisit from 2026-11-18).
             const maxDelayAllowed = error.data["org.matrix.msc4140.max_delay"];
             if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
                 this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
+            }
+            this.logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
+            return true;
+        }
+
+        if (this.isDelayTooLargeError(error)) {
+            // The error does not carry the limit. It is advertised in the capabilities.
+            const previousDelay = this.delayedLeaveEventDelayMs;
+            let capabilities: Capabilities | undefined;
+            if (!this.capabilitiesUnreachable) {
+                try {
+                    capabilities = await this.client.getCapabilities();
+                } catch (e) {
+                    // This is expected in widget mode where the client cannot talk to the homeserver.
+                    this.logger.info("Could not get the server capabilities to read the maximum delay:", e);
+                    this.capabilitiesUnreachable = true;
+                }
+            }
+            if (!this.applyDelayedEventsCapability(capabilities)) return false;
+
+            if (this.delayedLeaveEventDelayMs >= previousDelay) {
+                // We do not know the limit (or it is not the one the server enforces): halve the delay until the server
+                // accepts it. We give up once the event would time out before we get to restart it.
+                const halvedDelay = Math.floor(previousDelay / 2);
+                if (halvedDelay <= this.delayedLeaveEventRestartMs) return false;
+                this.delayedLeaveEventDelayMsOverride = halvedDelay;
             }
             this.logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
             return true;
