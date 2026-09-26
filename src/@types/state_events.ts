@@ -147,7 +147,46 @@ export interface PolicyRuleEventContent {
     recommendation: PolicyRecommendation;
 }
 
+/**
+ * The public signing keys of a Policy Server, keyed by algorithm.
+ * Must contain at least `ed25519`. Keys are unpadded base64.
+ */
+export interface RoomPolicyPublicKeys {
+    ed25519: string;
+    [algorithm: string]: string;
+}
+
+/**
+ * Content of the `m.room.policy` state event, which designates the room's Policy Server.
+ * An empty content object means the room does not use a Policy Server.
+ *
+ * @see https://spec.matrix.org/v1.18/client-server-api/#mroompolicy
+ */
 export interface RoomPolicyContent {
+    /** The server name of the Policy Server. It must have a joined user in the room. */
     via: string;
-    public_key: string;
+    /** The public signing keys of the Policy Server. */
+    public_keys: RoomPolicyPublicKeys;
+}
+
+/**
+ * Content of the unstable `org.matrix.msc4284.policy` state event used before MSC4284 was stabilised.
+ * Early implementations used a single `public_key` string instead of `public_keys`.
+ *
+ * @deprecated Rooms should be migrated to `m.room.policy` with {@link RoomPolicyContent}.
+ */
+export interface UnstableRoomPolicyContent {
+    via: string;
+    public_key?: string;
+    public_keys?: RoomPolicyPublicKeys;
+}
+
+/**
+ * Response body of `GET /.well-known/matrix/policy_server`, served on a Policy Server's server name.
+ * Clients use it to populate the `m.room.policy` state event.
+ *
+ * @see https://spec.matrix.org/v1.18/client-server-api/#getwell-knownmatrixpolicy_server
+ */
+export interface PolicyServerWellKnown {
+    public_keys: RoomPolicyPublicKeys;
 }
