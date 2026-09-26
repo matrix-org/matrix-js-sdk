@@ -1228,6 +1228,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     public scheduler?: MatrixScheduler;
     public clientRunning = false;
+    /**
+     * Server discovery gates thread network requests, but not cached room restoration.
+     * @internal
+     */
+    public threadSupportPending?: Promise<void>;
     public timelineSupport = false;
     public urlPreviewCache: { [key: string]: Promise<IPreviewUrlResponse> } = {};
     public identityServer?: IIdentityServerProvider;
@@ -1506,22 +1511,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi.stop();
         }
 
-        try {
-            await this.getVersions();
-
-            // This should be done with `canSupport`
-            // TODO: https://github.com/vector-im/element-web/issues/23643
-            const { threads, list, fwdPagination } = await this.doesServerSupportThread();
-            Thread.setServerSideSupport(threads);
-            Thread.setServerSideListSupport(list);
-            Thread.setServerSideFwdPaginationSupport(fwdPagination);
-        } catch (e) {
-            this.logger.error(
-                "Can't fetch server versions, continuing to initialise sync, this will be retried later",
-                e,
-            );
-        }
-
         this.clientOpts = opts ?? {};
         if (this.clientOpts.slidingSync) {
             this.syncApi = new SlidingSyncSdk(
@@ -1534,7 +1523,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             this.syncApi = new SyncApi(this, this.clientOpts, this.buildSyncApiOptions());
         }
 
-        this.syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
+        const syncApi = this.syncApi;
+        const isCurrent = (): boolean => this.clientRunning && this.syncApi === syncApi;
+        this.threadSupportPending = (async (): Promise<void> => {
+            try {
+                await this.getVersions();
+                const { threads, list, fwdPagination } = await this.doesServerSupportThread();
+                if (!isCurrent()) return;
+                Thread.setServerSideSupport(threads);
+                Thread.setServerSideListSupport(list);
+                Thread.setServerSideFwdPaginationSupport(fwdPagination);
+            } catch (e) {
+                this.logger.error("Can't fetch server versions, continuing to initialise sync", e);
+            } finally {
+                if (isCurrent()) this.threadSupportPending = undefined;
+            }
+        })();
+
+        // Replay saved rooms while discovery is pending. sync() reuses this replay
+        // and waits for it before processing live data.
+        if (syncApi instanceof SyncApi && !this.isGuest()) void syncApi.restoreFromCache();
+        await this.threadSupportPending;
+        if (!isCurrent()) return;
+        syncApi.sync().catch((e) => this.logger.info("Sync startup aborted with an error:", e));
 
         // Only poll the client well-known when a poll period was configured: leaving
         // `clientWellKnownPollPeriod` undefined disables the lookups entirely.
@@ -2794,7 +2805,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     event_id:
                         thread
                             .lastReply((ev: MatrixEvent) => {
-                                return ev.isRelation(THREAD_RELATION_TYPE.name) && !ev.status;
+                                return ev.isThreadRelation && !ev.status;
                             })
                             ?.getId() ?? threadId,
                 };
@@ -4731,7 +4742,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const mapper = this.getEventMapper();
         const event = mapper(res.event);
-        if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if (event.isThreadRelation) {
             this.logger.warn("Tried loading a regular timeline at the position of a thread event");
             return null;
         }
@@ -5299,7 +5310,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
-                        timelineEvents.filter((it) => it.getServerAggregatedRelation(THREAD_RELATION_TYPE.name)),
+                        timelineEvents.filter((it) => it.isThreadRoot),
                         false,
                     );
                     unknownRelations.forEach((event) => room.relations.aggregateChildEvent(event));
@@ -9177,7 +9188,7 @@ export function inMainTimelineForReceipt(event: MatrixEvent): boolean {
         return true;
     }
 
-    if (event.isRelation(THREAD_RELATION_TYPE.name)) {
+    if (event.isThreadRelation) {
         // It's a message in a thread - definitely not in the main timeline.
         return false;
     }

@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { NamespacedValue, UnstableValue } from "../../src/NamespacedValue";
+import { NamespacedValue, ServerControlledNamespacedValue, UnstableValue } from "../../src/NamespacedValue";
 
 describe("NamespacedValue", () => {
     it("should prefer stable over unstable", () => {
@@ -67,5 +67,18 @@ describe("UnstableValue", () => {
 
     it("should not permit falsey unstable values", () => {
         expect(() => new UnstableValue("stable", null!)).toThrow("Unstable value must be supplied");
+    });
+});
+
+describe("ServerControlledNamespacedValue", () => {
+    it.each([false, true])("should recognize both aliases when preferUnstable is %s", (preferUnstable) => {
+        const ns = new ServerControlledNamespacedValue("stable", "unstable");
+        ns.setPreferUnstable(preferUnstable);
+        expect(ns.matches("stable")).toBe(true);
+        expect(ns.matches("unstable")).toBe(true);
+        expect(ns.matches("unrelated")).toBe(false);
+        expect(ns.findIn({ stable: "cached stable value" })).toBe("cached stable value");
+        expect(ns.findIn({ unstable: "cached unstable value" })).toBe("cached unstable value");
+        expect(ns.name).toBe(preferUnstable ? "unstable" : "stable");
     });
 });

@@ -211,6 +211,7 @@ export class SyncApi {
     private syncStateData?: ISyncStateData; // additional data (eg. error object for failed sync)
     private catchingUp = false;
     private running = false;
+    private stopped = false;
     private keepAliveTimer?: ReturnType<typeof setTimeout>;
     private connectionReturnedResolvers?: PromiseWithResolvers<boolean>;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
@@ -694,6 +695,21 @@ export class SyncApi {
 
     private savedSyncPromise?: Promise<void>;
 
+    /** Restore saved rooms without waiting for server discovery or starting network sync. */
+    public restoreFromCache(): Promise<void> {
+        return (this.savedSyncPromise ??= this.client.store
+            .getSavedSync()
+            .then((savedSync) => {
+                this.syncOpts.logger.debug(`Got reply from saved sync, exists? ${!!savedSync}`);
+                if (savedSync && !this.stopped) {
+                    return this.syncFromCache(savedSync);
+                }
+            })
+            .catch((err) => {
+                this.syncOpts.logger.error("Getting saved sync failed", err);
+            }));
+    }
+
     /**
      * Main entry point
      */
@@ -717,17 +733,7 @@ export class SyncApi {
             return tok;
         });
 
-        this.savedSyncPromise = this.client.store
-            .getSavedSync()
-            .then((savedSync) => {
-                this.syncOpts.logger.debug(`Got reply from saved sync, exists? ${!!savedSync}`);
-                if (savedSync) {
-                    return this.syncFromCache(savedSync);
-                }
-            })
-            .catch((err) => {
-                this.syncOpts.logger.error("Getting saved sync failed", err);
-            });
+        void this.restoreFromCache();
 
         // We need to do one-off checks before we can begin the /sync loop.
         // These are:
@@ -785,6 +791,7 @@ export class SyncApi {
      * Stops the sync object from syncing.
      */
     public stop(): void {
+        this.stopped = true;
         this.syncOpts.logger.debug("SyncApi.stop");
         // It is necessary to check for the existance of
         // globalThis.window AND globalThis.window.removeEventListener.
@@ -848,7 +855,7 @@ export class SyncApi {
         // Don't emit a prepared if we've bailed because the store is invalid:
         // in this case the client will not be usable until stopped & restarted
         // so this would be useless and misleading.
-        if (!this.storeIsInvalid) {
+        if (!this.storeIsInvalid && !this.stopped) {
             this.updateSyncState(SyncState.Prepared, syncEventData);
         }
     }
