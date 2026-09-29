@@ -328,6 +328,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
 
         // Handle unkeyedStickyEvents first since it's *quick*.
         const redactEventId = typeof redactedEvent === "string" ? redactedEvent : redactedEvent.getId();
+        if (!redactEventId) {
+            return;
+        }
         for (const event of this.unkeyedStickyEvents) {
             if (event.getId() === redactEventId) {
                 this.unkeyedStickyEvents.delete(event);
@@ -339,7 +342,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         // Faster method of finding the event since we have the event cached.
         if (typeof redactedEvent !== "string" && !redactedEvent.isRedacted()) {
             const stickyKey = redactedEvent.getContent().msc4354_sticky_key;
-            if (typeof stickyKey !== "string" && stickyKey !== undefined) {
+            if (typeof stickyKey !== "string") {
                 return; // Not a sticky event.
             }
             const sender = redactedEvent.getSender();
@@ -354,13 +357,13 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
 
         // We only know the event ID of the redacted event, so we need to
         // traverse the map to find our event.
-        for (const innerMap of this.stickyEventsMap.values()) {
-            for (const [currentEvent] of innerMap.values()) {
-                if (currentEvent.getId() !== redactEventId) {
-                    continue;
+        for (const [eventType, innerMap] of this.stickyEventsMap) {
+            for (const [mapKey, events] of innerMap) {
+                if (events.some((e) => e.getId() === redactEventId)) {
+                    // Found the event.
+                    this.removeKeyedStickyEvent(eventType, mapKey, redactEventId);
+                    return;
                 }
-                // Found the event.
-                return this.handleRedaction(currentEvent);
             }
         }
     }
@@ -372,13 +375,27 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @param mapKey The inner map key of the redacted event, see {@link stickyMapKey}.
      * @param redactEventId The ID of the redacted event.
      */
-    private removeKeyedStickyEvent(eventType: string, mapKey: string, redactEventId: string | undefined): void {
+    private removeKeyedStickyEvent(eventType: string, mapKey: string, redactEventId: string): void {
         const innerMap = this.stickyEventsMap.get(eventType);
-        const [currentEvent, ...previousEvents] = innerMap?.get(mapKey) ?? [];
-        if (!innerMap || !currentEvent) {
-            // No event current in the map so ignore.
+        const events = innerMap?.get(mapKey);
+        if (!innerMap || !events) {
             return;
         }
+        const index = events.findIndex((e) => e.getId() === redactEventId);
+        if (index === -1) {
+            // The event is not in the map so ignore.
+            return;
+        }
+        if (index > 0) {
+            // A superseded event was redacted. The current event is unaffected, so there is no
+            // need to emit. We just drop the redacted event so it cannot be reverted to later.
+            innerMap.set(
+                mapKey,
+                events.filter((e) => e.getId() !== redactEventId),
+            );
+            return;
+        }
+        const [currentEvent, ...previousEvents] = events;
         logger.debug(`Redaction for ${redactEventId} under sticky map key ${mapKey}`);
         // Revert to previous state, taking care to skip any other redacted events.
         const newEvents = previousEvents.filter((e) => !e.isRedacted()).sort(RoomStickyEventsStore.sortStickyEvent);
