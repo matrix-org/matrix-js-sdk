@@ -1,3 +1,26 @@
+Changes in [43.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v43.0.0) (2026-09-29)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Bring OAuth token refresh into the js-sdk ([#5520](https://github.com/matrix-org/matrix-js-sdk/pull/5520)). Contributed by @dbkr.
+
+## ✨ Features
+
+* Update RTC notification and decline events as per MSC4075 ([#5544](https://github.com/matrix-org/matrix-js-sdk/pull/5544)). Contributed by @Johennes.
+* Add support of the stable room summary endpoint ([#5552](https://github.com/matrix-org/matrix-js-sdk/pull/5552)). Contributed by @florianduros.
+* Let applications publish their own data in MatrixRTC memberships ([#5550](https://github.com/matrix-org/matrix-js-sdk/pull/5550)). Contributed by @ara4n.
+* Bring OAuth token refresh into the js-sdk ([#5520](https://github.com/matrix-org/matrix-js-sdk/pull/5520)). Contributed by @dbkr.
+
+## 🐛 Bug Fixes
+
+* MatrixRTC: restart the delayed leave event before extending a membership's expiry ([#5522](https://github.com/matrix-org/matrix-js-sdk/pull/5522)). Contributed by @ara4n.
+* MatrixRTC: don't let a superseded membership recalculation overwrite a newer one ([#5523](https://github.com/matrix-org/matrix-js-sdk/pull/5523)). Contributed by @ara4n.
+* Preserve read receipts of different types during sync accumulation ([#5541](https://github.com/matrix-org/matrix-js-sdk/pull/5541)). Contributed by @rubinsh.
+* Fix sync.ts to emit state events when msc4222 state\_after is enabled ([#5542](https://github.com/matrix-org/matrix-js-sdk/pull/5542)). Contributed by @maheichyk.
+* Set hasCurrentUserParticipated when the current user sends a thread reply ([#5516](https://github.com/matrix-org/matrix-js-sdk/pull/5516)). Contributed by @nathanael-h.
+* Fix type definitions on `import|exportSecretsBundle` ([#5526](https://github.com/matrix-org/matrix-js-sdk/pull/5526)). Contributed by @richvdh.
+
+
 Changes in [42.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.4.0) (2026-09-15)
 ==================================================================================================
 ## ✨ Features
