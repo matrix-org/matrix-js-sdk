@@ -279,7 +279,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                         .get(eventType)!
                         .set(innerMapKey, [
                             currentEvent,
-                            ...previousEvents.filter((e) => e.unstableStickyExpiresAt <= now),
+                            ...previousEvents.filter((e) => e.unstableStickyExpiresAt > now),
                         ]);
                     // If not removing the event, check to see if it's the next lowest expiry.
                     this.nextStickyEventExpiryTs = Math.min(
