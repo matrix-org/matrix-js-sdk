@@ -133,7 +133,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: StickyMatrixEvent } | { added: false } {
         // The map is keyed on the event's type and sticky key, both of which are encrypted. Wait for the
         // event to be decrypted, otherwise it would be filed under `m.room.encrypted` with no sticky key.
-        if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
+        if (event.isBeingDecrypted() || event.shouldAttemptDecryption() || event.isDecryptionFailure()) {
             this.addStickyEventOnceDecrypted(event);
             return { added: false };
         }
