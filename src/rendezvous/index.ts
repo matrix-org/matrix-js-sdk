@@ -21,6 +21,7 @@ import { MSC4108RendezvousSession } from "./transports/MSC4108RendezvousSession.
 import { MSC4108SecureChannel } from "./channels/MSC4108SecureChannel.ts";
 import { RendezvousIntent } from "./RendezvousIntent.ts";
 import { logger } from "../logger.ts";
+import { type SignInWithQRFlow } from "./SignInWithQRFlow.ts";
 
 export * from "./MSC4108SignInWithQR.ts";
 export type * from "./SignInWithQRFlow.ts";
@@ -73,7 +74,7 @@ export async function linkNewDeviceByGeneratingQR(
     client: MatrixClient,
     onFailure: RendezvousFailureListener,
     abortSignal: AbortSignal,
-): Promise<MSC4108SignInWithQR> {
+): Promise<SignInWithQRFlow> {
     // we assume rust crypto is already initialised
     return initGenerateQrFlow(RendezvousIntent.RECIPROCATE_LOGIN_ON_EXISTING_DEVICE, client, onFailure, abortSignal);
 }
@@ -94,7 +95,7 @@ export async function signInByGeneratingQR(
     tempClient: MatrixClient,
     onFailure: RendezvousFailureListener,
     abortSignal: AbortSignal,
-): Promise<MSC4108SignInWithQR> {
+): Promise<SignInWithQRFlow> {
     // ensure rust crypto is initialized as needed for the secure channel
     const RustSdkCryptoJs = await import("@matrix-org/matrix-sdk-crypto-wasm");
     await RustSdkCryptoJs.initAsync();
@@ -107,7 +108,7 @@ async function initGenerateQrFlow(
     client: MatrixClient,
     onFailure: RendezvousFailureListener,
     abortSignal: AbortSignal,
-): Promise<MSC4108SignInWithQR> {
+): Promise<SignInWithQRFlow> {
     const session = new MSC4108RendezvousSession({
         onFailure,
         client,
