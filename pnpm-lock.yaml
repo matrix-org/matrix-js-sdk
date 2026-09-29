@@ -117,8 +117,8 @@ importers:
         specifier: ^8.0.0
         version: 8.0.5
       '@matrix-org/matrix-sdk-crypto-wasm':
-        specifier: matrix-org/matrix-sdk-crypto-wasm#e64b393e562ae4dee00624c5cbacf8834040bba0
-        version: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/e64b393e562ae4dee00624c5cbacf8834040bba0
+        specifier: matrix-org/matrix-sdk-crypto-wasm#7c4ef4ed82d9a79d837c2655b034655f4771d226
+        version: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/7c4ef4ed82d9a79d837c2655b034655f4771d226
       another-json:
         specifier: ^0.2.0
         version: 0.2.0
@@ -979,8 +979,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/e64b393e562ae4dee00624c5cbacf8834040bba0':
-    resolution: {gitHosted: true, integrity: sha512-wj2u7KpAQdRdzaxisQt1lfFbbtgAmhhqFo9x0X9pOBe/V+5ygDpY2HWz0nNMwyq01DCwnHK8w8GjIJTTas027A==, tarball: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/e64b393e562ae4dee00624c5cbacf8834040bba0}
+  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/7c4ef4ed82d9a79d837c2655b034655f4771d226':
+    resolution: {gitHosted: true, integrity: sha512-8ykfkI9kOiMR8AT0kQUaKNQpwgHEhb+WZMG29Y6ti3k6+9ej7Xr3FoeBBuGQg4TnuH8FshEGAxVqmp2al+mx/w==, tarball: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/7c4ef4ed82d9a79d837c2655b034655f4771d226}
     version: 18.9.0
     engines: {node: '>= 18'}
 
@@ -3601,7 +3601,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/e64b393e562ae4dee00624c5cbacf8834040bba0': {}
+  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/7c4ef4ed82d9a79d837c2655b034655f4771d226': {}
 
   '@matrix-org/olm@3.2.15': {}
 

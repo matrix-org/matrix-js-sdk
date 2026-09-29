@@ -18,9 +18,41 @@ import { logger } from "../../logger.ts";
 import { sleep } from "../../utils.ts";
 import { ClientRendezvousFailureReason, MSC4108FailureReason, type RendezvousFailureListener } from "../index.ts";
 import { type MatrixClient, Method } from "../../matrix.ts";
-import { ClientPrefix, MatrixError } from "../../http-api/index.ts";
+import { ClientPrefix, ConnectionError, MatrixError } from "../../http-api/index.ts";
 
 const API_PREFIX = "/io.element.msc4388/rendezvous";
+
+/** How long to wait between polls of the rendezvous session, and before retrying after a transient error. */
+const POLL_INTERVAL_MS = 1000;
+
+/**
+ * Implements `EncodeStringAsBytes8` from MSC4388: one byte giving the length in bytes of the UTF-8 encoding of the
+ * input, followed by the UTF-8 encoding of the input.
+ *
+ * @param input the string to encode, which must be at most 255 bytes when UTF-8 encoded
+ * @returns the MSC4388 `EncodeStringAsBytes8` encoding of the input. Exported for testing.
+ * @internal
+ */
+export function encodeStringAsBytes8(input: string): Uint8Array {
+    const utf8 = new TextEncoder().encode(input);
+    if (utf8.length > 255) {
+        throw new Error(`Cannot encode string of ${utf8.length} bytes as additional authentication data`);
+    }
+    const result = new Uint8Array(1 + utf8.length);
+    result[0] = utf8.length;
+    result.set(utf8, 1);
+    return result;
+}
+
+/**
+ * Normalises a homeserver base URL to the form used in the MSC4388 QR code so that the additional authentication
+ * data computed by both devices is identical. This matches `matrix-sdk-crypto`: the URL is parsed and serialised,
+ * and a trailing slash is dropped when the path is just `/`.
+ */
+function normaliseBaseUrl(baseUrl: string): string {
+    const url = new URL(baseUrl);
+    return url.pathname === "/" ? url.href.replace(/\/$/, "") : url.href;
+}
 
 /**
  * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
@@ -43,7 +75,8 @@ export class MSC4388RendezvousSession {
     private _ready = false;
 
     /**
-     * The server base URL for client-server connections.
+     * The server base URL for client-server connections, normalised to the form used in the QR code and in the
+     * additional authentication data of the secure channel.
      */
     public readonly baseUrl: string;
 
@@ -53,8 +86,7 @@ export class MSC4388RendezvousSession {
     public constructor({ onFailure, client }: { onFailure?: RendezvousFailureListener; client: MatrixClient }) {
         this.onFailure = onFailure;
         this.client = client;
-        // we parse to a URL to get consistency of / at end of it
-        this.baseUrl = new URL(client.baseUrl).href;
+        this.baseUrl = normaliseBaseUrl(client.baseUrl);
     }
 
     /**
@@ -139,13 +171,19 @@ export class MSC4388RendezvousSession {
         } catch (e) {
             if (e instanceof MatrixError) {
                 if (e.httpStatus === 404) {
+                    // the session has expired or been cancelled by the other side
                     return this.cancel(ClientRendezvousFailureReason.Unknown);
                 }
                 if (e.httpStatus === 409) {
+                    // M_CONCURRENT_WRITE: the other device wrote before reading our previous payload. MSC4388 allows
+                    // a GET and retry, but the secure channel protocol layered on top is strictly ping-pong so this
+                    // means the two devices are out of step and the session cannot be recovered.
                     logger.error("Concurrent write detected");
                     return this.cancel(ClientRendezvousFailureReason.Unknown);
                 }
             }
+            // anything else (e.g. 413, 429, network failure) means the payload was not sent and the caller must know
+            throw e;
         }
     }
 
@@ -194,14 +232,36 @@ export class MSC4388RendezvousSession {
                     logger.info(`Received: ${body.data} with sequence_token ${this.sequenceToken}`);
                     return body.data;
                 }
-                await sleep(1000);
+                await sleep(POLL_INTERVAL_MS);
             } catch (e) {
                 if (e instanceof MatrixError) {
                     if (e.httpStatus === 404) {
+                        // the session has expired or been cancelled by the other side
                         await this.cancel(ClientRendezvousFailureReason.Unknown);
                         return undefined;
                     }
+                    if (e.httpStatus === 429) {
+                        const retryAfterMs = e.getRetryAfterMs() ?? POLL_INTERVAL_MS;
+                        logger.warn(`Rate limited polling rendezvous session, retrying in ${retryAfterMs}ms`);
+                        await sleep(retryAfterMs);
+                        continue;
+                    }
+                    if (e.httpStatus !== undefined && e.httpStatus >= 500) {
+                        logger.warn(`Server error ${e.httpStatus} polling rendezvous session, retrying`);
+                        await sleep(POLL_INTERVAL_MS);
+                        continue;
+                    }
+                    // any other client error (e.g. 403 M_FORBIDDEN) is not going to be fixed by retrying
+                    logger.error("Unexpected error polling rendezvous session", e);
+                    await this.cancel(ClientRendezvousFailureReason.Unknown);
+                    return undefined;
                 }
+                if (e instanceof ConnectionError) {
+                    logger.warn("Connection error polling rendezvous session, retrying", e);
+                    await sleep(POLL_INTERVAL_MS);
+                    continue;
+                }
+                throw e;
             }
         }
     }
@@ -245,17 +305,43 @@ export class MSC4388RendezvousSession {
         }
     }
 
-    public getAdditionalAuthenticationDataForSend(): string {
-        if (!this.baseUrl || !this.id || !this.lastSequenceTokenReceived) {
+    /**
+     * Builds the additional authentication data for the secure channel as defined in MSC4388:
+     * `EncodeStringAsBytes8(BaseUrl) || EncodeStringAsBytes8(RendezvousId) || EncodeStringAsBytes8(SequenceToken)`
+     */
+    private buildAdditionalAuthenticationData(sequenceToken: string): Uint8Array {
+        if (!this.id) {
             throw new Error("Rendezvous session not ready");
         }
-        return this.baseUrl + this.id + this.lastSequenceTokenReceived;
+        const parts = [this.baseUrl, this.id, sequenceToken].map(encodeStringAsBytes8);
+        const result = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
+        let offset = 0;
+        for (const part of parts) {
+            result.set(part, offset);
+            offset += part.length;
+        }
+        return result;
     }
 
-    public getAdditionalAuthenticationDataForReceive(): string {
-        if (!this.baseUrl || !this.id || !this.lastSequenceTokenSent) {
+    /**
+     * The additional authentication data to use when sealing a payload to send over the secure channel.
+     * Per MSC4388 the sequence token is the one from the last payload that we received.
+     */
+    public getAdditionalAuthenticationDataForSend(): Uint8Array {
+        if (!this.lastSequenceTokenReceived) {
             throw new Error("Rendezvous session not ready");
         }
-        return this.baseUrl + this.id + this.lastSequenceTokenSent;
+        return this.buildAdditionalAuthenticationData(this.lastSequenceTokenReceived);
+    }
+
+    /**
+     * The additional authentication data to use when opening a payload received over the secure channel.
+     * Per MSC4388 the sequence token is the one returned by the last `PUT` (or initial `POST`) that we made.
+     */
+    public getAdditionalAuthenticationDataForReceive(): Uint8Array {
+        if (!this.lastSequenceTokenSent) {
+            throw new Error("Rendezvous session not ready");
+        }
+        return this.buildAdditionalAuthenticationData(this.lastSequenceTokenSent);
     }
 }

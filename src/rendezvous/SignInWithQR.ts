@@ -76,7 +76,9 @@ export interface SignInWithQR {
 
     /**
      * The second & third step in the OAuth2 QR login process.
-     * To be called after `negotiateProtocols` for the existing device.
+     * To be called after `negotiateProtocols` for the existing device. If the existing device generated the QR code
+     * then this must only be called once the user has entered the correct {@link checkCode}, as the existing device
+     * only trusts the secure channel from that point.
      * To be called after OAuth2 negotiation for the new device.
      *
      * @param input - Required for the new device to start the device authorization grant, not required for the existing device reciprocating the login
@@ -101,8 +103,13 @@ export interface SignInWithQR {
 
     /**
      * Decline the login on the existing device.
+     * @param reason why the login is being declined: `user_cancelled` (the default) if the user declined, or
+     * `unable_to_open_verification_uri` if the verification URI could not be opened. The 2024 version of the flow
+     * has no such distinction and always sends `user_cancelled`.
      */
-    declineLoginOnExistingDevice(): Promise<void>;
+    declineLoginOnExistingDevice(
+        reason?: MSC4108FailureReason.UserCancelled | MSC4108FailureReason.UnableToOpenVerificationUri,
+    ): Promise<void>;
 
     /**
      * Cancels the rendezvous session.

@@ -20,6 +20,7 @@ import {
     type EstablishedHpkeChannel,
     QrCodeData,
     type QrCodeIntent,
+    type UnidirectionalRecipientChannel,
 } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
@@ -101,11 +102,23 @@ export class MSC4388SecureChannel {
 
         logger.info("Received LoginInitiateMessage");
 
-        const { channel: unidirectionalChannel, message: candidateLoginInitiateMessage } =
-            this.recipientChannel.establishChannel(
-                loginInitiateMessage,
-                this.rendezvousSession.getAdditionalAuthenticationDataForReceive(),
+        let unidirectionalChannel: UnidirectionalRecipientChannel;
+        let candidateLoginInitiateMessage: string;
+        try {
+            ({ channel: unidirectionalChannel, message: candidateLoginInitiateMessage } =
+                this.recipientChannel.establishChannel(
+                    loginInitiateMessage,
+                    this.rendezvousSession.getAdditionalAuthenticationDataForReceive(),
+                ));
+        } catch (e) {
+            // the message could not be parsed or decrypted: either it wasn't sent by a device that scanned our QR
+            // code, or it is bound to a different rendezvous session
+            logger.warn("Failed to establish secure channel from LoginInitiateMessage", e);
+            throw new RendezvousError(
+                "Invalid response from other device",
+                ClientRendezvousFailureReason.InsecureChannelDetected,
             );
+        }
 
         // Verify LoginInitiateMessage
         if (candidateLoginInitiateMessage !== "MATRIX_QR_CODE_LOGIN_INITIATE") {
@@ -138,10 +151,19 @@ export class MSC4388SecureChannel {
             throw new Error("Channel closed");
         }
 
-        return this.establishedChannel.open(
-            ciphertext,
-            this.rendezvousSession.getAdditionalAuthenticationDataForReceive(),
-        );
+        try {
+            return this.establishedChannel.open(
+                ciphertext,
+                this.rendezvousSession.getAdditionalAuthenticationDataForReceive(),
+            );
+        } catch (e) {
+            // a payload that doesn't decrypt was not sealed by the other device with the expected sequence token
+            logger.warn("Failed to decrypt payload from secure channel", e);
+            throw new RendezvousError(
+                "Failed to decrypt payload from other device",
+                ClientRendezvousFailureReason.InsecureChannelDetected,
+            );
+        }
     }
 
     private async encrypt(plaintext: string): Promise<string> {

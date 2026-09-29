@@ -17,12 +17,14 @@ limitations under the License.
 
 import { QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 
+// import directly rather than via ./index.ts to avoid a circular import: KNOWN_FAILURE_REASONS below is evaluated
+// at module load time and needs the enum to already be defined.
 import {
     ClientRendezvousFailureReason,
     MSC4108FailureReason,
-    RendezvousError,
     type RendezvousFailureListener,
-} from "./index.ts";
+} from "./RendezvousFailureReason.ts";
+import { RendezvousError } from "./RendezvousError.ts";
 import { type MatrixClient } from "../client.ts";
 import { logger } from "../logger.ts";
 import { MatrixError } from "../http-api/index.ts";
@@ -94,6 +96,23 @@ interface FailurePayload extends MSC4108v2025Payload {
     type: PayloadType.Failure;
     reason: MSC4108FailureReason;
     homeserver?: string;
+}
+
+const KNOWN_FAILURE_REASONS = new Set<string>(Object.values(MSC4108FailureReason));
+
+/**
+ * Converts a received `m.login.failure` message into an error to throw.
+ *
+ * MSC4108 requires that an unrecognised `reason` is handled generically rather than rejected, so anything that isn't
+ * a known {@link MSC4108FailureReason} is mapped to {@link ClientRendezvousFailureReason.Unknown}.
+ */
+function errorFromFailurePayload(payload: Partial<FailurePayload>): RendezvousError {
+    const reason: unknown = payload.reason;
+    if (typeof reason === "string" && KNOWN_FAILURE_REASONS.has(reason)) {
+        return new RendezvousError("Failed", reason as MSC4108FailureReason);
+    }
+    logger.warn(`Received m.login.failure with unrecognised reason: ${JSON.stringify(reason)}`);
+    return new RendezvousError(`Failed with unrecognised reason ${reason}`, ClientRendezvousFailureReason.Unknown);
 }
 
 interface DeclinedPayload extends MSC4108v2025Payload {
@@ -176,53 +195,57 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
     }
 
     /**
+     * Sends the `m.login.protocols` message from the existing device to the new device.
+     *
+     * Per MSC4108 this is always the first message sent over the secure channel, regardless of which device
+     * generated the QR code, and it must only be sent once the existing device trusts the channel.
+     */
+    private async sendProtocols(): Promise<void> {
+        let oidcClientConfig: ValidatedAuthMetadata | undefined;
+        try {
+            oidcClientConfig = await this.client!.getAuthMetadata();
+        } catch (e) {
+            logger.error("Failed to discover OIDC metadata", e);
+        }
+
+        if (oidcClientConfig?.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
+            logger.info("Sending protocols message");
+            await this.send<ProtocolsPayload>({
+                type: PayloadType.Protocols,
+                protocols: ["device_authorization_grant"],
+                base_url: this.client!.baseUrl,
+            });
+        } else {
+            await this.send<FailurePayload>({
+                type: PayloadType.Failure,
+                reason: MSC4108FailureReason.UnsupportedProtocol,
+            });
+            throw new RendezvousError("Device code grant unsupported", MSC4108FailureReason.UnsupportedProtocol);
+        }
+    }
+
+    /**
      * The first step in the OIDC QR login process.
      * To be called after the QR code has been rendered or scanned.
-     * The scanning device has to discover the homeserver details, if they scanned the code then they already have it.
-     * If the new device is the one rendering the QR code then it has to wait be sent the homeserver details via the rendezvous channel.
+     *
+     * The new device always waits to be sent the homeserver details and available protocols via the secure channel,
+     * even if it scanned the QR code and so already knows the base URL of the rendezvous server.
+     *
+     * The existing device sends the homeserver details and available protocols as soon as it trusts the channel:
+     * immediately if it scanned the QR code, otherwise (if it generated the QR code) only after the user has
+     * confirmed the check code, which happens in {@link deviceAuthorizationGrant}.
      */
     public async negotiateProtocols(): Promise<{ baseUrl?: string }> {
         logger.info(`negotiateProtocols(isNewDevice=${this.isNewDevice} didScanCode=${this.didScanCode})`);
         await this.channel.connect();
 
-        if (this.didScanCode) {
-            // Secure Channel step 6 completed, we trust the channel
-
-            if (this.isNewDevice) {
-                // MSC4108-Flow: ExistingScanned - take homeserver from QR code which should already be set
-            } else {
-                // MSC4108-Flow: NewScanned -send protocols message
-                let oidcClientConfig: ValidatedAuthMetadata | undefined;
-                try {
-                    oidcClientConfig = await this.client!.getAuthMetadata();
-                } catch (e) {
-                    logger.error("Failed to discover OIDC metadata", e);
-                }
-
-                if (oidcClientConfig?.grant_types_supported.includes(OAuthGrantType.DeviceAuthorization)) {
-                    await this.send<ProtocolsPayload>({
-                        type: PayloadType.Protocols,
-                        protocols: ["device_authorization_grant"],
-                        base_url: this.client!.baseUrl,
-                    });
-                } else {
-                    await this.send<FailurePayload>({
-                        type: PayloadType.Failure,
-                        reason: MSC4108FailureReason.UnsupportedProtocol,
-                    });
-                    throw new RendezvousError(
-                        "Device code grant unsupported",
-                        MSC4108FailureReason.UnsupportedProtocol,
-                    );
-                }
-            }
-        } else if (this.isNewDevice) {
-            // MSC4108-Flow: ExistingScanned - wait for protocols message
+        if (this.isNewDevice) {
+            // MSC4108-Flow: the new device must wait for the protocols message regardless of who generated the QR
             logger.info("Waiting for protocols message");
             const payload = await this.receive<ProtocolsPayload>();
 
             if (payload?.type === PayloadType.Failure) {
-                throw new RendezvousError("Failed", payload.reason);
+                throw errorFromFailurePayload(payload);
             }
 
             if (payload?.type !== PayloadType.Protocols) {
@@ -236,18 +259,42 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
                 );
             }
 
+            // MSC4108 step 2: pick a protocol that we support from those offered, ignoring any we don't recognise.
+            // If none are supported then we must fail with unsupported_protocol.
+            if (!Array.isArray(payload.protocols) || !payload.protocols.includes("device_authorization_grant")) {
+                await this.send<FailurePayload>({
+                    type: PayloadType.Failure,
+                    reason: MSC4108FailureReason.UnsupportedProtocol,
+                });
+                throw new RendezvousError(
+                    "No supported protocol offered by existing device",
+                    MSC4108FailureReason.UnsupportedProtocol,
+                );
+            }
+
             return { baseUrl: payload.base_url };
+        }
+
+        if (this.didScanCode) {
+            // MSC4388 step 6 completed by scanning the QR: we trust the channel and can send protocols now
+            await this.sendProtocols();
         } else {
-            // MSC4108-Flow: NewScanned - nothing to do
-            // Not supported
+            // MSC4108-Flow: we generated the QR so we don't yet trust the channel. The user must first enter the
+            // check code (MSC4388 step 7) after which the caller invokes deviceAuthorizationGrant() which sends
+            // the protocols message.
         }
         return {};
     }
 
     /**
      * The second & third step in the OIDC QR login process.
-     * To be called after `negotiateProtocols` for the existing device.
-     * To be called after OIDC negotiation for the new device. (Currently unsupported)
+     *
+     * For the existing device: to be called after `negotiateProtocols`. If the existing device generated the QR code
+     * then this must only be called once the user has entered the correct check code (MSC4388 step 7), as this is
+     * the point at which the existing device trusts the channel and sends the `m.login.protocols` message.
+     *
+     * For the new device: to be called after receiving the homeserver details from `negotiateProtocols` and doing
+     * the OIDC metadata discovery and client registration.
      */
     public async deviceAuthorizationGrant(input?: {
         metadata: ValidatedAuthMetadata;
@@ -293,14 +340,19 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
                 userCode: dagResponse.user_code,
             };
         } else {
-            // The user needs to do step 7 for the out-of-band confirmation
-            // but, first we receive the protocol chosen by the other device so that
-            // the confirmation_uri is ready to go
+            if (!this.didScanCode) {
+                // We generated the QR code so the user has now confirmed the check code (MSC4388 step 7) and we
+                // trust the channel and can send the protocols message. If we scanned the QR code then this was
+                // already sent in negotiateProtocols().
+                await this.sendProtocols();
+            }
+
+            // Then we receive the protocol chosen by the other device so that the verification_uri is ready to go
             logger.info("Waiting for protocol message");
             const payload = await this.receive<ProtocolPayload | DeviceAuthorizationGrantProtocolPayload>();
 
             if (payload?.type === PayloadType.Failure) {
-                throw new RendezvousError("Failed", payload.reason);
+                throw errorFromFailurePayload(payload);
             }
 
             if (payload?.type !== PayloadType.Protocol) {
@@ -318,12 +370,16 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
                 const { device_authorization_grant: dag, device_id: expectingNewDeviceId } = payload;
                 const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } = dag;
 
+                // MSC4108 step 4: assert that no device with this ID exists yet by expecting a 404
                 let deviceAlreadyExists = true;
                 try {
-                    await this.client?.getDevice(expectingNewDeviceId);
+                    await this.client!.getDevice(expectingNewDeviceId);
                 } catch (err: MatrixError | unknown) {
                     if (err instanceof MatrixError && err.httpStatus === 404) {
                         deviceAlreadyExists = false;
+                    } else {
+                        // we don't know either way, so don't blame the new device for it
+                        throw err;
                     }
                 }
 
@@ -374,7 +430,7 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
             );
         }
         if (payload.type === PayloadType.Failure) {
-            throw new RendezvousError("Failed", payload.reason);
+            throw errorFromFailurePayload(payload);
         }
         if (payload.type !== PayloadType.ProtocolAccepted) {
             throw new RendezvousError("Unexpected message received", MSC4108FailureReason.UnexpectedMessageReceived);
@@ -395,17 +451,20 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
         }
 
         if ("error" in res) {
+            if (res.error === "access_denied") {
+                // MSC4108: the user declined the grant on the existing device
+                await this.send<DeclinedPayload>({ type: PayloadType.Declined });
+                return undefined;
+            }
+
             let reason: MSC4108FailureReason = MSC4108FailureReason.UnexpectedMessageReceived;
             if (res.error === "expired_token") {
                 reason = MSC4108FailureReason.AuthorizationExpired;
-            } else if (res.error === "access_denied") {
-                reason = MSC4108FailureReason.UserCancelled;
             }
-            const payload: FailurePayload = {
+            await this.send<FailurePayload>({
                 type: PayloadType.Failure,
                 reason,
-            };
-            await this.send(payload);
+            });
             return undefined;
         }
 
@@ -425,7 +484,7 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
             logger.info("Waiting for secrets message");
             const payload = await this.receive<SecretsPayload>();
             if (payload?.type === PayloadType.Failure) {
-                throw new RendezvousError("Failed", payload.reason);
+                throw errorFromFailurePayload(payload);
             }
 
             if (payload?.type !== PayloadType.Secrets) {
@@ -457,7 +516,7 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
             const payload = await this.receive<SuccessPayload | DeclinedPayload>();
 
             if (payload?.type === PayloadType.Failure) {
-                throw new RendezvousError("Failed", payload.reason);
+                throw errorFromFailurePayload(payload);
             }
 
             if (payload?.type === PayloadType.Declined) {
@@ -520,14 +579,20 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
 
     /**
      * Decline the login on the existing device.
+     * @param reason why the login is being declined: `user_cancelled` (the default) if the user declined, or
+     * `unable_to_open_verification_uri` if the verification URI could not be opened.
      */
-    public async declineLoginOnExistingDevice(): Promise<void> {
+    public async declineLoginOnExistingDevice(
+        reason:
+            | MSC4108FailureReason.UserCancelled
+            | MSC4108FailureReason.UnableToOpenVerificationUri = MSC4108FailureReason.UserCancelled,
+    ): Promise<void> {
         if (!this.isExistingDevice) {
             throw new Error("Can only decline login on existing device");
         }
         await this.send<FailurePayload>({
             type: PayloadType.Failure,
-            reason: MSC4108FailureReason.UserCancelled,
+            reason,
         });
     }
 
