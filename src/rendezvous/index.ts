@@ -23,6 +23,7 @@ import { RendezvousIntent } from "./RendezvousIntent.ts";
 import { logger } from "../logger.ts";
 
 export * from "./MSC4108SignInWithQR.ts";
+export type * from "./SignInWithQRFlow.ts";
 export type * from "./RendezvousChannel.ts";
 export type * from "./RendezvousCode.ts";
 export * from "./RendezvousError.ts";
