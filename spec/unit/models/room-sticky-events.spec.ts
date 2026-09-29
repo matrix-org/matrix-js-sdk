@@ -98,6 +98,50 @@ describe("RoomStickyEvents", () => {
             expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: newerEv, previous: originalEv }], []);
         });
+        describe.each([
+            ["in chronological order", false],
+            ["in reverse chronological order", true],
+        ])("when events are added %s", (_, reverse) => {
+            function add(...events: MatrixEvent[]): void {
+                if (reverse) events.reverse();
+                for (const event of events) stickyEvents.addStickyEvents([event]);
+            }
+
+            it("should prefer the event with the later intended expiry over the newer event", () => {
+                const now = Date.now();
+                // Expires at now + 15000
+                const olderEv = new MatrixEvent({ ...stickyEvent, event_id: "$older", origin_server_ts: now });
+                // Expires at now + 7000
+                const newerEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$newer",
+                    origin_server_ts: now + 2000,
+                    msc4354_sticky: { duration_ms: 5000 },
+                });
+                add(olderEv, newerEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([olderEv]);
+                // The newer event is still retained as a predecessor for redaction purposes.
+                stickyEvents.handleRedaction(olderEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
+            });
+
+            it("should tie break on the highest event ID when the intended expiry is equal", () => {
+                const now = Date.now();
+                // Both intended to expire at now + 15000
+                const lowIdEv = new MatrixEvent({ ...stickyEvent, event_id: "$aaa", origin_server_ts: now });
+                const highIdEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$zzz",
+                    origin_server_ts: now + 5000,
+                    msc4354_sticky: { duration_ms: 10000 },
+                });
+                add(lowIdEv, highIdEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([highIdEv]);
+                // The losing event is still retained as a predecessor for redaction purposes.
+                stickyEvents.handleRedaction(highIdEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([lowIdEv]);
+            });
+        });
         it("should allow multiple events with the same sticky key for different event types", () => {
             const originalEv = new MatrixEvent({ ...stickyEvent });
             const anotherEv = new MatrixEvent({

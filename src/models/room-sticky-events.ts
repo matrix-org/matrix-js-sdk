@@ -40,7 +40,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * Sticky event map is a nested map of:
      *  eventType -> `content.sticky_key sender` -> StickyMatrixEvent[]
      *
-     * The events are ordered in latest to earliest expiry, so that the first event
+     * The events are ordered descendingly by expiry, tie breaking on the event ID, so that the first event
      * in the array will always be the "current" one.
      */
     private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent[]>>();
@@ -54,19 +54,25 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
 
     /**
-     * Sort two sticky events by order of expiry. This assumes the sticky events have the same
+     * Sort two sticky events by expiry, tie breaking on the event ID. This assumes the sticky events have the same
      * `type`, `sticky_key` and `sender`.
      * @returns A positive value if event A will expire sooner, or a negative value if event B will expire sooner.
      */
     private static sortStickyEvent(eventA: StickyMatrixEvent, eventB: StickyMatrixEvent): number {
-        // Sticky events with the same key have to use the same expiration duration.
-        // Hence, comparing via `origin_server_ts` yields the exact same result as comparing their expiration time.
-        if (eventB.getTs() !== eventA.getTs()) {
-            return eventB.getTs() - eventA.getTs();
+        // First, compare by expiry (`origin_server_ts + sticky.duration_ms`).
+        const expiryA = eventA.getTs() + eventA.unstableStickyInfo!.duration_ms;
+        const expiryB = eventB.getTs() + eventB.unstableStickyInfo!.duration_ms;
+        if (expiryB !== expiryA) {
+            return expiryB - expiryA;
         }
 
-        if ((eventB.getId() ?? "") > (eventA.getId() ?? "")) {
+        // Tie break on the highest lexicographical event ID.
+        const idA = eventA.getId() ?? "";
+        const idB = eventB.getId() ?? "";
+        if (idB > idA) {
             return 1;
+        } else if (idB < idA) {
+            return -1;
         }
 
         // This should fail as we've got corruption in our sticky array.
