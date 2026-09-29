@@ -23,6 +23,12 @@ import { type DeviceAccessTokenResponse, type ValidatedAuthMetadata } from "../o
 import type { SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm.d.ts";
 
 /**
+ * The secrets bundle shared from the existing device to the new device.
+ * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
+ */
+export type { SecretsBundleJson as SignInWithQRSecrets } from "../@types/matrix-sdk-crypto-wasm.d.ts";
+
+/**
  * Common interface for the sign in with QR + OAuth2 flows, e.g. the 2024 and 2025 versions of
  * [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108).
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.

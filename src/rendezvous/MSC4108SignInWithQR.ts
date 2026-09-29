@@ -36,8 +36,7 @@ import {
     type ValidatedAuthMetadata,
     waitForDeviceAuthorization,
 } from "../oauth/index.ts";
-import type { SignInWithQRFlow } from "./SignInWithQRFlow.ts";
-import type { SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm.d.ts";
+import { type SignInWithQRSecrets, type SignInWithQRFlow } from "./SignInWithQRFlow.ts";
 
 /**
  * Enum representing the payload types transmissible over [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
@@ -107,7 +106,7 @@ interface AcceptedPayload extends MSC4108Payload {
     type: PayloadType.ProtocolAccepted;
 }
 
-interface SecretsPayload extends MSC4108Payload, SecretsBundleJson {
+interface SecretsPayload extends MSC4108Payload, SignInWithQRSecrets {
     type: PayloadType.Secrets;
 }
 
