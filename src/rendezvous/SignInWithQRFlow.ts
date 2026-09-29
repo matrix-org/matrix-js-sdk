@@ -20,13 +20,7 @@ import {
     type RendezvousFailureListener,
 } from "./RendezvousFailureReason.ts";
 import { type DeviceAccessTokenResponse, type ValidatedAuthMetadata } from "../oauth/index.ts";
-import { type CryptoApi } from "../crypto-api/index.ts";
-
-/**
- * The secrets bundle shared from the existing device to the new device.
- * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
- */
-export type SignInWithQRSecrets = Awaited<ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>>>;
+import type { SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm.d.ts";
 
 /**
  * Common interface for the sign in with QR + OAuth2 flows, e.g. the 2024 and 2025 versions of
@@ -97,7 +91,7 @@ export interface SignInWithQRFlow {
      * The fifth (and final) step in the OAuth2 QR login process.
      * To be called after the new device has completed authentication.
      */
-    shareSecrets(): Promise<{ secrets?: SignInWithQRSecrets }>;
+    shareSecrets(): Promise<{ secrets?: SecretsBundleJson }>;
 
     /**
      * Decline the login on the existing device.
