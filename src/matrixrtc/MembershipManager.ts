@@ -15,7 +15,7 @@ limitations under the License.
 */
 import { AbortError } from "p-retry";
 
-import { EventType, RelationType } from "../@types/event.ts";
+import { EventType } from "../@types/event.ts";
 import { type ISendEventResponse, type SendDelayedEventResponse } from "../@types/requests.ts";
 import { type EmptyObject } from "../@types/common.ts";
 import type { MatrixClient } from "../client.ts";
@@ -1324,12 +1324,7 @@ export class StickyEventMembershipManager extends MembershipManager {
      * @returns Only returns `RtcMembershipData`
      */
     protected makeMyMembership(): RtcMembershipData {
-        const ownMembership = this.ownMembership;
-
         const livekitTransport = isLivekitTransportConfig(this.rtcTransport) ? this.rtcTransport : undefined;
-        const relationObject = ownMembership?.eventId
-            ? { "m.relation": { rel_type: RelationType.Reference, event_id: ownMembership?.eventId } }
-            : {};
         return {
             application: {
                 ...this.applicationData,
@@ -1347,7 +1342,6 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
             versions: [],
-            ...relationObject,
         };
     }
 }

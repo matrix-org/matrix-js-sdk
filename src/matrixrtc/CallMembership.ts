@@ -343,7 +343,6 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                // TODO we need to read the referenced (relation) event if available to get the real created_ts
                 return this.matrixEvent.getTs();
             case MembershipKind.Session:
             default:
