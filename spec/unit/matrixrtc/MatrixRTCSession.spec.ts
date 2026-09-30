@@ -539,6 +539,23 @@ describe("MatrixRTCSession", () => {
         });
     });
 
+    describe("getOldestMembership", () => {
+        it("returns the oldest membership event", async () => {
+            vi.useFakeTimers();
+            vi.setSystemTime(4000);
+            const mockRoom = makeMockRoom([
+                Object.assign({}, sessionMembershipTemplate, { device_id: "foo", created_ts: 3000 }),
+                Object.assign({}, sessionMembershipTemplate, { device_id: "old", created_ts: 1000 }),
+                Object.assign({}, sessionMembershipTemplate, { device_id: "bar", created_ts: 2000 }),
+            ]);
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.getOldestMembership()!.deviceId).toEqual("old");
+            vi.useRealTimers();
+        });
+    });
+
     describe("getConsensusCallIntent", () => {
         it.each([
             [undefined, undefined, undefined],

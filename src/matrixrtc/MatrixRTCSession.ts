@@ -682,6 +682,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * @returns The oldest membership, if any, as determined by {@link CallMembership.createdTs}.
+     * @deprecated This SDK no longer selects transports based on the transport preferred by the
+     *   oldest member, so the oldest membership should generally not be of interest anymore.
+     */
+    public getOldestMembership(): CallMembership | undefined {
+        return this.memberships[0];
+    }
+
+    /**
      * Get the call intent for the current call, based on what members are advertising. If one or more
      * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
      *
