@@ -1,5 +1,5 @@
 import { logger as loggerInstance } from "../logger.ts";
-import { type MatrixEvent } from "./event.ts";
+import { type MatrixEvent, MatrixEventEvent } from "./event.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 
 const logger = loggerInstance.getChild("RoomStickyEvents");
@@ -40,7 +40,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * Sticky event map is a nested map of:
      *  eventType -> `content.sticky_key sender` -> StickyMatrixEvent[]
      *
-     * The events are ordered in latest to earliest expiry, so that the first event
+     * The events are ordered descendingly by expiry, tie breaking on the event ID, so that the first event
      * in the array will always be the "current" one.
      */
     private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent[]>>();
@@ -54,19 +54,25 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
 
     /**
-     * Sort two sticky events by order of expiry. This assumes the sticky events have the same
+     * Sort two sticky events by expiry, tie breaking on the event ID. This assumes the sticky events have the same
      * `type`, `sticky_key` and `sender`.
      * @returns A positive value if event A will expire sooner, or a negative value if event B will expire sooner.
      */
     private static sortStickyEvent(eventA: StickyMatrixEvent, eventB: StickyMatrixEvent): number {
-        // Sticky events with the same key have to use the same expiration duration.
-        // Hence, comparing via `origin_server_ts` yields the exact same result as comparing their expiration time.
-        if (eventB.getTs() !== eventA.getTs()) {
-            return eventB.getTs() - eventA.getTs();
+        // First, compare by expiry (`origin_server_ts + sticky.duration_ms`).
+        const expiryA = eventA.getTs() + eventA.unstableStickyInfo!.duration_ms;
+        const expiryB = eventB.getTs() + eventB.unstableStickyInfo!.duration_ms;
+        if (expiryB !== expiryA) {
+            return expiryB - expiryA;
         }
 
-        if ((eventB.getId() ?? "") > (eventA.getId() ?? "")) {
+        // Tie break on the highest lexicographical event ID.
+        const idA = eventA.getId() ?? "";
+        const idB = eventB.getId() ?? "";
+        if (idB > idA) {
             return 1;
+        } else if (idB < idA) {
+            return -1;
         }
 
         // This should fail as we've got corruption in our sticky array.
@@ -131,6 +137,13 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      *          and the previous event it may have replaced.
      */
     private addStickyEvent(event: MatrixEvent): { added: true; prevEvent?: StickyMatrixEvent } | { added: false } {
+        // The map is keyed on the event's type and sticky key, both of which are encrypted. Wait for the
+        // event to be decrypted, otherwise it would be filed under `m.room.encrypted` with no sticky key.
+        if (event.isBeingDecrypted() || event.shouldAttemptDecryption()) {
+            this.addStickyEventOnceDecrypted(event);
+            return { added: false };
+        }
+
         const stickyKey = event.getContent().msc4354_sticky_key;
         if (typeof stickyKey !== "string" && stickyKey !== undefined) {
             throw new Error(`${event.getId()} is missing msc4354_sticky_key`);
@@ -187,6 +200,24 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             added: currentEventSet[0] === stickyEvent,
             prevEvent: currentEventSet?.[1],
         };
+    }
+
+    /**
+     * Adds the event to the map once it has been decrypted, emitting `RoomEvent.StickyEvents` at that point.
+     *
+     * Decryption may fail because the keys haven't arrived yet, in which case we keep waiting. An event that
+     * is never decrypted simply never enters the map.
+     */
+    private addStickyEventOnceDecrypted(event: MatrixEvent): void {
+        const onEventDecrypted = (): void => {
+            if (event.isDecryptionFailure()) {
+                // The event may still be decrypted later, e.g. once the keys arrive. Keep listening.
+                event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
+                return;
+            }
+            this.addStickyEvents([event]); // Safe to call because it sorts events by timestamp when updating a keyed entry.
+        };
+        event.once(MatrixEventEvent.Decrypted, onEventDecrypted);
     }
 
     /**

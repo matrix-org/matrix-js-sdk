@@ -172,7 +172,7 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // Alternatively we would need to setup some event emission when the RTC session ended.
         // TODO we want to add the emission en session end. This makes the responsibility of the session manager more clear.
 
-        await session._onRTCSessionMemberUpdate().catch((error) => {
+        await session.ensureRecalculateSessionMembers().catch((error) => {
             this.logger.error(`Error updating RTC session members for ${room.roomId}: ${error}`);
         });
 

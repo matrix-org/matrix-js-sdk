@@ -80,8 +80,9 @@ export class UnsupportedStickyEventsEndpointError extends Error {
     public constructor(
         message: string,
         public clientEndpoint: "sendStickyEvent" | "sendStickyStateEvent",
+        options?: ErrorOptions,
     ) {
-        super(message);
+        super(message, options);
         this.name = "UnsupportedStickyEventsEndpointError";
     }
 }

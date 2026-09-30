@@ -84,7 +84,7 @@ export * from "./models/event-status.ts";
 export * from "./models/profile-keys.ts";
 export * from "./models/related-relations.ts";
 export { type StickyMatrixEvent, RoomStickyEventsEvent } from "./models/room-sticky-events.ts";
-export type { RoomSummary } from "./client.ts";
+export type { RoomSummary } from "./room-summary-api.ts";
 export * as ContentHelpers from "./content-helpers.ts";
 export * as SecretStorage from "./secret-storage.ts";
 export { createNewMatrixCall, CallEvent } from "./webrtc/call.ts";
