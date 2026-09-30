@@ -409,9 +409,11 @@ export class CallMembership {
      * In case of a legacy session membership (m.call.member) this will return the first transport of the
      * `foci_preferred` list. (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
      *
+     * @param _oldestMembership Deprecated and unused.
+     *
      * @returns The transport this membership uses to publish media or undefined if no transport is available.
      */
-    public getTransport(): Transport | undefined {
+    public getTransport(_oldestMembership?: CallMembership): Transport | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
