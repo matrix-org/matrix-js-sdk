@@ -305,6 +305,31 @@ describe("RoomStickyEvents", () => {
             vi.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
+        it("should prune expired previous events while keeping the current event", () => {
+            vi.setSystemTime(0);
+            const olderEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$older",
+                origin_server_ts: 0,
+            });
+            vi.setSystemTime(5000);
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer",
+                origin_server_ts: 5000,
+            });
+            stickyEvents.addStickyEvents([olderEv, newerEv]);
+            const emitSpy = vi.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Expire the older (previous) event only. The newer (current) event is still active.
+            vi.advanceTimersByTime(10000);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
+            // Redacting the current event must not fall back to the expired previous event.
+            stickyEvents.handleRedaction(newerEv.getId()!);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [newerEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
+        });
     });
 
     describe("encrypted events", () => {

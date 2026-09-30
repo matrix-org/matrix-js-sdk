@@ -80,6 +80,16 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     }
 
     /**
+     * Check whether a sticky event has expired.
+     * @param event The sticky event to check.
+     * @param now The current time in milliseconds since the epoch.
+     * @returns True if the event has expired, false otherwise.
+     */
+    private static isExpired(event: StickyMatrixEvent, now: number): boolean {
+        return event.unstableStickyExpiresAt <= now;
+    }
+
+    /**
      * Generate the correct key for an event to be found in the inner maps of `stickyEventsMap`.
      * @param stickyKey The sticky key of an event.
      * @param sender The sender of the event.
@@ -153,10 +163,12 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         if (event.unstableStickyExpiresAt === undefined) {
             throw new Error(`${event.getId()} is missing msc4354_sticky.duration_ms`);
         }
+        const stickyEvent = event as StickyMatrixEvent;
+
         const sender = event.getSender();
         const type = event.getType();
         assertIsUserId(sender);
-        if (event.unstableStickyExpiresAt <= Date.now()) {
+        if (RoomStickyEventsStore.isExpired(stickyEvent, Date.now())) {
             logger.info("ignored sticky event with older expiration time than current time", stickyKey);
             return { added: false };
         }
@@ -166,8 +178,6 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         if (!sender.startsWith("@")) {
             throw new Error("Expected sender to start with @");
         }
-
-        const stickyEvent = event as StickyMatrixEvent;
 
         if (stickyKey === undefined) {
             this.unkeyedStickyEvents.add(stickyEvent);
@@ -275,7 +285,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         for (const [eventType, innerEvents] of this.stickyEventsMap.entries()) {
             for (const [innerMapKey, [currentEvent, ...previousEvents]] of innerEvents) {
                 // we only added items with `sticky` into this map so we can assert non-null here
-                if (now >= currentEvent.unstableStickyExpiresAt) {
+                if (RoomStickyEventsStore.isExpired(currentEvent, now)) {
                     logger.debug("Expiring sticky event", currentEvent.getId());
                     removedEvents.push(currentEvent);
                     this.stickyEventsMap.get(eventType)!.delete(innerMapKey);
@@ -285,7 +295,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
                         .get(eventType)!
                         .set(innerMapKey, [
                             currentEvent,
-                            ...previousEvents.filter((e) => e.unstableStickyExpiresAt <= now),
+                            ...previousEvents.filter((e) => !RoomStickyEventsStore.isExpired(e, now)),
                         ]);
                     // If not removing the event, check to see if it's the next lowest expiry.
                     this.nextStickyEventExpiryTs = Math.min(
@@ -300,7 +310,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             }
         }
         for (const event of this.unkeyedStickyEvents) {
-            if (now >= event.unstableStickyExpiresAt) {
+            if (RoomStickyEventsStore.isExpired(event, now)) {
                 logger.debug("Expiring sticky event", event.getId());
                 this.unkeyedStickyEvents.delete(event);
                 removedEvents.push(event);
