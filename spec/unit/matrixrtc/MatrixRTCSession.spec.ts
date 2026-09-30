@@ -616,7 +616,7 @@ describe("MatrixRTCSession", () => {
         afterEach(async () => {
             const wasJoined = sess!.isJoined();
             // stop the timers
-            const left = await sess!.leaveRoomSession();
+            const left = await sess!.leave();
             if (left !== wasJoined) {
                 throw new Error(`Unexpected leave result: wanted ${wasJoined}, got ${left}`);
             }
@@ -630,7 +630,7 @@ describe("MatrixRTCSession", () => {
             joinConfig: JoinSessionConfig,
             ownMembership: Partial<SessionMembershipData> = {},
         ): Promise<string> {
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], joinConfig);
+            sess!.join(owmMemberIdentity, [mockFocus], joinConfig);
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...sessionMembershipTemplate, user_id: client.getUserId()!, ...ownMembership }]);
             await sess!._onRTCSessionMemberUpdate();
@@ -642,12 +642,12 @@ describe("MatrixRTCSession", () => {
         });
 
         it("shows joined once join is called", () => {
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus]);
+            sess!.join(owmMemberIdentity, [mockFocus]);
             expect(sess!.isJoined()).toEqual(true);
         });
 
         it("uses the sticky events membership manager implementation", () => {
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], { unstableSendStickyEvents: true });
+            sess!.join(owmMemberIdentity, [mockFocus], { unstableSendStickyEvents: true });
             expect(sess!.isJoined()).toEqual(true);
             expect(sess!["membershipManager"] instanceof StickyEventMembershipManager).toEqual(true);
         });
@@ -661,7 +661,7 @@ describe("MatrixRTCSession", () => {
                     return Promise.resolve({ event_id: "$membership" });
                 }),
             );
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], {
+            sess!.join(owmMemberIdentity, [mockFocus], {
                 applicationData: { "org.example.key": 1 },
             });
             await sent;
@@ -857,7 +857,7 @@ describe("MatrixRTCSession", () => {
             await sess!._onRTCSessionMemberUpdate();
 
             // Simulate a join, including the update to the room state
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], { notificationType: "ring" });
+            sess!.join(owmMemberIdentity, [mockFocus], { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [
                 sessionMembershipTemplate,
@@ -873,7 +873,7 @@ describe("MatrixRTCSession", () => {
 
         it("doesn't send a notification when someone else starts the call faster than us", async () => {
             // Simulate a join, including the update to the room state
-            sess!.joinRTCSession(owmMemberIdentity, [mockFocus], { notificationType: "ring" });
+            sess!.join(owmMemberIdentity, [mockFocus], { notificationType: "ring" });
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent
@@ -1019,7 +1019,7 @@ describe("MatrixRTCSession", () => {
                 },
             ]);
             const sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            sess.joinRTCSession(owmMemberIdentity, [{ type: "livekit", livekit_service_url: "https://test.org" }]);
+            sess.join(owmMemberIdentity, [{ type: "livekit", livekit_service_url: "https://test.org" }]);
             await flushPromises();
 
             expect(client.encryptAndSendToDevice).toHaveBeenCalledTimes(1);
@@ -1030,7 +1030,7 @@ describe("MatrixRTCSession", () => {
             );
             expect(sess.statistics.counters.roomEventEncryptionKeysSent).toEqual(1);
 
-            await sess.leaveRoomSession();
+            await sess.leave();
         });
 
         it("reports and emits when the key rotation participant limit is reached", async () => {
@@ -1045,7 +1045,7 @@ describe("MatrixRTCSession", () => {
 
             const mockRoom = makeMockRoom([ownMembership, bob]);
             const sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            sess.joinRTCSession(owmMemberIdentity, [mockFocus], {
+            sess.join(owmMemberIdentity, [mockFocus], {
                 manageMediaKeys: true,
                 keyRotationParticipantLimit: 3,
             });
@@ -1071,7 +1071,7 @@ describe("MatrixRTCSession", () => {
             expect(onKeyRotationSuppressedChanged).toHaveBeenLastCalledWith(false);
             expect(onKeyRotationSuppressedChanged).toHaveBeenCalledTimes(2);
 
-            await sess.leaveRoomSession();
+            await sess.leave();
         });
     });
 
@@ -1081,7 +1081,7 @@ describe("MatrixRTCSession", () => {
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             expect(sess.probablyLeft).toBe(undefined);
 
-            sess.joinRTCSession(owmMemberIdentity, [mockFocus], { manageMediaKeys: true });
+            sess.join(owmMemberIdentity, [mockFocus], { manageMediaKeys: true });
             expect(sess.probablyLeft).toBe(false);
 
             // Simulate the membership manager believing the user has left
@@ -1097,7 +1097,7 @@ describe("MatrixRTCSession", () => {
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             expect(sess.membershipStatus).toBe(undefined);
 
-            sess.joinRTCSession(owmMemberIdentity, [mockFocus], { manageMediaKeys: true });
+            sess.join(owmMemberIdentity, [mockFocus], { manageMediaKeys: true });
             expect(sess.membershipStatus).toBe(Status.Connecting);
         });
     });
@@ -1521,7 +1521,7 @@ describe("MatrixRTCSession", () => {
         const probablyLeftChanged = vi.fn();
         sess.on(MembershipManagerEvent.ProbablyLeft, probablyLeftChanged);
 
-        sess.joinRTCSession(owmMemberIdentity, [mockFocus]);
+        sess.join(owmMemberIdentity, [mockFocus]);
 
         const membershipManager = sess["membershipManager"]!;
         membershipManager.emit(MembershipManagerEvent.DelayIdChanged, "newDelayId");

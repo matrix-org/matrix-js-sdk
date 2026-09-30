@@ -582,15 +582,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Announces this user and device as joined to the MatrixRTC session,
      * and continues to update the membership event to keep it valid until
      * leaveRoomSession() is called
-     * This will not subscribe to updates: remember to call subscribe() separately if
-     * desired.
      * This method will return immediately and the session will be joined in the background.
      * @param ownMembershipIdentity the identity of the user and device joining the session.
      * This will be put into the content.member.
      * @param publishedTransports the list of transports on which the member is publishing.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRTCSession(
+    public join(
         ownMembershipIdentity: CallMembershipIdentityParts,
         publishedTransports: Transport[],
         joinConfig?: JoinSessionConfig,
@@ -656,16 +654,28 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * @deprecated Use {@link join} instead.
+     */
+    // TODO: Delete, this is only preserved here to avoid briefly breaking
+    // Element Web's CI while we make breaking changes to this class.
+    public joinRTCSession(
+        ownMembershipIdentity: CallMembershipIdentityParts,
+        fociPreferred: Transport[],
+        multiSfuFocus?: Transport,
+        joinConfig?: JoinSessionConfig,
+    ): void {
+        this.join(ownMembershipIdentity, [...fociPreferred, ...(multiSfuFocus ? [multiSfuFocus] : [])], joinConfig);
+    }
+
+    /**
      * Announces this user and device as having left the MatrixRTC session
      * and stops scheduled updates.
-     * This will not unsubscribe from updates: remember to call unsubscribe() separately if
-     * desired.
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      * @returns Whether the membership update was attempted and did not time out.
      */
-    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
+    public async leave(timeout?: number): Promise<boolean> {
         if (!this.isJoined()) {
             this.logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
             return false;
@@ -679,6 +689,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         return await leavePromise;
+    }
+
+    /**
+     * @deprecated Use {@link leave} instead.
+     */
+    // TODO: Delete, this is only preserved here to avoid briefly breaking
+    // Element Web's CI while we make breaking changes to this class.
+    public async leaveRoomSession(timeout?: number): Promise<boolean> {
+        return this.leave(timeout);
     }
 
     /**
