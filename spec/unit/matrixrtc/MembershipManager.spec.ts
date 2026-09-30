@@ -237,7 +237,6 @@ describe("MembershipManager", () => {
                     );
 
                     // preparing the delayed disconnect should handle the delay being too long
-                    // The error does not carry the limit, it is read from the capabilities.
                     vi.mocked(client.getCapabilities).mockResolvedValue({
                         "org.matrix.msc4140.delayed_events": { max_delay_ms: 7500, max_scheduled: 100 },
                     });
