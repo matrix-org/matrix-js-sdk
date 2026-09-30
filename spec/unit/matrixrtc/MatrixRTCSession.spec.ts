@@ -646,6 +646,11 @@ describe("MatrixRTCSession", () => {
             expect(sess!.isJoined()).toEqual(true);
         });
 
+        it("joins with deprecated method", () => {
+            sess!.joinRTCSession(owmMemberIdentity, [], mockFocus);
+            expect(sess!.isJoined()).toEqual(true);
+        });
+
         it("uses the sticky events membership manager implementation", () => {
             sess!.join(owmMemberIdentity, [mockFocus], { unstableSendStickyEvents: true });
             expect(sess!.isJoined()).toEqual(true);
