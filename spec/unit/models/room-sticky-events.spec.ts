@@ -363,6 +363,30 @@ describe("RoomStickyEvents", () => {
             );
             expect([...stickyEvents.getStickyEvents()]).toEqual([event]);
         });
+
+        it("should keep waiting when decryption failed before the event was added", async () => {
+            const event = makeEncryptedStickyEvent();
+            const failing = {
+                decryptEvent: vi.fn().mockRejectedValue(new Error("no keys")),
+            } as unknown as CryptoBackend;
+            await event.attemptDecryption(failing);
+
+            stickyEvents.addStickyEvents([event]);
+
+            // Indexing it now would file it under `m.room.message` with no sticky key.
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+            expect(emitSpy).not.toHaveBeenCalled();
+
+            // The keys arrive later and the event is decrypted after all.
+            await event.attemptDecryption(
+                cryptoDecryptingTo("org.example.any_type", { msc4354_sticky_key: "foobar" }),
+                { isRetry: true },
+            );
+            expect(stickyEvents.getKeyedStickyEvent("@alice:example.org", "org.example.any_type", "foobar")).toBe(
+                event,
+            );
+            expect(emitSpy).toHaveBeenCalledWith([event], [], []);
+        });
     });
 
     describe("handleRedaction", () => {
