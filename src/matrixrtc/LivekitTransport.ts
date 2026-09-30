@@ -25,6 +25,14 @@ export const isLivekitTransport = (object: any): object is LivekitTransport =>
     object.type === "livekit" && "livekit_service_url" in object;
 
 /**
+ * @alias
+ * @deprecated Use {@link isLivekitTransport} instead.
+ */
+// TODO: Delete, this is only preserved here due to avoid briefly breaking
+// Element Web's CI while we make breaking changes in this module.
+export const isLivekitTransportConfig = isLivekitTransport;
+
+/**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.
  * Not needed for new implementations.
  */
