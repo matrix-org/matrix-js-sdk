@@ -386,41 +386,32 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
             // The event is not in the map so ignore.
             return;
         }
-        if (index > 0) {
-            // A superseded event was redacted. The current event is unaffected, so there is no
-            // need to emit. We just drop the redacted event so it cannot be reverted to later.
-            innerMap.set(
-                mapKey,
-                events.filter((e) => e.getId() !== redactEventId),
-            );
-            return;
-        }
-        const [currentEvent, ...previousEvents] = events;
         logger.debug(`Redaction for ${redactEventId} under sticky map key ${mapKey}`);
-        // Revert to previous state, taking care to skip any other redacted events.
-        const newEvents = previousEvents.filter((e) => !e.isRedacted()).sort(RoomStickyEventsStore.sortStickyEvent);
+
+        // The current event always sits at index 0.
+        const currentEvent = events[0];
+        const currentEventRedacted = index === 0;
+
+        // Drop the redacted event and any other events that may have already been redacted before.
+        const newEvents = events.filter((e) => e.getId() !== redactEventId && !e.isRedacted());
         if (newEvents.length) {
             innerMap.set(mapKey, newEvents);
-            this.emit(
-                RoomStickyEventsEvent.Update,
-                [],
-                [
-                    {
-                        // This looks confusing. This emits that the newer event
-                        // has been redacted and the previous event has taken it's place.
-                        previous: currentEvent,
-                        current: newEvents[0],
-                    },
-                ],
-                [],
-            );
         } else {
-            // We did not find a previous event, so just expire.
             innerMap.delete(mapKey);
             if (innerMap.size === 0) {
                 this.stickyEventsMap.delete(eventType);
             }
-            this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
+        }
+
+        // Emit an update if the current event was redacted.
+        if (currentEventRedacted) {
+            if (newEvents.length) {
+                // The current event was redacted and most recent superseded event takes its place.
+                this.emit(RoomStickyEventsEvent.Update, [], [{ previous: currentEvent, current: newEvents[0] }], []);
+            } else {
+                // The current event was redacted and no superseded events remain to replace it.
+                this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
+            }
         }
     }
 
