@@ -68,15 +68,6 @@ type MembershipData =
     | { kind: MembershipKind.RTC; data: RtcMembershipData }
     | { kind: MembershipKind.Session; data: SessionMembershipData };
 
-function getUserId({ kind, data }: MembershipData, sender: string): string {
-    switch (kind) {
-        case MembershipKind.RTC:
-            return data.member.user_id;
-        case MembershipKind.Session:
-            return sender;
-    }
-}
-
 function getDeviceId({ kind, data }: MembershipData): string {
     switch (kind) {
         case MembershipKind.RTC:
@@ -154,7 +145,7 @@ export class CallMembership {
         const transports = getTransports(membershipData);
 
         const rtcBackendIdentity = useHashedRtcBackendIdentity(transports)
-            ? await computeRtcIdentityRaw(getUserId(membershipData, sender), getMemberId(membershipData, sender))
+            ? await computeRtcIdentityRaw(sender, getMemberId(membershipData, sender))
             : `${sender}:${getDeviceId(membershipData)}`;
 
         return new CallMembership(matrixEvent, membershipData, rtcBackendIdentity);
@@ -201,7 +192,7 @@ export class CallMembership {
     }
 
     public get userId(): string {
-        return getUserId(this.membershipData, this.matrixEventData.sender);
+        return this.matrixEventData.sender;
     }
 
     public get eventId(): string {
