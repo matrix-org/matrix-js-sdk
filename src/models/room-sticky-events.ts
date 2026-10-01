@@ -344,6 +344,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
 
         // Handle unkeyedStickyEvents first since it's *quick*.
         const redactEventId = typeof redactedEvent === "string" ? redactedEvent : redactedEvent.getId();
+        if (!redactEventId) {
+            return;
+        }
         for (const event of this.unkeyedStickyEvents) {
             if (event.getId() === redactEventId) {
                 this.unkeyedStickyEvents.delete(event);
@@ -355,60 +358,75 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         // Faster method of finding the event since we have the event cached.
         if (typeof redactedEvent !== "string" && !redactedEvent.isRedacted()) {
             const stickyKey = redactedEvent.getContent().msc4354_sticky_key;
-            if (typeof stickyKey !== "string" && stickyKey !== undefined) {
+            if (typeof stickyKey !== "string") {
                 return; // Not a sticky event.
             }
-            const eventType = redactedEvent.getType();
             const sender = redactedEvent.getSender();
             assertIsUserId(sender);
-            const innerMap = this.stickyEventsMap.get(eventType);
-            if (!innerMap) {
-                return;
-            }
-            const mapKey = RoomStickyEventsStore.stickyMapKey(stickyKey, sender);
-            const [currentEvent, ...previousEvents] = innerMap.get(mapKey) ?? [];
-            if (!currentEvent) {
-                // No event current in the map so ignore.
-                return;
-            }
-            logger.debug(`Redaction for ${redactEventId} under sticky key ${stickyKey}`);
-            // Revert to previous state, taking care to skip any other redacted events.
-            const newEvents = previousEvents.filter((e) => !e.isRedacted()).sort(RoomStickyEventsStore.sortStickyEvent);
-            this.stickyEventsMap.get(eventType)?.set(mapKey, newEvents);
-            if (newEvents.length) {
-                this.emit(
-                    RoomStickyEventsEvent.Update,
-                    [],
-                    [
-                        {
-                            // This looks confusing. This emits that the newer event
-                            // has been redacted and the previous event has taken it's place.
-                            previous: currentEvent,
-                            current: newEvents[0],
-                        },
-                    ],
-                    [],
-                );
-            } else {
-                // We did not find a previous event, so just expire.
-                innerMap.delete(mapKey);
-                if (innerMap.size === 0) {
-                    this.stickyEventsMap.delete(eventType);
-                }
-                this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
-            }
+            this.removeKeyedStickyEvent(
+                redactedEvent.getType(),
+                RoomStickyEventsStore.stickyMapKey(stickyKey, sender),
+                redactEventId,
+            );
             return;
         }
 
         // We only know the event ID of the redacted event, so we need to
         // traverse the map to find our event.
-        for (const innerMap of this.stickyEventsMap.values()) {
-            for (const [currentEvent] of innerMap.values()) {
-                if (currentEvent.getId() !== redactEventId) {
-                    continue;
+        for (const [eventType, innerMap] of this.stickyEventsMap) {
+            for (const [mapKey, events] of innerMap) {
+                if (events.some((e) => e.getId() === redactEventId)) {
+                    // Found the event.
+                    this.removeKeyedStickyEvent(eventType, mapKey, redactEventId);
+                    return;
                 }
-                // Found the event.
-                return this.handleRedaction(currentEvent);
+            }
+        }
+    }
+
+    /**
+     * Remove a redacted event from an entry of the keyed sticky map, emitting
+     * `RoomEvent.StickyEvents` if this changes the "current" event of that entry.
+     * @param eventType The event `type` of the redacted event.
+     * @param mapKey The inner map key of the redacted event, see {@link stickyMapKey}.
+     * @param redactEventId The ID of the redacted event.
+     */
+    private removeKeyedStickyEvent(eventType: string, mapKey: string, redactEventId: string): void {
+        const innerMap = this.stickyEventsMap.get(eventType);
+        const events = innerMap?.get(mapKey);
+        if (!innerMap || !events) {
+            return;
+        }
+        const index = events.findIndex((e) => e.getId() === redactEventId);
+        if (index === -1) {
+            // The event is not in the map so ignore.
+            return;
+        }
+        logger.debug(`Redaction for ${redactEventId} under sticky map key ${mapKey}`);
+
+        // The current event always sits at index 0.
+        const currentEvent = events[0];
+        const currentEventRedacted = index === 0;
+
+        // Drop the redacted event and any other events that may have already been redacted before.
+        const newEvents = events.filter((e) => e.getId() !== redactEventId && !e.isRedacted());
+        if (newEvents.length) {
+            innerMap.set(mapKey, newEvents);
+        } else {
+            innerMap.delete(mapKey);
+            if (innerMap.size === 0) {
+                this.stickyEventsMap.delete(eventType);
+            }
+        }
+
+        // Emit an update if the current event was redacted.
+        if (currentEventRedacted) {
+            if (newEvents.length) {
+                // The current event was redacted and most recent superseded event takes its place.
+                this.emit(RoomStickyEventsEvent.Update, [], [{ previous: currentEvent, current: newEvents[0] }], []);
+            } else {
+                // The current event was redacted and no superseded events remain to replace it.
+                this.emit(RoomStickyEventsEvent.Update, [], [], [currentEvent]);
             }
         }
     }
