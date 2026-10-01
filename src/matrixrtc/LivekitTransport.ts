@@ -47,23 +47,6 @@ export const isLivekitFocusSelection = (object: any): object is LivekitFocusSele
     object.type === "livekit" && "focus_selection" in object;
 
 /**
- * Identifies the MatrixRTC membership that a LiveKit request is made for (MSC4195).
- *
- * Note that this is *not* the `member` field of an `m.rtc.member` event verbatim: the homeserver knows
- * the user ID from the access token, and the device ID is only ever claimed, never verified.
- */
-export interface LivekitRtcMember {
-    /**
-     * The ID of the member within the MatrixRTC session, i.e. the `member.id` of the `m.rtc.member` event.
-     */
-    id: string;
-    /**
-     * The device ID the member claims to be using, i.e. the `member.device_id` of the `m.rtc.member` event.
-     */
-    claimed_device_id?: string;
-}
-
-/**
  * The body of a request to the LiveKit `get_token` endpoint (MSC4195).
  *
  * Declared as a type alias rather than an interface so that it can be passed to the widget API
@@ -83,9 +66,9 @@ export type LivekitGetTokenRequest = {
      */
     slot_id: string;
     /**
-     * The MatrixRTC membership to obtain a token for.
+     * The `member.id` value from the `m.rtc.member` event.
      */
-    member: LivekitRtcMember;
+    member_id: string;
     /**
      * The server name of the `m.rtc.member` event's sender. If omitted, the homeserver uses its own
      * server name. This is what makes it possible to obtain a token for an SFU of a remote homeserver.
@@ -123,9 +106,9 @@ export type LivekitDelegateDelayedLeaveRequest = {
      */
     slot_id: string;
     /**
-     * The MatrixRTC membership the delayed leave event belongs to.
+     * The `member.id` value from the `m.rtc.member` event.
      */
-    member: LivekitRtcMember;
+    member_id: string
     /**
      * The delay ID of the delayed leave event to hand over to the homeserver.
      */
