@@ -16,23 +16,34 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
+type WebsocketUrl = {
+    /**
+     * WebSocket URL of the LiveKit server.
+     */
+    url: string;
+};
+
+type ServiceUrl = {
+    /**
+     * Base URL of the LiveKit JWT service.
+     */
+    livekit_service_url: string;
+};
+
 export type LivekitTransport =
-    // Latest MSC4195 variant
-    | {
-          type: "livekit";
-          /**
-           * WebSocket URL of the LiveKit server.
-           */
-          url: string;
-      }
-    // Legacy variant
-    | {
-          type: "livekit";
-          /**
-           * Base URL of the LiveKit JWT service.
-           */
-          livekit_service_url: string;
-      };
+    // Latest MSC4195 variant, with `url`. Indicates that both publishers and
+    // subscribers will use the /_matrix/client/v1/rtc/livekit/get_token
+    // endpoint.
+    | ({ type: "livekit" } & WebsocketUrl)
+    // Legacy variant, with `livekit_service_url`. Indicates that both
+    // publishers and subscribers will use the endpoints of the provided LiveKit
+    // JWT service.
+    | ({ type: "livekit" } & ServiceUrl)
+    // Transitional variant, with both `url` and `livekit_service_url`.
+    // Indicates that both publishers and subscribers may use either the
+    // /_matrix/client/v1/rtc/livekit/get_token endpoint or the provided LiveKit
+    // JWT service.
+    | ({ type: "livekit" } & WebsocketUrl & ServiceUrl);
 
 export const isLivekitTransport = (object: unknown): object is LivekitTransport => {
     if (typeof object !== "object" || object === null) return false;

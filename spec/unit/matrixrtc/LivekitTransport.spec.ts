@@ -28,6 +28,8 @@ describe("LivekitTransport", () => {
         expect(isLivekitFocusSelection({ type: "not-livekit", focus_selection: "multi_sfu" })).toBeFalsy();
     });
     it("isLivekitTransport", () => {
+        expect(isLivekitTransport(0)).toBeFalsy();
+        expect(isLivekitTransport(null)).toBeFalsy();
         expect(
             isLivekitTransport({
                 type: "livekit",
@@ -38,6 +40,13 @@ describe("LivekitTransport", () => {
             isLivekitTransport({
                 type: "livekit",
                 url: "ws://test.com",
+            }),
+        ).toBeTruthy();
+        expect(
+            isLivekitTransport({
+                type: "livekit",
+                url: "ws://test.com",
+                livekit_service_url: "http://test.com",
             }),
         ).toBeTruthy();
         expect(isLivekitTransport({ type: "livekit" })).toBeFalsy();
