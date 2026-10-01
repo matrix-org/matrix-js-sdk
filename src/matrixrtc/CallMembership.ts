@@ -18,7 +18,7 @@ import { deepCompare } from "../utils.ts";
 import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
-import { computeSlotId, slotIdToDescription } from "./utils.ts";
+import { computeSlotId, slotIdToDescription, useHashedRtcBackendIdentity } from "./utils.ts";
 import {
     checkRtcMembershipData,
     computeRtcIdentityRaw,
@@ -68,6 +68,50 @@ type MembershipData =
     | { kind: MembershipKind.RTC; data: RtcMembershipData }
     | { kind: MembershipKind.Session; data: SessionMembershipData };
 
+function getUserId({ kind, data }: MembershipData, sender: string): string {
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.member.user_id;
+        case MembershipKind.Session:
+            return sender;
+    }
+}
+
+function getDeviceId({ kind, data }: MembershipData): string {
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.member.device_id;
+        case MembershipKind.Session:
+            return data.device_id;
+    }
+}
+
+function getMemberId({ kind, data }: MembershipData, sender: string): string {
+    // the createdTs behaves equivalent to the membershipID.
+    // we only need the field for the legacy member events where we needed to update them
+    // synapse ignores sending state events if they have the same content.
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.member.id;
+        case MembershipKind.Session:
+            return (
+                // best case we have a client already publishing the right custom membershipId
+                data.membershipID ??
+                // alternativly we use the hard coded jwt id defuatl value (used until version 0.16.0)
+                `${sender}:${data.device_id}`
+            );
+    }
+}
+
+function getTransports({ kind, data }: MembershipData): Transport[] {
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.transports.published;
+        case MembershipKind.Session:
+            return data.foci_preferred;
+    }
+}
+
 type LimitedEvent = Pick<MatrixEvent, "getId" | "getSender" | "getTs" | "getType" | "getContent">;
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership is removed, to avoid confusion.
 export class CallMembership {
@@ -104,15 +148,15 @@ export class CallMembership {
      * @param matrixEvent The Matrix event to read.
      */
     public static async parseFromEvent(matrixEvent: LimitedEvent): Promise<CallMembership> {
+        const sender = matrixEvent.getSender();
+        if (sender === undefined) throw new Error("matrixEvent is missing sender field");
         const membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
-        const rtcBackendIdentity =
-            membershipData.kind === MembershipKind.RTC
-                ? await computeRtcIdentityRaw(
-                      membershipData.data.member.user_id,
-                      membershipData.data.member.device_id,
-                      membershipData.data.member.id,
-                  )
-                : `${matrixEvent.getSender()}:${membershipData.data.device_id}`;
+        const transports = getTransports(membershipData);
+
+        const rtcBackendIdentity = useHashedRtcBackendIdentity(transports)
+            ? await computeRtcIdentityRaw(getUserId(membershipData, sender), getMemberId(membershipData, sender))
+            : `${sender}:${getDeviceId(membershipData)}`;
+
         return new CallMembership(matrixEvent, membershipData, rtcBackendIdentity);
     }
 
@@ -144,8 +188,8 @@ export class CallMembership {
         const eventId = matrixEvent.getId();
         const sender = matrixEvent.getSender();
 
-        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
-        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+        if (eventId === undefined) throw new Error("matrixEvent is missing eventId field");
+        if (sender === undefined) throw new Error("matrixEvent is missing sender field");
 
         this.logger = logger.getChild(`[CallMembership ${sender}:${this.deviceId}]`);
         this.matrixEventData = { eventId, sender };
@@ -157,14 +201,7 @@ export class CallMembership {
     }
 
     public get userId(): string {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.member.user_id;
-            case MembershipKind.Session:
-            default:
-                return this.matrixEventData.sender;
-        }
+        return getUserId(this.membershipData, this.matrixEventData.sender);
     }
 
     public get eventId(): string {
@@ -226,14 +263,7 @@ export class CallMembership {
     }
 
     public get deviceId(): string {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.member.device_id;
-            case MembershipKind.Session:
-            default:
-                return data.device_id;
-        }
+        return getDeviceId(this.membershipData);
     }
 
     public get callIntent(): RTCCallIntent | undefined {
@@ -313,23 +343,7 @@ export class CallMembership {
      * It is also possible for a session event to set a custom membershipID. in that case this will be used.
      */
     public get memberId(): string {
-        // the createdTs behaves equivalent to the membershipID.
-        // we only need the field for the legacy member events where we needed to update them
-        // synapse ignores sending state events if they have the same content.
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case "rtc":
-                return data.member.id;
-            case "session":
-                return (
-                    // best case we have a client already publishing the right custom membershipId
-                    data.membershipID ??
-                    // alternativly we use the hard coded jwt id defuatl value (used until version 0.16.0)
-                    `${this.matrixEventData.sender}:${data.device_id}`
-                );
-            default:
-                throw Error("Not possible to get memberID without knowing the membership event kind");
-        }
+        return getMemberId(this.membershipData, this.matrixEventData.sender);
     }
 
     /**
@@ -430,13 +444,6 @@ export class CallMembership {
      * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).
      */
     public get transports(): Transport[] {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.transports.published;
-            case MembershipKind.Session:
-            default:
-                return data.foci_preferred;
-        }
+        return getTransports(this.membershipData);
     }
 }

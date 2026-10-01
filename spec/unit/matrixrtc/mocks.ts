@@ -43,12 +43,10 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     focus_active: { type: "livekit", focus_selection: "multi_sfu" },
     foci_preferred: [
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
             type: "livekit",
         },
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.dev",
             type: "livekit",
         },
@@ -71,19 +69,7 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         published: [
             {
                 type: "livekit",
-                focus_active: { type: "livekit", focus_selection: "multi_sfu" },
-                foci_preferred: [
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.io",
-                        type: "livekit",
-                    },
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.dev",
-                        type: "livekit",
-                    },
-                ],
+                url: "wss://livekit.something.io",
             },
         ],
         can_subscribe: ["livekit"],

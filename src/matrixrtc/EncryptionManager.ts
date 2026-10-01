@@ -25,9 +25,11 @@ export interface IEncryptionManager {
      * Joins the encryption manager with the provided configuration.
      *
      * @param joinConfig - The configuration for joining encryption, or undefined
+     * @param useHashedRtcBackendIdentity - Whether the user's own RTC backend identity should use
+     *   the hashed format from newer versions of MSC4195.
      * if no specific configuration is provided.
      */
-    join(joinConfig: EncryptionConfig | undefined): void;
+    join(joinConfig: EncryptionConfig | undefined, useHashedRtcBackendIdentity: boolean): void;
 
     /**
      * Leaves the encryption manager, cleaning up any associated resources.

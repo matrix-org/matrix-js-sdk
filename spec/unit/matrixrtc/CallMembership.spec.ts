@@ -405,9 +405,29 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-        it("uses unpadded base64 for RTC backend identities", async () => {
-            const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
-            expect(membership.rtcBackendIdentity).toBe("jUZ0Q1yF5nV3LlAI5xfD1I7BPnAytJaPEAR57EXjJ6s");
+        it("uses unpadded base64 for hashed RTC backend identities", async () => {
+            const membership = await CallMembership.parseFromEvent(
+                makeMockEvent(0, {
+                    ...membershipTemplate,
+                    transports: {
+                        published: [{ type: "livekit", url: "wss://example.org" }],
+                        can_subscribe: ["livekit"],
+                    },
+                }),
+            );
+            expect(membership.rtcBackendIdentity).toBe("b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0");
+        });
+        it("uses legacy RTC backend identities in case of legacy transport", async () => {
+            const membership = await CallMembership.parseFromEvent(
+                makeMockEvent(0, {
+                    ...membershipTemplate,
+                    transports: {
+                        published: [{ type: "livekit", livekit_service_url: "https://example.org" }],
+                        can_subscribe: ["livekit"],
+                    },
+                }),
+            );
+            expect(membership.rtcBackendIdentity).toBe("@alice:example.org:AAAAAAA");
         });
     });
 });

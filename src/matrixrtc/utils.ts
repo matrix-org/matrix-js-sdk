@@ -15,10 +15,17 @@ limitations under the License.
 */
 
 import { getEncryptionKeyMapKey, type CallMembershipIdentityParts } from "./EncryptionManager.ts";
-import type { InboundEncryptionSession, EncryptionKeyMapKey, RtcSlotEventContent, SlotDescription } from "./types.ts";
+import type {
+    InboundEncryptionSession,
+    EncryptionKeyMapKey,
+    RtcSlotEventContent,
+    SlotDescription,
+    Transport,
+} from "./types.ts";
 import type { Room } from "../models/room.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { EventType } from "../@types/event.ts";
+import { isLivekitTransport } from "./LivekitTransport.ts";
 
 /**
  * Detects when a key for a given index is outdated.
@@ -119,4 +126,13 @@ export function isSlotClosed(
 export function isSlotOpen(room: Pick<Room, "getLiveTimeline">, slotDescription: SlotDescription): boolean | undefined {
     const closed = isSlotClosed(room, slotDescription);
     return closed === undefined ? undefined : !closed;
+}
+
+/**
+ * @param transports The transports that a given member is publishing.
+ * @returns Whether that member uses the hashed RTC backend identity format from newer versions of
+ *   MSC4195, as opposed to the legacy string concatenation format.
+ */
+export function useHashedRtcBackendIdentity(transports: Transport[]): boolean {
+    return transports.every((transport) => !isLivekitTransport(transport) || "url" in transport);
 }

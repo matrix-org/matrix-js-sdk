@@ -19,7 +19,7 @@ import {
     getEncryptionKeyMapKey,
     type IEncryptionManager,
 } from "./EncryptionManager.ts";
-import { type EncryptionConfig, type MembershipConfig } from "./MatrixRTCSession.ts";
+import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import type { CallMembership } from "./CallMembership.ts";
 import { decodeBase64, encodeBase64 } from "../base64.ts";
 import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents } from "./IKeyTransport.ts";
@@ -130,7 +130,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
 
     private logger: Logger | undefined = undefined;
 
-    private readonly rtcIdentityProvider: (userId: string, deviceId: string, memberId: string) => Promise<string>;
+    private readonly rtcIdentityProvider: (userId: string, memberId: string) => Promise<string>;
 
     /**
      *
@@ -154,7 +154,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             rtcBackendIdentity: string,
         ) => void,
         parentLogger?: Logger,
-        rtcBackendIdProvider?: (userId: string, deviceId: string, memberId: string) => Promise<string>,
+        rtcBackendIdProvider?: (userId: string, memberId: string) => Promise<string>,
     ) {
         this.logger = parentLogger?.getChild(`[EncryptionManager]`);
         this.rtcIdentityProvider = rtcBackendIdProvider ?? computeRtcIdentityRaw;
@@ -184,7 +184,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 // If we see this log multiple times, we need to reconsider the precompute call of getOwnRtcBackendIdentity
                 `Computing RTC backend identity for ${userId}:${deviceId}:${memberId} (SHOULD ONLY BE CALLED ONCE)`,
             );
-            this.ownRtcBackendIdentityCache = await this.rtcIdentityProvider(userId, deviceId, memberId);
+            this.ownRtcBackendIdentityCache = await this.rtcIdentityProvider(userId, memberId);
         } else {
             this.ownRtcBackendIdentityCache = `${this.ownMembership.userId}:${this.ownMembership.deviceId}`;
         }
@@ -250,9 +250,9 @@ export class RTCEncryptionManager implements IEncryptionManager {
         this.onEncryptionKeysChanged(key, keyIndex, membership, rtcBackendIdentity);
     }
 
-    public join(joinConfig: (EncryptionConfig & MembershipConfig) | undefined): void {
+    public join(joinConfig: EncryptionConfig | undefined, useHashedRtcBackendIdentity: boolean): void {
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
-        this.useHashedRtcBackendIdentity = joinConfig?.unstableSendStickyEvents ?? false;
+        this.useHashedRtcBackendIdentity = useHashedRtcBackendIdentity;
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
         this.keyRotationParticipantLimit =

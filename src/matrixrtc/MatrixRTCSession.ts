@@ -51,7 +51,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen } from "./utils.ts";
+import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen, useHashedRtcBackendIdentity } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -648,7 +648,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
-        this.encryptionManager.join(joinConfig);
+        this.encryptionManager.join(joinConfig, useHashedRtcBackendIdentity(publishedTransports));
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }

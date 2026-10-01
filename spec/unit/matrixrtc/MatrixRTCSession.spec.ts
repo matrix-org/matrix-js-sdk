@@ -401,11 +401,11 @@ describe("MatrixRTCSession", () => {
                 await sess.initialMembershipCalculated;
                 expect(sess?.memberships.length).toEqual(1);
                 // Backend identity is expected to not be hashed with a legacy (session) membership
+                // which publishes a legacy (livekit_service_url) transport
                 expect(sess?.memberships[0].rtcBackendIdentity).toEqual(
                     testConfig.testCreateSticky
                         ? await computeRtcIdentityRaw(
                               rtcMembershipTemplate.member.user_id,
-                              rtcMembershipTemplate.member.device_id,
                               rtcMembershipTemplate.member.id,
                           )
                         : "@mock:user.example:AAAAAAA",
