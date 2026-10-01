@@ -48,7 +48,7 @@ export type SessionMembershipData = {
      */
     "focus_active": {
         type: "livekit" | string;
-        focus_selection: "oldest_membership" | "multi_sfu" | string;
+        focus_selection: "multi_sfu" | string;
     };
 
     /**

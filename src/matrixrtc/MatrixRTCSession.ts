@@ -582,22 +582,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Announces this user and device as joined to the MatrixRTC session,
      * and continues to update the membership event to keep it valid until
      * leaveRoomSession() is called
-     * This will not subscribe to updates: remember to call subscribe() separately if
-     * desired.
      * This method will return immediately and the session will be joined in the background.
      * @param ownMembershipIdentity the identity of the user and device joining the session.
      * This will be put into the content.member.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRTCSession(
+    public join(
         ownMembershipIdentity: CallMembershipIdentityParts,
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
+        publishedTransports: Transport[],
         joinConfig?: JoinSessionConfig,
     ): void {
         if (this.isJoined()) {
@@ -650,7 +643,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager.join(fociPreferred, multiSfuFocus, (e) => {
+        this.membershipManager.join(publishedTransports, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
@@ -661,34 +654,28 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     *
-     * @param fociPreferred
-     * @param multiSfuFocus
-     * @param joinConfig
-     * @deprecated use the joinRTCSession method instead
+     * @deprecated Use {@link join} instead.
      */
-    public joinRoomSession(
+    // TODO: Delete, this is only preserved here to avoid briefly breaking
+    // Element Web's CI while we make breaking changes to this class.
+    public joinRTCSession(
+        ownMembershipIdentity: CallMembershipIdentityParts,
         fociPreferred: Transport[],
         multiSfuFocus?: Transport,
         joinConfig?: JoinSessionConfig,
     ): void {
-        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
-        // TODO this wants to become a UUID
-        const memberId = `${userId}:${deviceId}`;
-        this.joinRTCSession({ userId, deviceId, memberId }, fociPreferred, multiSfuFocus, joinConfig);
+        this.join(ownMembershipIdentity, [...fociPreferred, ...(multiSfuFocus ? [multiSfuFocus] : [])], joinConfig);
     }
 
     /**
      * Announces this user and device as having left the MatrixRTC session
      * and stops scheduled updates.
-     * This will not unsubscribe from updates: remember to call unsubscribe() separately if
-     * desired.
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      * @returns Whether the membership update was attempted and did not time out.
      */
-    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
+    public async leave(timeout?: number): Promise<boolean> {
         if (!this.isJoined()) {
             this.logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
             return false;
@@ -703,16 +690,21 @@ export class MatrixRTCSession extends TypedEventEmitter<
 
         return await leavePromise;
     }
+
     /**
-     * This returns the focus in use by the oldest membership.
-     * Do not use since this might be just the focus for the oldest membership. others might use a different focus.
-     * @deprecated use `member.getTransport(session.getOldestMembership())` instead for the specific member you want to get the focus for.
+     * @deprecated Use {@link leave} instead.
      */
-    public getFocusInUse(): Transport | undefined {
-        const oldestMembership = this.getOldestMembership();
-        return oldestMembership?.getTransport(oldestMembership);
+    // TODO: Delete, this is only preserved here to avoid briefly breaking
+    // Element Web's CI while we make breaking changes to this class.
+    public async leaveRoomSession(timeout?: number): Promise<boolean> {
+        return this.leave(timeout);
     }
 
+    /**
+     * @returns The oldest membership, if any, as determined by {@link CallMembership.createdTs}.
+     * @deprecated This SDK no longer selects transports based on the transport preferred by the
+     *   oldest member, so the oldest membership should generally not be of interest anymore.
+     */
     public getOldestMembership(): CallMembership | undefined {
         return this.memberships[0];
     }
