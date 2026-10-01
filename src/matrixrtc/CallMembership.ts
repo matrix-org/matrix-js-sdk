@@ -343,6 +343,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
+                // TODO Do we need this to represent the TS of the original join?
                 return this.matrixEvent.getTs();
             case MembershipKind.Session:
             default:
