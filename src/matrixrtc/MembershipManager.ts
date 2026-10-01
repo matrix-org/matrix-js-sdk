@@ -36,7 +36,7 @@ import {
 import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
 import { deepCompare } from "../utils.ts";
-import { isLivekitTransportConfig } from "./LivekitTransport.ts";
+import { isLivekitTransport } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────────┐   ┌───────────────(1)───────────┐
@@ -1324,7 +1324,7 @@ export class StickyEventMembershipManager extends MembershipManager {
      * @returns Only returns `RtcMembershipData`
      */
     protected makeMyMembership(): RtcMembershipData {
-        const livekitTransport = isLivekitTransportConfig(this.rtcTransport) ? this.rtcTransport : undefined;
+        const livekitTransport = isLivekitTransport(this.rtcTransport) ? this.rtcTransport : undefined;
         return {
             application: {
                 ...this.applicationData,
