@@ -88,7 +88,7 @@ function getMemberId({ kind, data }: MembershipData, sender: string): string {
             return (
                 // best case we have a client already publishing the right custom membershipId
                 data.membershipID ??
-                // alternativly we use the hard coded jwt id defuatl value (used until version 0.16.0)
+                // alternatively we use the hardcoded jwt id default value (used until version 0.16.0)
                 `${sender}:${data.device_id}`
             );
     }
