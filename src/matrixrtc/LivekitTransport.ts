@@ -108,7 +108,7 @@ export type LivekitDelegateDelayedLeaveRequest = {
     /**
      * The `member.id` value from the `m.rtc.member` event.
      */
-    member_id: string
+    member_id: string;
     /**
      * The delay ID of the delayed leave event to hand over to the homeserver.
      */
