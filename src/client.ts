@@ -872,13 +872,13 @@ export interface IProtocol {
     instances: IInstance[];
 }
 
-interface IThirdPartyLocation {
+export interface IThirdPartyLocation {
     alias: string;
     protocol: string;
     fields: object;
 }
 
-interface IThirdPartyUser {
+export interface IThirdPartyUser {
     userid: string;
     protocol: string;
     fields: object;
@@ -7417,15 +7417,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param options
      * @param options.term - the term with which to search.
      * @param options.limit - the maximum number of results to return. The server will apply a limit if unspecified.
+     * @param options.server - the remote server whose directory to search (MSC4258-adjacent
+     *     targeted federated search). Ignored by servers without support.
+     * @param options.searchScope - MSC4258 search scope: "local", "restricted" or "remote".
      * @returns Promise which resolves: an array of results.
      */
-    public searchUserDirectory({ term, limit }: { term: string; limit?: number }): Promise<IUserDirectoryResponse> {
+    public searchUserDirectory({
+        term,
+        limit,
+        server,
+        searchScope,
+    }: {
+        term: string;
+        limit?: number;
+        server?: string;
+        searchScope?: "local" | "restricted" | "remote";
+    }): Promise<IUserDirectoryResponse> {
         const body: Body = {
             search_term: term,
         };
 
         if (limit !== undefined) {
             body.limit = limit;
+        }
+        if (server !== undefined) {
+            body.server = server;
+        }
+        if (searchScope !== undefined) {
+            body.search_scope = searchScope;
         }
 
         return this.http.authedRequest(Method.Post, "/user_directory/search", undefined, body);
@@ -8640,9 +8659,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * this HS
      * @returns Promise which resolves to the result object
      */
-    public getThirdpartyProtocols(): Promise<{ [protocol: string]: IProtocol }> {
+    public getThirdpartyProtocols(server?: string): Promise<{ [protocol: string]: IProtocol }> {
         return this.http
-            .authedRequest<Record<string, IProtocol>>(Method.Get, "/thirdparty/protocols")
+            .authedRequest<Record<string, IProtocol>>(
+                Method.Get,
+                "/thirdparty/protocols",
+                server !== undefined ? { server } : undefined,
+            )
             .then((response) => {
                 // sanity check
                 if (!response || typeof response !== "object") {
@@ -8660,10 +8683,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                        response to getThirdpartyProtocols()
      * @returns Promise which resolves to the result object
      */
-    public getThirdpartyLocation(
-        protocol: string,
-        params: { searchFields?: string[] },
-    ): Promise<IThirdPartyLocation[]> {
+    public getThirdpartyLocation(protocol: string, params?: QueryDict): Promise<IThirdPartyLocation[]> {
         const path = utils.encodeUri("/thirdparty/location/$protocol", {
             $protocol: protocol,
         });

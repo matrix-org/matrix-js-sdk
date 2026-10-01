@@ -4241,4 +4241,46 @@ describe("MatrixClient", function () {
             });
         });
     });
+
+    describe("searchUserDirectory", () => {
+        it("passes the MSC4258 server and search scope", async () => {
+            httpLookups = [
+                {
+                    method: "POST",
+                    path: "/user_directory/search",
+                    expectBody: { search_term: "alice", limit: 5, server: "remote.example", search_scope: "remote" },
+                    data: { results: [], limited: false },
+                },
+            ];
+            expect(
+                await client.searchUserDirectory({
+                    term: "alice",
+                    limit: 5,
+                    server: "remote.example",
+                    searchScope: "remote",
+                }),
+            ).toEqual({ results: [], limited: false });
+        });
+    });
+
+    describe("getThirdpartyProtocols", () => {
+        it("targets a remote server via the MSC4517 server parameter", async () => {
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: "/thirdparty/protocols",
+                    expectQueryParams: { server: "remote.example" },
+                    data: { xmpp: { user_fields: ["user"], location_fields: [], icon: "", instances: [] } },
+                },
+            ];
+            expect(await client.getThirdpartyProtocols("remote.example")).toEqual({
+                xmpp: { user_fields: ["user"], location_fields: [], icon: "", instances: [] },
+            });
+        });
+
+        it("rejects a non-object response", async () => {
+            httpLookups = [{ method: "GET", path: "/thirdparty/protocols", data: "nope" as any }];
+            await expect(client.getThirdpartyProtocols()).rejects.toThrow("did not return an object");
+        });
+    });
 });
