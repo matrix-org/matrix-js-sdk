@@ -343,7 +343,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                // TODO we need to read the referenced (relation) event if available to get the real created_ts
+                // TODO Do we need this to represent the TS of the original join?
                 return this.matrixEvent.getTs();
             case MembershipKind.Session:
             default:

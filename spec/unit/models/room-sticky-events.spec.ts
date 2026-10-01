@@ -572,5 +572,70 @@ describe("RoomStickyEvents", () => {
             stickyEvents.handleRedaction(newerEv);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
         });
+        it.each([
+            ["a `MatrixEvent` parameter", (ev: MatrixEvent) => ev],
+            ["an event ID parameter", (ev: MatrixEvent) => ev.getId()!],
+        ])("should not touch the current event when a superseded event is redacted via %s", (_, param) => {
+            const emitSpy = vi.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            vi.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, newerEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Redact the older, superseded event.
+            stickyEvents.handleRedaction(param(ev));
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect(stickyEvents.getKeyedStickyEvent(stickyEvent.sender, stickyEvent.type, "foobar")).toBe(newerEv);
+            // The superseded event must have been dropped, so redacting the current
+            // event now removes the entry rather than reverting to the older event.
+            stickyEvents.handleRedaction(param(newerEv));
+            expect(emitSpy).toHaveBeenCalledWith([], [], [newerEv]);
+        });
+        it("should not touch the current event when redacting an event that was never added to the map", () => {
+            const emitSpy = vi.fn();
+            // This event has already expired on arrival, so it is never added to the map.
+            const expiredEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$expired-ev",
+                origin_server_ts: Date.now() - stickyEvent.msc4354_sticky.duration_ms - 1000,
+            });
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([expiredEv, ev]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(expiredEv);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
+        });
+        it("should not touch keyed events when redacting an unkeyed event that is not in the map", () => {
+            const emitSpy = vi.fn();
+            // A keyed event whose sticky key collides with the string form of `undefined`.
+            const keyedEv = new MatrixEvent({
+                ...stickyEvent,
+                content: { msc4354_sticky_key: "undefined" },
+                origin_server_ts: Date.now(),
+            });
+            const unkeyedEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$unkeyed-ev",
+                content: {},
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([keyedEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(unkeyedEv);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([keyedEv]);
+        });
     });
 });
