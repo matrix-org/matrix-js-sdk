@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import "fake-indexeddb/auto";
+import fetchMock from "@fetch-mock/vitest";
 
 import type HttpBackend from "matrix-mock-request";
 import {
@@ -38,13 +39,25 @@ import {
     RelationType,
     EventType,
     MatrixEventEvent,
+    createClient,
+    MemoryStore,
+    SyncState,
+    type IEvent,
+    type IServerVersions,
 } from "../../src";
+import { type ISavedSync } from "../../src/store";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "../../src/@types/sync";
 import * as utils from "../test-utils/test-utils";
 import { TestClient } from "../TestClient";
 import { emitPromise, mkEvent, mkMessage } from "../test-utils/test-utils";
-import { THREAD_RELATION_TYPE } from "../../src/models/thread";
+import {
+    FeatureSupport,
+    Thread,
+    FILTER_RELATED_BY_REL_TYPES,
+    FILTER_RELATED_BY_SENDERS,
+    THREAD_RELATION_TYPE,
+} from "../../src/models/thread";
 import { type IActionsObject } from "../../src/pushprocessor";
 import { KnownMembership } from "../../src/@types/membership";
 
@@ -2859,5 +2872,285 @@ describe("MatrixClient syncing (IndexedDB version)", () => {
         idbHttpBackend.verifyNoOutstandingExpectation();
         idbClient.stopClient();
         await idbHttpBackend.stop();
+    });
+});
+
+describe("MatrixClient cached startup", () => {
+    const roomId = "!cached:example.org";
+    const userId = "@alice:example.org";
+    let client: MatrixClient;
+    let savedSync: ISavedSync;
+    let versions: ReturnType<typeof Promise.withResolvers<IServerVersions>>;
+    let previousSupport: FeatureSupport[];
+    const namespaces = [THREAD_RELATION_TYPE, FILTER_RELATED_BY_REL_TYPES, FILTER_RELATED_BY_SENDERS];
+    let previousNamespaces: boolean[];
+    const root: IEvent = {
+        event_id: "$root",
+        room_id: roomId,
+        sender: userId,
+        type: EventType.RoomMessage,
+        content: { msgtype: "m.text", body: "Cached root" },
+        origin_server_ts: 1,
+        unsigned: {},
+    };
+    const reply: IEvent = {
+        ...root,
+        event_id: "$reply",
+        origin_server_ts: 2,
+        content: {
+            "msgtype": "m.text",
+            "body": "Cached reply",
+            "m.relates_to": { rel_type: "m.thread", event_id: "$root" },
+        },
+    };
+
+    const cachedEvents = (relationType = "m.thread", encrypted = false): IEvent[] => {
+        const cachedReply = {
+            ...reply,
+            type: encrypted ? EventType.RoomMessageEncrypted : reply.type,
+            content: {
+                ...(encrypted
+                    ? {
+                          algorithm: "m.megolm.v1.aes-sha2",
+                          ciphertext: "ciphertext",
+                          session_id: "session",
+                          sender_key: "sender",
+                      }
+                    : reply.content),
+                "m.relates_to": { rel_type: relationType, event_id: "$root" },
+            },
+        };
+        return [
+            {
+                ...root,
+                unsigned: {
+                    "m.relations": {
+                        [relationType]: {
+                            count: 2,
+                            current_user_participated: true,
+                            latest_event: cachedReply,
+                        },
+                    },
+                },
+            },
+            cachedReply,
+        ];
+    };
+
+    beforeEach(() => {
+        previousSupport = [
+            Thread.hasServerSideSupport,
+            Thread.hasServerSideListSupport,
+            Thread.hasServerSideFwdPaginationSupport,
+        ];
+        previousNamespaces = namespaces.map((value) => value.name === value.unstable);
+        Thread.setServerSideSupport(FeatureSupport.None);
+        Thread.setServerSideListSupport(FeatureSupport.None);
+        Thread.setServerSideFwdPaginationSupport(FeatureSupport.None);
+        THREAD_RELATION_TYPE.setPreferUnstable(false);
+        versions = Promise.withResolvers<IServerVersions>();
+        savedSync = {
+            nextBatch: "cached-token",
+            accountData: [],
+            roomsData: {
+                invite: {},
+                leave: {},
+                knock: {},
+                join: {
+                    [roomId]: {
+                        summary: { "m.heroes": [] },
+                        unread_notifications: {},
+                        state: {
+                            events: [
+                                utils.mkMembership({
+                                    room: roomId,
+                                    user: userId,
+                                    mship: KnownMembership.Join,
+                                }) as IStateEvent,
+                            ],
+                        },
+                        timeline: {
+                            events: cachedEvents(),
+                            prev_batch: "cached-history",
+                        },
+                        ephemeral: { events: [] },
+                        account_data: { events: [] },
+                    },
+                },
+            },
+        };
+        const store = new MemoryStore();
+        vi.spyOn(store, "getSavedSync").mockImplementation(async () => savedSync);
+        vi.spyOn(store, "getSavedSyncToken").mockResolvedValue(savedSync.nextBatch);
+        client = createClient({
+            baseUrl: "https://example.org",
+            userId,
+            accessToken: "token",
+            store,
+            timelineSupport: true,
+        });
+        fetchMock.get("end:/versions", () => versions.promise, { name: "versions" });
+        fetchMock.get("end:/pushrules/", { global: {} });
+        fetchMock.post("end:/filter", { filter_id: "filter" });
+        fetchMock.get("end:/capabilities", { capabilities: {} });
+        fetchMock.get("end:/rtc/transports", { transports: [] });
+    });
+
+    afterEach(() => {
+        client.stopClient();
+        [Thread.hasServerSideSupport, Thread.hasServerSideListSupport, Thread.hasServerSideFwdPaginationSupport] =
+            previousSupport;
+        namespaces.forEach((value, index) => value.setPreferUnstable(previousNamespaces[index]));
+        vi.restoreAllMocks();
+    });
+
+    it("should restore cached threads before discovery and resume live sync on the same room", async () => {
+        const liveSync = Promise.withResolvers<ISyncResponse>();
+        fetchMock.getOnce("path:/_matrix/client/v3/sync", () => liveSync.promise, { name: "live-sync" });
+        fetchMock.get("path:/_matrix/client/v3/sync", () => new Promise(() => {}));
+        const starting = client.startClient({ threadSupport: true });
+        await vi.waitFor(() => expect(client.getSyncState()).toBe(SyncState.Prepared));
+        const room = client.getRoom(roomId)!;
+        const thread = room.getThread("$root")!;
+        expect(thread.length).toBe(2);
+        expect(thread.hasCurrentUserParticipated).toBe(true);
+        expect(thread.findEventById("$reply")?.getContent().body).toBe("Cached reply");
+        expect(fetchMock.callHistory.calls().every(({ url }) => url.endsWith("/versions"))).toBe(true);
+
+        // Thread-list setup must also wait rather than cache an unsupported-server fallback.
+        const threadLists = room.createThreadsTimelineSets();
+        const loadingThreads = threadLists.then(() => room.fetchRoomThreads());
+        fetchMock.get(
+            "express:/_matrix/client/v1/rooms/:roomId/threads",
+            { chunk: [], next_batch: null },
+            { name: "threads" },
+        );
+        fetchMock.get("end:/event/%24root", () => savedSync.roomsData.join[roomId].timeline.events[0]);
+        fetchMock.get("express:/_matrix/client/v1/rooms/:roomId/relations/:eventId", { chunk: [reply] });
+        versions.resolve({ versions: ["v1.4"], unstable_features: {} });
+        await starting;
+        await threadLists;
+        await loadingThreads;
+        liveSync.resolve({
+            next_batch: "live-token",
+            account_data: { events: [] },
+            rooms: {
+                invite: {},
+                leave: {},
+                knock: {},
+                join: {
+                    [roomId]: {
+                        summary: { "m.heroes": [] },
+                        unread_notifications: {},
+                        state: { events: [] },
+                        ephemeral: { events: [] },
+                        account_data: { events: [] },
+                        timeline: {
+                            prev_batch: "live-history",
+                            events: [
+                                { ...root, event_id: "$live", content: { msgtype: "m.text", body: "Live message" } },
+                            ],
+                        },
+                    },
+                },
+            },
+        });
+        await vi.waitFor(() => expect(room.findEventById("$live")?.getContent().body).toBe("Live message"));
+        expect(client.getRoom(roomId)).toBe(room);
+        expect(room.getThread("$root")).toBe(thread);
+        expect(client.store.getSavedSync).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveFetched("threads");
+        expect(new URL(fetchMock.callHistory.calls("live-sync")[0].url).searchParams.get("since")).toBe("cached-token");
+    });
+
+    it("should keep cached edits when discovery reports no thread support", async () => {
+        Thread.setServerSideSupport(FeatureSupport.Experimental);
+        savedSync.roomsData.join[roomId].timeline.events = cachedEvents("io.element.thread");
+        savedSync.roomsData.join[roomId].timeline.events.push({
+            ...reply,
+            event_id: "$edit",
+            origin_server_ts: 3,
+            content: {
+                "msgtype": "m.text",
+                "body": "* Corrected reply",
+                "m.new_content": { msgtype: "m.text", body: "Corrected reply" },
+                "m.relates_to": { rel_type: RelationType.Replace, event_id: "$reply" },
+            },
+        });
+        fetchMock.get("path:/_matrix/client/v3/sync", () => new Promise(() => {}));
+        const starting = client.startClient({ threadSupport: true });
+        await vi.waitFor(() => expect(client.getSyncState()).toBe(SyncState.Prepared));
+        const thread = client.getRoom(roomId)!.getThread("$root")!;
+        versions.resolve({ versions: ["v1.3"], unstable_features: {} });
+        await starting;
+        await vi.waitFor(() => expect(thread.findEventById("$edit")).toBeDefined());
+        expect(thread.findEventById("$reply")?.getContent().body).toBe("Corrected reply");
+    });
+
+    it.each([
+        ["m.thread", true],
+        ["io.element.thread", false],
+    ] as const)(
+        "should restore cached %s threads regardless of the initial namespace",
+        async (relationType, preferUnstable) => {
+            THREAD_RELATION_TYPE.setPreferUnstable(preferUnstable);
+            savedSync.roomsData.join[roomId].timeline.events = cachedEvents(relationType);
+            const starting = client.startClient({ threadSupport: true });
+            await vi.waitFor(() => expect(client.getSyncState()).toBe(SyncState.Prepared));
+            const room = client.getRoom(roomId)!;
+            const thread = room.getThread("$root");
+            expect(thread?.length).toBe(2);
+            expect(thread?.hasCurrentUserParticipated).toBe(true);
+            expect(thread?.findEventById("$reply")?.getContent().body).toBe("Cached reply");
+            expect(
+                room
+                    .getLiveTimeline()
+                    .getEvents()
+                    .map((event) => event.getId()),
+            ).not.toContain("$reply");
+            client.stopClient();
+            versions.resolve({ versions: ["v1.4"], unstable_features: {} });
+            await starting;
+        },
+    );
+
+    it("should defer encrypted thread edit requests until discovery finishes", async () => {
+        Thread.hasServerSideSupport = FeatureSupport.Stable;
+        savedSync.roomsData.join[roomId].timeline.events = cachedEvents("m.thread", true);
+        const starting = client.startClient({ threadSupport: true });
+        await vi.waitFor(() => expect(client.getSyncState()).toBe(SyncState.Prepared));
+        expect(client.getRoom(roomId)!.getThread("$root")?.findEventById("$reply")?.isEncrypted()).toBe(true);
+        expect(fetchMock.callHistory.calls().every(({ url }) => url.endsWith("/versions"))).toBe(true);
+        client.stopClient();
+        versions.resolve({ versions: ["v1.4"], unstable_features: {} });
+        await starting;
+    });
+
+    it("should not restore a late cache read after stopping", async () => {
+        const cache = Promise.withResolvers<ISavedSync>();
+        vi.mocked(client.store.getSavedSync).mockReturnValue(cache.promise);
+        const starting = client.startClient({ threadSupport: true });
+        await vi.waitFor(() => expect(fetchMock).toHaveFetched("versions"));
+        client.stopClient();
+        cache.resolve(savedSync);
+        versions.resolve({ versions: ["v1.4"], unstable_features: {} });
+        await starting;
+        expect(client.getRooms()).toEqual([]);
+        expect(client.getSyncState()).not.toBe(SyncState.Prepared);
+        expect(fetchMock.callHistory.calls().every(({ url }) => url.endsWith("/versions"))).toBe(true);
+    });
+
+    it("should not restart network work when discovery completes after stopping", async () => {
+        const starting = client.startClient({ threadSupport: true });
+        await vi.waitFor(() => expect(client.getSyncState()).toBe(SyncState.Prepared));
+        const room = client.getRoom(roomId)!;
+        const lists = room.createThreadsTimelineSets();
+        const loading = room.fetchRoomThreads();
+        fetchMock.get("express:/_matrix/client/v3/rooms/:roomId/messages", { chunk: [] });
+        client.stopClient();
+        versions.resolve({ versions: ["v1.4"], unstable_features: {} });
+        await Promise.all([starting, lists, loading]);
+        expect(Thread.hasServerSideSupport).toBe(FeatureSupport.None);
+        expect(fetchMock.callHistory.calls().every(({ url }) => url.endsWith("/versions"))).toBe(true);
     });
 });

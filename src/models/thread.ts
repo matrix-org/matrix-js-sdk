@@ -181,6 +181,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
         this.room = opts.room;
         this.client = opts.client;
+        if (this.client.threadSupportPending) this.initialEventsFetched = false;
         this.pendingEventOrdering = opts.pendingEventOrdering ?? PendingEventOrdering.Chronological;
         this.timelineSet = new EventTimelineSet(
             this.room,
@@ -251,7 +252,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     private onBeforeRedaction = (event: MatrixEvent, redaction: MatrixEvent): void => {
         if (
-            event?.isRelation(THREAD_RELATION_TYPE.name) &&
+            event?.isThreadRelation &&
             this.room.eventShouldLiveIn(event).threadId === this.id &&
             event.getId() !== this.id && // the root event isn't counted in the length so ignore this redaction
             !redaction.status // only respect it when it succeeds
@@ -292,7 +293,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             if (sender && room && this.shouldSendLocalEchoReceipt(sender, event)) {
                 room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
             }
-            if (event.getId() !== this.id && event.isRelation(THREAD_RELATION_TYPE.name)) {
+            if (event.getId() !== this.id && event.isThreadRelation) {
                 this.replyCount++;
             }
         }
@@ -326,7 +327,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (event.threadRootId !== this.id) return; // ignore echoes for other timelines
         if (this.lastEvent === event) return; // ignore duplicate events
         await this.updateThreadMetadata();
-        if (!event.isRelation(THREAD_RELATION_TYPE.name)) return; // don't send a new reply event for reactions or edits
+        if (!event.isThreadRelation) return; // don't send a new reply event for reactions or edits
         if (toStartOfTimeline) return; // ignore messages added to the start of the timeline
         // Clear the lastEvent and instead start tracking locally using lastReply
         this.lastEvent = undefined;
@@ -396,7 +397,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         // so relying on it alone drops just-sent replies out of "participated" views until the next
         // root event bundle refresh. Latch it as soon as the current user authors a thread reply,
         // matching the server's participated semantics: an m.thread relation, not a reaction or edit.
-        if (event.getSender() === this.client.getUserId() && event.isRelation(THREAD_RELATION_TYPE.name)) {
+        if (event.getSender() === this.client.getUserId() && event.isThreadRelation) {
             this._currentUserParticipated = true;
         }
 
@@ -445,12 +446,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
             }
         }
 
-        if (
-            event.getId() !== this.id &&
-            event.isRelation(THREAD_RELATION_TYPE.name) &&
-            !toStartOfTimeline &&
-            isNewestReply
-        ) {
+        if (event.getId() !== this.id && event.isThreadRelation && !toStartOfTimeline && isNewestReply) {
             // Clear the last event as we have the latest end of the timeline
             this.lastEvent = undefined;
         }
@@ -569,12 +565,12 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     }
 
     private getRootEventBundledRelationship(rootEvent = this.rootEvent): IThreadBundledRelationship | undefined {
-        return rootEvent?.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+        return THREAD_RELATION_TYPE.findIn<IThreadBundledRelationship>(rootEvent?.getUnsigned()["m.relations"] ?? {});
     }
 
     private async processRootEvent(): Promise<void> {
         const bundledRelationship = this.getRootEventBundledRelationship();
-        if (Thread.hasServerSideSupport && bundledRelationship) {
+        if ((Thread.hasServerSideSupport || this.client.threadSupportPending) && bundledRelationship) {
             this.replyCount = bundledRelationship.count;
             this._currentUserParticipated = !!bundledRelationship.current_user_participated;
 
@@ -595,7 +591,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         const pendingEvents = unfilteredPendingEvents.filter(
             (ev) =>
                 ev.threadRootId === this.id &&
-                ev.isRelation(THREAD_RELATION_TYPE.name) &&
+                ev.isThreadRelation &&
                 ev.status !== null &&
                 ev.getId() !== this.lastEvent?.getId(),
         );
@@ -675,6 +671,18 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     private async updateThreadMetadata(): Promise<void> {
         this.updatePendingReplyCount();
 
+        if (this.client.threadSupportPending) {
+            await this.processRootEvent();
+            await this.client.threadSupportPending;
+            if (!this.client.clientRunning) return;
+            if (!Thread.hasServerSideSupport) {
+                this.initialEventsFetched = true;
+                for (const event of this.replayEvents ?? []) this.addEvent(event, false);
+                this.replayEvents = null;
+                this.preInitEventTargets.clear();
+            }
+        }
+
         if (!this.processRootEventPromise) {
             // We only want to do this once otherwise we end up rolling back to the last unsigned summary we have for the thread
             this.processRootEventPromise = this.updateThreadFromRootEvent();
@@ -733,6 +741,10 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
 
     // XXX: Workaround for https://github.com/matrix-org/matrix-spec-proposals/pull/2676/files#r827240084
     private async fetchEditsWhereNeeded(...events: MatrixEvent[]): Promise<unknown> {
+        if (this.client.threadSupportPending) {
+            await this.client.threadSupportPending;
+            if (!this.client.clientRunning) return;
+        }
         const recursionSupport = this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
         if (recursionSupport === ServerSupport.Unsupported) {
             return Promise.all(
@@ -770,7 +782,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     public clearEventMetadata(event: MatrixEvent | null | undefined): void {
         if (event) {
             event.setThread(undefined);
-            delete event.event?.unsigned?.["m.relations"]?.[THREAD_RELATION_TYPE.name];
+            for (const name of THREAD_RELATION_TYPE.names) delete event.event?.unsigned?.["m.relations"]?.[name];
         }
     }
 
@@ -784,9 +796,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
     /**
      * Return last reply to the thread, if known.
      */
-    public lastReply(
-        matches: (ev: MatrixEvent) => boolean = (ev): boolean => ev.isRelation(THREAD_RELATION_TYPE.name),
-    ): MatrixEvent | null {
+    public lastReply(matches: (ev: MatrixEvent) => boolean = (ev): boolean => ev.isThreadRelation): MatrixEvent | null {
         for (let i = this.timeline.length - 1; i >= 0; i--) {
             const event = this.timeline[i];
             if (matches(event)) {
@@ -976,7 +986,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
  * thread - either inside it, or a root.
  */
 function isAnEncryptedThreadMessage(event: MatrixEvent): boolean {
-    return event.isEncrypted() && (event.isRelation(THREAD_RELATION_TYPE.name) || event.isThreadRoot);
+    return event.isEncrypted() && (event.isThreadRelation || event.isThreadRoot);
 }
 
 export const FILTER_RELATED_BY_SENDERS = new ServerControlledNamespacedValue(
