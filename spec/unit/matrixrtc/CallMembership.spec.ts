@@ -229,7 +229,6 @@ describe("CallMembership", () => {
             application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
-            versions: [],
             msc4354_sticky_key: "abc123",
         };
 

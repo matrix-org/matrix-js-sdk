@@ -1427,7 +1427,6 @@ describe("MembershipManager", () => {
                                 published: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
                                 can_subscribe: ["livekit"],
                             },
-                            versions: [],
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
