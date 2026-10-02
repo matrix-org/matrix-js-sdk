@@ -25,7 +25,7 @@ import type {
 import type { Room } from "../models/room.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { EventType } from "../@types/event.ts";
-import { isLivekitTransport } from "./LivekitTransport.ts";
+import { isUnstableLivekitTransport } from "./LivekitTransport.ts";
 
 /**
  * Detects when a key for a given index is outdated.
@@ -134,5 +134,5 @@ export function isSlotOpen(room: Pick<Room, "getLiveTimeline">, slotDescription:
  *   MSC4195, as opposed to the legacy string concatenation format.
  */
 export function useHashedRtcBackendIdentity(transports: Transport[]): boolean {
-    return transports.every((transport) => !isLivekitTransport(transport) || "url" in transport);
+    return transports.every((transport) => !isUnstableLivekitTransport(transport) || "url" in transport);
 }

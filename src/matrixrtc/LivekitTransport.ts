@@ -16,6 +16,25 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
+/**
+ * @deprecated Use {@link UnstableLivekitTransport} instead, which has multiple
+ *   variants to support the migration to newer versions of MSC4195.
+ */
+export interface LivekitTransport extends Transport {
+    type: "livekit";
+    livekit_service_url: string;
+}
+
+/**
+ * @deprecated Use {@link isUnstableLivekitTransport} instead.
+ */
+export const isLivekitTransport = (object: unknown): object is LivekitTransport => {
+    if (typeof object !== "object" || object === null) return false;
+    const transport = object as Transport;
+
+    return transport.type === "livekit" && typeof transport.livekit_service_url === "string";
+};
+
 type WebsocketUrl = {
     /**
      * WebSocket URL of the LiveKit server.
@@ -30,7 +49,12 @@ type ServiceUrl = {
     livekit_service_url: string;
 };
 
-export type LivekitTransport =
+/**
+ * Any LiveKit transport that can be advertised by a homeserver or published by
+ * a session member in unstable MSC4195 implementations: `url` only,
+ * `livekit_service_url` only, or both during the migration.
+ */
+export type UnstableLivekitTransport =
     // Latest MSC4195 variant, with `url`. Indicates that both publishers and
     // subscribers will use the /_matrix/client/v1/rtc/livekit/get_token
     // endpoint.
@@ -45,9 +69,10 @@ export type LivekitTransport =
     // JWT service.
     | ({ type: "livekit" } & WebsocketUrl & ServiceUrl);
 
-export const isLivekitTransport = (object: unknown): object is LivekitTransport => {
+export const isUnstableLivekitTransport = (object: unknown): object is UnstableLivekitTransport => {
     if (typeof object !== "object" || object === null) return false;
     const transport = object as Transport;
+
     if (transport.type !== "livekit") return false;
     if (!("url" in transport || "livekit_service_url" in transport)) return false;
     if ("url" in transport && typeof transport.url !== "string") return false;
@@ -57,7 +82,7 @@ export const isLivekitTransport = (object: unknown): object is LivekitTransport 
 
 /**
  * @alias
- * @deprecated Use {@link isLivekitTransport} instead.
+ * @deprecated Use {@link isUnstableLivekitTransport} instead.
  */
 // TODO: Delete, this is only preserved here due to avoid briefly breaking
 // Element Web's CI while we make breaking changes in this module.
