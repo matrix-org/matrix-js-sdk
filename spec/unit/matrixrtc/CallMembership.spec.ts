@@ -52,6 +52,7 @@ describe("CallMembership", () => {
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" },
             "foci_preferred": [{ type: "livekit" }],
             "m.call.intent": "voice",
+            "capabilities": ["render_audio", "render_video"],
         };
 
         it("rejects membership with no device_id", () => {
@@ -70,6 +71,21 @@ describe("CallMembership", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
             }).not.toThrow();
+        });
+
+        it("rejects membership with non-array capabilities", () => {
+            expect(() => {
+                createCallMembership(
+                    makeMockEvent(),
+                    Object.assign({}, membershipTemplate, { capabilities: "render_audio" }),
+                );
+            }).toThrow();
+        });
+
+        it("rejects membership with non-string entries in capabilities", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { capabilities: [42] }));
+            }).toThrow();
         });
 
         it("uses event timestamp if no created_ts", () => {
@@ -161,11 +177,25 @@ describe("CallMembership", () => {
             it("returns correct call intent", () => {
                 expect(membership.callIntent).toBe("voice");
             });
+            it("returns correct call capabilities", () => {
+                expect(membership.callCapabilities).toStrictEqual(["render_audio", "render_video"]);
+            });
+            it("returns undefined call capabilities if not advertised", () => {
+                const withoutCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    capabilities: undefined,
+                });
+                expect(withoutCapabilities.callCapabilities).toBeUndefined();
+            });
             it("returns correct application", () => {
                 expect(membership.application).toStrictEqual("m.call");
             });
             it("returns correct applicationData", () => {
-                expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
+                expect(membership.applicationData).toStrictEqual({
+                    "type": "m.call",
+                    "m.call.intent": "voice",
+                    "capabilities": ["render_audio", "render_video"],
+                });
             });
             it("returns the application's own top-level data in applicationData", () => {
                 const withData = createCallMembership(makeMockEvent(), {
@@ -176,6 +206,7 @@ describe("CallMembership", () => {
                     "org.example.key": { nested: true },
                     "type": "m.call",
                     "m.call.intent": "voice",
+                    "capabilities": ["render_audio", "render_video"],
                 });
             });
             it("returns correct scope", () => {
@@ -226,7 +257,12 @@ describe("CallMembership", () => {
         }
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
-            application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+            application: {
+                "type": "m.call",
+                "m.call.id": "",
+                "m.call.intent": "voice",
+                "capabilities": ["render_audio", "render_video"],
+            },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
             versions: [],
@@ -383,6 +419,30 @@ describe("CallMembership", () => {
             it("returns correct call intent", () => {
                 expect(membership.callIntent).toBe("voice");
             });
+            it("returns correct call capabilities", () => {
+                expect(membership.callCapabilities).toStrictEqual(["render_audio", "render_video"]);
+            });
+            it("returns undefined call capabilities if not advertised", () => {
+                const withoutCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { "type": "m.call", "m.call.intent": "voice" },
+                });
+                expect(withoutCapabilities.callCapabilities).toBeUndefined();
+            });
+            it("returns undefined call capabilities if it is not an array", () => {
+                const invalidCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call", capabilities: "render_audio" },
+                });
+                expect(invalidCapabilities.callCapabilities).toBeUndefined();
+            });
+            it("returns undefined call capabilities if an entry is not a string", () => {
+                const invalidCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call", capabilities: ["render_audio", 42] },
+                });
+                expect(invalidCapabilities.callCapabilities).toBeUndefined();
+            });
             it("returns correct application", () => {
                 expect(membership.application).toStrictEqual("m.call");
             });
@@ -391,6 +451,7 @@ describe("CallMembership", () => {
                     "type": "m.call",
                     "m.call.id": "",
                     "m.call.intent": "voice",
+                    "capabilities": ["render_audio", "render_video"],
                 });
             });
             it("returns correct scope", () => {

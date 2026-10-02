@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { deepCompare } from "../utils.ts";
-import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
+import { type RTCCallCapability, type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
 import { computeSlotId, slotIdToDescription } from "./utils.ts";
@@ -242,6 +242,14 @@ export class CallMembership {
             return intent;
         }
         this.logger.warn("RTC membership has invalid m.call.intent");
+        return undefined;
+    }
+
+    public get callCapabilities(): RTCCallCapability[] | undefined {
+        const capabilities = this.applicationData["capabilities"];
+        if (capabilities === undefined) return undefined;
+        if (Array.isArray(capabilities) && capabilities.every((c) => typeof c === "string")) return capabilities;
+        this.logger.warn("RTC membership has invalid capabilities");
         return undefined;
     }
 

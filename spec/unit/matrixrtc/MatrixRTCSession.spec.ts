@@ -682,6 +682,18 @@ describe("MatrixRTCSession", () => {
             expect((sendStateEventMock.mock.calls[1][2] as Record<string, unknown>)["org.example.key"]).toBe(2);
         });
 
+        it("publishes the call capabilities in the membership and reads them back", async () => {
+            await joinAsFirstMember(
+                { callCapabilities: ["render_audio", "render_video"] },
+                { capabilities: ["render_audio", "render_video"] },
+            );
+            expect((sendStateEventMock.mock.calls[0][2] as SessionMembershipData).capabilities).toStrictEqual([
+                "render_audio",
+                "render_video",
+            ]);
+            expect(sess!.memberships[0].callCapabilities).toStrictEqual(["render_audio", "render_video"]);
+        });
+
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
             // Ensure the send returns an event ID so the DidSendCallNotification payload includes it
             sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
