@@ -1316,7 +1316,6 @@ export class StickyEventMembershipManager extends MembershipManager {
             slot_id: computeSlotId(this.slotDescription),
             transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
-            versions: [],
         };
     }
 }
