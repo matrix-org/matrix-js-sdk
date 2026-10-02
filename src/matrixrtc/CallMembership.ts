@@ -258,14 +258,6 @@ export class CallMembership {
     }
 
     /**
-     * The application `type`.
-     * @deprecated Use @see applicationData
-     */
-    public get application(): string {
-        return this.applicationData.type;
-    }
-
-    /**
      * Information about the application being used for the RTC session.
      * May contain extra keys specific to the application.
      */
@@ -330,13 +322,6 @@ export class CallMembership {
             default:
                 throw Error("Not possible to get memberID without knowing the membership event kind");
         }
-    }
-
-    /**
-     * @deprecated renamed to `memberId`
-     */
-    public get membershipID(): string {
-        return this.memberId;
     }
 
     public createdTs(): number {

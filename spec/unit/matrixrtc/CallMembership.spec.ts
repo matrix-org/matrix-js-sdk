@@ -161,9 +161,6 @@ describe("CallMembership", () => {
             it("returns correct call intent", () => {
                 expect(membership.callIntent).toBe("voice");
             });
-            it("returns correct application", () => {
-                expect(membership.application).toStrictEqual("m.call");
-            });
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
             });
@@ -180,9 +177,6 @@ describe("CallMembership", () => {
             });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe("m.room");
-            });
-            it("returns correct membershipID", () => {
-                expect(membership.membershipID).toBe("@alice:example.org:AAAAAAA");
             });
             it("returns correct unused fields", () => {
                 expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
@@ -383,9 +377,6 @@ describe("CallMembership", () => {
             it("returns correct call intent", () => {
                 expect(membership.callIntent).toBe("voice");
             });
-            it("returns correct application", () => {
-                expect(membership.application).toStrictEqual("m.call");
-            });
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({
                     "type": "m.call",
@@ -395,9 +386,6 @@ describe("CallMembership", () => {
             });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe(undefined);
-            });
-            it("returns correct membershipID", () => {
-                expect(membership.membershipID).toBe("xyzHASHxyz");
             });
             it("returns correct unused fields", () => {
                 expect(membership.getAbsoluteExpiry()).toBe(undefined);
