@@ -81,14 +81,6 @@ export const isUnstableLivekitTransport = (object: unknown): object is UnstableL
 };
 
 /**
- * @alias
- * @deprecated Use {@link isUnstableLivekitTransport} instead.
- */
-// TODO: Delete, this is only preserved here due to avoid briefly breaking
-// Element Web's CI while we make breaking changes in this module.
-export const isLivekitTransportConfig = isLivekitTransport;
-
-/**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.
  * Not needed for new implementations.
  */

@@ -51,15 +51,6 @@ export interface IMembershipManager extends TypedEventEmitter<
     MembershipManagerEventHandlerMap
 > {
     /**
-     * If we are trying to join, or have successfully joined the session.
-     * It does not reflect if the room state is already configured to represent us being joined.
-     * It only means that the Manager should be trying to connect or to disconnect running.
-     * The Manager is still running right after isJoined becomes false to send the disconnect events.
-     * @returns true if we intend to be participating in the MatrixRTC session
-     * @deprecated This name is confusing and replaced by `isActivated()`. (Returns the same as `isActivated()`)
-     */
-    isJoined(): boolean;
-    /**
      * If the manager is activated. This means it tries to do its job to join the call, resend state events...
      * It does not imply that the room state is already configured to represent being joined.
      * It means that the Manager tries to connect or is connected. ("the manager is still active")
