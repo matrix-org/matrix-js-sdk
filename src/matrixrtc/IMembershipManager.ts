@@ -92,14 +92,10 @@ export interface IMembershipManager extends TypedEventEmitter<
 
     /**
      * Start sending all necessary events to make this user participate in the RTC session.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @throws can throw if it exceeds a configured maximum retry.
      */
-    join(fociPreferred: Transport[], multiSfuFocus?: Transport, onError?: (error: unknown) => void): void;
+    join(publishedTransports: Transport[], onError?: (error: unknown) => void): void;
     /**
      * Send all necessary events to make this user leave the RTC session.
      * @param timeout the maximum duration in ms until the promise is forced to resolve.

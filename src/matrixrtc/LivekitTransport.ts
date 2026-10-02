@@ -16,20 +16,21 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
-export interface LivekitTransportConfig extends Transport {
+export interface LivekitTransport extends Transport {
     type: "livekit";
     livekit_service_url: string;
 }
 
-export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
+export const isLivekitTransport = (object: any): object is LivekitTransport =>
     object.type === "livekit" && "livekit_service_url" in object;
 
-export interface LivekitTransport extends LivekitTransportConfig {
-    livekit_alias: string;
-}
-
-export const isLivekitTransport = (object: any): object is LivekitTransport =>
-    isLivekitTransportConfig(object) && "livekit_alias" in object;
+/**
+ * @alias
+ * @deprecated Use {@link isLivekitTransport} instead.
+ */
+// TODO: Delete, this is only preserved here due to avoid briefly breaking
+// Element Web's CI while we make breaking changes in this module.
+export const isLivekitTransportConfig = isLivekitTransport;
 
 /**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.
@@ -37,7 +38,7 @@ export const isLivekitTransport = (object: any): object is LivekitTransport =>
  */
 export interface LivekitFocusSelection extends Transport {
     type: "livekit";
-    focus_selection: "oldest_membership" | "multi_sfu";
+    focus_selection: "multi_sfu";
 }
 /**
  * @deprecated see LivekitFocusSelection

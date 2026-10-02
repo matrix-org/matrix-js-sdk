@@ -351,7 +351,7 @@ export class CallMembership {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                // TODO we need to read the referenced (relation) event if available to get the real created_ts
+                // TODO Do we need this to represent the TS of the original join?
                 return this.matrixEvent.getTs();
             case MembershipKind.Session:
             default:
@@ -414,34 +414,20 @@ export class CallMembership {
      * Directly relates to the `transports.published` field.
      *
      * ## Legacy session membership
-     * In case of a legacy session membership (m.call.member) this will return the selected transport where
-     * media is published. How this selection happens depends on the `focus_active` field of the session membership.
-     * If the `focus_selection` is `oldest_membership` this will return the transport of the oldest membership
-     * in the room (based on the `created_ts` field of the session membership).
-     * If the `focus_selection` is `multi_sfu` it will return the first transport of the `foci_preferred` list.
-     * (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
-     * @param oldestMembership For backwards compatibility with session membership (legacy). Unused in case of RTC membership.
-     * Always required to make the consumer not care if it deals with RTC or session memberships.
+     * In case of a legacy session membership (m.call.member) this will return the first transport of the
+     * `foci_preferred` list. (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
+     *
+     * @param _oldestMembership Deprecated and unused.
+     *
      * @returns The transport this membership uses to publish media or undefined if no transport is available.
      */
-    public getTransport(oldestMembership: CallMembership): Transport | undefined {
+    public getTransport(_oldestMembership?: CallMembership): Transport | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
                 return data.transports.published[0];
             case MembershipKind.Session:
-                switch (data.focus_active.focus_selection) {
-                    case "oldest_membership":
-                        if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
-                        if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
-                        break;
-                    case "multi_sfu":
-                        return data.foci_preferred[0];
-                    default:
-                        // `focus_selection` not understood.
-                        return undefined;
-                }
-                break;
+                return data.foci_preferred[0];
             default:
                 return undefined;
         }

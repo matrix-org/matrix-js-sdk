@@ -29,7 +29,7 @@ if [ -n "$CONFLICTS" ]; then
 fi
 
 # Rebuild lockfile based on the unified package.json
-pnpm install --lockfile-only --ignore-scripts --frozen-lockfile=false
+pnpm install --lockfile-only --ignore-scripts --no-frozen-lockfile
 
 # Commit and push
 git add .

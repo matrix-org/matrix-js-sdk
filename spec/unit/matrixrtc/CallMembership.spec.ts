@@ -49,7 +49,7 @@ describe("CallMembership", () => {
             "scope": "m.room",
             "application": "m.call",
             "device_id": "AAAAAAA",
-            "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+            "focus_active": { type: "livekit", focus_selection: "multi_sfu" },
             "foci_preferred": [{ type: "livekit" }],
             "m.call.intent": "voice",
             "capabilities": ["render_audio", "render_video"],
@@ -122,45 +122,16 @@ describe("CallMembership", () => {
 
         describe("getTransport", () => {
             const mockFocus = { type: "this_is_a_mock_focus" };
-            const oldestMembership = createCallMembership(makeMockEvent(), membershipTemplate);
-            it("gets the correct active transport with oldest_membership", () => {
-                const membership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-                });
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
-
-                // If there is an older member we use its focus.
-                expect(membership.getTransport(oldestMembership)).toBe(membershipTemplate.foci_preferred[0]);
-            });
-
-            it("gets the correct active transport with multi_sfu", () => {
+            it("gets the correct active transport from session membership", () => {
                 const membership = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
                     foci_preferred: [mockFocus],
                     focus_active: { type: "livekit", focus_selection: "multi_sfu" },
                 });
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
-
-                // If there is an older member we still use our own focus in multi sfu.
-                expect(membership.getTransport(oldestMembership)).toBe(mockFocus);
-            });
-            it("does not provide focus if the selection method is unknown", () => {
-                const membership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "unknown" },
-                });
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toBeUndefined();
+                expect(membership.getTransport()).toStrictEqual(mockFocus);
             });
         });
+
         describe("correct values from computed fields", () => {
             const membership = createCallMembership(makeMockEvent(), membershipTemplate);
             it("returns correct sender", () => {
@@ -430,21 +401,6 @@ describe("CallMembership", () => {
         it.todo("considers memberships unexpired if local age low enough");
         it.todo("considers memberships expired if local age large enough");
 
-        describe("getTransport", () => {
-            it("gets the correct active transport with oldest_membership", () => {
-                const oldestMembership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    transports: { ...membershipTemplate.transports, published: [{ type: "oldest_transport" }] },
-                });
-                const membership = createCallMembership(makeMockEvent(), membershipTemplate);
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual({ type: "livekit" });
-
-                // If there is an older member we use our own focus focus. (RtcMembershipData always uses multi sfu)
-                expect(membership.getTransport(oldestMembership)).toStrictEqual({ type: "livekit" });
-            });
-        });
         describe("correct values from computed fields", () => {
             const membership = createCallMembership(makeMockEvent(), membershipTemplate);
             it("returns correct sender", () => {

@@ -2253,7 +2253,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     /**
      * Processes poll events:
      * If the event has a decryption failure, it will listen for decryption and tries again.
-     * If it is a poll start event (`m.poll.start`),
+     * If it is a poll start event (`m.poll.start`) for a poll not yet known to the room,
      * it creates and stores a Poll model and emits a PollEvent.New event.
      * If the event is related to a poll, it will add it to the poll.
      * Noop for other cases.
@@ -2269,6 +2269,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         if (M_POLL_START.matches(event.getType())) {
+            // Check that we don't already have the poll as events can arrive more than once
+            // in some situations. If we add the poll twice, it will break the existing poll model.
+            if (this.polls.has(event.getId()!)) return;
+
             try {
                 const poll = new Poll(event, this.client, this);
                 this.polls.set(event.getId()!, poll);

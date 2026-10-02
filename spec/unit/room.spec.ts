@@ -3928,6 +3928,32 @@ describe("Room", function () {
             expect(room.emit).toHaveBeenCalledWith(PollEvent.New, pollInstance);
         });
 
+        it("keeps the existing poll model when a poll start event is processed again", async () => {
+            const pollStartEvent = makePollStart("1");
+            await room.processPollEvents([pollStartEvent]);
+            const poll = room.polls.get(pollStartEvent.getId()!)!;
+            vi.spyOn(poll, "onNewRelation");
+
+            // process the poll start event again
+            await room.processPollEvents([pollStartEvent]);
+
+            expect(room.polls.get(pollStartEvent.getId()!)).toBe(poll);
+            expect(vi.mocked(room.emit).mock.calls.filter(([name]) => name === PollEvent.New)).toHaveLength(1);
+
+            // new responses still reach the existing poll
+            const pollResponseEvent = new MatrixEvent({
+                type: M_POLL_RESPONSE.name,
+                content: {
+                    "m.relates_to": {
+                        rel_type: RelationType.Reference,
+                        event_id: pollStartEvent.getId(),
+                    },
+                },
+            });
+            await room.processPollEvents([pollResponseEvent]);
+            expect(poll.onNewRelation).toHaveBeenCalledWith(pollResponseEvent);
+        });
+
         it("adds related events to poll models and log errors", async () => {
             const pollStartEvent = makePollStart("1");
             const pollStartEvent2 = makePollStart("2");
