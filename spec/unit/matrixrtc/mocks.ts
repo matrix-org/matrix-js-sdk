@@ -96,6 +96,8 @@ export type MockClient = MockedObject<
         MatrixClient,
         | "getUserId"
         | "getDeviceId"
+        | "getCapabilities"
+        | "getCachedCapabilities"
         | "sendEvent"
         | "sendStateEvent"
         | "_unstable_sendDelayedStateEvent"
@@ -115,6 +117,9 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
         getDeviceId: vi.fn(() => deviceId),
         getUserId: vi.fn(() => userId),
+        // By default the capabilities are not reachable, as it is the case in widget mode.
+        getCapabilities: vi.fn().mockRejectedValue(new Error("Capabilities are not reachable")),
+        getCachedCapabilities: vi.fn(() => undefined),
         sendEvent: vi.fn(),
         sendStateEvent: vi.fn(),
         cancelPendingEvent: vi.fn(),
