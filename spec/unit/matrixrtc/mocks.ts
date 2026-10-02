@@ -240,12 +240,12 @@ export function mockRTCEvent(
 export function mockCallMembership(
     membershipData: MembershipData,
     roomId: string,
-    rtcBackendIdentity?: string,
+    backendIdentities = ["xx"],
 ): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx");
+    return new CallMembership(ev, data, backendIdentities, "(deprecated)");
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {

@@ -51,7 +51,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen, useHashedRtcBackendIdentity } from "./utils.ts";
+import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -83,7 +83,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         key: Uint8Array<ArrayBuffer>,
         encryptionKeyIndex: number,
         membership: CallMembershipIdentityParts,
-        rtcBackendIdentity: string,
+        backendIdentity: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
@@ -625,14 +625,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyBin: Uint8Array<ArrayBuffer>,
                     encryptionKeyIndex: number,
                     membership: CallMembershipIdentityParts,
-                    rtcBackendIdentity: string,
+                    backendIdentity: string,
                 ) => {
                     this.emit(
                         MatrixRTCSessionEvent.EncryptionKeyChanged,
                         keyBin,
                         encryptionKeyIndex,
                         membership,
-                        rtcBackendIdentity,
+                        backendIdentity,
                     );
                 },
                 this.logger,
@@ -648,7 +648,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
-        this.encryptionManager.join(joinConfig, useHashedRtcBackendIdentity(publishedTransports));
+        this.encryptionManager.join(joinConfig, publishedTransports);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
@@ -759,7 +759,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyInfo.key,
                     keyInfo.keyIndex,
                     keyInfo.membership,
-                    keyInfo.rtcBackendIdentity,
+                    keyInfo.backendIdentity,
                 );
             });
         });

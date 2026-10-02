@@ -26,6 +26,7 @@ import { type IKeyTransport, type KeyTransportEventListener, KeyTransportEvents 
 import { type Logger } from "../logger.ts";
 import { sleep } from "../utils.ts";
 import {
+    type Transport,
     type EncryptionKeyMapKey,
     type InboundEncryptionSession,
     type OutboundEncryptionSession,
@@ -33,6 +34,7 @@ import {
 } from "./types.ts";
 import { OutdatedKeyFilter } from "./utils.ts";
 import { computeRtcIdentityRaw } from "./membershipData/rtc.ts";
+import { isUnstableLivekitTransport } from "./LivekitTransport.ts";
 
 /**
  * Default for {@link EncryptionConfig.keyRotationParticipantLimit}.
@@ -61,8 +63,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     // This will be done when removing the legacy EncryptionManager.
     private manageMediaKeys = false;
 
-    private useHashedRtcBackendIdentity = false;
-    private ownRtcBackendIdentityCache: string | undefined;
+    private publishedTransports: Transport[] = [];
 
     /**
      * Store the key rings for each participant.
@@ -75,7 +76,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
-            rtcBackendIdentity: string;
+            backendIdentity: string;
         }>
     >();
 
@@ -151,7 +152,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             keyBin: Uint8Array<ArrayBuffer>,
             encryptionKeyIndex: number,
             membership: CallMembershipIdentityParts,
-            rtcBackendIdentity: string,
+            backendIdentity: string,
         ) => void,
         parentLogger?: Logger,
         rtcBackendIdProvider?: (userId: string, memberId: string) => Promise<string>,
@@ -175,20 +176,24 @@ export class RTCEncryptionManager implements IEncryptionManager {
         return this.getMemberships().length >= this.keyRotationParticipantLimit;
     }
 
-    private async getOwnRtcBackendIdentity(): Promise<string> {
-        if (this.ownRtcBackendIdentityCache) return this.ownRtcBackendIdentityCache;
+    private ownBackendIdentitiesPromise: Promise<string[]> | undefined;
 
-        if (this.useHashedRtcBackendIdentity) {
+    private getOwnBackendIdentities(): Promise<string[]> {
+        return (this.ownBackendIdentitiesPromise ??= (async () => {
             const { userId, deviceId, memberId } = this.ownMembership;
-            this.logger?.info(
-                // If we see this log multiple times, we need to reconsider the precompute call of getOwnRtcBackendIdentity
-                `Computing RTC backend identity for ${userId}:${deviceId}:${memberId} (SHOULD ONLY BE CALLED ONCE)`,
-            );
-            this.ownRtcBackendIdentityCache = await this.rtcIdentityProvider(userId, memberId);
-        } else {
-            this.ownRtcBackendIdentityCache = `${this.ownMembership.userId}:${this.ownMembership.deviceId}`;
-        }
-        return this.ownRtcBackendIdentityCache;
+            const livekitTransports = this.publishedTransports.filter(isUnstableLivekitTransport);
+            const backendIdentities: string[] = [];
+
+            if (livekitTransports.some((t) => "url" in t)) {
+                this.logger?.info(`Computing RTC backend identity for ${userId}:${deviceId}:${memberId}`);
+                backendIdentities.push(await this.rtcIdentityProvider(userId, memberId));
+            }
+            if (livekitTransports.some((t) => "livekit_service_url" in t)) {
+                backendIdentities.push(`${userId}:${deviceId}`);
+            }
+
+            return backendIdentities;
+        })());
     }
 
     public getEncryptionKeys(): ReadonlyMap<
@@ -197,7 +202,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
             key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
-            rtcBackendIdentity: string;
+            backendIdentity: string;
         }>
     > {
         return new Map(this.participantKeyRings);
@@ -233,33 +238,36 @@ export class RTCEncryptionManager implements IEncryptionManager {
             this.keysWithoutMatchingRTCMembership.push({ key, keyIndex, membership });
             return;
         }
-        this.addKeyToParticipantWithBackendIdentity(key, keyIndex, membership, fullMembership.rtcBackendIdentity);
+        for (const backendIdentity of fullMembership.backendIdentities) {
+            this.addKeyToParticipantWithBackendIdentity(key, keyIndex, membership, backendIdentity);
+        }
     }
 
     private addKeyToParticipantWithBackendIdentity(
         key: Uint8Array<ArrayBuffer>,
         keyIndex: number,
         membership: CallMembershipIdentityParts,
-        rtcBackendIdentity: string,
+        backendIdentity: string,
     ): void {
         const mapKey = getEncryptionKeyMapKey(membership);
         if (!this.participantKeyRings.has(mapKey)) {
             this.participantKeyRings.set(mapKey, []);
         }
-        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, rtcBackendIdentity });
-        this.onEncryptionKeysChanged(key, keyIndex, membership, rtcBackendIdentity);
+        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, backendIdentity: backendIdentity });
+        this.onEncryptionKeysChanged(key, keyIndex, membership, backendIdentity);
     }
 
-    public join(joinConfig: EncryptionConfig | undefined, useHashedRtcBackendIdentity: boolean): void {
+    public join(joinConfig: EncryptionConfig | undefined, publishedTransports: Transport[]): void {
         this.manageMediaKeys = joinConfig?.manageMediaKeys ?? true; // default to true
-        this.useHashedRtcBackendIdentity = useHashedRtcBackendIdentity;
+        this.publishedTransports = publishedTransports;
+        this.ownBackendIdentitiesPromise = undefined;
         this.useKeyDelay = joinConfig?.useKeyDelay ?? 1000;
         this.keyRotationGracePeriodMs = joinConfig?.keyRotationGracePeriodMs ?? 10_000;
         this.keyRotationParticipantLimit =
             joinConfig?.keyRotationParticipantLimit ?? DEFAULT_KEY_ROTATION_PARTICIPANT_LIMIT;
 
         this.transport.on(KeyTransportEvents.ReceivedKeys, this.onNewKeyReceived);
-        void this.getOwnRtcBackendIdentity(); // precompute own identity
+        void this.getOwnBackendIdentities(); // precompute own identity
 
         this.logger?.info(`Joining room`);
         this.transport.start();
@@ -364,12 +372,14 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 keyId: 0,
             };
             this.outboundSession = firstKey;
-            this.addKeyToParticipantWithBackendIdentity(
-                firstKey.key,
-                firstKey.keyId,
-                this.ownMembership,
-                await this.getOwnRtcBackendIdentity(),
-            );
+            const ids = await this.getOwnBackendIdentities();
+            for (const backendIdentity of ids)
+                this.addKeyToParticipantWithBackendIdentity(
+                    firstKey.key,
+                    firstKey.keyId,
+                    this.ownMembership,
+                    backendIdentity,
+                );
         }
         // get current memberships
         const toShareWith: ParticipantDeviceInfo[] = this.getMemberships()
@@ -467,12 +477,13 @@ export class RTCEncryptionManager implements IEncryptionManager {
                 this.logger?.trace(`Delay Rollout for key:${newOutboundEncryptionSession.keyId}...`);
                 await sleep(this.useKeyDelay);
                 this.logger?.trace(`...Delayed rollout of index:${newOutboundEncryptionSession.keyId} `);
-                this.addKeyToParticipantWithBackendIdentity(
-                    newOutboundEncryptionSession.key,
-                    newOutboundEncryptionSession.keyId,
-                    this.ownMembership,
-                    await this.getOwnRtcBackendIdentity(),
-                );
+                for (const backendIdentity of await this.getOwnBackendIdentities())
+                    this.addKeyToParticipantWithBackendIdentity(
+                        newOutboundEncryptionSession.key,
+                        newOutboundEncryptionSession.keyId,
+                        this.ownMembership,
+                        backendIdentity,
+                    );
             }
         } catch (err) {
             this.logger?.error(`Failed to rollout key`, err);

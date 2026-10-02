@@ -22,7 +22,7 @@ import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/
 function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
     vi.mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, "xx");
+    return new CallMembership(ev, data, ["xx"], "(deprecated)");
 }
 
 describe("CallMembership", () => {
@@ -405,7 +405,7 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-        it("uses unpadded base64 for hashed RTC backend identities", async () => {
+        it("uses unpadded base64 for hashed backend identities", async () => {
             const membership = await CallMembership.parseFromEvent(
                 makeMockEvent(0, {
                     ...membershipTemplate,
@@ -415,9 +415,9 @@ describe("CallMembership", () => {
                     },
                 }),
             );
-            expect(membership.rtcBackendIdentity).toBe("b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0");
+            expect(membership.backendIdentities).toEqual(["b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0"]);
         });
-        it("uses legacy RTC backend identities in case of legacy transport", async () => {
+        it("uses legacy backend identity in case of legacy transport", async () => {
             const membership = await CallMembership.parseFromEvent(
                 makeMockEvent(0, {
                     ...membershipTemplate,
@@ -427,7 +427,25 @@ describe("CallMembership", () => {
                     },
                 }),
             );
-            expect(membership.rtcBackendIdentity).toBe("@alice:example.org:AAAAAAA");
+            expect(membership.backendIdentities).toEqual(["@alice:example.org:AAAAAAA"]);
+        });
+        it("includes both possible backend identities in case of ambiguous transport", async () => {
+            const membership = await CallMembership.parseFromEvent(
+                makeMockEvent(0, {
+                    ...membershipTemplate,
+                    transports: {
+                        published: [
+                            // Includes both `url` and `livekit_service_url`
+                            { type: "livekit", url: "wss://example.org", livekit_service_url: "https://example.org" },
+                        ],
+                        can_subscribe: ["livekit"],
+                    },
+                }),
+            );
+            expect(membership.backendIdentities).toEqual([
+                "b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0",
+                "@alice:example.org:AAAAAAA",
+            ]);
         });
     });
 });

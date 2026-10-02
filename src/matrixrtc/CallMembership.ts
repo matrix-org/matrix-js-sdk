@@ -18,7 +18,7 @@ import { deepCompare } from "../utils.ts";
 import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
-import { computeSlotId, slotIdToDescription, useHashedRtcBackendIdentity } from "./utils.ts";
+import { computeSlotId, slotIdToDescription } from "./utils.ts";
 import {
     checkRtcMembershipData,
     computeRtcIdentityRaw,
@@ -28,6 +28,7 @@ import {
     MatrixRTCMembershipParseError,
 } from "./membershipData/index.ts";
 import { EventType } from "../@types/event.ts";
+import { isUnstableLivekitTransport } from "./LivekitTransport.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -142,13 +143,19 @@ export class CallMembership {
         const sender = matrixEvent.getSender();
         if (sender === undefined) throw new Error("matrixEvent is missing sender field");
         const membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
-        const transports = getTransports(membershipData);
+        const livekitTransports = getTransports(membershipData).filter(isUnstableLivekitTransport);
+        const legacyIdentity = `${sender}:${getDeviceId(membershipData)}`;
 
-        const rtcBackendIdentity = useHashedRtcBackendIdentity(transports)
-            ? await computeRtcIdentityRaw(sender, getMemberId(membershipData, sender))
-            : `${sender}:${getDeviceId(membershipData)}`;
+        const backendIdentities: string[] = [];
+        if (livekitTransports.some((t) => "url" in t)) {
+            backendIdentities.push(await computeRtcIdentityRaw(sender, getMemberId(membershipData, sender)));
+        }
+        if (livekitTransports.some((t) => "livekit_service_url" in t)) {
+            backendIdentities.push(legacyIdentity);
+        }
 
-        return new CallMembership(matrixEvent, membershipData, rtcBackendIdentity);
+        // rtcBackendIdentity is deprecated, so it's fine to always set it to the legacy identity.
+        return new CallMembership(matrixEvent, membershipData, backendIdentities, legacyIdentity);
     }
 
     public static equal(a?: CallMembership, b?: CallMembership): boolean {
@@ -166,14 +173,20 @@ export class CallMembership {
      * Use `parseFromEvent`.
      * Constructor should only be used by tests.
      * @private
-     * @param matrixEvent
-     * @param membershipData
-     * @param rtcBackendIdentity
      */
     public constructor(
         /** The Matrix event that this membership is based on */
         private readonly matrixEvent: LimitedEvent,
         private readonly membershipData: MembershipData,
+        /**
+         * Possible identities which this member may have on the backends of
+         * their published transports.
+         */
+        public readonly backendIdentities: string[],
+        /**
+         * @deprecated Check the backend for the existence of any of
+         * {@link backendIdentities} instead.
+         */
         public readonly rtcBackendIdentity: string,
     ) {
         const eventId = matrixEvent.getId();
@@ -322,8 +335,8 @@ export class CallMembership {
     /**
      * This computes the membership ID for the membership.
      * For the sticky event based rtcSessionData this is trivial it is `member.id`.
-     * This is not supposed to be used to identity on an rtc backend. This is just a nouance for
-     * a generated (sha256) anonymised identity. Only send `rtcBackendIdentity` to any rtc backend service.
+     * This is not supposed to be used to identity on an rtc backend. This is just a nuance for
+     * a generated (sha256) anonymised identity. Only send {@link backendIdentities} to any rtc backend service.
      *
      * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
      * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
