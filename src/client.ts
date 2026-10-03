@@ -587,6 +587,8 @@ export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_m
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
+export const UNSTABLE_MSC4306_THREAD_SUBSCRIPTIONS = "org.matrix.msc4306";
+const MSC4306_PREFIX = "/_matrix/client/unstable/io.element.msc4306";
 
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
@@ -1110,6 +1112,12 @@ export enum ClientEvent {
     TurnServersError = "turnServers.error",
     UserProfileUpdate = "userProfileUpdate",
     RtcTransportsUpdated = "rtcTransportsUpdated",
+    /**
+     * MSC4306: Fires when the client's knowledge of the user's subscription to a thread changes,
+     * e.g. after {@link MatrixClient#subscribeToThread}, {@link MatrixClient#unsubscribeFromThread}
+     * or {@link MatrixClient#getThreadSubscription}.
+     */
+    ThreadSubscriptionUpdate = "threadSubscriptionUpdate",
 }
 
 type RoomEvents =
@@ -1187,6 +1195,12 @@ export type ClientEventHandlerMap = {
      * @param profile - the updated profile information
      */
     [ClientEvent.UserProfileUpdate]: (userId: string, profile: Record<string, unknown> | null) => void;
+    /**
+     * @param roomId - the room the thread is in
+     * @param threadRootId - the event ID of the thread root
+     * @param subscribed - whether the user is now subscribed to the thread
+     */
+    [ClientEvent.ThreadSubscriptionUpdate]: (roomId: string, threadRootId: string, subscribed: boolean) => void;
 } & RoomEventHandlerMap &
     RoomStateEventHandlerMap &
     CryptoEventHandlerMap &
@@ -1286,6 +1300,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncApi?: SlidingSyncSdk | SyncApi;
     public roomNameGenerator?: ICreateClientOpts["roomNameGenerator"];
     public pushRules?: IPushRules;
+    /** MSC4306: in-memory thread subscription state, keyed by `${roomId}|${rootEventId}`. */
+    private threadSubscriptionCache = new Map<string, boolean>();
     protected syncLeftRoomsPromise?: Promise<Room[]>;
     protected syncedLeftRooms = false;
     protected clientOpts?: IStoredClientOpts;
@@ -8024,6 +8040,101 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             $ruleId: ruleId,
         });
         return this.http.authedRequest(Method.Put, path, undefined, { actions: actions });
+    }
+
+    /**
+     * MSC4306: Get the user's subscription state for a thread.
+     * @param roomId - The room the thread is in.
+     * @param eventId - The thread root event ID.
+     * @returns Subscription details, or `null` if the user is not subscribed.
+     */
+    public async getThreadSubscription(roomId: string, eventId: string): Promise<{ automatic: boolean } | null> {
+        const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
+        try {
+            const result = await this.http.authedRequest<{ automatic: boolean }>(
+                Method.Get,
+                path,
+                undefined,
+                undefined,
+                { prefix: MSC4306_PREFIX },
+            );
+            this.setCachedThreadSubscription(roomId, eventId, true);
+            return result;
+        } catch (err) {
+            if ((err as MatrixError).httpStatus === 404) {
+                this.setCachedThreadSubscription(roomId, eventId, false);
+                return null;
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * MSC4306: Subscribe to a thread.
+     *
+     * If an automatic subscription is skipped by the server because the user unsubscribed after
+     * the cause event (409 `M_CONFLICTING_UNSUBSCRIPTION`), this resolves without changing the
+     * cached state: the server's knowledge of the earlier unsubscription is more accurate.
+     *
+     * @param roomId - The room the thread is in.
+     * @param eventId - The thread root event ID.
+     * @param automaticCauseEventId - When set, marks the subscription as automatic
+     *   and supplies the cause event ID (e.g. the event that mentioned the user).
+     *   Omit for manual / user-initiated subscriptions.
+     */
+    public async subscribeToThread(
+        roomId: string,
+        eventId: string,
+        automaticCauseEventId?: string,
+    ): Promise<EmptyObject> {
+        const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
+        const body = automaticCauseEventId ? { automatic: automaticCauseEventId } : {};
+        try {
+            const result = await this.http.authedRequest<EmptyObject>(Method.Put, path, undefined, body, {
+                prefix: MSC4306_PREFIX,
+            });
+            this.setCachedThreadSubscription(roomId, eventId, true);
+            return result;
+        } catch (err) {
+            if (
+                automaticCauseEventId &&
+                err instanceof MatrixError &&
+                err.errcode === "IO.ELEMENT.MSC4306.M_CONFLICTING_UNSUBSCRIPTION"
+            ) {
+                return {};
+            }
+            throw err;
+        }
+    }
+
+    /**
+     * MSC4306: Remove the user's subscription to a thread. Idempotent — succeeds
+     * even if no subscription exists.
+     */
+    public async unsubscribeFromThread(roomId: string, eventId: string): Promise<EmptyObject> {
+        const path = `/rooms/${encodeURIComponent(roomId)}/thread/${encodeURIComponent(eventId)}/subscription`;
+        const result = await this.http.authedRequest<EmptyObject>(Method.Delete, path, undefined, undefined, {
+            prefix: MSC4306_PREFIX,
+        });
+        this.setCachedThreadSubscription(roomId, eventId, false);
+        return result;
+    }
+
+    /**
+     * MSC4306: Synchronously read the cached thread subscription state. Returns
+     * `undefined` if no GET/PUT/DELETE has populated the cache for this thread
+     * yet. Used by `PushProcessor` to evaluate the `thread_subscription`
+     * condition without an async hop.
+     */
+    public getCachedThreadSubscription(roomId: string, eventId: string): boolean | undefined {
+        return this.threadSubscriptionCache.get(`${roomId}|${eventId}`);
+    }
+
+    private setCachedThreadSubscription(roomId: string, eventId: string, subscribed: boolean): void {
+        const key = `${roomId}|${eventId}`;
+        if (this.threadSubscriptionCache.get(key) === subscribed) return;
+        this.threadSubscriptionCache.set(key, subscribed);
+        this.emit(ClientEvent.ThreadSubscriptionUpdate, roomId, eventId, subscribed);
     }
 
     /**
