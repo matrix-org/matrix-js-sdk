@@ -1117,6 +1117,7 @@ type RoomEvents =
     | RoomEvent.Redaction
     | RoomEvent.RedactionCancelled
     | RoomEvent.Receipt
+    | RoomEvent.RetentionChanged
     | RoomEvent.Tags
     | RoomEvent.LocalEchoUpdated
     | RoomEvent.HistoryImportedWithinTimeline
