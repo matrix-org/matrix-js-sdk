@@ -254,7 +254,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
         if (!this.participantKeyRings.has(mapKey)) {
             this.participantKeyRings.set(mapKey, []);
         }
-        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, backendIdentity: backendIdentity });
+        this.participantKeyRings.get(mapKey)!.push({ key, keyIndex, membership, backendIdentity });
         this.onEncryptionKeysChanged(key, keyIndex, membership, backendIdentity);
     }
 
