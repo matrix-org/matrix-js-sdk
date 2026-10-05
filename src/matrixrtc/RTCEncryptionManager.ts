@@ -179,7 +179,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     private ownBackendIdentitiesPromise: Promise<string[]> | undefined;
 
     private getOwnBackendIdentities(): Promise<string[]> {
-        return (this.ownBackendIdentitiesPromise ??= (async () => {
+        this.ownBackendIdentitiesPromise ??= (async (): Promise<string[]> => {
             const { userId, deviceId, memberId } = this.ownMembership;
             const livekitTransports = this.publishedTransports.filter(isUnstableLivekitTransport);
             const backendIdentities: string[] = [];
@@ -193,7 +193,8 @@ export class RTCEncryptionManager implements IEncryptionManager {
             }
 
             return backendIdentities;
-        })());
+        })();
+        return this.ownBackendIdentitiesPromise;
     }
 
     public getEncryptionKeys(): ReadonlyMap<
