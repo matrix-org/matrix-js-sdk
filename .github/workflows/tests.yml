@@ -66,6 +66,17 @@ jobs:
             disable_coverage: true
             matrix-js-sdk-sha: ${{ github.sha }}
 
+    element-call:
+        name: Downstream test element-call
+        if: github.event_name == 'merge_group'
+        uses: element-hq/element-call/.github/workflows/test.yaml@main # zizmor: ignore[unpinned-uses]
+        permissions:
+            contents: read
+        with:
+            matrix-js-sdk-sha: ${{ github.sha }}
+            disable_coverage: true
+            disable_e2e_tests: true
+
     complement-crypto:
         name: "Run Complement Crypto tests"
         if: github.event_name == 'merge_group'
@@ -79,6 +90,7 @@ jobs:
         needs:
             - test
             - element-web
+            - element-call
             - complement-crypto
         if: always()
         runs-on: ubuntu-26.04
