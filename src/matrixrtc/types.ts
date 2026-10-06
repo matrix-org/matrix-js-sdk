@@ -113,9 +113,9 @@ export type RTCCallIntent = "audio" | "video" | string;
 
 /**
  * Represents one kind of media a member's device is capable of handling.
- * May be any string, although `"render_audio"` and `"render_video"` are commonly accepted values.
+ * May be any string, although `"m.render_audio"` and `"m.render_video"` are commonly accepted values.
  */
-export type RTCCallCapability = "render_audio" | "render_video" | string;
+export type RTCCallCapability = "m.render_audio" | "m.render_video" | string;
 
 /**
  * The maximum `lifetime` of an RTC notification as per MSC4075. Larger values are capped to this.

@@ -52,7 +52,7 @@ describe("CallMembership", () => {
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" },
             "foci_preferred": [{ type: "livekit" }],
             "m.call.intent": "voice",
-            "capabilities": ["render_audio", "render_video"],
+            "capabilities": ["m.render_audio", "m.render_video"],
         };
 
         it("rejects membership with no device_id", () => {
@@ -77,7 +77,7 @@ describe("CallMembership", () => {
             expect(() => {
                 createCallMembership(
                     makeMockEvent(),
-                    Object.assign({}, membershipTemplate, { capabilities: "render_audio" }),
+                    Object.assign({}, membershipTemplate, { capabilities: "m.render_audio" }),
                 );
             }).toThrow();
         });
@@ -178,7 +178,7 @@ describe("CallMembership", () => {
                 expect(membership.callIntent).toBe("voice");
             });
             it("returns correct call capabilities", () => {
-                expect(membership.callCapabilities).toStrictEqual(["render_audio", "render_video"]);
+                expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
             });
             it("returns undefined call capabilities if not advertised", () => {
                 const withoutCapabilities = createCallMembership(makeMockEvent(), {
@@ -191,7 +191,7 @@ describe("CallMembership", () => {
                 expect(membership.applicationData).toStrictEqual({
                     "type": "m.call",
                     "m.call.intent": "voice",
-                    "capabilities": ["render_audio", "render_video"],
+                    "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
             it("returns the application's own top-level data in applicationData", () => {
@@ -203,7 +203,7 @@ describe("CallMembership", () => {
                     "org.example.key": { nested: true },
                     "type": "m.call",
                     "m.call.intent": "voice",
-                    "capabilities": ["render_audio", "render_video"],
+                    "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
             it("returns correct scope", () => {
@@ -255,7 +255,7 @@ describe("CallMembership", () => {
                 "type": "m.call",
                 "m.call.id": "",
                 "m.call.intent": "voice",
-                "capabilities": ["render_audio", "render_video"],
+                "capabilities": ["m.render_audio", "m.render_video"],
             },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
@@ -414,7 +414,7 @@ describe("CallMembership", () => {
                 expect(membership.callIntent).toBe("voice");
             });
             it("returns correct call capabilities", () => {
-                expect(membership.callCapabilities).toStrictEqual(["render_audio", "render_video"]);
+                expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
             });
             it("returns undefined call capabilities if not advertised", () => {
                 const withoutCapabilities = createCallMembership(makeMockEvent(), {
@@ -426,14 +426,14 @@ describe("CallMembership", () => {
             it("returns undefined call capabilities if it is not an array", () => {
                 const invalidCapabilities = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
-                    application: { type: "m.call", capabilities: "render_audio" },
+                    application: { type: "m.call", capabilities: "m.render_audio" },
                 });
                 expect(invalidCapabilities.callCapabilities).toBeUndefined();
             });
             it("returns undefined call capabilities if an entry is not a string", () => {
                 const invalidCapabilities = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
-                    application: { type: "m.call", capabilities: ["render_audio", 42] },
+                    application: { type: "m.call", capabilities: ["m.render_audio", 42] },
                 });
                 expect(invalidCapabilities.callCapabilities).toBeUndefined();
             });
@@ -442,7 +442,7 @@ describe("CallMembership", () => {
                     "type": "m.call",
                     "m.call.id": "",
                     "m.call.intent": "voice",
-                    "capabilities": ["render_audio", "render_video"],
+                    "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
             it("returns correct scope", () => {

@@ -662,14 +662,14 @@ describe("MatrixRTCSession", () => {
 
         it("publishes the call capabilities in the membership and reads them back", async () => {
             await joinAsFirstMember(
-                { callCapabilities: ["render_audio", "render_video"] },
-                { capabilities: ["render_audio", "render_video"] },
+                { callCapabilities: ["m.render_audio", "m.render_video"] },
+                { capabilities: ["m.render_audio", "m.render_video"] },
             );
             expect((sendStateEventMock.mock.calls[0][2] as SessionMembershipData).capabilities).toStrictEqual([
-                "render_audio",
-                "render_video",
+                "m.render_audio",
+                "m.render_video",
             ]);
-            expect(sess!.memberships[0].callCapabilities).toStrictEqual(["render_audio", "render_video"]);
+            expect(sess!.memberships[0].callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
         });
 
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {

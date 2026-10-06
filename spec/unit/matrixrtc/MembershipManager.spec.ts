@@ -228,7 +228,7 @@ describe("MembershipManager", () => {
 
             it("sends the configured capabilities at the top level of a legacy membership", async () => {
                 const memberManager = new MembershipManager(
-                    { callCapabilities: ["render_audio", "render_video"] },
+                    { callCapabilities: ["m.render_audio", "m.render_video"] },
                     room,
                     client,
                     callSession,
@@ -236,7 +236,7 @@ describe("MembershipManager", () => {
                 memberManager.join([focus], undefined);
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
                 const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
-                expect(eventContent.capabilities).toStrictEqual(["render_audio", "render_video"]);
+                expect(eventContent.capabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
             });
 
             it("sends empty capabilities if configured as such", async () => {
@@ -249,7 +249,7 @@ describe("MembershipManager", () => {
 
             it("prefers the configured capabilities over ones in applicationData", async () => {
                 const memberManager = new MembershipManager(
-                    { callCapabilities: ["render_video"], applicationData: { capabilities: ["render_audio"] } },
+                    { callCapabilities: ["m.render_video"], applicationData: { capabilities: ["m.render_audio"] } },
                     room,
                     client,
                     callSession,
@@ -257,7 +257,7 @@ describe("MembershipManager", () => {
                 memberManager.join([focus], undefined);
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
                 const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
-                expect(eventContent.capabilities).toStrictEqual(["render_video"]);
+                expect(eventContent.capabilities).toStrictEqual(["m.render_video"]);
             });
 
             it("reschedules delayed leave event if sending state cancels it", async () => {
@@ -1443,7 +1443,7 @@ describe("MembershipManager", () => {
                     const memberManager = new StickyEventMembershipManager(
                         {
                             applicationData: { "org.example.key": "value" },
-                            callCapabilities: ["render_audio", "render_video"],
+                            callCapabilities: ["m.render_audio", "m.render_video"],
                         },
                         room,
                         client,
@@ -1464,7 +1464,7 @@ describe("MembershipManager", () => {
                             application: {
                                 "type": "m.call",
                                 "org.example.key": "value",
-                                "capabilities": ["render_audio", "render_video"],
+                                "capabilities": ["m.render_audio", "m.render_video"],
                             },
                             member: {
                                 user_id: "@alice:example.org",
