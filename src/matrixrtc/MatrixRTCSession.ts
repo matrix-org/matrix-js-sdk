@@ -33,6 +33,7 @@ import type {
     Status,
     IRTCNotificationContent,
     RTCCallIntent,
+    RTCCallCapability,
     Transport,
     SlotDescription,
     RtcSlotEventContent,
@@ -105,10 +106,15 @@ export interface SessionConfig {
     callIntent?: RTCCallIntent;
 
     /**
+     * What kinds of media this device is capable of handling for the call.
+     */
+    callCapabilities?: RTCCallCapability[];
+
+    /**
      * Application-specific data to publish in our membership alongside the
-     * application `type` and `m.call.intent`: in the `application` object of
-     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
-     * one. Keys should be namespaced. Read back through
+     * application `type`, `m.call.intent` and `capabilities`: in the `application`
+     * object of an `m.rtc.member` event, or at the top level of a legacy
+     * `m.call.member` one. Keys should be namespaced. Read back through
      * {@link CallMembership.applicationData}.
      */
     applicationData?: Record<string, unknown>;

@@ -218,6 +218,48 @@ describe("MembershipManager", () => {
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
             });
 
+            it("does not send capabilities if none are configured", async () => {
+                const memberManager = new MembershipManager({}, room, client, callSession);
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect("capabilities" in eventContent).toBe(false);
+            });
+
+            it("sends the configured capabilities at the top level of a legacy membership", async () => {
+                const memberManager = new MembershipManager(
+                    { callCapabilities: ["m.render_audio", "m.render_video"] },
+                    room,
+                    client,
+                    callSession,
+                );
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.capabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
+            });
+
+            it("sends empty capabilities if configured as such", async () => {
+                const memberManager = new MembershipManager({ callCapabilities: [] }, room, client, callSession);
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.capabilities).toStrictEqual([]);
+            });
+
+            it("prefers the configured capabilities over ones in applicationData", async () => {
+                const memberManager = new MembershipManager(
+                    { callCapabilities: ["m.render_video"], applicationData: { capabilities: ["m.render_audio"] } },
+                    room,
+                    client,
+                    callSession,
+                );
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.capabilities).toStrictEqual(["m.render_video"]);
+            });
+
             it("reschedules delayed leave event if sending state cancels it", async () => {
                 const memberManager = new MembershipManager(undefined, room, client, callSession);
                 const waitForSendState = waitForMockCall(client.sendStateEvent);
@@ -1399,7 +1441,10 @@ describe("MembershipManager", () => {
                         client._unstable_restartScheduledDelayedEvent,
                     );
                     const memberManager = new StickyEventMembershipManager(
-                        { applicationData: { "org.example.key": "value" } },
+                        {
+                            applicationData: { "org.example.key": "value" },
+                            callCapabilities: ["m.render_audio", "m.render_video"],
+                        },
                         room,
                         client,
                         callSession,
@@ -1416,7 +1461,11 @@ describe("MembershipManager", () => {
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
-                            application: { "type": "m.call", "org.example.key": "value" },
+                            application: {
+                                "type": "m.call",
+                                "org.example.key": "value",
+                                "capabilities": ["m.render_audio", "m.render_video"],
+                            },
                             member: {
                                 user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",

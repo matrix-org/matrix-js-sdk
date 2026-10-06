@@ -23,7 +23,14 @@ import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
+import {
+    type Transport,
+    isMyMembership,
+    type RTCCallCapability,
+    type RTCCallIntent,
+    Status,
+    type SlotDescription,
+} from "./types.ts";
 import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { type Action, ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
@@ -208,6 +215,7 @@ export class MembershipManager
     private activated = false;
     private readonly logger: Logger;
     protected callIntent: RTCCallIntent | undefined;
+    protected callCapabilities: RTCCallCapability[] | undefined;
     protected applicationData: Record<string, unknown> | undefined;
 
     public isActivated(): boolean {
@@ -361,6 +369,7 @@ export class MembershipManager
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
+        this.callCapabilities = joinConfig?.callCapabilities;
         this.applicationData = joinConfig?.applicationData;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
@@ -1015,6 +1024,7 @@ export class MembershipManager
             "membershipID": `${this.userId}:${this.deviceId}`,
             expires,
             "m.call.intent": this.callIntent,
+            ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" } as const,
             "foci_preferred": this.publishedTransports,
             ...(ownMembership !== undefined ? { created_ts: ownMembership.createdTs() } : undefined),
@@ -1312,6 +1322,7 @@ export class StickyEventMembershipManager extends MembershipManager {
                 ...this.applicationData,
                 type: this.slotDescription.application,
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
+                ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
             transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
