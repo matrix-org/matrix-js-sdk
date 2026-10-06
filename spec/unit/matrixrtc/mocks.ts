@@ -43,12 +43,10 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     focus_active: { type: "livekit", focus_selection: "multi_sfu" },
     foci_preferred: [
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
             type: "livekit",
         },
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.dev",
             type: "livekit",
         },
@@ -71,19 +69,7 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         published: [
             {
                 type: "livekit",
-                focus_active: { type: "livekit", focus_selection: "multi_sfu" },
-                foci_preferred: [
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.io",
-                        type: "livekit",
-                    },
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.dev",
-                        type: "livekit",
-                    },
-                ],
+                url: "wss://livekit.something.io",
             },
         ],
         can_subscribe: ["livekit"],
@@ -273,12 +259,12 @@ export function mockRTCEvent(
 export function mockCallMembership(
     membershipData: MembershipData,
     roomId: string,
-    rtcBackendIdentity?: string,
+    backendIdentities = ["xx"],
 ): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx");
+    return new CallMembership(ev, data, backendIdentities, "(deprecated)");
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {

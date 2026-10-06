@@ -145,9 +145,9 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     return true;
 };
 
-export async function computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
+export async function computeRtcIdentityRaw(userId: string, memberId: string): Promise<string> {
     // canonical JSON serialization (Matrix canonical JSON for arrays)
-    const jsonStr = JSON.stringify([userId, deviceId, memberId]);
+    const jsonStr = JSON.stringify([userId, memberId]);
     const hashBuffer = await sha256(jsonStr);
     const hashedString = encodeUnpaddedBase64(hashBuffer);
     return hashedString;
