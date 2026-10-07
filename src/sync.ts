@@ -406,6 +406,14 @@ export class SyncApi {
                 throw new Error("Peeking aborted");
             }
 
+            // The room may have reached the store some other way while we waited, e.g. /sync returned it because
+            // we are joined to it. Replacing it would leave its listeners on a room the store no longer updates.
+            const existingRoom = client.getRoom(roomId);
+            if (existingRoom) {
+                this.stopPeeking();
+                return existingRoom;
+            }
+
             // make sure things are init'd
             response.messages = response.messages || { chunk: [] };
             response.messages.chunk = response.messages.chunk || [];
