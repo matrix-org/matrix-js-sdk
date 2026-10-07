@@ -460,7 +460,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.localTimestamp = age !== undefined ? now - age : (this.getTs() ?? now);
         this.reEmitter = new TypedReEmitter(this);
         if (this.unstableStickyInfo) {
-            if (this.unstableStickyInfo.duration_ttl_ms) {
+            if (this.unstableStickyInfo.duration_ttl_ms !== undefined) {
                 this.unstableStickyExpiresAt = now + this.unstableStickyInfo.duration_ttl_ms;
             } else {
                 // Bound the timestamp so it doesn't come from the future.

@@ -632,6 +632,13 @@ describe("MatrixEvent", () => {
             vi.setSystemTime(50);
             // Prefer unsigned
             expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
+            // A TTL of 0 means already expired.
+            expect(
+                new MatrixEvent({
+                    ...evData,
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 0 },
+                } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(50);
             // Fall back to `duration_ms`
             expect(
                 new MatrixEvent({ ...evData, unsigned: undefined } satisfies IStickyEvent).unstableStickyExpiresAt,

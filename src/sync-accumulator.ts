@@ -229,7 +229,7 @@ interface IRoom {
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
     _receipts: ReceiptAccumulator;
     _stickyEvents: {
-        readonly event: IStickyEvent | IStickyStateEvent;
+        readonly event: (IStickyEvent | IStickyStateEvent) & EventTags;
         /**
          * This is the timestamp at which point it is safe to remove this event from the store.
          * This value is immutable
@@ -256,6 +256,8 @@ export interface ISyncData {
 type EventTags = {
     /** The local timestamp of the event (`now - unsigned.age` at the time of receipt). */
     _localTs?: number;
+    /** The local timestamp at which the sticky TTL elapses (`now + TTL` at the time of receipt). */
+    _stickyExpiresTs?: number;
 };
 
 type TaggedEvent = IRoomEvent & EventTags;
@@ -280,9 +282,11 @@ function copyEventForModifyingUnsigned<T extends IRoomEvent>(event: T): T {
  */
 function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
     const age = event.unsigned?.age;
-    if (age === undefined) return event;
+    const stickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
+    if (age === undefined && stickyTtl === undefined) return event;
     const copy: T & EventTags = copyEventForModifyingUnsigned(event);
-    copy._localTs = now - age;
+    if (age !== undefined) copy._localTs = now - age;
+    if (stickyTtl !== undefined) copy._stickyExpiresTs = now + stickyTtl;
     return copy;
 }
 
@@ -293,12 +297,31 @@ function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
  * @returns A copy with the tags removed, or the event itself if it carries no tags.
  */
 function untagEvent<T extends TaggedEvent>(event: T, now: number): T {
-    if (event._localTs === undefined) return event;
+    if (event._localTs === undefined && event._stickyExpiresTs === undefined) return event;
     const copy = copyEventForModifyingUnsigned(event);
     copy.unsigned = copy.unsigned || {};
-    delete copy._localTs;
-    copy.unsigned.age = now - event._localTs;
+    if (event._localTs !== undefined) {
+        delete copy._localTs;
+        copy.unsigned.age = now - event._localTs;
+    }
+    if (event._stickyExpiresTs !== undefined) {
+        delete copy._stickyExpiresTs;
+        copy.unsigned.msc4354_sticky_duration_ttl_ms = Math.max(0, event._stickyExpiresTs - now);
+    }
     return copy;
+}
+
+/**
+ * Works out the local timestamp at which a sticky event expires.
+ */
+function computeStickyExpiresTs(event: (IStickyEvent | IStickyStateEvent) & EventTags, now: number): number {
+    // Prefer the server-provided TTL if available.
+    if (event._stickyExpiresTs !== undefined) return event._stickyExpiresTs;
+    // If `duration_ms` exceeds the spec limit of a hour, we cap it.
+    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
+    // If `origin_server_ts` claims to have been from the future, we still bound it to now.
+    const createdTs = Math.min(event.origin_server_ts, now);
+    return cappedDuration + createdTs;
 }
 
 /**
@@ -616,26 +639,20 @@ export class SyncAccumulator {
             });
         });
 
-        // Prune out any events in our stores that have since expired, do this before we
-        // insert new events.
-        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
-
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
         // process these events into the correct mapped order.
         if (data.msc4354_sticky?.events) {
             currentData._stickyEvents = currentData._stickyEvents.concat(
-                data.msc4354_sticky.events.map((event) => {
-                    // If `duration_ms` exceeds the spec limit of a hour, we cap it.
-                    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
-                    // If `origin_server_ts` claims to have been from the future, we still bound it to now.
-                    const createdTs = Math.min(event.origin_server_ts, now);
-                    return {
-                        event,
-                        expiresTs: cappedDuration + createdTs,
-                    };
+                data.msc4354_sticky.events.map((e) => {
+                    const event = fromDatabase ? e : tagEvent(e, now);
+                    return { event, expiresTs: computeStickyExpiresTs(event, now) };
                 }),
             );
         }
+
+        // Prune out any events in our stores that have since expired. We do this after inserting
+        // so that events loaded from the database which expired whilst we were offline get dropped, too.
+        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
 
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
@@ -693,6 +710,11 @@ export class SyncAccumulator {
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
+            // Drop anything that expired since we last accumulated. When not writing to the
+            // database, also turn the stored absolute timestamps back into relative values.
+            const stickyEvents = roomData._stickyEvents
+                .filter(({ expiresTs }) => expiresTs > now)
+                .map(({ event }) => (forDatabase ? event : untagEvent(event, now)));
             const roomJson: IJoinedRoom & {
                 // We track both `state` and `state_after` for downgrade compatibility
                 "state": IState;
@@ -709,11 +731,7 @@ export class SyncAccumulator {
                 "unread_notifications": roomData._unreadNotifications,
                 "unread_thread_notifications": roomData._unreadThreadNotifications,
                 "summary": roomData._summary as IRoomSummary,
-                "msc4354_sticky": roomData._stickyEvents?.length
-                    ? {
-                          events: roomData._stickyEvents.map((e) => e.event),
-                      }
-                    : undefined,
+                "msc4354_sticky": stickyEvents.length ? { events: stickyEvents } : undefined,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
