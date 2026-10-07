@@ -6272,11 +6272,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Returns a set of configured RTC transports supported by the homeserver.
-     * Requires homeserver support for MSC4143.
+     * Requires the homeserver to advertise `org.matrix.msc4143` in `/versions`.
      * @throws A M_NOT_FOUND error if not supported by the homeserver.
      */
     public async _unstable_getRTCTransports(): Promise<Transport[]> {
-        // There is no /versions endpoint to check for support, so we just have to attempt a request.
+        if (!(await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))) {
+            throw new MatrixError({ errcode: "M_NOT_FOUND", error: "Server does not support RTC transports" }, 404);
+        }
+
         return (
             await this.http.authedRequest<{
                 rtc_transports: Transport[];
