@@ -587,7 +587,6 @@ export class MembershipManager
                 if (update) return update;
 
                 if (this.isDelayedEventGoneError(e)) {
-                    // The delayed event got already removed (404) or was already sent (409).
                     // This means we are good and can set it to undefined and run this again.
                     this.logger.info("Delayed event to cancel is already gone, scheduling a new one:", e);
                     this.setAndEmitDelayId(undefined);
