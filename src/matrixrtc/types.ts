@@ -112,6 +112,12 @@ export type RTCNotificationType = "ring" | "notification";
 export type RTCCallIntent = "audio" | "video" | string;
 
 /**
+ * Represents one kind of media a member's device is capable of handling.
+ * May be any string, although `"m.render_audio"` and `"m.render_video"` are commonly accepted values.
+ */
+export type RTCCallCapability = "m.render_audio" | "m.render_video" | string;
+
+/**
  * The maximum `lifetime` of an RTC notification as per MSC4075. Larger values are capped to this.
  *
  * Exported for use within the js-sdk only. Not re-exported from `matrixrtc/index.ts`.

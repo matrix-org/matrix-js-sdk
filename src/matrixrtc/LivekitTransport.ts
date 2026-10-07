@@ -16,20 +16,69 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
-export interface LivekitTransportConfig extends Transport {
+/**
+ * @deprecated Use {@link UnstableLivekitTransport} instead, which has multiple
+ *   variants to support the migration to newer versions of MSC4195.
+ */
+export interface LivekitTransport extends Transport {
     type: "livekit";
     livekit_service_url: string;
 }
 
-export const isLivekitTransportConfig = (object: any): object is LivekitTransportConfig =>
-    object.type === "livekit" && "livekit_service_url" in object;
+/**
+ * @deprecated Use {@link isUnstableLivekitTransport} instead.
+ */
+export const isLivekitTransport = (object: unknown): object is LivekitTransport => {
+    if (typeof object !== "object" || object === null) return false;
+    const transport = object as Transport;
 
-export interface LivekitTransport extends LivekitTransportConfig {
-    livekit_alias: string;
-}
+    return transport.type === "livekit" && typeof transport.livekit_service_url === "string";
+};
 
-export const isLivekitTransport = (object: any): object is LivekitTransport =>
-    isLivekitTransportConfig(object) && "livekit_alias" in object;
+type WebsocketUrl = {
+    /**
+     * WebSocket URL of the LiveKit server.
+     */
+    url: string;
+};
+
+type ServiceUrl = {
+    /**
+     * Base URL of the LiveKit JWT service.
+     */
+    livekit_service_url: string;
+};
+
+/**
+ * Any LiveKit transport that can be advertised by a homeserver or published by
+ * a session member in unstable MSC4195 implementations: `url` only,
+ * `livekit_service_url` only, or both during the migration.
+ */
+export type UnstableLivekitTransport =
+    // Latest MSC4195 variant, with `url`. Indicates that both publishers and
+    // subscribers will use the /_matrix/client/v1/rtc/livekit/get_token
+    // endpoint.
+    | ({ type: "livekit" } & WebsocketUrl)
+    // Legacy variant, with `livekit_service_url`. Indicates that both
+    // publishers and subscribers will use the endpoints of the provided LiveKit
+    // JWT service.
+    | ({ type: "livekit" } & ServiceUrl)
+    // Transitional variant, with both `url` and `livekit_service_url`.
+    // Indicates that both publishers and subscribers may use either the
+    // /_matrix/client/v1/rtc/livekit/get_token endpoint or the provided LiveKit
+    // JWT service.
+    | ({ type: "livekit" } & WebsocketUrl & ServiceUrl);
+
+export const isUnstableLivekitTransport = (object: unknown): object is UnstableLivekitTransport => {
+    if (typeof object !== "object" || object === null) return false;
+    const transport = object as Transport;
+
+    if (transport.type !== "livekit") return false;
+    if (!("url" in transport || "livekit_service_url" in transport)) return false;
+    if ("url" in transport && typeof transport.url !== "string") return false;
+    if ("livekit_service_url" in transport && typeof transport.livekit_service_url !== "string") return false;
+    return true;
+};
 
 /**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.
@@ -37,7 +86,7 @@ export const isLivekitTransport = (object: any): object is LivekitTransport =>
  */
 export interface LivekitFocusSelection extends Transport {
     type: "livekit";
-    focus_selection: "oldest_membership" | "multi_sfu";
+    focus_selection: "multi_sfu";
 }
 /**
  * @deprecated see LivekitFocusSelection

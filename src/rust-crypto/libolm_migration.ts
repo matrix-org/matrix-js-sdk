@@ -465,44 +465,51 @@ export async function migrateLegacyLocalTrustIfNeeded(args: {
         // There are no cross-signing keys published server side, so nothing to do here.
         return;
     }
-    if (rustOwnIdentity.isVerified()) {
-        // The rust session already trusts the keys, so again, nothing to do.
-        return;
-    }
+    // The identity keeps the crypto store open until freed
+    try {
+        if (rustOwnIdentity.isVerified()) {
+            // The rust session already trusts the keys, so again, nothing to do.
+            return;
+        }
 
-    const legacyLocallyTrustedMSK = await getLegacyTrustedPublicMasterKeyBase64(legacyCryptoStore);
-    if (!legacyLocallyTrustedMSK) {
-        // The user never verified their identity in the legacy session, so nothing to do.
-        return;
-    }
+        const legacyLocallyTrustedMSK = await getLegacyTrustedPublicMasterKeyBase64(legacyCryptoStore);
+        if (!legacyLocallyTrustedMSK) {
+            // The user never verified their identity in the legacy session, so nothing to do.
+            return;
+        }
 
-    const mskInfo: CrossSigningKeyInfo = JSON.parse(rustOwnIdentity.masterKey);
-    if (!mskInfo.keys || Object.keys(mskInfo.keys).length === 0) {
-        // This should not happen, but let's be safe
-        logger.error("Post Migration | Unexpected error: no master key in the rust session.");
-        return;
-    }
-    const rustSeenMSK = Object.values(mskInfo.keys)[0];
+        const mskInfo: CrossSigningKeyInfo = JSON.parse(rustOwnIdentity.masterKey);
+        if (!mskInfo.keys || Object.keys(mskInfo.keys).length === 0) {
+            // This should not happen, but let's be safe
+            logger.error("Post Migration | Unexpected error: no master key in the rust session.");
+            return;
+        }
+        const rustSeenMSK = Object.values(mskInfo.keys)[0];
 
-    if (rustSeenMSK && rustSeenMSK == legacyLocallyTrustedMSK) {
-        logger.info(`Post Migration: Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`);
-        // Let's mark the user identity as locally verified as part of the migration.
-        await rustOwnIdentity.verify();
-        // As well as marking the MSK as trusted, `OlmMachine.verify` returns a
-        // `SignatureUploadRequest` which will publish a signature of the MSK using
-        // this device. In this case, we ignore the request: since the user hasn't
-        // actually re-verified the MSK, we don't publish a new signature. (`.verify`
-        // doesn't store the signature, and if we drop the request here it won't be
-        // retried.)
-        //
-        // Not publishing the signature is consistent with the behaviour of
-        // matrix-crypto-sdk when the private key is imported via
-        // `importCrossSigningKeys`, and when the identity is verified via interactive
-        // verification.
-        //
-        // [Aside: device signatures on the MSK are not considered by the rust-sdk to
-        // establish the trust of the user identity so in any case, what we actually do
-        // here is somewhat moot.]
+        if (rustSeenMSK && rustSeenMSK == legacyLocallyTrustedMSK) {
+            logger.info(
+                `Post Migration: Migrating legacy trusted MSK: ${legacyLocallyTrustedMSK} to locally verified.`,
+            );
+            // Let's mark the user identity as locally verified as part of the migration.
+            await rustOwnIdentity.verify();
+            // As well as marking the MSK as trusted, `OlmMachine.verify` returns a
+            // `SignatureUploadRequest` which will publish a signature of the MSK using
+            // this device. In this case, we ignore the request: since the user hasn't
+            // actually re-verified the MSK, we don't publish a new signature. (`.verify`
+            // doesn't store the signature, and if we drop the request here it won't be
+            // retried.)
+            //
+            // Not publishing the signature is consistent with the behaviour of
+            // matrix-crypto-sdk when the private key is imported via
+            // `importCrossSigningKeys`, and when the identity is verified via interactive
+            // verification.
+            //
+            // [Aside: device signatures on the MSK are not considered by the rust-sdk to
+            // establish the trust of the user identity so in any case, what we actually do
+            // here is somewhat moot.]
+        }
+    } finally {
+        rustOwnIdentity.free();
     }
 }
 

@@ -22,7 +22,7 @@ import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/
 function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
     vi.mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, "xx");
+    return new CallMembership(ev, data, ["xx"], "(deprecated)");
 }
 
 describe("CallMembership", () => {
@@ -49,9 +49,10 @@ describe("CallMembership", () => {
             "scope": "m.room",
             "application": "m.call",
             "device_id": "AAAAAAA",
-            "focus_active": { type: "livekit", focus_selection: "oldest_membership" },
+            "focus_active": { type: "livekit", focus_selection: "multi_sfu" },
             "foci_preferred": [{ type: "livekit" }],
             "m.call.intent": "voice",
+            "capabilities": ["m.render_audio", "m.render_video"],
         };
 
         it("rejects membership with no device_id", () => {
@@ -70,6 +71,21 @@ describe("CallMembership", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { scope: undefined }));
             }).not.toThrow();
+        });
+
+        it("rejects membership with non-array capabilities", () => {
+            expect(() => {
+                createCallMembership(
+                    makeMockEvent(),
+                    Object.assign({}, membershipTemplate, { capabilities: "m.render_audio" }),
+                );
+            }).toThrow();
+        });
+
+        it("rejects membership with non-string entries in capabilities", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { capabilities: [42] }));
+            }).toThrow();
         });
 
         it("uses event timestamp if no created_ts", () => {
@@ -106,45 +122,16 @@ describe("CallMembership", () => {
 
         describe("getTransport", () => {
             const mockFocus = { type: "this_is_a_mock_focus" };
-            const oldestMembership = createCallMembership(makeMockEvent(), membershipTemplate);
-            it("gets the correct active transport with oldest_membership", () => {
-                const membership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-                });
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
-
-                // If there is an older member we use its focus.
-                expect(membership.getTransport(oldestMembership)).toBe(membershipTemplate.foci_preferred[0]);
-            });
-
-            it("gets the correct active transport with multi_sfu", () => {
+            it("gets the correct active transport from session membership", () => {
                 const membership = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
                     foci_preferred: [mockFocus],
                     focus_active: { type: "livekit", focus_selection: "multi_sfu" },
                 });
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual(mockFocus);
-
-                // If there is an older member we still use our own focus in multi sfu.
-                expect(membership.getTransport(oldestMembership)).toBe(mockFocus);
-            });
-            it("does not provide focus if the selection method is unknown", () => {
-                const membership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    foci_preferred: [mockFocus],
-                    focus_active: { type: "livekit", focus_selection: "unknown" },
-                });
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toBeUndefined();
+                expect(membership.getTransport()).toStrictEqual(mockFocus);
             });
         });
+
         describe("correct values from computed fields", () => {
             const membership = createCallMembership(makeMockEvent(), membershipTemplate);
             it("returns correct sender", () => {
@@ -190,11 +177,22 @@ describe("CallMembership", () => {
             it("returns correct call intent", () => {
                 expect(membership.callIntent).toBe("voice");
             });
-            it("returns correct application", () => {
-                expect(membership.application).toStrictEqual("m.call");
+            it("returns correct call capabilities", () => {
+                expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
+            });
+            it("returns undefined call capabilities if not advertised", () => {
+                const withoutCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    capabilities: undefined,
+                });
+                expect(withoutCapabilities.callCapabilities).toBeUndefined();
             });
             it("returns correct applicationData", () => {
-                expect(membership.applicationData).toStrictEqual({ "type": "m.call", "m.call.intent": "voice" });
+                expect(membership.applicationData).toStrictEqual({
+                    "type": "m.call",
+                    "m.call.intent": "voice",
+                    "capabilities": ["m.render_audio", "m.render_video"],
+                });
             });
             it("returns the application's own top-level data in applicationData", () => {
                 const withData = createCallMembership(makeMockEvent(), {
@@ -205,13 +203,11 @@ describe("CallMembership", () => {
                     "org.example.key": { nested: true },
                     "type": "m.call",
                     "m.call.intent": "voice",
+                    "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe("m.room");
-            });
-            it("returns correct membershipID", () => {
-                expect(membership.membershipID).toBe("@alice:example.org:AAAAAAA");
             });
             it("returns correct unused fields", () => {
                 expect(membership.getAbsoluteExpiry()).toBe(DEFAULT_EXPIRE_DURATION);
@@ -255,7 +251,12 @@ describe("CallMembership", () => {
         }
         const membershipTemplate: RtcMembershipData = {
             slot_id: "m.call#",
-            application: { "type": "m.call", "m.call.id": "", "m.call.intent": "voice" },
+            application: {
+                "type": "m.call",
+                "m.call.id": "",
+                "m.call.intent": "voice",
+                "capabilities": ["m.render_audio", "m.render_video"],
+            },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
             versions: [],
@@ -394,21 +395,6 @@ describe("CallMembership", () => {
         it.todo("considers memberships unexpired if local age low enough");
         it.todo("considers memberships expired if local age large enough");
 
-        describe("getTransport", () => {
-            it("gets the correct active transport with oldest_membership", () => {
-                const oldestMembership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    transports: { ...membershipTemplate.transports, published: [{ type: "oldest_transport" }] },
-                });
-                const membership = createCallMembership(makeMockEvent(), membershipTemplate);
-
-                // if we are the oldest member we use our focus.
-                expect(membership.getTransport(membership)).toStrictEqual({ type: "livekit" });
-
-                // If there is an older member we use our own focus focus. (RtcMembershipData always uses multi sfu)
-                expect(membership.getTransport(oldestMembership)).toStrictEqual({ type: "livekit" });
-            });
-        });
         describe("correct values from computed fields", () => {
             const membership = createCallMembership(makeMockEvent(), membershipTemplate);
             it("returns correct sender", () => {
@@ -427,21 +413,40 @@ describe("CallMembership", () => {
             it("returns correct call intent", () => {
                 expect(membership.callIntent).toBe("voice");
             });
-            it("returns correct application", () => {
-                expect(membership.application).toStrictEqual("m.call");
+            it("returns correct call capabilities", () => {
+                expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
+            });
+            it("returns undefined call capabilities if not advertised", () => {
+                const withoutCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { "type": "m.call", "m.call.intent": "voice" },
+                });
+                expect(withoutCapabilities.callCapabilities).toBeUndefined();
+            });
+            it("returns undefined call capabilities if it is not an array", () => {
+                const invalidCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call", capabilities: "m.render_audio" },
+                });
+                expect(invalidCapabilities.callCapabilities).toBeUndefined();
+            });
+            it("returns undefined call capabilities if an entry is not a string", () => {
+                const invalidCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call", capabilities: ["m.render_audio", 42] },
+                });
+                expect(invalidCapabilities.callCapabilities).toBeUndefined();
             });
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({
                     "type": "m.call",
                     "m.call.id": "",
                     "m.call.intent": "voice",
+                    "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
             it("returns correct scope", () => {
                 expect(membership.scope).toBe(undefined);
-            });
-            it("returns correct membershipID", () => {
-                expect(membership.membershipID).toBe("xyzHASHxyz");
             });
             it("returns correct unused fields", () => {
                 expect(membership.getAbsoluteExpiry()).toBe(undefined);
@@ -449,9 +454,47 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-        it("uses unpadded base64 for RTC backend identities", async () => {
-            const membership = await CallMembership.parseFromEvent(makeMockEvent(0, { ...membershipTemplate }));
-            expect(membership.rtcBackendIdentity).toBe("jUZ0Q1yF5nV3LlAI5xfD1I7BPnAytJaPEAR57EXjJ6s");
+        it("uses unpadded base64 for hashed backend identities", async () => {
+            const membership = await CallMembership.parseFromEvent(
+                makeMockEvent(0, {
+                    ...membershipTemplate,
+                    transports: {
+                        published: [{ type: "livekit", url: "wss://example.org" }],
+                        can_subscribe: ["livekit"],
+                    },
+                }),
+            );
+            expect(membership.backendIdentities).toEqual(["b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0"]);
+        });
+        it("uses legacy backend identity in case of legacy transport", async () => {
+            const membership = await CallMembership.parseFromEvent(
+                makeMockEvent(0, {
+                    ...membershipTemplate,
+                    transports: {
+                        published: [{ type: "livekit", livekit_service_url: "https://example.org" }],
+                        can_subscribe: ["livekit"],
+                    },
+                }),
+            );
+            expect(membership.backendIdentities).toEqual(["@alice:example.org:AAAAAAA"]);
+        });
+        it("includes both possible backend identities in case of ambiguous transport", async () => {
+            const membership = await CallMembership.parseFromEvent(
+                makeMockEvent(0, {
+                    ...membershipTemplate,
+                    transports: {
+                        published: [
+                            // Includes both `url` and `livekit_service_url`
+                            { type: "livekit", url: "wss://example.org", livekit_service_url: "https://example.org" },
+                        ],
+                        can_subscribe: ["livekit"],
+                    },
+                }),
+            );
+            expect(membership.backendIdentities).toEqual([
+                "b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0",
+                "@alice:example.org:AAAAAAA",
+            ]);
         });
     });
 });

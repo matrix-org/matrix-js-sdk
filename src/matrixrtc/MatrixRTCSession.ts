@@ -33,6 +33,7 @@ import type {
     Status,
     IRTCNotificationContent,
     RTCCallIntent,
+    RTCCallCapability,
     Transport,
     SlotDescription,
     RtcSlotEventContent,
@@ -83,7 +84,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         key: Uint8Array<ArrayBuffer>,
         encryptionKeyIndex: number,
         membership: CallMembershipIdentityParts,
-        rtcBackendIdentity: string,
+        backendIdentity: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
@@ -105,10 +106,15 @@ export interface SessionConfig {
     callIntent?: RTCCallIntent;
 
     /**
+     * What kinds of media this device is capable of handling for the call.
+     */
+    callCapabilities?: RTCCallCapability[];
+
+    /**
      * Application-specific data to publish in our membership alongside the
-     * application `type` and `m.call.intent`: in the `application` object of
-     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
-     * one. Keys should be namespaced. Read back through
+     * application `type`, `m.call.intent` and `capabilities`: in the `application`
+     * object of an `m.rtc.member` event, or at the top level of a legacy
+     * `m.call.member` one. Keys should be namespaced. Read back through
      * {@link CallMembership.applicationData}.
      */
     applicationData?: Record<string, unknown>;
@@ -202,12 +208,6 @@ export interface EncryptionConfig {
      *  media keys for other participants become available.
      */
     manageMediaKeys?: boolean;
-    /**
-     * The minimum time (in milliseconds) between each attempt to send encryption key(s).
-     * e.g. if this is set to 1000, then we will send at most one key event every second.
-     * @deprecated - Not used by the new encryption manager.
-     */
-    updateEncryptionKeyThrottle?: number;
 
     /**
      * Sometimes it is necessary to rotate the encryption key after a membership update.
@@ -331,16 +331,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         return this.encryptionManager?.isKeyRotationSuppressed ?? false;
     }
 
-    /**
-     * The callId (sessionId) of the call.
-     *
-     * It can be undefined since the callId is only known once the first membership joins.
-     * The callId is the property that, per definition, groups memberships into one call.
-     * @deprecated use `slotId` instead.
-     */
-    public get callId(): string | undefined {
-        return this.slotDescription?.id;
-    }
     /**
      * The slotId of the call.
      * `{application}#{appSpecificId}`
@@ -550,12 +540,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.initialMembershipCalculated = this.ensureRecalculateSessionMembers();
         this.setExpiryTimer();
     }
+
     /*
      * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
      */
     public isJoined(): boolean {
-        return this.membershipManager?.isJoined() ?? false;
+        return this.membershipManager?.isActivated() ?? false;
     }
 
     /**
@@ -582,22 +572,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Announces this user and device as joined to the MatrixRTC session,
      * and continues to update the membership event to keep it valid until
      * leaveRoomSession() is called
-     * This will not subscribe to updates: remember to call subscribe() separately if
-     * desired.
      * This method will return immediately and the session will be joined in the background.
      * @param ownMembershipIdentity the identity of the user and device joining the session.
      * This will be put into the content.member.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRTCSession(
+    public join(
         ownMembershipIdentity: CallMembershipIdentityParts,
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
+        publishedTransports: Transport[],
         joinConfig?: JoinSessionConfig,
     ): void {
         if (this.isJoined()) {
@@ -632,14 +615,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyBin: Uint8Array<ArrayBuffer>,
                     encryptionKeyIndex: number,
                     membership: CallMembershipIdentityParts,
-                    rtcBackendIdentity: string,
+                    backendIdentity: string,
                 ) => {
                     this.emit(
                         MatrixRTCSessionEvent.EncryptionKeyChanged,
                         keyBin,
                         encryptionKeyIndex,
                         membership,
-                        rtcBackendIdentity,
+                        backendIdentity,
                     );
                 },
                 this.logger,
@@ -650,45 +633,25 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager.join(fociPreferred, multiSfuFocus, (e) => {
+        this.membershipManager.join(publishedTransports, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
-        this.encryptionManager.join(joinConfig);
+        this.encryptionManager.join(joinConfig, publishedTransports);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
     /**
-     *
-     * @param fociPreferred
-     * @param multiSfuFocus
-     * @param joinConfig
-     * @deprecated use the joinRTCSession method instead
-     */
-    public joinRoomSession(
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
-        joinConfig?: JoinSessionConfig,
-    ): void {
-        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
-        // TODO this wants to become a UUID
-        const memberId = `${userId}:${deviceId}`;
-        this.joinRTCSession({ userId, deviceId, memberId }, fociPreferred, multiSfuFocus, joinConfig);
-    }
-
-    /**
      * Announces this user and device as having left the MatrixRTC session
      * and stops scheduled updates.
-     * This will not unsubscribe from updates: remember to call unsubscribe() separately if
-     * desired.
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      * @returns Whether the membership update was attempted and did not time out.
      */
-    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
+    public async leave(timeout?: number): Promise<boolean> {
         if (!this.isJoined()) {
             this.logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
             return false;
@@ -702,19 +665,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         return await leavePromise;
-    }
-    /**
-     * This returns the focus in use by the oldest membership.
-     * Do not use since this might be just the focus for the oldest membership. others might use a different focus.
-     * @deprecated use `member.getTransport(session.getOldestMembership())` instead for the specific member you want to get the focus for.
-     */
-    public getFocusInUse(): Transport | undefined {
-        const oldestMembership = this.getOldestMembership();
-        return oldestMembership?.getTransport(oldestMembership);
-    }
-
-    public getOldestMembership(): CallMembership | undefined {
-        return this.memberships[0];
     }
 
     /**
@@ -767,7 +717,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyInfo.key,
                     keyInfo.keyIndex,
                     keyInfo.membership,
-                    keyInfo.rtcBackendIdentity,
+                    keyInfo.backendIdentity,
                 );
             });
         });
@@ -896,15 +846,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         ) {
             void this.ensureRecalculateSessionMembers();
         }
-    };
-
-    /**
-     * Call this when something changed that may impacts the current MatrixRTC members in this session.
-     *
-     * @deprecated use {@link ensureRecalculateSessionMembers} instead.
-     */
-    public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.ensureRecalculateSessionMembers();
     };
 
     // Recalculations are chained onto this promise, so they never run in parallel.

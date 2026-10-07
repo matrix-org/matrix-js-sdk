@@ -125,16 +125,33 @@ describe("RoomStickyEvents", () => {
                 expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
             });
 
+            it("should prefer the event with the later server-provided TTL over the later intended expiry", () => {
+                const now = Date.now();
+                // Intended to expire at now + 60000 but the server says there are only 5000 left
+                const longIntendedEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$long",
+                    origin_server_ts: now,
+                    msc4354_sticky: { duration_ms: 60000 },
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 5000 },
+                });
+                // Intended to expire at now + 30000 and the server agrees there are 29000 left
+                const shortIntendedEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$short",
+                    origin_server_ts: now + 1000,
+                    msc4354_sticky: { duration_ms: 30000 },
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 29000 },
+                });
+                add(longIntendedEv, shortIntendedEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([shortIntendedEv]);
+            });
+
             it("should tie break on the highest event ID when the intended expiry is equal", () => {
                 const now = Date.now();
                 // Both intended to expire at now + 15000
                 const lowIdEv = new MatrixEvent({ ...stickyEvent, event_id: "$aaa", origin_server_ts: now });
-                const highIdEv = new MatrixEvent({
-                    ...stickyEvent,
-                    event_id: "$zzz",
-                    origin_server_ts: now + 5000,
-                    msc4354_sticky: { duration_ms: 10000 },
-                });
+                const highIdEv = new MatrixEvent({ ...stickyEvent, event_id: "$zzz", origin_server_ts: now });
                 add(lowIdEv, highIdEv);
                 expect([...stickyEvents.getStickyEvents()]).toEqual([highIdEv]);
                 // The losing event is still retained as a predecessor for redaction purposes.
@@ -305,6 +322,31 @@ describe("RoomStickyEvents", () => {
             vi.advanceTimersByTime(15000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [ev]);
         });
+        it("should prune expired previous events while keeping the current event", () => {
+            vi.setSystemTime(0);
+            const olderEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$older",
+                origin_server_ts: 0,
+            });
+            vi.setSystemTime(5000);
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer",
+                origin_server_ts: 5000,
+            });
+            stickyEvents.addStickyEvents([olderEv, newerEv]);
+            const emitSpy = vi.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Expire the older (previous) event only. The newer (current) event is still active.
+            vi.advanceTimersByTime(10000);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
+            // Redacting the current event must not fall back to the expired previous event.
+            stickyEvents.handleRedaction(newerEv.getId()!);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [newerEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
+        });
     });
 
     describe("encrypted events", () => {
@@ -362,6 +404,30 @@ describe("RoomStickyEvents", () => {
                 { isRetry: true },
             );
             expect([...stickyEvents.getStickyEvents()]).toEqual([event]);
+        });
+
+        it("should keep waiting when decryption failed before the event was added", async () => {
+            const event = makeEncryptedStickyEvent();
+            const failing = {
+                decryptEvent: vi.fn().mockRejectedValue(new Error("no keys")),
+            } as unknown as CryptoBackend;
+            await event.attemptDecryption(failing);
+
+            stickyEvents.addStickyEvents([event]);
+
+            // Indexing it now would file it under `m.room.message` with no sticky key.
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(0);
+            expect(emitSpy).not.toHaveBeenCalled();
+
+            // The keys arrive later and the event is decrypted after all.
+            await event.attemptDecryption(
+                cryptoDecryptingTo("org.example.any_type", { msc4354_sticky_key: "foobar" }),
+                { isRetry: true },
+            );
+            expect(stickyEvents.getKeyedStickyEvent("@alice:example.org", "org.example.any_type", "foobar")).toBe(
+                event,
+            );
+            expect(emitSpy).toHaveBeenCalledWith([event], [], []);
         });
     });
 
@@ -522,6 +588,71 @@ describe("RoomStickyEvents", () => {
             stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
             stickyEvents.handleRedaction(newerEv);
             expect(emitSpy).toHaveBeenCalledWith([], [{ current: ev, previous: newerEv }], []);
+        });
+        it.each([
+            ["a `MatrixEvent` parameter", (ev: MatrixEvent) => ev],
+            ["an event ID parameter", (ev: MatrixEvent) => ev.getId()!],
+        ])("should not touch the current event when a superseded event is redacted via %s", (_, param) => {
+            const emitSpy = vi.fn();
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            vi.advanceTimersByTime(1000); // Advance time so we can insert a newer event.
+            const newerEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$newer-ev",
+                origin_server_ts: Date.now() + 1000,
+            });
+            stickyEvents.addStickyEvents([ev, newerEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            // Redact the older, superseded event.
+            stickyEvents.handleRedaction(param(ev));
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect(stickyEvents.getKeyedStickyEvent(stickyEvent.sender, stickyEvent.type, "foobar")).toBe(newerEv);
+            // The superseded event must have been dropped, so redacting the current
+            // event now removes the entry rather than reverting to the older event.
+            stickyEvents.handleRedaction(param(newerEv));
+            expect(emitSpy).toHaveBeenCalledWith([], [], [newerEv]);
+        });
+        it("should not touch the current event when redacting an event that was never added to the map", () => {
+            const emitSpy = vi.fn();
+            // This event has already expired on arrival, so it is never added to the map.
+            const expiredEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$expired-ev",
+                origin_server_ts: Date.now() - stickyEvent.msc4354_sticky.duration_ms - 1000,
+            });
+            const ev = new MatrixEvent({
+                ...stickyEvent,
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([expiredEv, ev]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(expiredEv);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([ev]);
+        });
+        it("should not touch keyed events when redacting an unkeyed event that is not in the map", () => {
+            const emitSpy = vi.fn();
+            // A keyed event whose sticky key collides with the string form of `undefined`.
+            const keyedEv = new MatrixEvent({
+                ...stickyEvent,
+                content: { msc4354_sticky_key: "undefined" },
+                origin_server_ts: Date.now(),
+            });
+            const unkeyedEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$unkeyed-ev",
+                content: {},
+                origin_server_ts: Date.now(),
+            });
+            stickyEvents.addStickyEvents([keyedEv]);
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(unkeyedEv);
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([keyedEv]);
         });
     });
 });

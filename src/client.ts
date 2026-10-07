@@ -1600,6 +1600,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC.stop();
 
         this.serverCapabilitiesService.stop();
+        this.retentionPolicyService?.stop();
 
         this.cachedRtcTransports.stop();
         this.cachedWellKnown.stop();
