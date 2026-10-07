@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type MockedObject } from "vitest";
 
-import { type IContent, MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import { type IContent, MatrixEvent, MatrixEventEvent, MAX_STICKY_DURATION_MS } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
@@ -632,6 +632,13 @@ describe("MatrixEvent", () => {
             vi.setSystemTime(50);
             // Prefer unsigned
             expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
+            // The TTL is capped to the spec limit
+            expect(
+                new MatrixEvent({
+                    ...evData,
+                    unsigned: { msc4354_sticky_duration_ttl_ms: MAX_STICKY_DURATION_MS * 10 },
+                } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(50 + MAX_STICKY_DURATION_MS);
             // A TTL of 0 means already expired.
             expect(
                 new MatrixEvent({

@@ -32,6 +32,7 @@ import {
     SyncAccumulator,
 } from "../../src/sync-accumulator";
 import { type IRoomSummary } from "../../src";
+import { MAX_STICKY_DURATION_MS } from "../../src/models/event";
 import * as utils from "../test-utils/test-utils";
 import { KnownMembership, type Membership } from "../../src/@types/membership";
 
@@ -1175,6 +1176,18 @@ describe("SyncAccumulator", function () {
                 sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
                 vi.setSystemTime(400);
                 expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
+            });
+
+            it("caps the TTL to the spec limit", () => {
+                vi.setSystemTime(0);
+                const ev = stickyEventWithTtl(MAX_STICKY_DURATION_MS * 10);
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
+                    { ...ev, unsigned: { age: 0, msc4354_sticky_duration_ttl_ms: MAX_STICKY_DURATION_MS } },
+                ]);
+                vi.setSystemTime(MAX_STICKY_DURATION_MS);
+                sa.accumulate(syncSkeleton({}));
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
             });
 
             it("drops events whose TTL has elapsed when the data is read back", () => {

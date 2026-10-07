@@ -286,7 +286,7 @@ function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
     if (age === undefined && stickyTtl === undefined) return event;
     const copy: T & EventTags = copyEventForModifyingUnsigned(event);
     if (age !== undefined) copy._localTs = now - age;
-    if (stickyTtl !== undefined) copy._stickyExpiresTs = now + stickyTtl;
+    if (stickyTtl !== undefined) copy._stickyExpiresTs = now + Math.min(stickyTtl, MAX_STICKY_DURATION_MS);
     return copy;
 }
 

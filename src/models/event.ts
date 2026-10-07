@@ -1760,7 +1760,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * If the event is not a sticky event (or not supported by the server),
      * then this returns `undefined`.
      *
-     * `duration_ms` is safely bounded to a hour.
+     * `duration_ms` and `duration_ttl_ms` are safely bounded to a hour.
      */
     public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
         if (!this.event.msc4354_sticky?.duration_ms) {
@@ -1768,8 +1768,10 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         }
         return {
             duration_ms: Math.min(MAX_STICKY_DURATION_MS, this.event.msc4354_sticky.duration_ms),
-            // This is assumed to be bounded server-side.
-            duration_ttl_ms: this.event.unsigned?.msc4354_sticky_duration_ttl_ms,
+            duration_ttl_ms:
+                this.event.unsigned?.msc4354_sticky_duration_ttl_ms === undefined
+                    ? undefined
+                    : Math.min(MAX_STICKY_DURATION_MS, this.event.unsigned.msc4354_sticky_duration_ttl_ms),
         };
     }
 }
