@@ -1,8 +1,7 @@
 overrides:
     expect: 30.5.2
-    # https://github.com/advisories/GHSA-c83g-rgw3-j3cx
-    # https://github.com/advisories/GHSA-73wf-gq98-2v4g
-    browserslist: 4.29.3
+    # https://github.com/advisories/GHSA-pqg4-j6r4-53mv
+    shell-quote@1: ^1.11.0
 
 allowBuilds:
     unrs-resolver: false
