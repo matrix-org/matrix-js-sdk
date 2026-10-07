@@ -267,9 +267,9 @@ type TaggedEvent = IRoomEvent & EventTags;
  * altered without affecting the original.
  */
 function copyEventForModifyingUnsigned<T extends IRoomEvent>(event: T): T {
-    const copy: T = Object.assign({}, event);
+    const copy: T = { ...event };
     if (copy.unsigned !== undefined) {
-        copy.unsigned = Object.assign({}, copy.unsigned);
+        copy.unsigned = { ...copy.unsigned };
     }
     return copy;
 }
