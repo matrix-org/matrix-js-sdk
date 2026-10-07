@@ -427,6 +427,19 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("stopClient", () => {
+        it("should stop serverCapabilitiesService and retentionPolicyService", () => {
+            const serverCapsSpy = vi.spyOn((client as any).serverCapabilitiesService, "stop");
+            const retentionSpy = vi.spyOn(client.retentionPolicyService, "stop");
+            (client as any).clientRunning = true;
+
+            client.stopClient();
+
+            expect(serverCapsSpy).toHaveBeenCalled();
+            expect(retentionSpy).toHaveBeenCalled();
+        });
+    });
+
     describe("mxcUrlToHttp", () => {
         it("should call getHttpUriForMxc", () => {
             const mxc = "mxc://server/example";
