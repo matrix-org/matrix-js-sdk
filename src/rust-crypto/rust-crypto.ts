@@ -807,10 +807,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             Boolean(privateKeysCachedLocally.userSigningKey);
 
         const identity = await this.getOwnIdentity();
+        const identityVerified = !!identity?.isVerified();
+        identity?.free();
 
         // Cross-signing is ready if the public identity is trusted, and the private keys
         // are either cached, or accessible via secret-storage.
-        return !!identity?.isVerified() && (hasKeysInCache || privateKeysInSecretStorage);
+        return identityVerified && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
     /**
@@ -1639,7 +1641,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         // 0. We can only share room history if our user has set up cross-signing.
         const identity = await this.getOwnIdentity();
-        if (!identity?.isVerified()) {
+        const identityVerified = !!identity?.isVerified();
+        identity?.free();
+        if (!identityVerified) {
             logger.warn(
                 "Not sharing message history as the current device is not verified by our cross-signing identity",
             );

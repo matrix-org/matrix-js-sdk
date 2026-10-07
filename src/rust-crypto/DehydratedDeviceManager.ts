@@ -83,8 +83,23 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
         super();
     }
 
+    /**
+     * Run `fn` with the OlmMachine's dehydrated devices, then free them.
+     *
+     * Each handle keeps the crypto store open until it is freed, so leaving them to the garbage collector stops
+     * the store from being deleted after the client has stopped.
+     */
+    private async withDehydratedDevices<T>(fn: (devices: RustSdkCryptoJs.DehydratedDevices) => Promise<T>): Promise<T> {
+        const devices = this.olmMachine.dehydratedDevices();
+        try {
+            return await fn(devices);
+        } finally {
+            devices.free();
+        }
+    }
+
     private async cacheKey(key: RustSdkCryptoJs.DehydratedDeviceKey): Promise<void> {
-        await this.olmMachine.dehydratedDevices().saveDehydratedDeviceKey(key);
+        await this.withDehydratedDevices((devices) => devices.saveDehydratedDeviceKey(key));
         this.emit(CryptoEvent.DehydrationKeyCached);
     }
 
@@ -139,7 +154,10 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
             opts = { createNewKey: opts };
         }
 
-        if (opts.onlyIfKeyCached && !(await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey())) {
+        if (
+            opts.onlyIfKeyCached &&
+            !(await this.withDehydratedDevices((devices) => devices.getDehydratedDeviceKey()))
+        ) {
             return;
         }
         this.stop();
@@ -189,7 +207,7 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
      * @returns the key, if available, or `null` if no key is available
      */
     private async getKey(create: boolean): Promise<RustSdkCryptoJs.DehydratedDeviceKey | null> {
-        const cachedKey = await this.olmMachine.dehydratedDevices().getDehydratedDeviceKey();
+        const cachedKey = await this.withDehydratedDevices((devices) => devices.getDehydratedDeviceKey());
         if (cachedKey) return cachedKey;
         const keyB64 = await this.secretStorage.get(SECRET_STORAGE_NAME);
         if (keyB64 === undefined) {
@@ -251,13 +269,13 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
         this.logger.info("dehydration: dehydrated device found");
         this.emit(CryptoEvent.RehydrationStarted);
 
-        const rehydratedDevice = await this.olmMachine
-            .dehydratedDevices()
-            .rehydrate(
+        const rehydratedDevice = await this.withDehydratedDevices((devices) =>
+            devices.rehydrate(
                 key,
                 new RustSdkCryptoJs.DeviceId(dehydratedDeviceResp.device_id),
                 JSON.stringify(dehydratedDeviceResp.device_data),
-            );
+            ),
+        );
 
         this.logger.info("dehydration: device rehydrated");
 
@@ -268,27 +286,32 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
             $device_id: dehydratedDeviceResp.device_id,
         });
 
-        do {
-            const eventResp: DehydratedDeviceEventsResp = await this.http.authedRequest<DehydratedDeviceEventsResp>(
-                Method.Get,
-                path,
-                nextBatch ? { from: nextBatch } : undefined,
-                undefined,
-                {
-                    prefix: UnstablePrefix,
-                },
-            );
+        try {
+            do {
+                const eventResp: DehydratedDeviceEventsResp = await this.http.authedRequest<DehydratedDeviceEventsResp>(
+                    Method.Get,
+                    path,
+                    nextBatch ? { from: nextBatch } : undefined,
+                    undefined,
+                    {
+                        prefix: UnstablePrefix,
+                    },
+                );
 
-            toDeviceCount += eventResp.events.length;
-            nextBatch = eventResp.next_batch;
+                toDeviceCount += eventResp.events.length;
+                nextBatch = eventResp.next_batch;
 
-            if (eventResp.events.length > 0) {
-                const roomKeyInfos = await rehydratedDevice.receiveEvents(JSON.stringify(eventResp.events));
-                roomKeyCount += roomKeyInfos.length;
+                if (eventResp.events.length > 0) {
+                    const roomKeyInfos = await rehydratedDevice.receiveEvents(JSON.stringify(eventResp.events));
+                    roomKeyCount += roomKeyInfos.length;
 
-                this.emit(CryptoEvent.RehydrationProgress, roomKeyCount, toDeviceCount);
-            }
-        } while (nextBatch !== undefined);
+                    this.emit(CryptoEvent.RehydrationProgress, roomKeyCount, toDeviceCount);
+                }
+            } while (nextBatch !== undefined);
+        } finally {
+            // Like the dehydrated devices handle, this keeps the crypto store open until freed
+            rehydratedDevice.free();
+        }
 
         this.logger.info(`dehydration: received ${roomKeyCount} room keys from ${toDeviceCount} to-device events`);
         this.emit(CryptoEvent.RehydrationCompleted);
@@ -304,9 +327,15 @@ export class DehydratedDeviceManager extends TypedEventEmitter<DehydratedDevices
     public async createAndUploadDehydratedDevice(): Promise<void> {
         const key = (await this.getKey(true))!;
 
-        const dehydratedDevice = await this.olmMachine.dehydratedDevices().create();
+        const dehydratedDevice = await this.withDehydratedDevices((devices) => devices.create());
         this.emit(CryptoEvent.DehydratedDeviceCreated);
-        const request = await dehydratedDevice.keysForUpload("Dehydrated device", key);
+        let request: RustSdkCryptoJs.PutDehydratedDeviceRequest;
+        try {
+            request = await dehydratedDevice.keysForUpload("Dehydrated device", key);
+        } finally {
+            // Like the dehydrated devices handle, this keeps the crypto store open until freed
+            dehydratedDevice.free();
+        }
 
         await this.outgoingRequestProcessor.makeOutgoingRequest(request);
         this.emit(CryptoEvent.DehydratedDeviceUploaded);
