@@ -244,10 +244,61 @@ export interface ISyncData {
     roomsData: IRooms;
 }
 
-type TaggedEvent = IRoomEvent & { _localTs?: number };
+/**
+ * Tags needed for maintaining relative fields in `unsigned` across the store lifecycle.
+ *
+ * Tagging and untagging events requires copying events. If this turns out to be a bottleneck, it
+ * could be optimised either by doing this in the main process after the data has been
+ * structured-cloned to go between the worker & main process, or special-casing data from
+ * saved syncs to read the tags directly rather than turning them into relative values to then
+ * immediately be transformed back again.
+ */
+type EventTags = {
+    /** The local timestamp of the event (`now - unsigned.age` at the time of receipt). */
+    _localTs?: number;
+};
 
-function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
-    return "_localTs" in event && event["_localTs"] !== undefined;
+type TaggedEvent = IRoomEvent & EventTags;
+
+/**
+ * Shallow-copies an event along with its `unsigned` object, so that the copy can be
+ * altered without affecting the original.
+ */
+function copyEventForModifyingUnsigned<T extends IRoomEvent>(event: T): T {
+    const copy: T = Object.assign({}, event);
+    if (copy.unsigned !== undefined) {
+        copy.unsigned = Object.assign({}, copy.unsigned);
+    }
+    return copy;
+}
+
+/**
+ * Tags an event freshly received from the server with the absolute timestamps derived from
+ * the relative fields in `unsigned`, for those fields the server provided.
+ *
+ * @returns A tagged copy, or the event itself if there is nothing to tag.
+ */
+function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
+    const age = event.unsigned?.age;
+    if (age === undefined) return event;
+    const copy: T & EventTags = copyEventForModifyingUnsigned(event);
+    copy._localTs = now - age;
+    return copy;
+}
+
+/**
+ * Removes the tags from an event and recomputes the relative `unsigned` fields from them,
+ * so that the event looks as if it had just been received from the server.
+ *
+ * @returns A copy with the tags removed, or the event itself if it carries no tags.
+ */
+function untagEvent<T extends TaggedEvent>(event: T, now: number): T {
+    if (event._localTs === undefined) return event;
+    const copy = copyEventForModifyingUnsigned(event);
+    copy.unsigned = copy.unsigned || {};
+    delete copy._localTs;
+    copy.unsigned.age = now - event._localTs;
+    return copy;
 }
 
 /**
@@ -559,20 +610,8 @@ export class SyncAccumulator {
             }
             // append the event to the timeline. The back-pagination token
             // corresponds to the first event in the timeline
-            let transformedEvent: TaggedEvent;
-            if (!fromDatabase) {
-                transformedEvent = Object.assign({}, e);
-                if (transformedEvent.unsigned !== undefined) {
-                    transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
-                }
-                const age = e.unsigned?.age;
-                if (age !== undefined) transformedEvent._localTs = Date.now() - age;
-            } else {
-                transformedEvent = e;
-            }
-
             currentData._timeline.push({
-                event: transformedEvent,
+                event: fromDatabase ? e : tagEvent(e, now),
                 token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
         });
@@ -628,6 +667,7 @@ export class SyncAccumulator {
      * a list of raw events which represent global account data.
      */
     public getJSON(forDatabase = false): ISyncData {
+        const now = Date.now();
         const data: IRooms = {
             join: {},
             invite: {},
@@ -698,27 +738,7 @@ export class SyncAccumulator {
                     roomJson.timeline.prev_batch = msgData.token;
                 }
 
-                let transformedEvent: (IRoomEvent | IStateEvent) & { _localTs?: number };
-                if (!forDatabase && isTaggedEvent(msgData.event)) {
-                    // This means we have to copy each event, so we can fix it up to
-                    // set a correct 'age' parameter whilst keeping the local timestamp
-                    // on our stored event. If this turns out to be a bottleneck, it could
-                    // be optimised either by doing this in the main process after the data
-                    // has been structured-cloned to go between the worker & main process,
-                    // or special-casing data from saved syncs to read the local timestamp
-                    // directly rather than turning it into age to then immediately be
-                    // transformed back again into a local timestamp.
-                    transformedEvent = Object.assign({}, msgData.event);
-                    if (transformedEvent.unsigned !== undefined) {
-                        transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
-                    }
-                    delete transformedEvent._localTs;
-                    transformedEvent.unsigned = transformedEvent.unsigned || {};
-                    transformedEvent.unsigned.age = Date.now() - msgData.event._localTs!;
-                } else {
-                    transformedEvent = msgData.event;
-                }
-                roomJson.timeline.events.push(transformedEvent);
+                roomJson.timeline.events.push(forDatabase ? msgData.event : untagEvent(msgData.event, now));
             });
 
             // Add state data: roll back current state to the start of timeline,
