@@ -159,8 +159,8 @@ export interface MembershipManagerState {
  * The outcome of a delayed leave event restart attempt.
  *
  *  - `"ok"`: the server restarted it, it will fire `delayedLeaveEventDelayMs` from now.
- *  - `"gone"`: the server does not know the delay id anymore (404), or the delayed event is already finalised (409).
- *    It either sent the event or lost/cancelled it.
+ *  - `"gone"`: the delayed event cannot be restarted anymore (see `isDelayedEventGoneError`). The server either sent
+ *    it or lost/cancelled it.
  *  - `"unsupported"`: the server does not support the delayed events endpoint.
  *  - `{ error }`: any other failure, for the caller to turn into a retry or to rethrow.
  */
@@ -659,7 +659,7 @@ export class MembershipManager
                 this.setAndEmitProbablyLeft(true);
             }
             if (this.isDelayedEventGoneError(e)) {
-                // The delayed event got already removed (404) or is already finalised (409) and cannot be restarted.
+                // There is nothing left to restart, so we forget the delay id and let the caller decide what to do next.
                 this.logger.info("Delayed event to restart is already gone:", e);
                 this.setAndEmitDelayId(undefined);
                 return "gone";
@@ -719,7 +719,6 @@ export class MembershipManager
                 const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
                 if (this.isDelayedEventGoneError(e)) {
-                    // The delayed event got already removed (404) or was already cancelled (409).
                     // It will never send our leave event, so we send it ourselves.
                     this.logger.info("Delayed leave event is already gone, falling back to SendLeaveEvent:", e);
                     this.setAndEmitDelayId(undefined);
@@ -862,7 +861,7 @@ export class MembershipManager
      * already sent it (e.g. because the device was asleep and no restarts reached the server), the membership we
      * would send would come back to life without any delayed leave event to clean it up, and stay until `expires`
      * runs out. So we restart the delayed event first. A success guarantees it will outlive the membership update;
-     * a 404 tells us it is gone, and we have to work out why.
+     * if it is gone instead, we have to work out why.
      * @returns `undefined` if the membership can be sent, otherwise the action to take instead.
      */
     private async ensureDelayedLeaveEventProtectsMembership(): Promise<ActionUpdate | undefined> {
@@ -912,7 +911,7 @@ export class MembershipManager
     }
 
     /**
-     * Restarting our delayed leave event failed with something other than a 404.
+     * Restarting our delayed leave event failed with something other than the delayed event being gone.
      * @param error what the restart failed with
      * @returns `undefined` if the membership can be sent regardless, otherwise the action to take instead.
      * @throws the error if it is not one we retry on.
