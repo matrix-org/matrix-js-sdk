@@ -63,6 +63,12 @@ export interface IAddEventToTimelineOptions extends Pick<
 > {
     /** Whether the sync response came from cache */
     fromCache?: boolean;
+    /**
+     * The other events being added in the same batch. A relation whose parent is in the batch but not yet
+     * in a timeline (back-pagination adds newest first) is placed as its parent will be, rather than dropped
+     * as a relation to an unknown event.
+     */
+    batch?: MatrixEvent[];
 }
 
 export interface IAddLiveEventOptions extends Pick<
@@ -501,6 +507,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 this.addEventToTimeline(event, timeline, {
                     toStartOfTimeline,
                     addToState,
+                    batch: events,
                 });
                 lastEventWasNew = true;
                 didUpdate = true;
@@ -526,9 +533,9 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                 // that would happen, so I'm going to ignore it for now.
                 //
                 if (existingTimeline == neighbour) {
-                    debuglog("Event " + eventId + " in neighbouring timeline - " + "switching to " + existingTimeline);
+                    debuglog("Event " + eventId + " in neighbouring timeline - switching to " + existingTimeline);
                 } else {
-                    debuglog("Event " + eventId + " already in a different " + "timeline " + existingTimeline);
+                    debuglog("Event " + eventId + " already in a different timeline " + existingTimeline);
                 }
                 timeline = existingTimeline;
                 continue;
@@ -582,7 +589,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             if (direction === EventTimeline.FORWARDS && timeline === this.liveTimeline) {
                 logger.warn({ lastEventWasNew, didUpdate }); // for debugging
                 logger.warn(
-                    `Refusing to set forwards pagination token of live timeline ` + `${timeline} to ${paginationToken}`,
+                    `Refusing to set forwards pagination token of live timeline ${timeline} to ${paginationToken}`,
                 );
                 return;
             }
@@ -656,7 +663,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public addEventToTimeline(
         event: MatrixEvent,
         timeline: EventTimeline,
-        { toStartOfTimeline, fromCache = false, roomState, timelineWasEmpty, addToState }: IAddEventToTimelineOptions,
+        {
+            toStartOfTimeline,
+            fromCache = false,
+            roomState,
+            timelineWasEmpty,
+            addToState,
+            batch,
+        }: IAddEventToTimelineOptions,
     ): void {
         if (timeline.getTimelineSet() !== this) {
             throw new Error(`EventTimelineSet.addEventToTimeline: Timeline=${timeline.toString()} does not belong " +
@@ -672,7 +686,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         //
         // We can only run this check for timelines with a `room` because `canContain`
         // requires it
-        if (this.room && !this.canContain(event)) {
+        if (this.room && !this.canContain(event, batch)) {
             let eventDebugString = `event=${eventId}`;
             if (event.threadRootId) {
                 eventDebugString += `(belongs to thread=${event.threadRootId})`;
@@ -932,10 +946,11 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Requires the `room` property to have been set at EventTimelineSet construction time.
      *
      * @param event - the event to check whether it belongs to this timeline set.
+     * @param batch - other events being added alongside, in which the event's parent may be found
      * @throws Error if `room` was not set when constructing this timeline set.
      * @returns whether the event belongs to this timeline set.
      */
-    public canContain(event: MatrixEvent): boolean {
+    public canContain(event: MatrixEvent, batch?: MatrixEvent[]): boolean {
         if (!this.room) {
             throw new Error(
                 "Cannot call `EventTimelineSet::canContain without a `room` set. " +
@@ -943,7 +958,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
             );
         }
 
-        const { threadId, shouldLiveInRoom, shouldLiveInThread } = this.room.eventShouldLiveIn(event);
+        const { threadId, shouldLiveInRoom, shouldLiveInThread } = this.room.eventShouldLiveIn(event, batch);
 
         if (this.thread) {
             return this.thread.id === threadId;

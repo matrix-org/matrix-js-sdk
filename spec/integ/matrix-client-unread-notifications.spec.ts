@@ -44,9 +44,9 @@ function setupTestClient(): [MatrixClient, HttpBackend] {
     const testClient = new TestClient(selfUserId, "DEVICE", selfAccessToken);
     const httpBackend = testClient.httpBackend;
     const client = testClient.client;
-    httpBackend!.when("GET", "/versions").respond(200, {});
-    httpBackend!.when("GET", "/pushrules").respond(200, {});
-    httpBackend!.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
+    httpBackend.when("GET", "/versions").respond(200, {});
+    httpBackend.when("GET", "/pushrules").respond(200, {});
+    httpBackend.when("POST", "/filter").respond(200, { filter_id: "a filter id" });
     return [client, httpBackend];
 }
 

@@ -59,7 +59,7 @@ describe("ContentRepo", function () {
         it("should return a thumbnail URL if a width/height/resize is specified", function () {
             const mxcUri = "mxc://server.name/resourceid";
             expect(getHttpUriForMxc(baseUrl, mxcUri, 32, 64, "crop")).toEqual(
-                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid" + "?width=32&height=64&method=crop",
+                baseUrl + "/_matrix/media/v3/thumbnail/server.name/resourceid?width=32&height=64&method=crop",
             );
         });
 

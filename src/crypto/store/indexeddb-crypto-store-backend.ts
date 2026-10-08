@@ -590,7 +590,7 @@ const DB_MIGRATIONS: DbMigration[] = [
 export const VERSION = DB_MIGRATIONS.length;
 
 export function upgradeDatabase(db: IDBDatabase, oldVersion: number): void {
-    logger.log(`Upgrading IndexedDBCryptoStore from version ${oldVersion}` + ` to ${VERSION}`);
+    logger.log(`Upgrading IndexedDBCryptoStore from version ${oldVersion} to ${VERSION}`);
     DB_MIGRATIONS.forEach((migration, index) => {
         if (oldVersion <= index) migration(db);
     });
@@ -607,7 +607,7 @@ function createDatabase(db: IDBDatabase): void {
 }
 
 interface IWrappedIDBTransaction extends IDBTransaction {
-    _mx_abortexception: Error; // eslint-disable-line camelcase
+    _mx_abortexception: Error;
 }
 
 /*
@@ -632,6 +632,7 @@ function promiseifyTxn<T>(txn: IDBTransaction): Promise<T | null> {
         txn.oncomplete = (): void => {
             if ((txn as IWrappedIDBTransaction)._mx_abortexception !== undefined) {
                 reject((txn as IWrappedIDBTransaction)._mx_abortexception);
+                return;
             }
             resolve(null);
         };

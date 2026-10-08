@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type EstablishedEcies, QrCodeData, QrCodeMode, Ecies } from "@matrix-org/matrix-sdk-crypto-wasm";
+import { type EstablishedEcies, QrCodeData, QrCodeIntent, Ecies } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import { MSC4108RendezvousSession, MSC4108SecureChannel, PayloadType } from "../../../../src/rendezvous";
 
@@ -28,7 +28,7 @@ describe("MSC4108SecureChannel", () => {
         });
         const channel = new MSC4108SecureChannel(session);
 
-        const code = await channel.generateCode(QrCodeMode.Login);
+        const code = await channel.generateCode(QrCodeIntent.Login);
         expect(code).toHaveLength(71);
         const text = new TextDecoder().decode(code);
         expect(text.startsWith("MATRIX")).toBeTruthy();
@@ -43,7 +43,7 @@ describe("MSC4108SecureChannel", () => {
         } as unknown as MSC4108RendezvousSession;
         const channel = new MSC4108SecureChannel(mockSession);
 
-        const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
+        const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeIntent.Reciprocate, baseUrl));
         const { initial_message: ciphertext } = new Ecies().establish_outbound_channel(
             qrCodeData.publicKey,
             "MATRIX_QR_CODE_LOGIN_INITIATE",
@@ -64,7 +64,7 @@ describe("MSC4108SecureChannel", () => {
         vi.mocked(mockSession.receive).mockResolvedValue("");
         await expect(channel.connect()).rejects.toThrow("No response from other device");
 
-        const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
+        const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeIntent.Reciprocate, baseUrl));
         const { initial_message: ciphertext } = new Ecies().establish_outbound_channel(
             qrCodeData.publicKey,
             "NOT_REAL_MATRIX_QR_CODE_LOGIN_INITIATE",
@@ -87,7 +87,7 @@ describe("MSC4108SecureChannel", () => {
             } as unknown as MSC4108RendezvousSession;
             channel = new MSC4108SecureChannel(mockSession);
 
-            const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeMode.Reciprocate, baseUrl));
+            const qrCodeData = QrCodeData.fromBytes(await channel.generateCode(QrCodeIntent.Reciprocate, baseUrl));
             const { channel: _opponentChannel, initial_message: ciphertext } = new Ecies().establish_outbound_channel(
                 qrCodeData.publicKey,
                 "MATRIX_QR_CODE_LOGIN_INITIATE",

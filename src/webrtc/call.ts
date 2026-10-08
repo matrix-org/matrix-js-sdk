@@ -21,7 +21,6 @@ limitations under the License.
  * This is an internal module. See {@link createNewMatrixCall} for the public API.
  */
 
-import { v4 as uuidv4 } from "uuid";
 import { parse as parseSdp, write as writeSdp } from "sdp-transform";
 
 import { logger } from "../logger.ts";
@@ -1055,9 +1054,9 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
             logger.warn(
                 `Call ${this.callId} shouldAnswerWithMediaType() unable to answer with ${type}=${wantedValue} because the other side doesn't support it. Answering with ${type}=${valueOfTheOtherSide}.`,
             );
-            return valueOfTheOtherSide!;
+            return valueOfTheOtherSide;
         }
-        return wantedValue ?? valueOfTheOtherSide!;
+        return wantedValue ?? valueOfTheOtherSide;
     }
 
     /**
@@ -2039,10 +2038,10 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
         this.remoteSDPStreamMetadata = recursivelyAssign(this.remoteSDPStreamMetadata || {}, metadata, true);
         for (const feed of this.getRemoteFeeds()) {
             const streamId = feed.stream.id;
-            const metadata = this.remoteSDPStreamMetadata![streamId];
+            const metadata = this.remoteSDPStreamMetadata[streamId];
 
             feed.setAudioVideoMuted(metadata?.audio_muted, metadata?.video_muted);
-            feed.purpose = this.remoteSDPStreamMetadata![streamId]?.purpose;
+            feed.purpose = this.remoteSDPStreamMetadata[streamId]?.purpose;
         }
     }
 
@@ -2287,7 +2286,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 logger.debug(
                     `Call ${this.callId} onIceConnectionStateChanged() ice restart (state=${this.peerConn?.iceConnectionState})`,
                 );
-                this.peerConn!.restartIce();
+                this.peerConn.restartIce();
             } else {
                 logger.info(
                     `Call ${this.callId} onIceConnectionStateChanged() hanging up call (ICE failed and no ICE restart method)`,
@@ -2490,7 +2489,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 sender_session_id: this.client.getSessionId(),
                 dest_session_id: this.opponentSessionId,
                 seq: toDeviceSeq,
-                [ToDeviceMessageId]: uuidv4(),
+                [ToDeviceMessageId]: globalThis.crypto.randomUUID(),
             };
 
             this.emit(
@@ -2534,7 +2533,7 @@ export class MatrixCall extends TypedEventEmitter<CallEvent, CallEventHandlerMap
                 this,
             );
 
-            await this.client.sendEvent(this.roomId!, eventType, realContent);
+            await this.client.sendEvent(this.roomId, eventType, realContent);
         }
     }
 

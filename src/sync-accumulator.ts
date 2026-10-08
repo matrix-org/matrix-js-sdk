@@ -26,6 +26,7 @@ import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
+import { type SyncUserProfile } from "./matrix.ts";
 
 interface IOpts {
     /**
@@ -36,6 +37,10 @@ interface IOpts {
      * Default: 50.
      */
     maxTimelineEntries?: number;
+    /**
+     * Whether to use the stable or unstable fields for user profiles.
+     */
+    profileFieldsStable?: boolean;
 }
 
 export interface IMinimalEvent {
@@ -49,7 +54,6 @@ export interface IEphemeral {
     events: IMinimalEvent[];
 }
 
-/* eslint-disable camelcase */
 interface UnreadNotificationCounts {
     highlight_count?: number;
     notification_count?: number;
@@ -183,6 +187,15 @@ export interface IDeviceLists {
     left?: string[];
 }
 
+/**
+ * The "users" section of the sync update which contains extended profile updates.
+ */
+export interface UsersUpdate {
+    [userId: string]: {
+        profile_updates?: SyncUserProfile | null;
+    };
+}
+
 export interface ISyncResponse {
     "next_batch": string;
     "rooms": IRooms;
@@ -191,11 +204,11 @@ export interface ISyncResponse {
     "to_device"?: IToDevice;
     "device_lists"?: IDeviceLists;
     "device_one_time_keys_count"?: Record<string, number>;
-
+    "users"?: UsersUpdate;
+    "org.matrix.msc4429.users"?: UsersUpdate;
     "device_unused_fallback_key_types"?: string[];
     "org.matrix.msc2732.device_unused_fallback_key_types"?: string[];
 }
-/* eslint-enable camelcase */
 
 export enum Category {
     Invite = "invite",
@@ -216,7 +229,7 @@ interface IRoom {
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
     _receipts: ReceiptAccumulator;
     _stickyEvents: {
-        readonly event: IStickyEvent | IStickyStateEvent;
+        readonly event: (IStickyEvent | IStickyStateEvent) & EventTags;
         /**
          * This is the timestamp at which point it is safe to remove this event from the store.
          * This value is immutable
@@ -231,10 +244,84 @@ export interface ISyncData {
     roomsData: IRooms;
 }
 
-type TaggedEvent = IRoomEvent & { _localTs?: number };
+/**
+ * Tags needed for maintaining relative fields in `unsigned` across the store lifecycle.
+ *
+ * Tagging and untagging events requires copying events. If this turns out to be a bottleneck, it
+ * could be optimised either by doing this in the main process after the data has been
+ * structured-cloned to go between the worker & main process, or special-casing data from
+ * saved syncs to read the tags directly rather than turning them into relative values to then
+ * immediately be transformed back again.
+ */
+type EventTags = {
+    /** The local timestamp of the event (`now - unsigned.age` at the time of receipt). */
+    _localTs?: number;
+    /** The local timestamp at which the sticky TTL elapses (`now + TTL` at the time of receipt). */
+    _stickyExpiresTs?: number;
+};
 
-function isTaggedEvent(event: IRoomEvent): event is TaggedEvent {
-    return "_localTs" in event && event["_localTs"] !== undefined;
+type TaggedEvent = IRoomEvent & EventTags;
+
+/**
+ * Shallow-copies an event along with its `unsigned` object, so that the copy can be
+ * altered without affecting the original.
+ */
+function copyEventForModifyingUnsigned<T extends IRoomEvent>(event: T): T {
+    const copy: T = { ...event };
+    if (copy.unsigned !== undefined) {
+        copy.unsigned = { ...copy.unsigned };
+    }
+    return copy;
+}
+
+/**
+ * Tags an event freshly received from the server with the absolute timestamps derived from
+ * the relative fields in `unsigned`, for those fields the server provided.
+ *
+ * @returns A tagged copy, or the event itself if there is nothing to tag.
+ */
+function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
+    const age = event.unsigned?.age;
+    const stickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
+    if (age === undefined && stickyTtl === undefined) return event;
+    const copy: T & EventTags = copyEventForModifyingUnsigned(event);
+    if (age !== undefined) copy._localTs = now - age;
+    if (stickyTtl !== undefined) copy._stickyExpiresTs = now + Math.min(stickyTtl, MAX_STICKY_DURATION_MS);
+    return copy;
+}
+
+/**
+ * Removes the tags from an event and recomputes the relative `unsigned` fields from them,
+ * so that the event looks as if it had just been received from the server.
+ *
+ * @returns A copy with the tags removed, or the event itself if it carries no tags.
+ */
+function untagEvent<T extends TaggedEvent>(event: T, now: number): T {
+    if (event._localTs === undefined && event._stickyExpiresTs === undefined) return event;
+    const copy = copyEventForModifyingUnsigned(event);
+    copy.unsigned = copy.unsigned || {};
+    if (event._localTs !== undefined) {
+        delete copy._localTs;
+        copy.unsigned.age = now - event._localTs;
+    }
+    if (event._stickyExpiresTs !== undefined) {
+        delete copy._stickyExpiresTs;
+        copy.unsigned.msc4354_sticky_duration_ttl_ms = Math.max(0, event._stickyExpiresTs - now);
+    }
+    return copy;
+}
+
+/**
+ * Works out the local timestamp at which a sticky event expires.
+ */
+function computeStickyExpiresTs(event: (IStickyEvent | IStickyStateEvent) & EventTags, now: number): number {
+    // Prefer the server-provided TTL if available.
+    if (event._stickyExpiresTs !== undefined) return event._stickyExpiresTs;
+    // If `duration_ms` exceeds the spec limit of a hour, we cap it.
+    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
+    // If `origin_server_ts` claims to have been from the future, we still bound it to now.
+    const createdTs = Math.min(event.origin_server_ts, now);
+    return cappedDuration + createdTs;
 }
 
 /**
@@ -546,44 +633,26 @@ export class SyncAccumulator {
             }
             // append the event to the timeline. The back-pagination token
             // corresponds to the first event in the timeline
-            let transformedEvent: TaggedEvent;
-            if (!fromDatabase) {
-                transformedEvent = Object.assign({}, e);
-                if (transformedEvent.unsigned !== undefined) {
-                    transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
-                }
-                const age = e.unsigned?.age;
-                if (age !== undefined) transformedEvent._localTs = Date.now() - age;
-            } else {
-                transformedEvent = e;
-            }
-
             currentData._timeline.push({
-                event: transformedEvent,
+                event: fromDatabase ? e : tagEvent(e, now),
                 token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
         });
-
-        // Prune out any events in our stores that have since expired, do this before we
-        // insert new events.
-        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
 
         // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
         // process these events into the correct mapped order.
         if (data.msc4354_sticky?.events) {
             currentData._stickyEvents = currentData._stickyEvents.concat(
-                data.msc4354_sticky.events.map((event) => {
-                    // If `duration_ms` exceeds the spec limit of a hour, we cap it.
-                    const cappedDuration = Math.min(event.msc4354_sticky.duration_ms, MAX_STICKY_DURATION_MS);
-                    // If `origin_server_ts` claims to have been from the future, we still bound it to now.
-                    const createdTs = Math.min(event.origin_server_ts, now);
-                    return {
-                        event,
-                        expiresTs: cappedDuration + createdTs,
-                    };
+                data.msc4354_sticky.events.map((e) => {
+                    const event = fromDatabase ? e : tagEvent(e, now);
+                    return { event, expiresTs: computeStickyExpiresTs(event, now) };
                 }),
             );
         }
+
+        // Prune out any events in our stores that have since expired. We do this after inserting
+        // so that events loaded from the database which expired whilst we were offline get dropped, too.
+        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
 
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
@@ -592,7 +661,7 @@ export class SyncAccumulator {
             for (let i = startIndex; i < currentData._timeline.length; i++) {
                 if (currentData._timeline[i].token) {
                     // keep all events after this, including this one
-                    currentData._timeline = currentData._timeline.slice(i, currentData._timeline.length);
+                    currentData._timeline = currentData._timeline.slice(i);
                     break;
                 }
             }
@@ -615,6 +684,7 @@ export class SyncAccumulator {
      * a list of raw events which represent global account data.
      */
     public getJSON(forDatabase = false): ISyncData {
+        const now = Date.now();
         const data: IRooms = {
             join: {},
             invite: {},
@@ -640,6 +710,11 @@ export class SyncAccumulator {
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
+            // Drop anything that expired since we last accumulated. When not writing to the
+            // database, also turn the stored absolute timestamps back into relative values.
+            const stickyEvents = roomData._stickyEvents
+                .filter(({ expiresTs }) => expiresTs > now)
+                .map(({ event }) => (forDatabase ? event : untagEvent(event, now)));
             const roomJson: IJoinedRoom & {
                 // We track both `state` and `state_after` for downgrade compatibility
                 "state": IState;
@@ -656,11 +731,7 @@ export class SyncAccumulator {
                 "unread_notifications": roomData._unreadNotifications,
                 "unread_thread_notifications": roomData._unreadThreadNotifications,
                 "summary": roomData._summary as IRoomSummary,
-                "msc4354_sticky": roomData._stickyEvents?.length
-                    ? {
-                          events: roomData._stickyEvents.map((e) => e.event),
-                      }
-                    : undefined,
+                "msc4354_sticky": stickyEvents.length ? { events: stickyEvents } : undefined,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -685,27 +756,7 @@ export class SyncAccumulator {
                     roomJson.timeline.prev_batch = msgData.token;
                 }
 
-                let transformedEvent: (IRoomEvent | IStateEvent) & { _localTs?: number };
-                if (!forDatabase && isTaggedEvent(msgData.event)) {
-                    // This means we have to copy each event, so we can fix it up to
-                    // set a correct 'age' parameter whilst keeping the local timestamp
-                    // on our stored event. If this turns out to be a bottleneck, it could
-                    // be optimised either by doing this in the main process after the data
-                    // has been structured-cloned to go between the worker & main process,
-                    // or special-casing data from saved syncs to read the local timestamp
-                    // directly rather than turning it into age to then immediately be
-                    // transformed back again into a local timestamp.
-                    transformedEvent = Object.assign({}, msgData.event);
-                    if (transformedEvent.unsigned !== undefined) {
-                        transformedEvent.unsigned = Object.assign({}, transformedEvent.unsigned);
-                    }
-                    delete transformedEvent._localTs;
-                    transformedEvent.unsigned = transformedEvent.unsigned || {};
-                    transformedEvent.unsigned.age = Date.now() - msgData.event._localTs!;
-                } else {
-                    transformedEvent = msgData.event;
-                }
-                roomJson.timeline.events.push(transformedEvent);
+                roomJson.timeline.events.push(forDatabase ? msgData.event : untagEvent(msgData.event, now));
             });
 
             // Add state data: roll back current state to the start of timeline,
@@ -765,6 +816,15 @@ export class SyncAccumulator {
 
     public getNextBatchToken(): string {
         return this.nextBatch!;
+    }
+
+    public removeEventsFromRoom(roomId: string, eventIds: string[]): void {
+        this.joinRooms[roomId]._timeline = this.joinRooms[roomId]._timeline.filter(
+            (ev) => !eventIds.includes(ev.event.event_id),
+        );
+        this.joinRooms[roomId]._stickyEvents = this.joinRooms[roomId]._stickyEvents.filter(
+            (ev) => !eventIds.includes(ev.event.event_id),
+        );
     }
 }
 

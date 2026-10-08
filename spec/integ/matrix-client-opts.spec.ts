@@ -5,7 +5,6 @@ import { ClientEvent, MatrixClient } from "../../src/matrix";
 import { MatrixScheduler } from "../../src/scheduler";
 import { MemoryStore } from "../../src/store/memory";
 import { MatrixError } from "../../src/http-api";
-import { type IStore } from "../../src/store";
 import { KnownMembership } from "../../src/@types/membership";
 
 describe("MatrixClient opts", function () {
@@ -136,7 +135,7 @@ describe("MatrixClient opts", function () {
         beforeEach(function () {
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
-                store: new MemoryStore() as IStore,
+                store: new MemoryStore(),
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,
@@ -215,7 +214,7 @@ describe("MatrixClient opts", function () {
             httpBackend = new HttpBackend();
             client = new MatrixClient({
                 fetchFn: httpBackend.fetchFn as typeof globalThis.fetch,
-                store: new MemoryStore() as IStore,
+                store: new MemoryStore(),
                 baseUrl: baseUrl,
                 userId: userId,
                 accessToken: accessToken,

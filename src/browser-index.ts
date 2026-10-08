@@ -14,14 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import * as matrixcs from "./matrix.ts";
+import * as sdk from "./matrix.ts";
 
-type BrowserMatrix = typeof matrixcs;
+type BrowserMatrix = typeof sdk;
 declare global {
-    /* eslint-disable no-var, camelcase */
     var __js_sdk_entrypoint: boolean;
     var matrixcs: BrowserMatrix;
-    /* eslint-enable no-var */
 }
 
 if (globalThis.__js_sdk_entrypoint) {
@@ -33,12 +31,14 @@ globalThis.__js_sdk_entrypoint = true;
 let indexedDB: IDBFactory | undefined;
 try {
     indexedDB = globalThis.indexedDB;
-} catch {}
+} catch {
+    // Do nothing
+}
 
 // if our browser (appears to) support indexeddb, use an indexeddb crypto store.
 if (indexedDB) {
-    matrixcs.setCryptoStoreFactory(() => new matrixcs.IndexedDBCryptoStore(indexedDB!, "matrix-js-sdk:crypto"));
+    sdk.setCryptoStoreFactory(() => new sdk.IndexedDBCryptoStore(indexedDB, "matrix-js-sdk:crypto"));
 }
 
 export * from "./matrix.ts";
-globalThis.matrixcs = matrixcs;
+globalThis.matrixcs = sdk;

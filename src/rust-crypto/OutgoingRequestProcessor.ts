@@ -190,7 +190,6 @@ export class OutgoingRequestProcessor {
     ): Promise<string> {
         let currentRetryCount = 0;
 
-        // eslint-disable-next-line no-constant-condition
         while (true) {
             try {
                 return await this.rawJsonRequest(method, path, queryParams, body);

@@ -1,5 +1,5 @@
 /*
-Copyright 2023 The Matrix.org Foundation C.I.C.
+Copyright 2023-2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -14,16 +14,19 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventEmitter } from "stream";
+import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
-import { CallMembership, type SessionMembershipData } from "../../../src/matrixrtc";
+import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
+import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
 import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
-import { logger } from "../../../src/logger.ts";
+import { type EmptyObject } from "../../../src/@types/common";
+import { type RtcSlotEventContent, type SlotDescription } from "../../../src/matrixrtc/types";
+import { computeSlotId } from "../../../src/matrixrtc/utils";
 
-export type MembershipData = (SessionMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
 
 export const owmMemberIdentity: CallMembershipIdentityParts = {
     deviceId: "AAAAAAA",
@@ -31,25 +34,47 @@ export const owmMemberIdentity: CallMembershipIdentityParts = {
     userId: "@alice:example.org",
 };
 
-export const membershipTemplate: SessionMembershipData & { user_id: string } = {
+export const sessionMembershipTemplate: SessionMembershipData & { user_id: string } = {
     application: "m.call",
     call_id: "",
     user_id: "@mock:user.example",
     device_id: "AAAAAAA",
     scope: "m.room",
-    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+    focus_active: { type: "livekit", focus_selection: "multi_sfu" },
     foci_preferred: [
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
             type: "livekit",
         },
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.dev",
             type: "livekit",
         },
     ],
+};
+
+export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
+    user_id: "@mock:user.example",
+    application: {
+        type: "m.call",
+    },
+    member: {
+        id: "IDIDID",
+        user_id: "@mock:user.example",
+        device_id: "AAAAAAA",
+    },
+    slot_id: "m.call#ROOM",
+    versions: [],
+    transports: {
+        published: [
+            {
+                type: "livekit",
+                url: "wss://livekit.something.io",
+            },
+        ],
+        can_subscribe: ["livekit"],
+    },
+    msc4354_sticky_key: "m.call#",
 };
 
 export type MockClient = MockedObject<
@@ -69,6 +94,7 @@ export type MockClient = MockedObject<
         | "cancelPendingEvent"
     >
 >;
+
 /**
  * Mocks a object that has all required methods for a MatrixRTC session client.
  */
@@ -92,10 +118,11 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
 export function makeMockRoom(
     membershipData: MembershipData[],
     useStickyEvents = false,
+    slotEvent?: MatrixEvent,
 ): Mocked<Room & { emitTimelineEvent: (event: MatrixEvent) => void }> {
     const roomId = secureRandomString(8);
     // Caching roomState here so it does not get recreated when calling `getLiveTimeline.getState()`
-    const roomState = makeMockRoomState(useStickyEvents ? [] : membershipData, roomId);
+    const roomState = makeMockRoomState(useStickyEvents ? [] : membershipData, roomId, slotEvent);
     const ts = Date.now();
     const room = Object.assign(new EventEmitter(), {
         roomId: roomId,
@@ -116,7 +143,7 @@ export function makeMockRoom(
     }) as unknown as Mocked<Room & { emitTimelineEvent: (event: MatrixEvent) => void }>;
 }
 
-function makeMockRoomState(membershipData: MembershipData[], roomId: string) {
+function makeMockRoomState(membershipData: MembershipData[], roomId: string, slotEvent?: MatrixEvent) {
     const events = membershipData.map((m) => mockRTCEvent(m, roomId));
     const keysAndEvents = events.map((e) => {
         const data = e.getContent() as SessionMembershipData;
@@ -126,7 +153,11 @@ function makeMockRoomState(membershipData: MembershipData[], roomId: string) {
     return {
         on: vi.fn(),
         off: vi.fn(),
-        getStateEvents: (_: string, stateKey: string) => {
+        getStateEvents: (type: string, stateKey?: string) => {
+            if (type === EventType.RTCSlot) {
+                if (stateKey !== undefined) return slotEvent?.getStateKey() === stateKey ? slotEvent : null;
+                return slotEvent ? [slotEvent] : [];
+            }
             if (stateKey !== undefined) return keysAndEvents.find(([k]) => k === stateKey)?.[1];
             return events;
         },
@@ -147,8 +178,25 @@ function makeMockRoomState(membershipData: MembershipData[], roomId: string) {
     };
 }
 
-export function mockRoomState(room: Room, membershipData: MembershipData[]): void {
-    room.getLiveTimeline().getState = vi.fn().mockReturnValue(makeMockRoomState(membershipData, room.roomId));
+export function mockRoomState(room: Room, membershipData: MembershipData[], slotEvent?: MatrixEvent): void {
+    room.getLiveTimeline().getState = vi
+        .fn()
+        .mockReturnValue(makeMockRoomState(membershipData, room.roomId, slotEvent));
+}
+
+export function mockSlotEvent(
+    slotDescription: SlotDescription,
+    content: RtcSlotEventContent | EmptyObject,
+    roomId: string,
+): MatrixEvent {
+    return makeMockEvent(
+        EventType.RTCSlot,
+        "@mock:user.example",
+        roomId,
+        content,
+        undefined,
+        computeSlotId(slotDescription),
+    );
 }
 
 export function makeMockEvent(
@@ -169,6 +217,24 @@ export function makeMockEvent(
         getStateKey: vi.fn().mockReturnValue(stateKey),
         isDecryptionFailure: vi.fn().mockReturnValue(false),
     } as unknown as MatrixEvent;
+}
+
+export function makeMatrixEvent(
+    type: string,
+    sender: string,
+    roomId: string | undefined,
+    content: any,
+    timestamp?: number,
+    stateKey?: string,
+): MatrixEvent {
+    return new MatrixEvent({
+        type,
+        sender,
+        room_id: roomId,
+        content,
+        state_key: stateKey,
+        origin_server_ts: timestamp,
+    });
 }
 
 export function mockRTCEvent(
@@ -193,12 +259,12 @@ export function mockRTCEvent(
 export function mockCallMembership(
     membershipData: MembershipData,
     roomId: string,
-    rtcBackendIdentity?: string,
+    backendIdentities = ["xx"],
 ): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx", logger);
+    return new CallMembership(ev, data, backendIdentities, "(deprecated)");
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {

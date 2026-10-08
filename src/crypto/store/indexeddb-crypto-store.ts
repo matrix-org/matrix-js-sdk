@@ -199,9 +199,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
                     // in this db so we should use it or nothing at all.
                     throw new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew);
                 }
-                logger.warn(
-                    `unable to connect to indexeddb ${this.dbName}` + `: falling back to localStorage store: ${e}`,
-                );
+                logger.warn(`unable to connect to indexeddb ${this.dbName}: falling back to localStorage store: ${e}`);
 
                 try {
                     if (!(globalThis.localStorage instanceof Storage)) {

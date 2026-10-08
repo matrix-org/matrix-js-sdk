@@ -79,7 +79,7 @@ describe("PollEndEvent", () => {
                 },
                 [M_POLL_END.name]: {},
                 [M_TEXT.name]: "Poll closed",
-            } as any, // force invalid type
+            },
         };
         expect(() => new PollEndEvent(input)).toThrow(
             new InvalidEventError("Relationship must be a reference to an event"),

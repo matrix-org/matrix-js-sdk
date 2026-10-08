@@ -323,7 +323,7 @@ describe("parseErrorResponse", () => {
                 } as Response,
                 '{"errcode": "TEST"}',
             ),
-        ).toStrictEqual(new Error("Error parsing Content-Type '': TypeError: argument string is required"));
+        ).toStrictEqual(new HTTPError("Server returned 500 error", 500, expect.any(Headers)));
     });
 
     it("should handle invalid type gracefully", () => {
@@ -336,7 +336,7 @@ describe("parseErrorResponse", () => {
                 } as Response,
                 '{"errcode": "TEST"}',
             ),
-        ).toStrictEqual(new Error("Error parsing Content-Type 'unknown': TypeError: invalid media type"));
+        ).toStrictEqual(new HTTPError("Server returned 500 error", 500, expect.any(Headers)));
     });
 
     it("should handle plaintext errors", () => {

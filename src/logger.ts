@@ -98,11 +98,9 @@ const DEFAULT_NAMESPACE = "matrix";
 // when logging so we always get the current value of console methods.
 loglevel.methodFactory = function (methodName, logLevel, loggerName) {
     return function (this: PrefixedLogger, ...args): void {
-        /* eslint-disable @typescript-eslint/no-invalid-this */
         if (this.prefix) {
             args.unshift(this.prefix);
         }
-        /* eslint-enable @typescript-eslint/no-invalid-this */
         const supportedByConsole =
             methodName === "error" ||
             methodName === "warn" ||

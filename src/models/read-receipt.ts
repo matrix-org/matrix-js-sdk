@@ -325,7 +325,7 @@ export abstract class ReadReceipt<
         }
         this.receiptCacheByEventId.get(eventId)!.push({
             userId: userId,
-            type: receiptType as ReceiptType,
+            type: receiptType,
             data: receipt,
         });
     }

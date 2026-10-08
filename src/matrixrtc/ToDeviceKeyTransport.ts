@@ -88,8 +88,8 @@ export class ToDeviceKeyTransport
         const targets = members
             .map((member) => {
                 return {
-                    userId: member.userId!,
-                    deviceId: member.deviceId!,
+                    userId: member.userId,
+                    deviceId: member.deviceId,
                 };
             })
             // filter out me
@@ -137,7 +137,7 @@ export class ToDeviceKeyTransport
             // TODO userId this is claimed information, deviceId is claimed information
             {
                 userId: fromUser,
-                deviceId: content.member.claimed_device_id!,
+                deviceId: content.member.claimed_device_id,
                 memberId: content.member.id ?? hardcodedMemberIdAlternative,
             },
             content.keys.key,
@@ -152,13 +152,13 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        // TODO: Not possible to check if the event is encrypted or not
-        // see https://github.com/matrix-org/matrix-rust-sdk/issues/4883
-        // if (evnt.getWireType() != EventType.RoomMessageEncrypted) {
-        //     // WARN: The call keys were sent in clear. Ignore them
-        //     logger.warn(`Call encryption keys sent in clear from: ${event.getSender()}`);
-        //     return;
-        // }
+        // NB: When received via the widget driver, the to-device events
+        // are properly reconstructed as if they are encrypted (see MatrixEvent#makeEncrypted).
+        if (event.getWireType() != EventType.RoomMessageEncrypted) {
+            // WARN: The call keys were sent in clear. Ignore them
+            this.logger.warn(`Call encryption keys sent in clear from: ${event.getSender()}`);
+            return;
+        }
 
         const content = this.getValidEventContent(event);
         if (!content) return;

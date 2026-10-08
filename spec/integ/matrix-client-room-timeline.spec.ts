@@ -132,16 +132,16 @@ describe("MatrixClient room timelines", function () {
         const client = testClient.client;
 
         setNextSyncData();
-        httpBackend!.when("GET", "/versions").respond(200, {});
-        httpBackend!.when("GET", "/pushrules").respond(200, {});
-        httpBackend!.when("POST", "/filter").respond(200, { filter_id: "fid" });
-        httpBackend!.when("GET", "/sync").respond(200, SYNC_DATA);
-        httpBackend!.when("GET", "/sync").respond(200, function () {
+        httpBackend.when("GET", "/versions").respond(200, {});
+        httpBackend.when("GET", "/pushrules").respond(200, {});
+        httpBackend.when("POST", "/filter").respond(200, { filter_id: "fid" });
+        httpBackend.when("GET", "/sync").respond(200, SYNC_DATA);
+        httpBackend.when("GET", "/sync").respond(200, function () {
             return NEXT_SYNC_DATA;
         });
-        client!.startClient();
+        client.startClient();
 
-        return [client!, httpBackend];
+        return [client, httpBackend];
     };
 
     beforeEach(async function () {
@@ -634,9 +634,7 @@ describe("MatrixClient room timelines", function () {
             utils.mkMessage({ user: userId, room: roomId }),
         ];
 
-        const contextUrl =
-            `/rooms/${encodeURIComponent(roomId)}/context/` +
-            `${encodeURIComponent(initialSyncEventData[2].event_id!)}`;
+        const contextUrl = `/rooms/${encodeURIComponent(roomId)}/context/${encodeURIComponent(initialSyncEventData[2].event_id!)}`;
         const contextResponse = {
             start: "start_token",
             events_before: [initialSyncEventData[1], initialSyncEventData[0]],

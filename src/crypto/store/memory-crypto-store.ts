@@ -132,7 +132,7 @@ export class MemoryCryptoStore implements CryptoStore {
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void {
-        const result = this.privateKeys[type] as SecretStorePrivateKeys[K] | undefined;
+        const result = this.privateKeys[type];
         func(result || null);
     }
 

@@ -21,6 +21,7 @@ import {
     KeysQueryRequest,
     Migration,
     OlmMachine,
+    type OtherUserIdentity,
     type PickledInboundGroupSession,
     type PickledSession,
     StoreHandle,
@@ -47,6 +48,7 @@ import {
     MatrixHttpApi,
     MemoryCryptoStore,
     TypedEventEmitter,
+    MatrixError,
 } from "../../../src";
 import { emitPromise, mkEvent, waitFor } from "../../test-utils/test-utils";
 import { type CryptoBackend } from "../../../src/common-crypto/CryptoBackend";
@@ -66,10 +68,10 @@ import {
     EventShieldReason,
     type ImportRoomKeysOpts,
     type KeyBackupCheck,
-    type KeyBackupInfo,
+    type NewKeyBackupInfo,
     type VerificationRequest,
 } from "../../../src/crypto-api";
-import * as testData from "../../test-utils/test-data";
+import * as testData from "../../test-utils/crypto-test-data";
 import { E2EKeyReceiver } from "../../test-utils/E2EKeyReceiver";
 import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
@@ -109,6 +111,7 @@ describe("initRustCrypto", () => {
             getBackupKeys: vi.fn(),
             getIdentity: vi.fn().mockResolvedValue(null),
             trackedUsers: vi.fn(),
+            getAllRoomsPendingKeyBundles: vi.fn().mockResolvedValue([]),
         } as unknown as Mocked<OlmMachine>;
     }
 
@@ -126,16 +129,24 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storePassphrase: "storePassphrase",
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith("storePrefix", "storePassphrase", logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            undefined,
+            undefined,
+            undefined,
+        );
     });
 
-    it("passes through the store params (key)", async () => {
+    it("passes through the store params (key), CA certs and sign function", async () => {
         const mockStore = { free: vi.fn() } as unknown as StoreHandle;
         vi.spyOn(StoreHandle, "openWithKey").mockResolvedValue(mockStore);
 
@@ -144,19 +155,42 @@ describe("initRustCrypto", () => {
 
         const storeKey = new Uint8Array(32);
         const logger = new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto"));
+        const caCertsPem = "MY_PEM etc...";
+        const x509Signer = async (item: Uint8Array) => {
+            return {
+                signature_bytes: item,
+                certificate_chain: "CHAIN",
+                signature_scheme: "RsaPssSha512" as const,
+            };
+        };
+        const x509Validity = () => {
+            return 10000;
+        };
+
         await initRustCrypto({
             logger,
             http: {} as MatrixClient["http"],
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storeKey: storeKey,
+            caCertsPem,
+            x509Signer,
+            x509Validity,
         });
 
         expect(StoreHandle.openWithKey).toHaveBeenCalledWith("storePrefix", storeKey, logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            caCertsPem,
+            x509Signer,
+            x509Validity,
+        );
     });
 
     it("suppresses the storePassphrase and storeKey if storePrefix is unset", async () => {
@@ -173,14 +207,22 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: null,
             storeKey: new Uint8Array(),
             storePassphrase: "storePassphrase",
         });
 
         expect(StoreHandle.open).toHaveBeenCalledWith(null, null, logger);
-        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(expect.anything(), expect.anything(), mockStore, logger);
+        expect(OlmMachine.initFromStore).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.anything(),
+            mockStore,
+            logger,
+            undefined,
+            undefined,
+            undefined,
+        );
     });
 
     it("Should get secrets from inbox on start", async () => {
@@ -196,12 +238,88 @@ describe("initRustCrypto", () => {
             userId: TEST_USER,
             deviceId: TEST_DEVICE_ID,
             secretStorage: {} as ServerSideSecretStorage,
-            cryptoCallbacks: {} as CryptoCallbacks,
+            cryptoCallbacks: {},
             storePrefix: "storePrefix",
             storePassphrase: "storePassphrase",
         });
 
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
+    });
+
+    it("should initialize without waiting for pending room key bundles", async () => {
+        // Given a pending key bundle whose lookup never completes.
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+        const olmMachine = makeTestOlmMachine();
+        olmMachine.getAllRoomsPendingKeyBundles.mockResolvedValue([
+            {
+                roomId: new RustSdkCryptoJs.RoomId("!joined:example.com"),
+                inviterId: new RustSdkCryptoJs.UserId("@inviter:example.com"),
+                inviteAcceptedAtMillis: Date.now(),
+            } as RustSdkCryptoJs.RoomPendingKeyBundleDetails,
+        ]);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(olmMachine);
+        // No real store or HTTP request is opened, so there is nothing to clean up if startup blocks.
+        const acceptKeyBundle = vi
+            .spyOn(RustCrypto.prototype, "maybeAcceptKeyBundle")
+            .mockReturnValue(new Promise(() => {}));
+
+        // When crypto initialisation starts.
+        const crypto = await makeTestRustCrypto();
+
+        // Then it completes without waiting for the lookup.
+        expect(crypto).toBeInstanceOf(RustCrypto);
+        expect(acceptKeyBundle).toHaveBeenCalledWith("!joined:example.com", "@inviter:example.com");
+    });
+
+    it("should keep local crypto usable and the bundle pending after a startup key query fails", async () => {
+        // Given a real crypto store with a pending key bundle from a recently accepted invitation.
+        const roomId = "!joined:example.com";
+        const inviterId = "@inviter:example.com";
+        let olmMachine: OlmMachine | undefined;
+        let crypto: RustCrypto | undefined;
+        const initFromStore = OlmMachine.initFromStore;
+        vi.spyOn(OlmMachine, "initFromStore").mockImplementationOnce(async (...args) => {
+            olmMachine = await initFromStore(...args);
+            await olmMachine.storeRoomPendingKeyBundle(
+                new RustSdkCryptoJs.RoomId(roomId),
+                new RustSdkCryptoJs.UserId(inviterId),
+            );
+            return olmMachine;
+        });
+
+        // Given the inviter's key query fails.
+        fetchMock.post("http://server/_matrix/client/v3/keys/query", {
+            status: 403,
+            body: { errcode: "M_FORBIDDEN", error: "Key query failed" },
+        });
+        const logError = vi.spyOn(DebugLogger.prototype, "error");
+
+        try {
+            // When crypto initialisation starts.
+            crypto = await makeTestRustCrypto(makeMatrixHttpApi());
+
+            // Then the failure is logged, local keys stay usable, and the bundle remains pending for retry.
+            await waitFor(() =>
+                expect(logError).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({ errcode: "M_FORBIDDEN" }),
+                ),
+            );
+            expect(fetchMock).toHaveFetched("http://server/_matrix/client/v3/keys/query", {
+                body: { device_keys: { [inviterId]: [] } },
+            });
+            expect((await crypto.getOwnDeviceKeys()).ed25519).toEqual(expect.any(String));
+            const pending = await olmMachine!.getAllRoomsPendingKeyBundles();
+            expect(pending.map((details) => details.roomId.toString())).toEqual([roomId]);
+        } finally {
+            if (crypto) {
+                crypto.stop();
+            } else {
+                // Initialisation may have thrown before returning a RustCrypto instance.
+                olmMachine?.close();
+            }
+        }
     });
 
     describe("libolm migration", () => {
@@ -229,7 +347,7 @@ describe("initRustCrypto", () => {
             const storeSecretKey = (type: string, key: string) =>
                 encryptAndStoreSecretKey(type, new TextEncoder().encode(key), PICKLE_KEY, legacyStore);
 
-            await legacyStore.storeAccount({}, "not a real account");
+            legacyStore.storeAccount({}, "not a real account");
             await storeSecretKey("m.megolm_backup.v1", "backup key");
             await storeSecretKey("master", "master key");
             await storeSecretKey("self_signing", "ssk");
@@ -266,7 +384,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -359,7 +477,7 @@ describe("initRustCrypto", () => {
             const storeSecretKey = (type: string, key: string) =>
                 storeSecretKeyInClear(type, new TextEncoder().encode(key), legacyStore);
 
-            await legacyStore.storeAccount({}, "not a real account");
+            legacyStore.storeAccount({}, "not a real account");
             await storeSecretKey("master", "master key");
             await storeSecretKey("self_signing", "ssk");
             await storeSecretKey("user_signing", "usk");
@@ -376,7 +494,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -416,7 +534,7 @@ describe("initRustCrypto", () => {
                 userId: TEST_USER,
                 deviceId: TEST_DEVICE_ID,
                 secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {} as CryptoCallbacks,
+                cryptoCallbacks: {},
                 storePrefix: "storePrefix",
                 storePassphrase: "storePassphrase",
                 legacyCryptoStore: legacyStore,
@@ -562,7 +680,9 @@ describe("RustCrypto", () => {
             const inputs: IToDeviceEvent[] = [
                 { content: { key: "value" }, type: "org.matrix.test", sender: "@alice:example.com" },
             ];
-            const res = (await rustCrypto.preprocessToDeviceMessages(inputs)).map((p) => p.message);
+            const res = (await rustCrypto.processSyncChanges({ toDeviceEvents: inputs, oneTimeKeysCounts: {} })).map(
+                (p) => p.message,
+            );
             expect(res).toEqual(inputs);
         });
 
@@ -586,9 +706,77 @@ describe("RustCrypto", () => {
                 },
             ];
 
-            const res = await rustCrypto.preprocessToDeviceMessages(inputs);
+            const res = await rustCrypto.processSyncChanges({ toDeviceEvents: inputs, oneTimeKeysCounts: {} });
             expect(res.length).toEqual(0);
         });
+
+        it.each(["m.room_key_bundle", "io.element.msc4268.room_key_bundle"])(
+            "should accept key bundles when we find out about them",
+            async (type: string) => {
+                // Given we are faking that the received to-device message is a
+                // decrypted room key bundle.
+
+                // @ts-ignore Overriding a private function
+                rustCrypto.olmMachine.receiveSyncChanges = vi.fn().mockResolvedValue([keyBundleEvent(type)]);
+
+                // And that there is a pending key bundle
+
+                // @ts-ignore Overriding a private function
+                rustCrypto.olmMachine.getPendingKeyBundleDetailsForRoom = vi.fn().mockReturnValue({
+                    inviteAcceptedAtMillis: Date.now(),
+                    inviterId: { toString: vi.fn().mockReturnValue("@inv:s.co") },
+                });
+
+                // When we process to-device messages
+                rustCrypto.maybeAcceptKeyBundle = vi.fn().mockName("maybeAcceptKeyBundle").mockResolvedValue(null);
+                await rustCrypto.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
+
+                // Then we accepted the key bundle
+                expect(rustCrypto.maybeAcceptKeyBundle).toHaveBeenCalledWith("!r:s.co", "@inv:s.co");
+            },
+        );
+
+        it("should not accept other to-device messages as key bundles when we receive them", async () => {
+            // Given we are faking that the received to-device message looks
+            // like a room key bundle, except it has the wrong type.
+
+            // @ts-ignore Overriding a private function
+            rustCrypto.olmMachine.receiveSyncChanges = vi
+                .fn()
+                .mockResolvedValue([keyBundleEvent("foo.some_other_type")]);
+
+            // And that there is a pending key bundle
+
+            // @ts-ignore Overriding a private function
+            rustCrypto.olmMachine.getPendingKeyBundleDetailsForRoom = vi.fn().mockReturnValue({
+                inviteAcceptedAtMillis: Date.now(),
+                inviterId: { toString: vi.fn().mockReturnValue("@inv:s.co") },
+            });
+
+            // When we process to-device messages
+            rustCrypto.maybeAcceptKeyBundle = vi.fn().mockName("maybeAcceptKeyBundle").mockResolvedValue(null);
+            await rustCrypto.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
+
+            // Then we do not try to accepted a key bundle
+            expect(rustCrypto.maybeAcceptKeyBundle).not.toHaveBeenCalledWith();
+        });
+
+        function keyBundleEvent(type: string): RustSdkCryptoJs.ProcessedToDeviceEvent {
+            return {
+                rawEvent: JSON.stringify({
+                    content: { room_id: "!r:s.co" },
+                    sender: "",
+                    type,
+                }),
+                type: 0,
+                encryptionInfo: {
+                    sender: "",
+                    senderDevice: null,
+                    senderCurve25519Key: "",
+                    isSenderVerified: vi.fn().mockReturnValue(true),
+                },
+            } as any as RustSdkCryptoJs.ProcessedToDeviceEvent;
+        }
 
         it("emits VerificationRequestReceived on incoming m.key.verification.request", async () => {
             rustCrypto = await makeTestRustCrypto(
@@ -626,7 +814,7 @@ describe("RustCrypto", () => {
 
             const onEvent = vi.fn<CryptoEventHandlerMap[CryptoEvent.VerificationRequestReceived]>();
             rustCrypto.on(CryptoEvent.VerificationRequestReceived, onEvent);
-            await rustCrypto.preprocessToDeviceMessages([toDeviceEvent]);
+            await rustCrypto.processSyncChanges({ toDeviceEvents: [toDeviceEvent], oneTimeKeysCounts: {} });
             expect(onEvent).toHaveBeenCalledTimes(1);
 
             const [req]: [VerificationRequest] = onEvent.mock.lastCall!;
@@ -637,6 +825,75 @@ describe("RustCrypto", () => {
     it("getCrossSigningKeyId when there is no cross signing keys", async () => {
         const rustCrypto = await makeTestRustCrypto();
         await expect(rustCrypto.getCrossSigningKeyId()).resolves.toBe(null);
+    });
+
+    describe("processSyncChanges", () => {
+        let olmMachine: Mocked<RustSdkCryptoJs.OlmMachine>;
+        let rustCrypto: RustCrypto;
+
+        beforeEach(() => {
+            olmMachine = {
+                receiveSyncChanges: vi.fn().mockResolvedValue([]),
+                receiveSyncChangesMsc4186: vi.fn().mockResolvedValue([]),
+            } as unknown as Mocked<RustSdkCryptoJs.OlmMachine>;
+            rustCrypto = new RustCrypto(
+                new DebugLogger(debug("matrix-js-sdk:test:RustCrypto")),
+                olmMachine,
+                {} as MatrixClient["http"],
+                TEST_USER,
+                TEST_DEVICE_ID,
+                {} as ServerSideSecretStorage,
+                {},
+            );
+        });
+
+        it("passes all the sync data to the OlmMachine in a single call", async () => {
+            const toDeviceEvents = [{ type: "m.dummy", sender: "@bob:example.org", content: {} }];
+
+            await rustCrypto.processSyncChanges({
+                toDeviceEvents,
+                deviceLists: { changed: ["@bob:example.org"], left: ["@carol:example.org"] },
+                oneTimeKeysCounts: { signed_curve25519: 42 },
+                unusedFallbackKeys: ["signed_curve25519"],
+            });
+
+            expect(olmMachine.receiveSyncChanges).toHaveBeenCalledTimes(1);
+            expect(olmMachine.receiveSyncChangesMsc4186).not.toHaveBeenCalled();
+            const [events, deviceLists, counts, fallbackKeys] = olmMachine.receiveSyncChanges.mock.calls[0];
+            expect(JSON.parse(events)).toEqual(toDeviceEvents);
+            expect(deviceLists).toBeInstanceOf(RustSdkCryptoJs.DeviceLists);
+            expect(deviceLists.changed.map((u: RustSdkCryptoJs.UserId) => u.toString())).toEqual(["@bob:example.org"]);
+            expect(deviceLists.left.map((u: RustSdkCryptoJs.UserId) => u.toString())).toEqual(["@carol:example.org"]);
+            expect(counts).toEqual(new Map([["signed_curve25519", 42]]));
+            expect(fallbackKeys).toEqual(new Set(["signed_curve25519"]));
+        });
+
+        it("passes an empty one-time key count map through unchanged, and omits fallback keys when unknown", async () => {
+            // A sync v2 response which omits `device_one_time_keys_count` means "zero keys": the caller passes `{}`
+            // and we must forward that as an empty map (not skip the call, and not invent a value).
+            await rustCrypto.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
+
+            expect(olmMachine.receiveSyncChanges).toHaveBeenCalledTimes(1);
+            const [events, deviceLists, counts, fallbackKeys] = olmMachine.receiveSyncChanges.mock.calls[0];
+            expect(JSON.parse(events)).toEqual([]);
+            expect(deviceLists.changed).toEqual([]);
+            expect(deviceLists.left).toEqual([]);
+            expect(counts).toEqual(new Map());
+            expect(fallbackKeys).toBeUndefined();
+        });
+
+        it("uses the MSC4186 semantics for sliding sync, where a missing one-time key count means unchanged", async () => {
+            // In sliding sync, `device_one_time_keys_count` is omitted when it is unchanged, so we must not tell the
+            // OlmMachine that there are zero keys: `receiveSyncChangesMsc4186` interprets a missing entry as unchanged.
+            await rustCrypto.processSyncChanges({ toDeviceEvents: [], useMsc4186: true });
+
+            expect(olmMachine.receiveSyncChanges).not.toHaveBeenCalled();
+            expect(olmMachine.receiveSyncChangesMsc4186).toHaveBeenCalledTimes(1);
+            const [events, , counts, fallbackKeys] = olmMachine.receiveSyncChangesMsc4186.mock.calls[0];
+            expect(JSON.parse(events)).toEqual([]);
+            expect(counts).toEqual(new Map());
+            expect(fallbackKeys).toBeUndefined();
+        });
     });
 
     describe("getCrossSigningStatus", () => {
@@ -693,7 +950,7 @@ describe("RustCrypto", () => {
     it("bootstrapSecretStorage creates new backup when requested", async () => {
         const secretStorageCallbacks = {
             getSecretStorageKey: async (keys: any, name: string) => {
-                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                return [Object.keys(keys.keys)[0], new Uint8Array(32)];
             },
         } as SecretStorageCallbacks;
         const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -749,7 +1006,7 @@ describe("RustCrypto", () => {
     describe("upload existing key backup key to new 4S store", () => {
         const secretStorageCallbacks = {
             getSecretStorageKey: async (keys: any, name: string) => {
-                return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                return [Object.keys(keys.keys)[0], new Uint8Array(32)];
             },
         } as SecretStorageCallbacks;
         let secretStorage: ServerSideSecretStorageImpl;
@@ -773,6 +1030,8 @@ describe("RustCrypto", () => {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
                     } else if (method === "GET" && backupAuthData) {
                         return Promise.resolve({ version: "1", algorithm: backupAlg, auth_data: backupAuthData });
+                    } else {
+                        throw new MatrixError({ errcode: "M_NOT_FOUND" }, 404);
                     }
                 }
                 return Promise.resolve({});
@@ -788,6 +1047,7 @@ describe("RustCrypto", () => {
                 undefined,
                 secretStorage,
             );
+            vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
 
             async function createSecretStorageKey() {
                 return {
@@ -816,6 +1076,7 @@ describe("RustCrypto", () => {
                     asJSON: vi.fn().mockReturnValue("{}"),
                 }),
                 saveBackupDecryptionKey: vi.fn(),
+                enableBackupV1: vi.fn(),
                 exportCrossSigningKeys: vi.fn().mockResolvedValue({
                     masterKey: "sosecret",
                     userSigningKey: "secrets",
@@ -832,9 +1093,10 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 secretStorage,
-                {} as CryptoCallbacks,
+                {},
                 false,
             );
+            vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
 
             async function createSecretStorageKey() {
                 return {
@@ -940,7 +1202,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
             rustCrypto["outgoingRequestProcessor"] = outgoingRequestProcessor;
             rustCrypto["outgoingRequestsManager"] = outgoingRequestsManager;
@@ -1058,7 +1320,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1276,7 +1538,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -1461,7 +1723,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             await rustCrypto.storeSessionBackupPrivateKey(
                 new TextEncoder().encode(key),
-                testData.SIGNED_BACKUP_DATA.version!,
+                testData.SIGNED_BACKUP_DATA.version,
             );
             const fetched = await rustCrypto.getSessionBackupPrivateKey();
             expect(new TextDecoder().decode(fetched!)).toEqual(key);
@@ -1518,12 +1780,13 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
         it("returns an unverified UserVerificationStatus when there is no UserIdentity", async () => {
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.known).toBe(false);
             expect(userVerificationStatus.isVerified()).toBeFalsy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeFalsy();
@@ -1535,9 +1798,10 @@ describe("RustCrypto", () => {
                 free: vi.fn(),
                 isVerified: vi.fn().mockReturnValue(true),
                 wasPreviouslyVerified: vi.fn().mockReturnValue(true),
-            });
+            } as unknown as OtherUserIdentity);
 
             const userVerificationStatus = await rustCrypto.getUserVerificationStatus(testData.TEST_USER_ID);
+            expect(userVerificationStatus.known).toBe(true);
             expect(userVerificationStatus.isVerified()).toBeTruthy();
             expect(userVerificationStatus.isTofu()).toBeFalsy();
             expect(userVerificationStatus.isCrossSigningVerified()).toBeTruthy();
@@ -1551,7 +1815,7 @@ describe("RustCrypto", () => {
         beforeEach(async () => {
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                    return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                 },
             } as SecretStorageCallbacks;
             const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -1597,7 +1861,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
             return { olmMachine, rustCrypto };
         }
@@ -1669,7 +1933,7 @@ describe("RustCrypto", () => {
                 testData.TEST_USER_ID,
                 testData.TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
 
             // Wait for the key backup to be available
@@ -1684,7 +1948,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -1727,7 +1991,7 @@ describe("RustCrypto", () => {
             const rustCrypto = await makeTestRustCrypto();
             const olmMachine: OlmMachine = rustCrypto["olmMachine"];
 
-            const backupVersion = testData.SIGNED_BACKUP_DATA.version!;
+            const backupVersion = testData.SIGNED_BACKUP_DATA.version;
             await olmMachine.enableBackupV1(
                 (testData.SIGNED_BACKUP_DATA.auth_data as Curve25519AuthData).public_key,
                 backupVersion,
@@ -1796,7 +2060,7 @@ describe("RustCrypto", () => {
         it("should load the dehydration key from SSSS if available", async () => {
             const secretStorageCallbacks = {
                 getSecretStorageKey: async (keys: any, name: string) => {
-                    return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                    return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                 },
             } as SecretStorageCallbacks;
             const secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -1829,7 +2093,7 @@ describe("RustCrypto", () => {
             });
 
             // we need to process a sync so that the OlmMachine will upload keys
-            await rustCrypto1.preprocessToDeviceMessages([]);
+            await rustCrypto1.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
             rustCrypto1.onSyncCompleted({});
 
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
@@ -1877,18 +2141,17 @@ describe("RustCrypto", () => {
             await rustCrypto2.bootstrapCrossSigning({ setupNewCrossSigning: true });
 
             // we need to process a sync so that the OlmMachine will upload keys
-            await rustCrypto2.preprocessToDeviceMessages([]);
+            await rustCrypto2.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
             rustCrypto2.onSyncCompleted({});
 
             fetchMock.get("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", {
                 device_id: dehydratedDeviceBody.device_id,
                 device_data: dehydratedDeviceBody.device_data,
             });
-            fetchMock.post(
+            fetchMock.get(
                 `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
                 {
                     events: [],
-                    next_batch: "token",
                 },
             );
 
@@ -1946,7 +2209,7 @@ describe("RustCrypto", () => {
                 // Set up a RustCrypto object with secret storage and cross-signing.
                 const secretStorageCallbacks = {
                     getSecretStorageKey: async (keys: any, name: string) => {
-                        return [[...Object.keys(keys.keys)][0], new Uint8Array(32)];
+                        return [Object.keys(keys.keys)[0], new Uint8Array(32)];
                     },
                 } as SecretStorageCallbacks;
                 secretStorage = new ServerSideSecretStorageImpl(new DummyAccountDataClient(), secretStorageCallbacks);
@@ -1977,7 +2240,7 @@ describe("RustCrypto", () => {
                     setupNewKeyBackup: false,
                 });
                 // we need to process a sync so that the OlmMachine will upload keys
-                await rustCrypto.preprocessToDeviceMessages([]);
+                await rustCrypto.processSyncChanges({ toDeviceEvents: [], oneTimeKeysCounts: {} });
                 rustCrypto.onSyncCompleted({});
 
                 // set up mocks needed for device dehydration
@@ -1990,11 +2253,10 @@ describe("RustCrypto", () => {
                     "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
                     putDehydratedDeviceMock,
                 );
-                fetchMock.post(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
+                fetchMock.get(/_matrix\/client\/unstable\/org.matrix.msc3814.v1\/dehydrated_device\/.*\/events/, {
                     status: 200,
                     body: {
                         events: [],
-                        next_batch: "foo",
                     },
                 });
                 getDehydratedDeviceMock.mockClear();
@@ -2297,7 +2559,12 @@ describe("RustCrypto", () => {
             });
             // If the backup is deleted, we will return an empty object
             fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
-                return backupIsDeleted ? {} : testData.SIGNED_BACKUP_DATA;
+                return backupIsDeleted
+                    ? {
+                          status: 404,
+                          body: { errcode: "M_NOT_FOUND" },
+                      }
+                    : testData.SIGNED_BACKUP_DATA;
             });
 
             let dehydratedDeviceIsDeleted = false;
@@ -2307,7 +2574,7 @@ describe("RustCrypto", () => {
             });
 
             // A new key backup should be created after the reset
-            let newKeyBackupInfo!: KeyBackupInfo;
+            let newKeyBackupInfo!: NewKeyBackupInfo;
             fetchMock.post("path:/_matrix/client/v3/room_keys/version", (callLog) => {
                 newKeyBackupInfo = JSON.parse(callLog.options.body as string);
                 return { version: "2" };
@@ -2320,6 +2587,7 @@ describe("RustCrypto", () => {
             });
 
             const rustCrypto = await makeTestRustCrypto(makeMatrixHttpApi(), undefined, undefined, secretStorage);
+            vi.spyOn(rustCrypto, "pushSecretToVerifiedDevices").mockResolvedValue();
 
             // We have a key backup
             await waitFor(async () => expect(await rustCrypto.getActiveSessionBackupVersion()).not.toBeNull());
@@ -2388,6 +2656,7 @@ describe("RustCrypto", () => {
                 queryKeysForUsers: vi.fn().mockReturnValue({}),
                 getReceivedRoomKeyBundleData: vi.fn(),
                 receiveRoomKeyBundle: vi.fn(),
+                clearRoomPendingKeyBundle: vi.fn(),
             } as unknown as Mocked<OlmMachine>;
 
             const http = new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
@@ -2403,7 +2672,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
         });
 
@@ -2448,6 +2717,10 @@ describe("RustCrypto", () => {
             expect(mockOlmMachine.receiveRoomKeyBundle).toHaveBeenCalledTimes(1);
             expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][0]).toBe(bundleData);
             expect(mockOlmMachine.receiveRoomKeyBundle.mock.calls[0][1]).toEqual(new TextEncoder().encode("asdfghjkl"));
+
+            // It should also flag the room as not waiting for a key bundle
+            expect(mockOlmMachine.clearRoomPendingKeyBundle).toHaveBeenCalledTimes(1);
+            expect(mockOlmMachine.clearRoomPendingKeyBundle.mock.calls[0][0].toString()).toEqual("!room_id");
         });
     });
 
@@ -2539,7 +2812,7 @@ describe("RustCrypto", () => {
                 TEST_USER,
                 TEST_DEVICE_ID,
                 {} as ServerSideSecretStorage,
-                {} as CryptoCallbacks,
+                {},
             );
 
             // @ts-ignore mocking outgoingRequestProcessor
@@ -2558,7 +2831,7 @@ describe("RustCrypto", () => {
             roomId: string | null,
             senderId: string | null,
             eventType: string,
-            msgtype?: string | undefined,
+            msgtype?: string,
         ): MatrixEvent {
             return {
                 isState: vi.fn().mockReturnValue(false),
@@ -2596,7 +2869,7 @@ async function makeTestRustCrypto(
     userId: string = TEST_USER,
     deviceId: string = TEST_DEVICE_ID,
     secretStorage: ServerSideSecretStorage = {} as ServerSideSecretStorage,
-    cryptoCallbacks: CryptoCallbacks = {} as CryptoCallbacks,
+    cryptoCallbacks: CryptoCallbacks = {},
 ): Promise<RustCrypto> {
     return await initRustCrypto({
         logger: new DebugLogger(debug("matrix-js-sdk:test:rust-crypto.spec")),

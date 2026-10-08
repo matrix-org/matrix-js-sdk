@@ -20,7 +20,6 @@ import { type IRoomEvent, type IStateEvent } from "../sync-accumulator.ts";
 import { type IRoomEventFilter } from "../filter.ts";
 import { type SearchResult } from "../models/search-result.ts";
 
-/* eslint-disable camelcase */
 export interface IEventWithRoomId extends IRoomEvent {
     room_id: string;
 }
@@ -116,4 +115,3 @@ export interface ISearchResults {
     pendingRequest?: Promise<ISearchResults>;
     abortSignal?: AbortSignal;
 }
-/* eslint-enable camelcase */

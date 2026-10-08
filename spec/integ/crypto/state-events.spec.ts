@@ -21,7 +21,7 @@ import Olm from "@matrix-org/olm";
 
 import * as testUtils from "../../test-utils/test-utils";
 import { getSyncResponse, syncPromise } from "../../test-utils/test-utils";
-import { TEST_ROOM_ID as ROOM_ID } from "../../test-utils/test-data";
+import { TEST_ROOM_ID as ROOM_ID } from "../../test-utils/crypto-test-data";
 import { logger } from "../../../src/logger";
 import {
     createClient,
@@ -90,7 +90,7 @@ describe("Encrypted State Events", () => {
         });
 
         keyReceiver = new E2EKeyReceiver(homeserverUrl);
-        syncResponder = new SyncResponder(homeserverUrl);
+        syncResponder = new SyncResponder(homeserverUrl, { e2eKeyReceiver: keyReceiver });
 
         await aliceClient.initRustCrypto();
 

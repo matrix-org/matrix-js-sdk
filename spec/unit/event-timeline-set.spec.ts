@@ -213,7 +213,7 @@ describe("EventTimelineSet", () => {
             });
             expect(liveTimeline.getEvents()).toHaveLength(1);
             const [event] = liveTimeline.getEvents();
-            const reactions = eventTimelineSet.relations!.getChildEventsForEvent(
+            const reactions = eventTimelineSet.relations.getChildEventsForEvent(
                 event.getId()!,
                 "m.annotation",
                 "m.reaction",
@@ -431,11 +431,28 @@ describe("EventTimelineSet", () => {
             const event = mkThreadResponse(messageEvent);
             expect(eventTimelineSet.canContain(event)).toBeTruthy();
         });
+
+        it("should keep a relation whose parent comes later in the same batch", () => {
+            // Back-pagination adds newest first, so a relation precedes its parent
+            const parent = utils.mkMessage({ room: roomId, user: userA, msg: "Hi!", event: true });
+            const reference = utils.mkEvent(
+                {
+                    event: true,
+                    type: "org.example.reference",
+                    user: userA,
+                    room: roomId,
+                    content: { "m.relates_to": { rel_type: "m.reference", event_id: parent.getId() } },
+                },
+                room.client,
+            );
+            eventTimelineSet.addEventsToTimeline([reference, parent], true, false, eventTimeline, "foo");
+            expect(eventTimeline.getEvents().map((e) => e.getId())).toEqual([parent.getId(), reference.getId()]);
+        });
     });
 
     describe("handleRemoteEcho", () => {
         it("should add to liveTimeline only if the event matches the filter", () => {
-            const filter = new Filter(client.getUserId()!, "test_filter");
+            const filter = new Filter(client.getUserId(), "test_filter");
             filter.setDefinition({
                 room: {
                     timeline: {

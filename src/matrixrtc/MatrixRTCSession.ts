@@ -1,5 +1,5 @@
 /*
-Copyright 2023 - 2024 The Matrix.org Foundation C.I.C.
+Copyright 2023 - 2026 The Matrix.org Foundation C.I.C.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -25,16 +25,23 @@ import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
-import { type CallMembershipIdentityParts, EncryptionManager, type IEncryptionManager } from "./EncryptionManager.ts";
-import { logDurationSync } from "../utils.ts";
+import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
+import { deepCompare, logDurationSync } from "../utils.ts";
 import type {
     Statistics,
     RTCNotificationType,
     Status,
     IRTCNotificationContent,
     RTCCallIntent,
+    RTCCallCapability,
     Transport,
+    SlotDescription,
+    RtcSlotEventContent,
+    RtcSlotEncryptionContent,
 } from "./types.ts";
+import { RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS } from "./types.ts";
+import { isLeftMembershipContent } from "./membershipData/index.ts";
+import { UnsupportedStickyEventsEndpointError } from "../errors.ts";
 import {
     MembershipManagerEvent,
     type MembershipManagerEventHandlerMap,
@@ -45,7 +52,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { RoomKeyTransport } from "./RoomKeyTransport.ts";
+import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -63,6 +70,8 @@ export enum MatrixRTCSessionEvent {
     MembershipManagerError = "membership_manager_error",
     /** The RTCSession did send a call notification caused by joining the call as the first member */
     DidSendCallNotification = "did_send_call_notification",
+    /** Whether the session is too large for the media key to be rotated has changed */
+    KeyRotationSuppressedChanged = "key_rotation_suppressed_changed",
 }
 
 export type MatrixRTCSessionEventHandlerMap = {
@@ -75,12 +84,13 @@ export type MatrixRTCSessionEventHandlerMap = {
         key: Uint8Array<ArrayBuffer>,
         encryptionKeyIndex: number,
         membership: CallMembershipIdentityParts,
-        rtcBackendIdentity: string,
+        backendIdentity: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
         notificationContentNew: { event_id: string } & IRTCNotificationContent,
     ) => void;
+    [MatrixRTCSessionEvent.KeyRotationSuppressedChanged]: (isKeyRotationSuppressed: boolean) => void;
 };
 
 export interface SessionConfig {
@@ -94,21 +104,26 @@ export interface SessionConfig {
      * Determines the kind of call this will be.
      */
     callIntent?: RTCCallIntent;
-}
 
-/**
- * The session description is used to identify a session. Used in the state event.
- */
-export interface SlotDescription {
-    id: string;
-    application: string;
-}
-export function slotIdToDescription(slotId: string): SlotDescription {
-    const [application, id] = slotId.split("#");
-    return { application, id };
-}
-export function slotDescriptionToId(slotDescription: SlotDescription): string {
-    return `${slotDescription.application}#${slotDescription.id}`;
+    /**
+     * What kinds of media this device is capable of handling for the call.
+     */
+    callCapabilities?: RTCCallCapability[];
+
+    /**
+     * Application-specific data to publish in our membership alongside the
+     * application `type`, `m.call.intent` and `capabilities`: in the `application`
+     * object of an `m.rtc.member` event, or at the top level of a legacy
+     * `m.call.member` one. Keys should be namespaced. Read back through
+     * {@link CallMembership.applicationData}.
+     */
+    applicationData?: Record<string, unknown>;
+
+    /**
+     * How long (in milliseconds) the callee's client should keep ringing/waiting for an
+     * answer before the sender gives up and the call notification is considered timed out.
+     */
+    notificationLifetimeMs?: number;
 }
 
 // The names follow these principles:
@@ -166,11 +181,6 @@ export interface MembershipConfig {
     networkErrorRetryMs?: number;
 
     /**
-     * If true, use the new to-device transport for sending encryption keys.
-     */
-    useExperimentalToDeviceTransport?: boolean;
-
-    /**
      * The time (in milliseconds) after which a we consider a delayed event restart http request to have failed.
      * Setting this to a lower value will result in more frequent retries but also a higher chance of failiour.
      *
@@ -198,12 +208,6 @@ export interface EncryptionConfig {
      *  media keys for other participants become available.
      */
     manageMediaKeys?: boolean;
-    /**
-     * The minimum time (in milliseconds) between each attempt to send encryption key(s).
-     * e.g. if this is set to 1000, then we will send at most one key event every second.
-     * @deprecated - Not used by the new encryption manager.
-     */
-    updateEncryptionKeyThrottle?: number;
 
     /**
      * Sometimes it is necessary to rotate the encryption key after a membership update.
@@ -215,6 +219,17 @@ export interface EncryptionConfig {
      * This has to be considered when choosing a value for this property.
      */
     keyRotationGracePeriodMs?: number;
+
+    /**
+     * The number of participants in the session at which the media key will no longer be rotated.
+     *
+     * Rotating a key requires sending it to every participant device, so in large sessions the cost of rotating
+     * on every join/leave becomes prohibitive. At this limit the current key is kept and
+     * distributed to new joiners. No new keys are generated for joiners/leavers.
+     *
+     * Defaults to undefined.
+     */
+    keyRotationParticipantLimit?: number;
 
     /**
      * The delay (in milliseconds) after a member leaves before we create and publish a new key, because people
@@ -276,6 +291,16 @@ export class MatrixRTCSession extends TypedEventEmitter<
     public memberships: CallMembership[] = [];
 
     /**
+     * Resolves when the session has calculated the initial membership of the session.
+     */
+    public readonly initialMembershipCalculated: Promise<void>;
+    /**
+     * Does membership need to be recalculated? This is set to false upon
+     * recalculation.
+     */
+    private membershipNeedsRecalculation = false;
+
+    /**
      * The statistics for this session.
      */
     public statistics: Statistics = {
@@ -299,23 +324,98 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * The callId (sessionId) of the call.
-     *
-     * It can be undefined since the callId is only known once the first membership joins.
-     * The callId is the property that, per definition, groups memberships into one call.
-     * @deprecated use `slotId` instead.
+     * Whether the key rotation is currently halted.
+     * mirror of: EncryptionConfig.keyRotationParticipantLimit
      */
-    public get callId(): string | undefined {
-        return this.slotDescription?.id;
+    public get isKeyRotationSuppressed(): boolean {
+        return this.encryptionManager?.isKeyRotationSuppressed ?? false;
     }
+
     /**
      * The slotId of the call.
      * `{application}#{appSpecificId}`
-     * It can be undefined since the slotId is only known once the first membership joins.
      * The slotId is the property that, per definition, groups memberships into one call.
      */
-    public get slotId(): string | undefined {
-        return slotDescriptionToId(this.slotDescription);
+    public get slotId(): string {
+        return computeSlotId(this.slotDescription);
+    }
+
+    /**
+     * Reads the current slot state event's content for this session.
+     *
+     * @returns The slot event's content, or `undefined` if no slot event exists for this session.
+     */
+    public getRtcSlot(): RtcSlotEventContent | undefined {
+        return getSlotEventContent(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Whether this session's slot is closed.
+     *
+     * @returns `true` if the slot is closed, `false` if the slot is open or `undefined`
+     * if no slot exists.
+     */
+    public isSlotClosed(): boolean | undefined {
+        return isSlotClosed(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Whether this session's slot is open.
+     *
+     * @returns `true` if the slot is open, `false` if the slot is closed or `undefined`
+     * if no slot exists.
+     */
+    public isSlotOpen(): boolean | undefined {
+        return isSlotOpen(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Ensures this session's slot is open, sending a slot state event to open (or create) it if needed.
+     *
+     * The event's `application` is set from this session's slot description and its `encryption` from
+     * `opts.encryption`, replacing whatever an existing slot event declares. Other content is preserved.
+     * No-op if the slot is already open with matching `application` and `encryption`.
+     *
+     * @param opts.encryption - The encryption to declare on the slot, or `undefined` for none.
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotOpen(opts: { encryption?: RtcSlotEncryptionContent } = {}): Promise<void> {
+        const application = { type: this.slotDescription.application };
+        const existingContent = this.getRtcSlot();
+        if (
+            existingContent?.status === "open" &&
+            deepCompare(existingContent.application, application) &&
+            deepCompare(existingContent.encryption, opts.encryption)
+        ) {
+            return;
+        }
+        await this.sendRtcSlot({
+            ...existingContent,
+            status: "open",
+            application,
+            encryption: opts.encryption,
+        });
+    }
+
+    /**
+     * Ensures this session's slot is closed, sending a slot state event to close it if needed.
+     * The other content of the existing slot event is preserved. No-op if no slot event exists.
+     *
+     * @throws if sending the state event fails.
+     */
+    public async ensureRtcSlotClosed(): Promise<void> {
+        const existingContent = this.getRtcSlot();
+        if (!existingContent || existingContent.status === "closed") return;
+        await this.sendRtcSlot({ ...existingContent, status: "closed" });
+    }
+
+    private async sendRtcSlot(content: RtcSlotEventContent): Promise<void> {
+        await this.client.sendStateEvent(
+            this.roomSubset.roomId,
+            EventType.RTCSlot,
+            content,
+            computeSlotId(this.slotDescription),
+        );
     }
 
     /**
@@ -326,18 +426,20 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public static async sessionMembershipsForSlot(
         room: Pick<Room, "getLiveTimeline" | "roomId" | "hasMembershipState" | "_unstable_getStickyEvents">,
-        slotId: string,
+        slotDescription: SlotDescription,
         // default both true this implied we combine sticky and state events for the final call state
         // (prefer sticky events in case of a duplicate)
         options: SessionMembershipsForSlotOpts = DEFAULT_SESSION_MEMBERSHIPS_FOR_SLOT_OPTS,
     ): Promise<CallMembership[]> {
-        const logger = rootLogger.getChild(`[MatrixRTCSession ${room.roomId}]`);
-        const callMemberEvents = collectMembersEvents(room, options, logger);
+        const logger = rootLogger.getChild(
+            `[MatrixRTCSession ${room.roomId} ${slotDescription.application}#${slotDescription.id}]`,
+        );
+        const callMemberEvents = collectMembersEvents(room, slotDescription, options, logger);
 
         const callMemberships = await computeBackendIdentityAndVerifyMemberEvents(
             room,
             callMemberEvents,
-            slotId,
+            slotDescription,
             logger,
         );
 
@@ -389,6 +491,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * @param slotDescription The slot description is a virtual address where participants are allowed to meet.
      * This session will only manage memberships that match this slot description.Sessions are distinct if any of
      * those properties are distinct: `roomSubset.roomId`, `slotDescription.application`, `slotDescription.id`.
+     * @param calculateMembershipsOpts - Options to configure how memberships are calculated for this session.
      */
     public constructor(
         private readonly client: Pick<
@@ -412,29 +515,36 @@ export class MatrixRTCSession extends TypedEventEmitter<
         >,
         private roomSubset: Pick<
             Room,
-            "getLiveTimeline" | "roomId" | "getVersion" | "hasMembershipState" | "on" | "off"
+            | "getLiveTimeline"
+            | "roomId"
+            | "getVersion"
+            | "hasMembershipState"
+            | "on"
+            | "off"
+            | "_unstable_getStickyEvents"
         >,
 
         public readonly slotDescription: SlotDescription,
         private readonly calculateMembershipsOpts?: SessionMembershipsForSlotOpts,
     ) {
         super();
-        this.logger = rootLogger.getChild(`[MatrixRTCSession ${roomSubset.roomId}]`);
+        this.logger = rootLogger.getChild(
+            `[MatrixRTCSession ${roomSubset.roomId} ${slotDescription.application}#${slotDescription.id}]`,
+        );
 
         this.roomSubset.on(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        this.roomSubset.on(RoomStateEvent.Events, this.onRoomStateEvent);
         this.roomSubset.on(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
 
-        // We can ignore this promise because `recalculateSessionMembers` will emit
-        // `MatrixRTCSessionEvent.MembershipsChanged` once it has completed.
-        this.ensureRecalculateSessionMembers();
+        this.initialMembershipCalculated = this.ensureRecalculateSessionMembers();
         this.setExpiryTimer();
     }
+
     /*
      * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
      */
     public isJoined(): boolean {
-        return this.membershipManager?.isJoined() ?? false;
+        return this.membershipManager?.isActivated() ?? false;
     }
 
     /**
@@ -448,6 +558,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         this.roomSubset.off(RoomStateEvent.Members, this.onRoomMemberUpdate);
+        this.roomSubset.off(RoomStateEvent.Events, this.onRoomStateEvent);
         this.roomSubset.off(RoomStickyEventsEvent.Update, this.onStickyEventUpdate);
     }
 
@@ -460,22 +571,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Announces this user and device as joined to the MatrixRTC session,
      * and continues to update the membership event to keep it valid until
      * leaveRoomSession() is called
-     * This will not subscribe to updates: remember to call subscribe() separately if
-     * desired.
      * This method will return immediately and the session will be joined in the background.
      * @param ownMembershipIdentity the identity of the user and device joining the session.
      * This will be put into the content.member.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @param joinConfig - Additional configuration for the joined session.
      */
-    public joinRTCSession(
+    public join(
         ownMembershipIdentity: CallMembershipIdentityParts,
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
+        publishedTransports: Transport[],
         joinConfig?: JoinSessionConfig,
     ): void {
         if (this.isJoined()) {
@@ -494,108 +598,59 @@ export class MatrixRTCSession extends TypedEventEmitter<
                   )
                 : new MembershipManager(joinConfig, this.roomSubset, this.client, this.slotDescription, this.logger);
 
-            this.reEmitter.reEmit(this.membershipManager!, [
+            this.reEmitter.reEmit(this.membershipManager, [
                 MembershipManagerEvent.ProbablyLeft,
                 MembershipManagerEvent.StatusChanged,
                 MembershipManagerEvent.DelayIdChanged,
             ]);
             // Create Encryption manager
-            let transport;
-            if (joinConfig?.useExperimentalToDeviceTransport) {
-                this.logger.info("Using experimental to-device transport for encryption keys");
-                this.logger.info("Using to-device with room fallback transport for encryption keys");
-                const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
-                const transport = new ToDeviceKeyTransport(ownMembershipIdentity, room.roomId, client, statistics);
-                this.encryptionManager = new RTCEncryptionManager(
-                    ownMembershipIdentity,
-                    () => this.memberships,
-                    transport,
-                    this.statistics,
-                    (
-                        keyBin: Uint8Array<ArrayBuffer>,
-                        encryptionKeyIndex: number,
-                        membership: CallMembershipIdentityParts,
-                        rtcBackendIdentity: string,
-                    ) => {
-                        this.emit(
-                            MatrixRTCSessionEvent.EncryptionKeyChanged,
-                            keyBin,
-                            encryptionKeyIndex,
-                            membership,
-                            rtcBackendIdentity,
-                        );
-                    },
-                    this.logger,
-                );
-            } else {
-                // TODO REMOVE ME!
-                transport = new RoomKeyTransport(this.roomSubset, this.client, this.statistics);
-                this.encryptionManager = new EncryptionManager(
-                    ownMembershipIdentity,
-                    () => this.memberships,
-                    transport,
-                    this.statistics,
-                    (
-                        keyBin: Uint8Array<ArrayBuffer>,
-                        encryptionKeyIndex: number,
-                        membership: CallMembershipIdentityParts,
-                        rtcBackendIdentity: string,
-                    ) => {
-                        this.emit(
-                            MatrixRTCSessionEvent.EncryptionKeyChanged,
-                            keyBin,
-                            encryptionKeyIndex,
-                            membership,
-                            rtcBackendIdentity,
-                        );
-                    },
-                );
-            }
+            const [room, client, statistics] = [this.roomSubset, this.client, this.statistics];
+            const transport = new ToDeviceKeyTransport(ownMembershipIdentity, room.roomId, client, statistics);
+            this.encryptionManager = new RTCEncryptionManager(
+                ownMembershipIdentity,
+                () => this.memberships,
+                transport,
+                (
+                    keyBin: Uint8Array<ArrayBuffer>,
+                    encryptionKeyIndex: number,
+                    membership: CallMembershipIdentityParts,
+                    backendIdentity: string,
+                ) => {
+                    this.emit(
+                        MatrixRTCSessionEvent.EncryptionKeyChanged,
+                        keyBin,
+                        encryptionKeyIndex,
+                        membership,
+                        backendIdentity,
+                    );
+                },
+                this.logger,
+            );
         }
 
         this.joinConfig = joinConfig;
         this.pendingNotificationToSend = this.joinConfig?.notificationType;
 
         // Join!
-        this.membershipManager!.join(fociPreferred, multiSfuFocus, (e) => {
+        this.membershipManager.join(publishedTransports, (e) => {
             this.logger.error("MembershipManager encountered an unrecoverable error: ", e);
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
-        this.encryptionManager!.join(joinConfig);
+        this.encryptionManager.join(joinConfig, publishedTransports);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
     }
 
     /**
-     *
-     * @param fociPreferred
-     * @param multiSfuFocus
-     * @param joinConfig
-     * @deprecated use the joinRTCSession method instead
-     */
-    public joinRoomSession(
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
-        joinConfig?: JoinSessionConfig,
-    ): void {
-        const [userId, deviceId] = [this.client.getUserId()!, this.client.getDeviceId()!];
-        // TODO this wants to become a UUID
-        const memberId = `${userId}:${deviceId}`;
-        this.joinRTCSession({ userId, deviceId, memberId }, fociPreferred, multiSfuFocus, joinConfig);
-    }
-
-    /**
      * Announces this user and device as having left the MatrixRTC session
      * and stops scheduled updates.
-     * This will not unsubscribe from updates: remember to call unsubscribe() separately if
-     * desired.
      * The membership update required to leave the session will retry if it fails.
      * Without network connection the promise will never resolve.
      * A timeout can be provided so that there is a guarantee for the promise to resolve.
      * @returns Whether the membership update was attempted and did not time out.
      */
-    public async leaveRoomSession(timeout: number | undefined = undefined): Promise<boolean> {
+    public async leave(timeout?: number): Promise<boolean> {
         if (!this.isJoined()) {
             this.logger.info(`Not joined to session in room ${this.roomSubset.roomId}: ignoring leave call`);
             return false;
@@ -609,26 +664,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         return await leavePromise;
-    }
-    /**
-     * This returns the focus in use by the oldest membership.
-     * Do not use since this might be just the focus for the oldest membership. others might use a different focus.
-     * @deprecated use `member.getTransport(session.getOldestMembership())` instead for the specific member you want to get the focus for.
-     */
-    public getFocusInUse(): Transport | undefined {
-        const oldestMembership = this.getOldestMembership();
-        return oldestMembership?.getTransport(oldestMembership);
-    }
-
-    /**
-     * The used focusActive of the oldest membership (to find out the selection type multi-sfu or oldest membership active focus)
-     * @deprecated does not work with m.rtc.member. Do not rely on it.
-     */
-    public getActiveFocus(): Transport | undefined {
-        return this.getOldestMembership()?.getFocusActive();
-    }
-    public getOldestMembership(): CallMembership | undefined {
-        return this.memberships[0];
     }
 
     /**
@@ -658,6 +693,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
+     * Replace the application-specific data in our membership (see
+     * {@link SessionConfig.applicationData}), re-sending it if it changed.
+     */
+    public async updateApplicationData(applicationData: Record<string, unknown>): Promise<void> {
+        const myMembership = this.membershipManager?.ownMembership;
+        if (!myMembership) {
+            throw Error("Not connected yet");
+        }
+        await this.membershipManager?.updateApplicationData(applicationData);
+    }
+
+    /**
      * Re-emit an EncryptionKeyChanged event for each tracked encryption key. This can be used to export
      * the keys.
      */
@@ -669,7 +716,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyInfo.key,
                     keyInfo.keyIndex,
                     keyInfo.membership,
-                    keyInfo.rtcBackendIdentity,
+                    keyInfo.backendIdentity,
                 );
             });
         });
@@ -695,7 +742,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
 
         if (soonestExpiry != undefined) {
-            this.expiryTimeout = setTimeout(this.ensureRecalculateSessionMembers.bind(this), soonestExpiry);
+            this.expiryTimeout = setTimeout(() => void this.ensureRecalculateSessionMembers(), soonestExpiry);
         }
     }
 
@@ -711,11 +758,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
         notificationType: RTCNotificationType,
         callIntent?: RTCCallIntent,
     ): void {
+        const lifetime = this.joinConfig?.notificationLifetimeMs ?? 90_000;
+        const slotId = computeSlotId(this.slotDescription);
         const sendNotificationEvent = async (): Promise<{
             response: ISendEventResponse;
             content: IRTCNotificationContent;
         }> => {
             const content: IRTCNotificationContent = {
+                "slot_id": slotId,
                 "m.mentions": { user_ids: [], room: true },
                 "notification_type": notificationType,
                 "m.relates_to": {
@@ -723,13 +773,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     rel_type: RelationType.Reference,
                 },
                 "sender_ts": Date.now(),
-                "lifetime": 30_000, // 30 seconds
+                "lifetime": lifetime,
+                "msc4354_sticky_key": slotId,
             };
             if (callIntent) {
                 content["m.call.intent"] = callIntent;
             }
-            const response = await this.client.sendEvent(this.roomSubset.roomId, EventType.RTCNotification, content);
-            return { response, content };
+            return { response: await this.sendNotificationEvent(content), content };
         };
 
         void sendNotificationEvent()
@@ -738,16 +788,46 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 const newResult = { ...notification.response, ...notification.content };
                 this.emit(MatrixRTCSessionEvent.DidSendCallNotification, newResult);
             })
-            .catch(([errorLegacy, errorNew]) =>
-                this.logger.error("Failed to send call notification", errorLegacy, errorNew),
+            .catch((error) => this.logger.error("Failed to send call notification", error));
+    }
+
+    /**
+     * Sends a notification event, as a sticky event (MSC4354) where the server supports it.
+     */
+    private async sendNotificationEvent(content: IRTCNotificationContent): Promise<ISendEventResponse> {
+        const roomId = this.roomSubset.roomId;
+        try {
+            // Stay sticky slightly longer than the lifetime, since the server measures the sticky duration
+            // from `origin_server_ts` while receivers measure the lifetime from `sender_ts`.
+            const stickyDurationMs = content.lifetime + RTC_NOTIFICATION_MAX_SENDER_TS_AHEAD_MS;
+            return await this.client._unstable_sendStickyEvent(
+                roomId,
+                stickyDurationMs,
+                null,
+                EventType.RTCNotification,
+                content,
             );
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending notification as a regular event");
+            return await this.client.sendEvent(roomId, EventType.RTCNotification, content);
+        }
     }
 
     /**
      * Call this when the Matrix room members have changed.
      */
     private readonly onRoomMemberUpdate = (): void => {
-        this.ensureRecalculateSessionMembers();
+        void this.ensureRecalculateSessionMembers();
+    };
+
+    /**
+     * Call this when a room state event has been updated.
+     */
+    private readonly onRoomStateEvent = (event: MatrixEvent): void => {
+        if (event.getType() !== EventType.RTCSlot) return;
+        if (event.getStateKey() !== computeSlotId(this.slotDescription)) return;
+        void this.ensureRecalculateSessionMembers();
     };
 
     /**
@@ -763,36 +843,30 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 (e) => e.getType() === EventType.RTCMembership,
             )
         ) {
-            this.ensureRecalculateSessionMembers();
+            void this.ensureRecalculateSessionMembers();
         }
     };
+
+    // Recalculations are chained onto this promise, so they never run in parallel.
+    private recalculateSessionMembersPromise: Promise<void> = Promise.resolve();
 
     /**
-     * Call this when something changed that may impacts the current MatrixRTC members in this session.
+     * Ensures that membership is recalculated when the state of the session may have changed.
+     * Also ensures that only one recalculation is made at a time.
+     * @returns A promise resolving when the state has been recalculated.
      */
-    // We allow this name schema since this function should only be used for testing purposes.
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.recalculateSessionMembers();
-    };
-
-    // helper variables to make sure we do not have parallel running recalculations.
-
-    private recalculateSessionMembersDirty = false;
-    private recalculateSessionMembersPromise: Promise<void> | undefined = undefined;
-
-    private ensureRecalculateSessionMembers(): void {
-        if (this.recalculateSessionMembersPromise === undefined) {
-            this.recalculateSessionMembersPromise = this.recalculateSessionMembers().then(() => {
-                this.recalculateSessionMembersPromise = undefined;
-                if (this.recalculateSessionMembersDirty) {
-                    this.ensureRecalculateSessionMembers();
-                    this.recalculateSessionMembersDirty = false;
-                }
-            });
-        } else {
-            this.recalculateSessionMembersDirty = true;
+    public ensureRecalculateSessionMembers(): Promise<void> {
+        if (this.membershipNeedsRecalculation) {
+            // We have already requested recalcuation, don't attempt a new one.
+            return this.recalculateSessionMembersPromise;
         }
+        this.membershipNeedsRecalculation = true;
+        // Chain the recalculation.
+        this.recalculateSessionMembersPromise = this.recalculateSessionMembersPromise.then(
+            () => this.recalculateSessionMembers(),
+            () => this.recalculateSessionMembers(),
+        );
+        return this.recalculateSessionMembersPromise;
     }
 
     /**
@@ -803,11 +877,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * This function should be called when the room members or call memberships might have changed.
      */
     private readonly recalculateSessionMembers = async (): Promise<void> => {
+        // Clear the flag.
+        this.membershipNeedsRecalculation = false;
         const oldMemberships = this.memberships;
+        // Needs to be computed before `this.memberships` is updated below, since it is derived from it.
+        const wasKeyRotationSuppressed = this.isKeyRotationSuppressed;
 
         this.memberships = await MatrixRTCSession.sessionMembershipsForSlot(
             this.room,
-            slotDescriptionToId(this.slotDescription),
+            this.slotDescription,
             this.calculateMembershipsOpts,
         );
 
@@ -847,7 +925,13 @@ export class MatrixRTCSession extends TypedEventEmitter<
         }
         // This also needs to be done if `changed` = false
         // A member might have updated their fingerprint (created_ts)
-        void this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        this.encryptionManager?.onMembershipsUpdate(oldMemberships);
+        if (this.isKeyRotationSuppressed !== wasKeyRotationSuppressed) {
+            this.logger.info(
+                `Key rotation is now ${this.isKeyRotationSuppressed ? "suppressed" : "active again"} (${this.memberships.length} members)`,
+            );
+            this.emit(MatrixRTCSessionEvent.KeyRotationSuppressedChanged, this.isKeyRotationSuppressed);
+        }
 
         this.setExpiryTimer();
     };
@@ -857,7 +941,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
 async function computeBackendIdentityAndVerifyMemberEvents(
     room: Pick<Room, "hasMembershipState">,
     callMemberEvents: MatrixEvent[],
-    slotId: string,
+    slotDescription: SlotDescription,
     logger: Logger,
 ): Promise<CallMembership[]> {
     const callMemberships: CallMembership[] = [];
@@ -866,22 +950,14 @@ async function computeBackendIdentityAndVerifyMemberEvents(
         const content = memberEvent.getContent();
 
         // Quick filter to avoid unneeded processing of invalid events or left events.
-        // A more thorough validation will be done later with CallMembership.membershipDataFromMatrixEvent.
-        if (!quickFilterNonRelevantContents(content, logger)) {
+        if (!quickFilterNonRelevantContents(content)) {
             continue;
         }
 
         try {
-            const membershipData = CallMembership.membershipDataFromMatrixEvent(memberEvent);
+            const membership = await CallMembership.parseFromEvent(memberEvent);
 
-            const membership = new CallMembership(
-                memberEvent,
-                membershipData,
-                await CallMembership.computeRtcBackendIdentity(memberEvent, membershipData),
-                logger,
-            );
-
-            if (isValidMembership(membership, room, slotId, logger)) {
+            if (isValidMembership(membership, room, slotDescription, logger)) {
                 callMemberships.push(membership);
             }
         } catch (e) {
@@ -892,18 +968,20 @@ async function computeBackendIdentityAndVerifyMemberEvents(
     return callMemberships;
 }
 
-function quickFilterNonRelevantContents(content: IContent, logger: Logger): boolean {
+function quickFilterNonRelevantContents(content: IContent): boolean {
+    // Don't even bother about left memberships (saves us from costly type/"key in" checks in bigger rooms)
+    if (isLeftMembershipContent(content)) return false;
+
     // Ignore sticky keys for the count
     const eventKeysCount = Object.keys(content).filter((k) => k !== "msc4354_sticky_key").length;
-    // Don't even bother about empty events (saves us from costly type/"key in" checks in bigger rooms)
-    if (eventKeysCount === 0) return false;
 
     // We first decide if it's a MSC4143 event (per device state key)
     if (eventKeysCount > 1 && "application" in content) {
         // We have a MSC4143 event membership event with a proper joined content
         return true;
     } else if (eventKeysCount === 1 && "memberships" in content) {
-        logger.warn(`Legacy event found. Those are ignored, they do not contribute to the MatrixRTC session`);
+        // Events used to have this format in the past, but are now deprecated.
+        // Given that state events ~cannot be deleted, there can be some remaining events in the room, just ignore them.
         return false;
     } else {
         // Invalid or left content
@@ -914,12 +992,12 @@ function quickFilterNonRelevantContents(content: IContent, logger: Logger): bool
 function isValidMembership(
     membership: CallMembership,
     room: Pick<Room, "hasMembershipState">,
-    slotId: string,
+    slotDescription: SlotDescription,
     logger: Logger,
 ): boolean {
-    if (membership.slotId !== slotId) {
+    if (membership.slotDescription.id !== slotDescription.id) {
         logger.info(
-            `Ignoring membership of user ${membership.userId} for a different slot:  user: ${JSON.stringify(membership.slotDescription)}, slotId: ${slotId})`,
+            `Ignoring membership of user ${membership.userId} for a different slot. Theirs: ${JSON.stringify(membership.slotDescription)}, Expected: ${JSON.stringify(slotDescription)}`,
         );
         return false;
     }
@@ -942,12 +1020,13 @@ function isValidMembership(
  */
 function collectMembersEvents(
     room: Pick<Room, "getLiveTimeline" | "roomId" | "_unstable_getStickyEvents">,
+    slotDescription: SlotDescription,
     options: SessionMembershipsForSlotOpts,
     logger: Logger,
 ): MatrixEvent[] {
     const { listenForStickyEvents, listenForMemberStateEvents } = options;
     let callMemberEvents: MatrixEvent[] = [];
-    if (listenForStickyEvents) {
+    if (listenForStickyEvents && !isSlotClosed(room, slotDescription)) {
         // prefill with sticky events
         callMemberEvents = [...room._unstable_getStickyEvents()].filter((e) => e.getType() === EventType.RTCMembership);
     }

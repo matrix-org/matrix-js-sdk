@@ -239,6 +239,14 @@ export class E2EKeyReceiver implements IE2EKeyReceiver {
     }
 
     /**
+     * The number of one-time keys currently held for this device (uploaded, and not yet claimed via
+     * {@link getOneTimeKey}), as a real homeserver would report in `device_one_time_keys_count`.
+     */
+    public getOneTimeKeyCount(): number {
+        return Object.keys(this.oneTimeKeys).length;
+    }
+
+    /**
      * If no one-time keys have yet been uploaded, return `null`.
      * Otherwise, pop a key from the uploaded list.
      */

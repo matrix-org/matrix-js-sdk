@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type MockedObject } from "vitest";
 
-import { type IContent, MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import { type IContent, MatrixEvent, MatrixEventEvent, MAX_STICKY_DURATION_MS } from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
@@ -421,7 +421,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent<IContent>()).toEqual({
+            expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: Error: test error **",
             });
@@ -447,7 +447,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).not.toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent<IContent>()).toEqual({
+            expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: uisi **",
             });
@@ -473,7 +473,7 @@ describe("MatrixEvent", () => {
             expect(encryptedEvent.decryptionFailureReason).toBe(
                 DecryptionFailureCode.MEGOLM_KEY_WITHHELD_FOR_UNVERIFIED_DEVICE,
             );
-            expect(encryptedEvent.getContent<IContent>()).toEqual({
+            expect(encryptedEvent.getContent()).toEqual({
                 msgtype: "m.bad.encrypted",
                 body: "** Unable to decrypt: DecryptionError: The sender has disabled encrypting to unverified devices. **",
             });
@@ -632,6 +632,20 @@ describe("MatrixEvent", () => {
             vi.setSystemTime(50);
             // Prefer unsigned
             expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
+            // The TTL is capped to the spec limit
+            expect(
+                new MatrixEvent({
+                    ...evData,
+                    unsigned: { msc4354_sticky_duration_ttl_ms: MAX_STICKY_DURATION_MS * 10 },
+                } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(50 + MAX_STICKY_DURATION_MS);
+            // A TTL of 0 means already expired.
+            expect(
+                new MatrixEvent({
+                    ...evData,
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 0 },
+                } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(50);
             // Fall back to `duration_ms`
             expect(
                 new MatrixEvent({ ...evData, unsigned: undefined } satisfies IStickyEvent).unstableStickyExpiresAt,
@@ -657,6 +671,7 @@ function mainTimelineLiveEventIds(room: Room): Array<string> {
 function threadLiveEventIds(room: Room, threadIndex: number): Array<string> {
     return room
         .getThreads()
+        // oxlint-disable-next-line no-unexpected-multiline - weird interplay with oxfmt & oxlint
         [threadIndex].getUnfilteredTimelineSet()
         .getLiveTimeline()
         .getEvents()

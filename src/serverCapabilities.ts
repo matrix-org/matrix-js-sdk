@@ -14,15 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { CapabilityPoller } from "./capabilityPoller.ts";
 import { type IHttpOpts, type MatrixHttpApi, Method } from "./http-api/index.ts";
-import { type Logger } from "./logger.ts";
-
-// How often we update the server capabilities.
-// 6 hours - an arbitrary value, but they should change very infrequently.
-const CAPABILITIES_CACHE_MS = 6 * 60 * 60 * 1000;
-
-// How long we want before retrying if we couldn't fetch
-const CAPABILITIES_RETRY_MS = 30 * 1000;
+import type { Logger } from "./logger.ts";
 
 export interface ICapability {
     enabled: boolean;
@@ -77,70 +71,17 @@ type CapabilitiesResponse = {
 /**
  * Manages storing and periodically refreshing the server capabilities.
  */
-export class ServerCapabilities {
-    private capabilities?: Capabilities;
-    private retryTimeout?: ReturnType<typeof setTimeout>;
-    private refreshTimeout?: ReturnType<typeof setInterval>;
-
-    public constructor(
-        private readonly logger: Logger,
-        private readonly http: MatrixHttpApi<IHttpOpts & { onlyData: true }>,
-    ) {}
-
-    /**
-     * Starts periodically fetching the server capabilities.
-     */
-    public start(): void {
-        this.poll().then();
+export class ServerCapabilities extends CapabilityPoller<Capabilities> {
+    public constructor(logger: Logger, http: MatrixHttpApi<IHttpOpts & { onlyData: true }>) {
+        super(logger, http, "server capabilities");
     }
-
-    /**
-     * Stops the service
-     */
-    public stop(): void {
-        this.clearTimeouts();
-    }
-
-    /**
-     * Returns the cached capabilities, or undefined if none are cached.
-     * @returns the current capabilities, if any.
-     */
-    public getCachedCapabilities(): Capabilities | undefined {
-        return this.capabilities;
-    }
-
     /**
      * Fetches the latest server capabilities from the homeserver and returns them, or rejects
      * on failure.
      */
-    public fetchCapabilities = async (): Promise<Capabilities> => {
+    public fetch = async (): Promise<Capabilities> => {
         const resp = await this.http.authedRequest<CapabilitiesResponse>(Method.Get, "/capabilities");
-        this.capabilities = resp["capabilities"];
-        return this.capabilities;
+        this.cached = resp["capabilities"];
+        return this.cached;
     };
-
-    private poll = async (): Promise<void> => {
-        try {
-            await this.fetchCapabilities();
-            this.clearTimeouts();
-            this.refreshTimeout = setTimeout(this.poll, CAPABILITIES_CACHE_MS);
-            this.logger.debug("Fetched new server capabilities");
-        } catch (e) {
-            this.clearTimeouts();
-            const howLong = Math.floor(CAPABILITIES_RETRY_MS + Math.random() * 5000);
-            this.retryTimeout = setTimeout(this.poll, howLong);
-            this.logger.warn(`Failed to refresh capabilities: retrying in ${howLong}ms`, e);
-        }
-    };
-
-    private clearTimeouts(): void {
-        if (this.refreshTimeout) {
-            clearInterval(this.refreshTimeout);
-            this.refreshTimeout = undefined;
-        }
-        if (this.retryTimeout) {
-            clearTimeout(this.retryTimeout);
-            this.retryTimeout = undefined;
-        }
-    }
 }

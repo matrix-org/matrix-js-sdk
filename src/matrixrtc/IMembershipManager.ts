@@ -51,15 +51,6 @@ export interface IMembershipManager extends TypedEventEmitter<
     MembershipManagerEventHandlerMap
 > {
     /**
-     * If we are trying to join, or have successfully joined the session.
-     * It does not reflect if the room state is already configured to represent us being joined.
-     * It only means that the Manager should be trying to connect or to disconnect running.
-     * The Manager is still running right after isJoined becomes false to send the disconnect events.
-     * @returns true if we intend to be participating in the MatrixRTC session
-     * @deprecated This name is confusing and replaced by `isActivated()`. (Returns the same as `isActivated()`)
-     */
-    isJoined(): boolean;
-    /**
      * If the manager is activated. This means it tries to do its job to join the call, resend state events...
      * It does not imply that the room state is already configured to represent being joined.
      * It means that the Manager tries to connect or is connected. ("the manager is still active")
@@ -92,14 +83,10 @@ export interface IMembershipManager extends TypedEventEmitter<
 
     /**
      * Start sending all necessary events to make this user participate in the RTC session.
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @throws can throw if it exceeds a configured maximum retry.
      */
-    join(fociPreferred: Transport[], multiSfuFocus?: Transport, onError?: (error: unknown) => void): void;
+    join(publishedTransports: Transport[], onError?: (error: unknown) => void): void;
     /**
      * Send all necessary events to make this user leave the RTC session.
      * @param timeout the maximum duration in ms until the promise is forced to resolve.
@@ -117,4 +104,10 @@ export interface IMembershipManager extends TypedEventEmitter<
      * @param callIntent The new intent to set.
      */
     updateCallIntent(callIntent: RTCCallIntent): Promise<void>;
+
+    /**
+     * Replace the application-specific data of our membership (see
+     * `SessionConfig.applicationData`), re-sending the membership if it changed.
+     */
+    updateApplicationData(applicationData: Record<string, unknown>): Promise<void>;
 }
