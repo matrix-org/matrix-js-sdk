@@ -4059,15 +4059,13 @@ describe("MatrixClient", function () {
     });
 
     describe("MSC4195 LiveKit endpoints", () => {
-        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
-
         describe("_unstable_getLivekitToken", () => {
             it("makes a well-formed request", async () => {
                 const body = {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                 } satisfies LivekitGetTokenRequest;
                 httpLookups = [
                     {
@@ -4087,7 +4085,7 @@ describe("MatrixClient", function () {
                     url: "wss://livekit.remote.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                     server_name: "remote.example.com",
                 } satisfies LivekitGetTokenRequest;
                 httpLookups = [
@@ -4117,7 +4115,7 @@ describe("MatrixClient", function () {
                         url: "wss://not-an-sfu.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
-                        member,
+                        member_id: "xyzABCDEF10123",
                     }),
                 ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
                 expect(httpLookups.length).toEqual(0);
@@ -4130,7 +4128,7 @@ describe("MatrixClient", function () {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                     delay_id: "1234567890",
                 } satisfies LivekitDelegateDelayedLeaveRequest;
                 httpLookups = [
@@ -4160,7 +4158,7 @@ describe("MatrixClient", function () {
                         url: "wss://livekit.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
-                        member,
+                        member_id: "xyzABCDEF10123",
                         delay_id: "1234567890",
                     }),
                 ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
