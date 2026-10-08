@@ -473,10 +473,9 @@ describe("MembershipManager", () => {
                 { delayedLeaveEventRestartMs: RESTART_DELAY },
                 room,
                 client,
-
                 callSession,
             );
-            manager.join([focus], undefined, onError);
+            manager.join([focus], onError);
             await vi.runOnlyPendingTimersAsync();
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             expect(manager.status).toBe(Status.Connected);
@@ -592,7 +591,7 @@ describe("MembershipManager", () => {
         it("send leave event when leave is called and the delayed leave was already cancelled (409)", async () => {
             const onError = vi.fn();
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], undefined, onError);
+            manager.join([focus], onError);
             await vi.advanceTimersByTimeAsync(1);
             (client._unstable_sendScheduledDelayedEvent as Mock<any>).mockRejectedValue(
                 new MatrixError({ errcode: "M_UNKNOWN" }, 409),
@@ -682,7 +681,7 @@ describe("MembershipManager", () => {
         it("recreates membership if it is missing and the delayed event to cancel was already sent (409)", async () => {
             const onError = vi.fn();
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive, onError);
+            manager.join([focus], onError);
             await vi.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
             vi.mocked(client.sendStateEvent).mockClear();
