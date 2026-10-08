@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
+import { TokenRefreshLogoutError } from "./errors.ts";
 import { type AccessTokens, type IHttpOpts, type OAuth2ClientConfig } from "./interface.ts";
 import { sleep } from "../utils.ts";
 import { TokenRefresher } from "../oauth/tokenRefresher.ts";
