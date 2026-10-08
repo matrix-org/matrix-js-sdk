@@ -165,7 +165,8 @@ export interface MembershipManagerState {
  * The outcome of a delayed leave event restart attempt.
  *
  *  - `"ok"`: the server restarted it, it will fire `delayedLeaveEventDelayMs` from now.
- *  - `"gone"`: the server does not know the delay id anymore. It either sent the event or lost/cancelled it.
+ *  - `"gone"`: the delayed event cannot be restarted anymore (see `isDelayedEventGoneError`). The server either sent
+ *    it or lost/cancelled it.
  *  - `"unsupported"`: the server does not support the delayed events endpoint.
  *  - `{ error }`: any other failure, for the caller to turn into a retry or to rethrow.
  */
@@ -586,9 +587,9 @@ export class MembershipManager
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "cancelScheduledDelayedEvent");
                 if (update) return update;
 
-                if (this.isNotFoundError(e)) {
-                    // If we get a M_NOT_FOUND we know that the delayed event got already removed.
+                if (this.isDelayedEventGoneError(e)) {
                     // This means we are good and can set it to undefined and run this again.
+                    this.logger.info("Delayed event to cancel is already gone, scheduling a new one:", e);
                     this.setAndEmitDelayId(undefined);
                     return createReplaceActionUpdate(repeatActionType);
                 }
@@ -658,7 +659,9 @@ export class MembershipManager
                 // It will emit `probablyLeft = false` once we notice about our leave through sync and successfully setup a new state event.
                 this.setAndEmitProbablyLeft(true);
             }
-            if (this.isNotFoundError(e)) {
+            if (this.isDelayedEventGoneError(e)) {
+                // There is nothing left to restart, so we forget the delay id and let the caller decide what to do next.
+                this.logger.info("Delayed event to restart is already gone:", e);
                 this.setAndEmitDelayId(undefined);
                 return "gone";
             }
@@ -716,7 +719,9 @@ export class MembershipManager
             .catch((e) => {
                 const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
-                if (this.isNotFoundError(e)) {
+                if (this.isDelayedEventGoneError(e)) {
+                    // It will never send our leave event, so we send it ourselves.
+                    this.logger.info("Delayed leave event is already gone, falling back to SendLeaveEvent:", e);
                     this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(repeatActionType);
                 }
@@ -857,7 +862,7 @@ export class MembershipManager
      * already sent it (e.g. because the device was asleep and no restarts reached the server), the membership we
      * would send would come back to life without any delayed leave event to clean it up, and stay until `expires`
      * runs out. So we restart the delayed event first. A success guarantees it will outlive the membership update;
-     * a 404 tells us it is gone, and we have to work out why.
+     * if it is gone instead, we have to work out why.
      * @returns `undefined` if the membership can be sent, otherwise the action to take instead.
      */
     private async ensureDelayedLeaveEventProtectsMembership(): Promise<ActionUpdate | undefined> {
@@ -907,7 +912,7 @@ export class MembershipManager
     }
 
     /**
-     * Restarting our delayed leave event failed with something other than a 404.
+     * Restarting our delayed leave event failed with something other than the delayed event being gone.
      * @param error what the restart failed with
      * @returns `undefined` if the membership can be sent regardless, otherwise the action to take instead.
      * @throws the error if it is not one we retry on.
@@ -1040,6 +1045,30 @@ export class MembershipManager
      */
     private isNotFoundError(error: unknown): boolean {
         return error instanceof MatrixError && error.errcode === "M_NOT_FOUND";
+    }
+
+    /**
+     * Check if its a 409 (conflict) error.
+     * A homeserver answers a delayed event management action (restart, cancel, send) with a 409 if the delayed event
+     * is already finalised with an outcome that conflicts with the action
+     * (MSC4140 — https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md).
+     * The MSC does not mandate an errcode for this case, so we only check the http status.
+     * @param error the error causing this handler check/execution
+     * @returns true if its a conflict error
+     */
+    private isConflictError(error: unknown): boolean {
+        return error instanceof HTTPError && error.httpStatus === 409;
+    }
+
+    /**
+     * Check if the error tells us that the delayed event we tried to manage is gone: either the homeserver does not
+     * know about it anymore (404) or it is already finalised with an outcome that conflicts with our action (409).
+     * In both cases the delayed event will not do what we asked, so the `delayId` is stale and needs to be replaced.
+     * @param error the error causing this handler check/execution
+     * @returns true if the delayed event is gone
+     */
+    private isDelayedEventGoneError(error: unknown): boolean {
+        return this.isNotFoundError(error) || this.isConflictError(error);
     }
 
     /**
