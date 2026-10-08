@@ -334,10 +334,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
     /**
      * The slotId of the call.
      * `{application}#{appSpecificId}`
-     * It can be undefined since the slotId is only known once the first membership joins.
      * The slotId is the property that, per definition, groups memberships into one call.
      */
-    public get slotId(): string | undefined {
+    public get slotId(): string {
         return computeSlotId(this.slotDescription);
     }
 

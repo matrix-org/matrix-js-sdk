@@ -411,6 +411,17 @@ describe("MatrixRTCSession", () => {
                         : "@mock:user.example:AAAAAAA",
                 ]);
             });
+
+            it("computes the right slot ID", () => {
+                const mockRoom = makeMockRoom([]);
+                sess = MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
+                );
+                expect(sess.slotId).toBe("m.call#ROOM");
+            });
         },
     );
 
