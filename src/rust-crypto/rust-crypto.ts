@@ -1523,6 +1523,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Implementation of {@link CryptoApi#isDehydratedDeviceKeyMissing}.
+     */
+    public async isDehydratedDeviceKeyMissing(): Promise<boolean> {
+        return await this.dehydratedDeviceManager.isDehydratedDeviceKeyMissing();
+    }
+
+    /**
      * Implementation of {@link CryptoApi#importSecretsBundle}.
      */
     public async importSecretsBundle(
