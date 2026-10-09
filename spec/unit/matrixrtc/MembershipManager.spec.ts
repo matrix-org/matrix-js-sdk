@@ -535,6 +535,35 @@ describe("MembershipManager", () => {
                     expect(client.fetchCapabilities).toHaveBeenCalledTimes(2);
                 });
 
+                it("fetches the capabilities again once the unreachable period is over", async () => {
+                    const error = new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400);
+                    const rateLimitError = new MatrixError(
+                        { errcode: "M_LIMIT_EXCEEDED" },
+                        429,
+                        undefined,
+                        undefined,
+                        new Headers({ "Retry-After": "360" }),
+                    );
+                    vi.mocked(client._unstable_sendDelayedStateEvent)
+                        .mockRejectedValueOnce(error)
+                        .mockRejectedValueOnce(rateLimitError)
+                        .mockRejectedValueOnce(error);
+                    const manager = new MembershipManager(
+                        { delayedLeaveEventDelayMs: 60_000 },
+                        room,
+                        client,
+                        callSession,
+                    );
+                    manager.join([focus]);
+                    await vi.advanceTimersByTimeAsync(0);
+                    expect(delays()).toEqual([60_000, 30_000]);
+                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(1);
+
+                    await vi.advanceTimersByTimeAsync(360_000);
+                    expect(delays()).toEqual([60_000, 30_000, 30_000, 15_000]);
+                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(2);
+                });
+
                 it("joins without a delayed leave event once halving goes below the restart interval", async () => {
                     vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValue(
                         new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400),

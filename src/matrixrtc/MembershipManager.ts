@@ -85,6 +85,7 @@ On Leave: ─────────  STOP ALL ABOVE
  * of time.
  */
 const MEMBERSHIP_STICKY_DURATION_MS = 60 * 60 * 1000; // 60 minutes
+const CAPABILITIES_UNREACHABLE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * The different types of actions the MembershipManager can take.
@@ -403,7 +404,7 @@ export class MembershipManager
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
     // Set once fetching the server capabilities failed (widget mode), so we do not try again on every retry.
-    private capabilitiesUnreachable = false;
+    private capabilitiesUnreachableUntil = 0;
 
     private get networkErrorRetryMs(): number {
         return this.joinConfig?.networkErrorRetryMs ?? 3_000;
@@ -521,7 +522,7 @@ export class MembershipManager
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
-                this.capabilitiesUnreachable = false;
+                this.capabilitiesUnreachableUntil = 0;
                 this.setAndEmitDelayId(response.delay_id);
                 if (this.state.hasMemberStateEvent) {
                     // This action was scheduled because the previous delayed event was cancelled
@@ -923,7 +924,7 @@ export class MembershipManager
             // The error does not carry the limit. It is advertised in the capabilities.
             const previousDelay = this.delayedLeaveEventDelayMs;
             let capabilities: Capabilities | undefined;
-            if (!this.capabilitiesUnreachable) {
+            if (Date.now() >= this.capabilitiesUnreachableUntil) {
                 try {
                     capabilities = await this.client.fetchCapabilities();
                 } catch (e) {
@@ -938,7 +939,7 @@ export class MembershipManager
                         e.httpStatus < 500 &&
                         e.httpStatus !== 429
                     ) {
-                        this.capabilitiesUnreachable = true;
+                        this.capabilitiesUnreachableUntil = Date.now() + CAPABILITIES_UNREACHABLE_DURATION_MS;
                     }
                 }
             }
