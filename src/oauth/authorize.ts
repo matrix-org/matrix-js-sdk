@@ -188,6 +188,7 @@ export function validateDeviceAuthorizationResponse(
  * @param options.scope - the scope to request for authorization.
  * @param options.metadata - the validated OAuth2 metadata for the Identity Provider.
  * @param options.logger - optional logger to use for the request, defaults to the root logger of the js-sdk.
+ * @param options.fetchFn - optional `fetch` implementation to use for the request, defaults to the global `fetch`.
  * @returns a promise that resolves to a device access token response,
  *   or an error response if the user denies authorization or the device code expires.
  */
@@ -196,11 +197,13 @@ export const startDeviceAuthorization = async ({
     scope,
     metadata,
     logger = rootLogger,
+    fetchFn,
 }: {
     clientId: string;
     scope: string;
     metadata: ValidatedAuthMetadata;
     logger?: Logger;
+    fetchFn?: typeof globalThis.fetch;
 }): Promise<DeviceAuthorizationResponse> => {
     const body = new URLSearchParams({ client_id: clientId, scope: scope }).toString();
 
@@ -209,13 +212,18 @@ export const startDeviceAuthorization = async ({
         throw new Error("No device_authorization_endpoint given");
     }
 
-    const response = await fetchWithLogging(logger, url, {
-        method: Method.Post,
-        headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
+    const response = await fetchWithLogging(
+        logger,
+        url,
+        {
+            method: Method.Post,
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            body,
         },
-        body,
-    });
+        fetchFn,
+    );
 
     const data = await response.json();
     validateDeviceAuthorizationResponse(data);
@@ -229,6 +237,7 @@ export const startDeviceAuthorization = async ({
  * @param options.metadata - The validated OAuth2 metadata for the Identity Provider.
  * @param options.clientId - The client ID returned from client registration.
  * @param options.logger - optional logger to use for the requests, defaults to the root logger of the js-sdk.
+ * @param options.fetchFn - optional `fetch` implementation to use for the requests, defaults to the global `fetch`.
  * @returns a promise that resolves to a device access token response,
  *   or an error response if the user denies authorization or the device code expires.
  */
@@ -237,11 +246,13 @@ export const waitForDeviceAuthorization = async ({
     metadata,
     clientId,
     logger = rootLogger,
+    fetchFn,
 }: {
     session: DeviceAuthorizationResponse;
     metadata: ValidatedAuthMetadata;
     clientId: string;
     logger?: Logger;
+    fetchFn?: typeof globalThis.fetch;
 }): Promise<DeviceAccessTokenResponse | DeviceAccessTokenError> => {
     let interval = (session.interval ?? 5) * 1000; // poll interval
     const expiration = Date.now() + session.expires_in * 1000;
@@ -251,11 +262,16 @@ export const waitForDeviceAuthorization = async ({
             grant_type: OAuthGrantType.DeviceAuthorization,
             client_id: clientId,
         }).toString();
-        const response = await fetchWithLogging(logger, metadata.token_endpoint, {
-            method: Method.Post,
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body,
-        });
+        const response = await fetchWithLogging(
+            logger,
+            metadata.token_endpoint,
+            {
+                method: Method.Post,
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body,
+            },
+            fetchFn,
+        );
 
         const data = await response.json();
 
