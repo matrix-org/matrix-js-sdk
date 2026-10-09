@@ -20,13 +20,19 @@ import { type Mocked, type MockedObject } from "vitest";
 import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
-import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
+import {
+    type RtcLeftMembershipData,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "../../../src/matrixrtc/membershipData";
 import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
 import { type EmptyObject } from "../../../src/@types/common";
 import { type RtcSlotEventContent, type SlotDescription } from "../../../src/matrixrtc/types";
 import { computeSlotId } from "../../../src/matrixrtc/utils";
 
-export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | RtcLeftMembershipData | {}) & {
+    user_id: string;
+};
 
 export const owmMemberIdentity: CallMembershipIdentityParts = {
     deviceId: "AAAAAAA",
@@ -62,6 +68,7 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         id: "IDIDID",
         user_id: "@mock:user.example",
         device_id: "AAAAAAA",
+        membership: "join",
     },
     slot_id: "m.call#ROOM",
     versions: [],

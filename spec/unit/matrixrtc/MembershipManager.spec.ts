@@ -1552,6 +1552,7 @@ describe("MembershipManager", () => {
                                 user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",
                                 device_id: "AAAAAAA",
+                                membership: "join",
                             },
                             slot_id: "m.call#ROOM",
                             transports: {
@@ -1573,12 +1574,43 @@ describe("MembershipManager", () => {
                         "org.matrix.msc4143.rtc.member",
                         {
                             slot_id: "m.call#ROOM",
+                            member: { id: "@alice:example.org:AAAAAAA_m.call", membership: "leave" },
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
                     // ..once
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
                 });
+            });
+            it("sends a leave event with member.membership leave when the scheduled delayed leave is gone", async () => {
+                const memberManager = new StickyEventMembershipManager(
+                    undefined,
+                    room,
+                    client,
+                    callSession,
+                    "@alice:example.org:AAAAAAA_m.call",
+                );
+                memberManager.join([focus]);
+                await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                await vi.advanceTimersByTimeAsync(1);
+                (client._unstable_sendScheduledDelayedEvent as Mock<any>).mockRejectedValue(
+                    new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
+                );
+
+                await memberManager.leave();
+
+                // We send a normal leave event since we failed using sendScheduledDelayedEvent.
+                expect(client._unstable_sendStickyEvent).toHaveBeenLastCalledWith(
+                    room.roomId,
+                    MAX_STICKY_DURATION_MS,
+                    null,
+                    "org.matrix.msc4143.rtc.member",
+                    {
+                        slot_id: "m.call#ROOM",
+                        member: { id: "@alice:example.org:AAAAAAA_m.call", membership: "leave" },
+                        msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
+                    },
+                );
             });
             it("preserves UnsupportedStickyEventsEndpointError on `cause` when wrapping", async () => {
                 const stickyError = new UnsupportedStickyEventsEndpointError(

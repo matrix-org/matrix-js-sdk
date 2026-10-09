@@ -453,13 +453,18 @@ describe("parseCallNotificationContent", () => {
         const joinedContent = {
             slot_id: slotId,
             application: { type: "m.call" },
-            member: { user_id: userId, device_id: "DEVICE", id: "MEMBER" },
+            member: { user_id: userId, device_id: "DEVICE", id: "MEMBER", membership: "join" },
             transports: { published: [], can_subscribe: [] },
             versions: [],
             msc4354_sticky_key: "MEMBER",
         };
-        // Left memberships only contain the slot ID and the sticky key.
+        // Left memberships predating `member.membership` only contain the slot ID and the sticky key.
         const leftContent = { slot_id: slotId, msc4354_sticky_key: "MEMBER" };
+        const leftContentWithMembership = {
+            slot_id: slotId,
+            member: { id: "MEMBER", membership: "leave" },
+            msc4354_sticky_key: "MEMBER",
+        };
 
         function addMembership(content: IContent, originServerTs = now, from = userId): void {
             store.addStickyEvents([
@@ -510,6 +515,25 @@ describe("parseCallNotificationContent", () => {
         it("accepts notifications if the receiving user left the slot before the notification was sent", async () => {
             const notification = addNotification();
             addMembership(leftContent, notificationTs - 1);
+            await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
+        });
+
+        it("rejects notifications if the receiving user is joined to the slot without member.membership", async () => {
+            const notification = addNotification();
+            const { membership: _membership, ...legacyMember } = joinedContent.member;
+            addMembership({ ...joinedContent, member: legacyMember });
+            await expect(parse(notification)).rejects.toThrow();
+        });
+
+        it("rejects notifications if the receiving user left the slot with member.membership after the notification was sent", async () => {
+            const notification = addNotification();
+            addMembership(leftContentWithMembership, notificationTs + 1);
+            await expect(parse(notification)).rejects.toThrow();
+        });
+
+        it("accepts notifications if the receiving user left the slot with member.membership before the notification was sent", async () => {
+            const notification = addNotification();
+            addMembership(leftContentWithMembership, notificationTs - 1);
             await expect(parse(notification)).resolves.toMatchObject({ slot_id: slotId });
         });
 

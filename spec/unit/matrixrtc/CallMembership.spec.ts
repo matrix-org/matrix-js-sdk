@@ -335,6 +335,46 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
+        it("accepts membership without member.membership for compatibility with older events", () => {
+            const { membership: _membership, ...legacyMember } = membershipTemplate.member;
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, member: legacyMember });
+            }).not.toThrow();
+        });
+
+        it("accepts membership with member.membership join", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: "join" },
+                });
+            }).not.toThrow();
+        });
+
+        it("rejects membership with member.membership leave", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: "leave" },
+                });
+            }).toThrow();
+        });
+
+        it("rejects membership with unknown member.membership", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: "knock" },
+                });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: 1 },
+                });
+            }).toThrow();
+        });
+
         it("rejects membership with incorrect transports", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, transports: { can_subscribe: [1] } });
