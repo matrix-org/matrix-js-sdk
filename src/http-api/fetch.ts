@@ -49,7 +49,9 @@ export class FetchHttpApi<O extends IHttpOpts> {
         }
         opts.useAuthorizationHeader = opts.useAuthorizationHeader ?? true;
 
-        this.tokenManager = new TokenManager(opts);
+        // Token requests share this instance's abort controller, so that `abort()` aborts
+        // them along with any in-flight C-S API requests.
+        this.tokenManager = new TokenManager(opts, () => this.abortController.signal);
     }
 
     public abort(): void {
