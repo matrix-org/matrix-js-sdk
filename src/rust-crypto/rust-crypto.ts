@@ -676,6 +676,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Mark the given device as locally blocked.
+     *
+     * Implementation of {@link CryptoApi#setDeviceBlocked}.
+     */
+    public async setDeviceBlocked(userId: string, deviceId: string, blocked = true): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) {
+            throw new Error(`Unknown device ${userId}|${deviceId}`);
+        }
+        try {
+            await device.setLocalTrust(
+                blocked ? RustSdkCryptoJs.LocalTrust.BlackListed : RustSdkCryptoJs.LocalTrust.Unset,
+            );
+        } finally {
+            device.free();
+        }
+    }
+
+    /**
      * Blindly cross-sign one of our other devices.
      *
      * Implementation of {@link CryptoApi#crossSignDevice}.
@@ -714,6 +737,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 signedByOwner: device.isCrossSignedByOwner(),
                 crossSigningVerified: device.isCrossSigningTrusted(),
                 localVerified: device.isLocallyTrusted(),
+                blocked: device.isBlacklisted(),
                 trustCrossSignedDevices: this._trustCrossSignedDevices,
             });
         } finally {

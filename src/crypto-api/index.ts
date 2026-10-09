@@ -303,6 +303,24 @@ export interface CryptoApi {
     setDeviceVerified(userId: string, deviceId: string, verified?: boolean): Promise<void>;
 
     /**
+     * Mark the given device as locally blocked, or lift the block.
+     *
+     * Blocked devices do not receive any room keys from this device, so they cannot decrypt messages sent from here
+     * afterwards. The state is local to this device (it is not shared with the user's other devices or the server).
+     *
+     * A device has a single local trust state: blocking a locally verified device replaces its verified state, and
+     * {@link CryptoApi.setDeviceVerified} (with either value) replaces the blocked state. Un-blocking leaves the
+     * device unverified.
+     *
+     * @param userId - owner of the device
+     * @param deviceId - unique identifier for the device.
+     * @param blocked - whether to block the device. Defaults to 'true'.
+     *
+     * @throws an error if the device is unknown, or has not published any encryption keys.
+     */
+    setDeviceBlocked(userId: string, deviceId: string, blocked?: boolean): Promise<void>;
+
+    /**
      * Cross-sign one of our own devices.
      *
      * This will create a signature for the device using our self-signing key, and publish that signature.
@@ -971,6 +989,13 @@ export class DeviceVerificationStatus {
     public readonly localVerified: boolean;
 
     /**
+     * True if the device has been marked as locally blocked via {@link CryptoApi#setDeviceBlocked}.
+     *
+     * No room keys are sent to a blocked device.
+     */
+    public readonly blocked: boolean;
+
+    /**
      * True if the client has been configured to trust cross-signed devices via {@link CryptoApi#setTrustCrossSignedDevices}.
      */
     private readonly trustCrossSignedDevices: boolean;
@@ -987,6 +1012,7 @@ export class DeviceVerificationStatus {
         this.crossSigningVerified = opts.crossSigningVerified ?? false;
         this.tofu = opts.tofu ?? false;
         this.localVerified = opts.localVerified ?? false;
+        this.blocked = opts.blocked ?? false;
         this.trustCrossSignedDevices = opts.trustCrossSignedDevices ?? false;
     }
 
