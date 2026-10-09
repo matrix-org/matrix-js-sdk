@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
+import { TokenRefreshLogoutError } from "./errors.ts";
 import { type AccessTokens, type IHttpOpts, type OAuth2ClientConfig } from "./interface.ts";
 import { sleep } from "../utils.ts";
 import { TokenRefresher } from "../oauth/tokenRefresher.ts";
@@ -171,8 +171,8 @@ export class TokenManager {
             // successfully got new tokens
             return TokenRefreshOutcome.Success;
         } catch (error) {
-            // If we get a TokenError or MatrixError, we should log out, otherwise assume transient
-            if (error instanceof TokenRefreshLogoutError || error instanceof MatrixError) {
+            // A TokenRefreshLogoutError is any error on which we should log out so… do that.
+            if (error instanceof TokenRefreshLogoutError) {
                 this.opts.logger?.error("Failed to refresh token", error);
                 return TokenRefreshOutcome.Logout;
             }
