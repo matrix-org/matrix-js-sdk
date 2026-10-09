@@ -24,7 +24,7 @@ import type { IContent } from "../../models/event.ts";
 export function isLeftMembershipContent(content: IContent): boolean {
     // Leaving a slot is expressed through setting membership to leave.
     if (content.member?.membership === "leave") return true;
-    // Events predating the membership roperty instead emptied the content except for
+    // Events predating the membership property instead emptied the content except for
     // the slot ID and the sticky key.
     return Object.keys(content).every((key) => key === "slot_id" || key === "msc4354_sticky_key");
 }
