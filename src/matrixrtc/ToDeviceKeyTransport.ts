@@ -39,14 +39,12 @@ interface ReceivedKey {
     deviceId: string;
 }
 
-function isValidMediaKey(mediaKey: unknown): mediaKey is RTCEncryptionKeyMediaKey {
-    return (
-        typeof mediaKey === "object" &&
-        mediaKey !== null &&
-        typeof (mediaKey as RTCEncryptionKeyMediaKey).key === "string" &&
-        !!(mediaKey as RTCEncryptionKeyMediaKey).key &&
-        typeof (mediaKey as RTCEncryptionKeyMediaKey).index === "number"
-    );
+/** Returns the given value as a media key if it is a valid one, otherwise `undefined`. */
+function parseMediaKey(mediaKey: unknown): RTCEncryptionKeyMediaKey | undefined {
+    if (typeof mediaKey !== "object" || mediaKey === null) return undefined;
+    const { key, index } = mediaKey as Partial<RTCEncryptionKeyMediaKey>;
+    if (typeof key !== "string" || key === "" || typeof index !== "number") return undefined;
+    return mediaKey as RTCEncryptionKeyMediaKey;
 }
 
 export class NotSupportedError extends Error {
@@ -198,11 +196,7 @@ export class ToDeviceKeyTransport
         }
 
         // Prefer `media_key` and fall back to the deprecated `keys` property for backwards compatibility.
-        const mediaKey = isValidMediaKey(content.media_key)
-            ? content.media_key
-            : isValidMediaKey(content.keys)
-              ? content.keys
-              : undefined;
+        const mediaKey = parseMediaKey(content.media_key) ?? parseMediaKey(content.keys);
         if (!mediaKey) {
             this.logger.warn("Malformed Event: Missing media key");
             return;
