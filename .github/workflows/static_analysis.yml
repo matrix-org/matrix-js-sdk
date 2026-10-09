@@ -170,6 +170,15 @@ jobs:
               working-directory: apps/web
               run: "pnpm run lint:types"
 
+    element-call:
+        name: Downstream lint element-call
+        if: github.event_name == 'merge_group'
+        uses: element-hq/element-call/.github/workflows/lint.yaml@main # zizmor: ignore[unpinned-uses]
+        permissions:
+            contents: read
+        with:
+            matrix-js-sdk-sha: ${{ github.sha }}
+
     # Workflow consolidation job
     done:
         needs:
@@ -180,6 +189,7 @@ jobs:
             - docs
             - analyse_dead_code
             - element-web
+            - element-call
         name: Static Analysis
         runs-on: ubuntu-26.04
         if: always()
