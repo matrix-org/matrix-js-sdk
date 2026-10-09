@@ -1220,7 +1220,7 @@ type SendDelayedEventParams = SendEventParams &
         {
             /**
              * Properties of the delay for this event.
-             * @deprecated Use {@link SendDelayedEventParams.delayMs} instead.
+             * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
              */
             delayOpts: SendDelayedEventRequestOpts;
         },
