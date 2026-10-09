@@ -23,7 +23,16 @@ import { encodeUnpaddedBase64 } from "../../base64.ts";
 import { slotIdToDescription } from "../utils.ts";
 
 /**
- * Represents the current form of MSC4143, which uses sticky events to store membership.
+ * The membership status of an RTC member event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export type RtcMembershipStatus = "join" | "leave";
+
+/**
+ * The membership data of a joined RTC member event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export interface RtcMembershipData {
     slot_id: string;
@@ -31,6 +40,12 @@ export interface RtcMembershipData {
         user_id: string;
         device_id: string;
         id: string;
+        /**
+         * The intended membership status.
+         *
+         * Optional and defaulting to "join" for backwards compatibility.
+         */
+        membership?: "join";
     };
     application: RtcSlotApplicationContent;
     transports: {
@@ -43,11 +58,36 @@ export interface RtcMembershipData {
 }
 
 /**
- * Validates that `data` matches the format expected by MSC4143.
+ * The membership data of a left RTC member event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export interface RtcLeftMembershipData {
+    slot_id: string;
+    member: {
+        id: string;
+        membership: "leave";
+    };
+    /**
+     * Optional context on why the member left.
+     */
+    leave_reason?: {
+        code: string;
+        reason?: string;
+    };
+    msc4354_sticky_key?: string;
+    sticky_key?: string;
+}
+
+/**
+ * Validates that `data` matches the format expected by MSC4143 for a joined membership.
+ *
  * @param data The event content.
  * @param sender The sender of the event.
  * @returns true if `data` is valid RtcMembershipData
  * @throws {MatrixRTCMembershipParseError} if the content is not valid
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export const checkRtcMembershipData = (data: IContent, sender: string): data is RtcMembershipData => {
     const errors: string[] = [];
@@ -85,6 +125,11 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
             errors.push(prefix + "member.device_id must be string");
         }
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
+        // Events predating `member.membership` omit it and are treated as joined. Anything other than `join`
+        // (including `leave`) does not describe a joined membership and is rejected.
+        if (data.member.membership !== undefined && data.member.membership !== "join") {
+            errors.push(prefix + "member.membership must be join");
+        }
     }
     if (typeof data.application !== "object" || data.application === null) {
         errors.push(prefix + "application must be an object");

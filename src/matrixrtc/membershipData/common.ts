@@ -19,10 +19,13 @@ import type { IContent } from "../../models/event.ts";
 /**
  * Whether the content of an `m.rtc.member` or `m.call.member` event represents a left membership.
  *
- * Leaving a slot is expressed by emptying the event's content, so nothing is left beyond the slot the
- * membership applied to and the MSC4354 sticky key.
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export function isLeftMembershipContent(content: IContent): boolean {
+    // Leaving a slot is expressed through setting membership to leave.
+    if (content.member?.membership === "leave") return true;
+    // Events predating the membership property instead emptied the content except for
+    // the slot ID and the sticky key.
     return Object.keys(content).every((key) => key === "slot_id" || key === "msc4354_sticky_key");
 }
 
