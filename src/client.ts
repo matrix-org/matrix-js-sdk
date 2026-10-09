@@ -3162,7 +3162,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         requestOpts: IRequestOpts = {},
     ): Promise<SendDelayedEventResponse> {
         // The dedicated endpoint has no equivalent of a delay made only of a parent delay ID.
-        if (!this.delayedEventEndpointUnrecognised && "delay" in delayOpts) {
+        if (!this.delayedEventEndpointUnrecognised && "delay_ms" in delayOpts) {
             const path = utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
                 $roomId: event.roomId,
                 $eventType: event.eventType,
@@ -3170,7 +3170,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             });
             const { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration, ...otherQuery } = queryDict ?? {};
             const body = {
-                delay_ms: delayOpts.delay,
+                delay_ms: delayOpts.delay_ms,
                 ...(event.stateKey !== undefined && { state_key: event.stateKey }),
                 ...(stickyDuration !== undefined && { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration }),
                 content: event.content,
@@ -9177,8 +9177,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 }
 
 function getUnstableDelayQueryOpts(delayOpts: SendDelayedEventRequestOpts): QueryDict {
+    // The query parameter predates the `delay_ms` name
     return Object.fromEntries(
-        Object.entries(delayOpts).map(([k, v]) => [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.${k}`, v]),
+        Object.entries(delayOpts).map(([k, v]) => [
+            `${UNSTABLE_MSC4140_DELAYED_EVENTS}.${k === "delay_ms" ? "delay" : k}`,
+            v,
+        ]),
     );
 }
 

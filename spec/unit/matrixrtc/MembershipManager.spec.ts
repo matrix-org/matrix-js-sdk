@@ -171,7 +171,7 @@ describe("MembershipManager", () => {
                 restartScheduledDelayedEventHandle.resolve?.();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    { delay: 8000 },
+                    { delay_ms: 8000 },
                     "org.matrix.msc3401.call.member",
                     {},
                     "_@alice:example.org_AAAAAAA_m.call",
@@ -210,7 +210,7 @@ describe("MembershipManager", () => {
                 restartScheduledDelayedEventHandle.resolve?.();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    { delay: 8000 },
+                    { delay_ms: 8000 },
                     "org.matrix.msc3401.call.member",
                     {},
                     "_@alice:example.org_AAAAAAA_m.callcustom",
@@ -343,7 +343,7 @@ describe("MembershipManager", () => {
                     await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
                     await sendDelayedStateAttempt;
                     const callProps = (d: number) => {
-                        return [room!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
+                        return [room!.roomId, { delay_ms: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
                     };
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(1, ...callProps(9000));
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(2, ...callProps(7500));
@@ -419,7 +419,7 @@ describe("MembershipManager", () => {
                 manager.join([focus]);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    { delay: 123456 },
+                    { delay_ms: 123456 },
                     "org.matrix.msc3401.call.member",
                     {},
                     "_@alice:example.org_AAAAAAA_m.call",
@@ -1568,7 +1568,7 @@ describe("MembershipManager", () => {
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledWith(
                         room.roomId,
                         MAX_STICKY_DURATION_MS,
-                        { delay: 8000 },
+                        { delay_ms: 8000 },
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {

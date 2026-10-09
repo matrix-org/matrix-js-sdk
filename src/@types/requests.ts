@@ -93,19 +93,25 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-export type SendDelayedEventRequestOpts = { parent_delay_id: string } | { delay: number; parent_delay_id?: string };
+export type SendDelayedEventRequestOpts =
+    | { parent_delay_id: string }
+    | {
+          /** How long, in milliseconds, the homeserver should wait before sending the event. */
+          delay_ms: number;
+          parent_delay_id?: string;
+      };
 
 export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
     if ("parent_delay_id" in opts && typeof opts.parent_delay_id !== "string") {
         // Invalid type, reject
         return false;
     }
-    if ("delay" in opts && typeof opts.delay !== "number") {
+    if ("delay_ms" in opts && typeof opts.delay_ms !== "number") {
         // Invalid type, reject.
         return true;
     }
     // At least one of these fields must be specified.
-    return "delay" in opts || "parent_delay_id" in opts;
+    return "delay_ms" in opts || "parent_delay_id" in opts;
 }
 export type SendDelayedEventResponse = {
     delay_id: string;
@@ -135,7 +141,7 @@ type DelayedPartialEvent = DelayedPartialTimelineEvent | DelayedPartialStateEven
 
 export type DelayedEventInfoItem = DelayedPartialEvent &
     SendDelayedEventResponse &
-    SendDelayedEventRequestOpts & {
+    ({ parent_delay_id: string } | { delay: number; parent_delay_id?: string }) & {
         running_since: number;
     };
 

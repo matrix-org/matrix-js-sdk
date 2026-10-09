@@ -466,7 +466,7 @@ export class RoomWidgetClient extends MatrixClient {
                     event.getType(),
                     content,
                     room.roomId,
-                    "delay" in delayOpts ? delayOpts.delay : undefined,
+                    "delay_ms" in delayOpts ? delayOpts.delay_ms : undefined,
                     "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
                     stickyDurationMsAsNumber,
                 )
@@ -537,7 +537,7 @@ export class RoomWidgetClient extends MatrixClient {
                 stateKey,
                 content,
                 roomId,
-                "delay" in delayOpts ? delayOpts.delay : undefined,
+                "delay_ms" in delayOpts ? delayOpts.delay_ms : undefined,
                 "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
             )
             .catch(timeoutToConnectionError);
