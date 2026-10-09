@@ -455,7 +455,6 @@ describe("parseCallNotificationContent", () => {
             application: { type: "m.call" },
             member: { user_id: userId, device_id: "DEVICE", id: "MEMBER" },
             transports: { published: [], can_subscribe: [] },
-            versions: [],
             msc4354_sticky_key: "MEMBER",
         };
         // Left memberships only contain the slot ID and the sticky key.
