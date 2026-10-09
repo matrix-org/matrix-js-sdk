@@ -599,6 +599,7 @@ export class SlidingSyncSdk {
             RoomEvent.Redaction,
             RoomEvent.RedactionCancelled,
             RoomEvent.Receipt,
+            RoomEvent.RetentionChanged,
             RoomEvent.Tags,
             RoomEvent.LocalEchoUpdated,
             RoomEvent.AccountData,
