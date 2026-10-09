@@ -927,6 +927,8 @@ export class MembershipManager
                     capabilities = await this.client.fetchCapabilities();
                 } catch (e) {
                     // This is expected in widget mode where the client cannot talk to the homeserver.
+                    // TODO: Get the delayed events capability through the widget API instead, and remove the halving
+                    // fallback below.
                     this.logger.info("Could not get the server capabilities to read the maximum delay:", e);
                     this.capabilitiesUnreachable = true;
                 }

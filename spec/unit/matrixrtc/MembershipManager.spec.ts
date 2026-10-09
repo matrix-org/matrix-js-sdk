@@ -475,6 +475,7 @@ describe("MembershipManager", () => {
                     expect(client.fetchCapabilities).not.toHaveBeenCalled();
                 });
 
+                // TODO: Replace these two widget mode tests once the widget API exposes the delayed events capability.
                 it("halves the delay if the capabilities are not reachable (widget mode)", async () => {
                     const error = new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400);
                     vi.mocked(client._unstable_sendDelayedStateEvent)
