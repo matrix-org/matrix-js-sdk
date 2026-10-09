@@ -402,7 +402,7 @@ export class MembershipManager
 
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
-    /** Set once fetching the server capabilities failed (widget mode), so we do not try again on every retry. */
+    // Set once fetching the server capabilities failed (widget mode), so we do not try again on every retry.
     private capabilitiesUnreachable = false;
 
     private get networkErrorRetryMs(): number {
