@@ -391,6 +391,7 @@ describe("FetchHttpApi", () => {
                 describe("with an oauth2ClientConfig", () => {
                     const makeOAuthApi = (
                         fetchFn: MockedFunction<Window["fetch"]>,
+                        extraOpts: Partial<IHttpOpts> = {},
                     ): { api: FetchHttpApi<any>; emitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap> } => {
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                         vi.spyOn(emitter, "emit");
@@ -403,6 +404,7 @@ describe("FetchHttpApi", () => {
                             accessToken,
                             refreshToken,
                             onlyData: true,
+                            ...extraOpts,
                         });
                         return { api, emitter };
                     };
@@ -455,6 +457,28 @@ describe("FetchHttpApi", () => {
                         // uses new access token
                         expect(fetchFn.mock.calls[1][1].headers.Authorization).toEqual("Bearer new-access-token");
                         expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should use the configured logger for requests to the authorization server", async () => {
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 200,
+                            headers: { "Content-Type": "application/json" },
+                            body: makeTokenResponse("new-access-token", "new-refresh-token"),
+                        });
+                        const fetchFn = vi
+                            .fn()
+                            .mockResolvedValueOnce(unknownTokenResponse)
+                            .mockResolvedValueOnce(okayResponse);
+                        const logger = {
+                            debug: vi.fn(),
+                            warn: vi.fn(),
+                            error: vi.fn(),
+                        } as unknown as Mocked<Logger>;
+                        const { api } = makeOAuthApi(fetchFn, { logger });
+
+                        await api.authedRequest(Method.Post, "/account/password");
+
+                        expect(logger.debug).toHaveBeenCalledWith(`OAuth2: --> POST ${authMetadata.token_endpoint}`);
                     });
 
                     it("should not try to refresh the token if it has plenty of time left before expiry", async () => {
