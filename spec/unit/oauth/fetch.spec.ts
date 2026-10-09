@@ -72,6 +72,19 @@ describe("fetchWithLogging()", () => {
         ]);
     });
 
+    it("should use the given fetchFn instead of the global fetch", async () => {
+        const fetchFn = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+
+        const res = await fetchWithLogging(mockLogger, "https://auth.org/token", { method: "POST" }, fetchFn);
+
+        expect(res.status).toBe(200);
+        expect(fetchFn).toHaveBeenCalledWith("https://auth.org/token", { method: "POST" });
+        expect(fetchMock).not.toHaveFetched("https://auth.org/token");
+        expect(mockLogger.debug.mock.calls[1]).toEqual([
+            expect.stringMatching(/^OAuth2: <-- POST https:\/\/auth\.org\/token \[\d+ms 200\]$/),
+        ]);
+    });
+
     it("should log and rethrow network errors", async () => {
         const error = new Error("Network error");
         fetchMock.post("https://auth.org/token", { throws: error });
