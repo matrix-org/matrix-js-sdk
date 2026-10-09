@@ -1185,7 +1185,7 @@ describe("MatrixClient", function () {
             );
         });
 
-        it("keeps the sticky duration as a query parameter", async () => {
+        it("sends the sticky duration in the request body", async () => {
             unstableFeatures["org.matrix.msc4354"] = true;
             const txnId = client.makeTxnId();
             httpLookups = [
@@ -1193,9 +1193,9 @@ describe("MatrixClient", function () {
                     method: "PUT",
                     prefix: unstableMSC4140Prefix,
                     path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
-                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": 5000 },
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": undefined },
                     data: { delay_id: "id1" },
-                    expectBody: { delay_ms: 2000, content },
+                    expectBody: { "delay_ms": 2000, "org.matrix.msc4354.sticky_duration_ms": 5000, content },
                 },
             ];
 

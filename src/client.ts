@@ -588,6 +588,8 @@ export const STABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mut
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
+// A query parameter of the regular send endpoints, but a body field of the MSC4140 delayed event endpoint
+const UNSTABLE_MSC4354_STICKY_DURATION = "org.matrix.msc4354.sticky_duration_ms";
 
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
@@ -3149,7 +3151,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * unrecognised, this falls back to `legacyPath` and remembers to do so for the lifetime of this client.
      *
      * @param legacyPath - the regular send endpoint for this event, used for the fallback.
-     * @param queryDict - query parameters to send on either endpoint.
+     * @param queryDict - query parameters to send on either endpoint. On the dedicated endpoint, the MSC4354
+     *     sticky duration is moved to the request body instead.
      */
     private async scheduleDelayedEvent(
         event: { roomId: string; eventType: string; txnId: string; stateKey?: string; content: IContent },
@@ -3165,13 +3168,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $eventType: event.eventType,
                 $txnId: event.txnId,
             });
+            const { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration, ...otherQuery } = queryDict ?? {};
             const body = {
                 delay_ms: delayOpts.delay,
                 ...(event.stateKey !== undefined && { state_key: event.stateKey }),
+                ...(stickyDuration !== undefined && { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration }),
                 content: event.content,
             };
             try {
-                return await this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, queryDict, body, {
+                return await this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, otherQuery, body, {
                     ...requestOpts,
                     prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
                 });
@@ -3639,7 +3644,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
             delayOpts,
             txnId,
         });
@@ -3714,7 +3719,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
             txnId,
         });
     }
