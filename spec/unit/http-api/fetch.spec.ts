@@ -71,6 +71,23 @@ describe("FetchHttpApi", () => {
                 : fetchMock.fetchHandler(resource, init);
     }
 
+    /**
+     * Makes a `fetchFn` whose response to a request never resolves, but rejects with an `AbortError` if the
+     * request's signal is aborted, in the same way as a real `fetch` would. Requests to any other origin get
+     * `homeserverResponse`.
+     */
+    function makeHangingAuthServerFetchFn(homeserverResponse: unknown): MockedFunction<Window["fetch"]> {
+        const homeserverOrigin = new URL(baseUrl).origin;
+        return vi.fn((resource: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+            if (new URL(requestUrl(resource)).origin === homeserverOrigin) {
+                return Promise.resolve(homeserverResponse as Response);
+            }
+            return new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+            });
+        });
+    }
+
     beforeEach(() => {
         vi.useRealTimers();
     });
@@ -589,11 +606,31 @@ describe("FetchHttpApi", () => {
 
                         expect(fetchFn).toHaveBeenCalledWith(
                             authMetadata.token_endpoint,
-                            expect.objectContaining({ method: "POST" }),
+                            expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }),
                         );
                         expect(fetchMock).not.toHaveFetched(authMetadata.token_endpoint);
                         expect(api.opts.accessToken).toBe("new-access-token");
                         expect(api.opts.refreshToken).toBe("new-refresh");
+                    });
+
+                    it("should abort an in-flight token refresh request when abort() is called", async () => {
+                        const fetchFn = makeHangingAuthServerFetchFn(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(fetchFn);
+
+                        const prom = api.authedRequest(Method.Get, "/path");
+                        // wait for the homeserver request to fail and the token request to be made
+                        await vi.waitFor(() =>
+                            expect(fetchFn).toHaveBeenCalledWith(authMetadata.token_endpoint, expect.anything()),
+                        );
+                        const tokenRequestSignal = fetchFn.mock.calls.at(-1)![1]!.signal!;
+                        expect(tokenRequestSignal.aborted).toBe(false);
+
+                        api.abort();
+
+                        await expect(prom).rejects.toThrow(TokenRefreshError);
+                        expect(tokenRequestSignal.aborted).toBe(true);
+                        // an aborted refresh is not evidence that the session is invalid
+                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, expect.anything());
                     });
                 });
             });
