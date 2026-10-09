@@ -26,7 +26,13 @@ import {
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
-import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
+import {
+    MembershipManagerEvent,
+    Status,
+    type Transport,
+    type LivekitFocusSelection,
+    type SlotDescription,
+} from "../../../src/matrixrtc";
 import {
     makeMockClient,
     makeMockRoom,
@@ -139,7 +145,10 @@ describe("MembershipManager", () => {
 
     describe("join()", () => {
         describe("sends a membership event", () => {
-            it("sends a membership event and schedules delayed leave when joining a call", async () => {
+            async function testSendMembershipEvent(
+                slotDescription: SlotDescription,
+                expectedCallId: string,
+            ): Promise<void> {
                 // Spys/Mocks
 
                 const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
@@ -147,7 +156,7 @@ describe("MembershipManager", () => {
                 );
 
                 // Test
-                const memberManager = new MembershipManager(undefined, room, client, callSession);
+                const memberManager = new MembershipManager(undefined, room, client, slotDescription);
                 memberManager.join([focus], undefined);
                 // expects
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
@@ -156,8 +165,7 @@ describe("MembershipManager", () => {
                     "org.matrix.msc3401.call.member",
                     {
                         application: "m.call",
-                        // This tests INFO_SLOT_ID_LEGACY_CASE because it is using callSession = { id: "ROOM", application: "m.call" }
-                        call_id: "",
+                        call_id: expectedCallId,
                         device_id: "AAAAAAA",
                         expires: 14400000,
                         foci_preferred: [focus],
@@ -165,8 +173,7 @@ describe("MembershipManager", () => {
                         focus_active: focusActive,
                         scope: "m.room",
                     },
-                    // This tests INFO_SLOT_ID_LEGACY_CASE because it is using callSession = { id: "ROOM", application: "m.call" }
-                    "_@alice:example.org_AAAAAAA_m.call",
+                    `_@alice:example.org_AAAAAAA_m.call${expectedCallId}`,
                 );
                 restartScheduledDelayedEventHandle.resolve?.();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
@@ -174,48 +181,21 @@ describe("MembershipManager", () => {
                     8000,
                     "org.matrix.msc3401.call.member",
                     {},
-                    "_@alice:example.org_AAAAAAA_m.call",
+                    `_@alice:example.org_AAAAAAA_m.call${expectedCallId}`,
                 );
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            }
+
+            // eslint-disable-next-line @vitest/expect-expect
+            it("sends a membership event and schedules delayed leave when joining a call", async () => {
+                // This tests INFO_SLOT_ID_LEGACY_CASE because it is using callSession = { id: "ROOM", application: "m.call" }
+                await testSendMembershipEvent(callSession, "");
             });
 
+            // eslint-disable-next-line @vitest/expect-expect
             it("sends correct call_id and state key when using non empty string. Not using empty string -> ROOM hack. See: INFO_SLOT_ID_LEGACY_CASE", async () => {
-                // Spys/Mocks
-
                 const customCallSession = { id: "custom", application: "m.call" };
-                const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
-                    client._unstable_restartScheduledDelayedEvent,
-                );
-
-                // Test
-                const memberManager = new MembershipManager(undefined, room, client, customCallSession);
-                memberManager.join([focus], undefined);
-                // expects
-                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
-                expect(client.sendStateEvent).toHaveBeenCalledWith(
-                    room.roomId,
-                    "org.matrix.msc3401.call.member",
-                    {
-                        application: "m.call",
-                        call_id: "custom",
-                        device_id: "AAAAAAA",
-                        expires: 14400000,
-                        foci_preferred: [focus],
-                        membershipID: "@alice:example.org:AAAAAAA",
-                        focus_active: focusActive,
-                        scope: "m.room",
-                    },
-                    "_@alice:example.org_AAAAAAA_m.callcustom",
-                );
-                restartScheduledDelayedEventHandle.resolve?.();
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
-                    room.roomId,
-                    8000,
-                    "org.matrix.msc3401.call.member",
-                    {},
-                    "_@alice:example.org_AAAAAAA_m.callcustom",
-                );
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                await testSendMembershipEvent(customCallSession, customCallSession.id);
             });
 
             it("does not send capabilities if none are configured", async () => {

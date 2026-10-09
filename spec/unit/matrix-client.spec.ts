@@ -980,17 +980,20 @@ describe("MatrixClient", function () {
             );
         });
 
-        // eslint-disable-next-line @vitest/expect-expect
-        it("should add thread relation if threadId is passed and the relation is missing", async () => {
-            const threadId = "$threadId:server";
+        async function testThreadRelation(
+            content: RoomMessageEventContent,
+            inReplyTo: string,
+            threadId: string,
+            isFallingBack: boolean,
+        ): Promise<void> {
             const expectBody = {
                 ...content,
                 "m.relates_to": {
                     "m.in_reply_to": {
-                        event_id: threadId,
+                        event_id: inReplyTo,
                     },
                     "event_id": threadId,
-                    "is_falling_back": true,
+                    "is_falling_back": isFallingBack,
                     "rel_type": "m.thread",
                 },
             };
@@ -1020,58 +1023,29 @@ describe("MatrixClient", function () {
                 { ...content },
                 timeoutDelayTxnId,
             );
+        }
+
+        // eslint-disable-next-line @vitest/expect-expect
+        it("should add thread relation if threadId is passed and the relation is missing", async () => {
+            const threadId = "$threadId:server";
+            await testThreadRelation(content, threadId, threadId, true);
         });
 
         // eslint-disable-next-line @vitest/expect-expect
         it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
-            httpLookups = [];
-            const threadId = "$threadId:server";
-
-            const content = {
-                body,
-                "msgtype": MsgType.Text,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
-                    },
-                },
-            } satisfies RoomMessageEventContent;
-            const expectBody = {
-                ...content,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
-                    },
-                    "event_id": threadId,
-                    "is_falling_back": false,
-                    "rel_type": "m.thread",
-                },
-            };
-
-            const room = new Room(roomId, client, userId);
-            vi.mocked(store.getRoom).mockReturnValue(room);
-
-            const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [rootEvent], false);
-
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups = [
+            await testThreadRelation(
                 {
-                    method: "PUT",
-                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                    data: delayData,
-                    expectQueryParams: realDelayOpts,
-                    expectBody,
+                    body,
+                    "msgtype": MsgType.Text,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: "$other:event",
+                        },
+                    },
                 },
-            ];
-
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                delayMs,
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
+                "$other:event",
+                "@threadId:server",
+                false,
             );
         });
 
