@@ -162,7 +162,7 @@ type MembershipManagerClient = Pick<
     MatrixClient,
     | "getUserId"
     | "getDeviceId"
-    | "getCapabilities"
+    | "fetchCapabilities"
     | "getCachedCapabilities"
     | "sendStateEvent"
     | "_unstable_sendDelayedStateEvent"
@@ -924,7 +924,7 @@ export class MembershipManager
             let capabilities: Capabilities | undefined;
             if (!this.capabilitiesUnreachable) {
                 try {
-                    capabilities = await this.client.getCapabilities();
+                    capabilities = await this.client.fetchCapabilities();
                 } catch (e) {
                     // This is expected in widget mode where the client cannot talk to the homeserver.
                     this.logger.info("Could not get the server capabilities to read the maximum delay:", e);

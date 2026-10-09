@@ -237,7 +237,7 @@ describe("MembershipManager", () => {
                     );
 
                     // preparing the delayed disconnect should handle the delay being too long
-                    vi.mocked(client.getCapabilities).mockResolvedValue({
+                    vi.mocked(client.fetchCapabilities).mockResolvedValue({
                         "org.matrix.msc4140.delayed_events": { max_delay_ms: 7500, max_scheduled: 100 },
                     });
                     const sendDelayedStateExceedAttempt = new Promise<void>((resolve) => {
@@ -374,7 +374,7 @@ describe("MembershipManager", () => {
 
                 it("still tries if the capability is absent (Synapse before 1.157.0)", async () => {
                     vi.mocked(client.getCachedCapabilities).mockReturnValue({});
-                    vi.mocked(client.getCapabilities).mockResolvedValue({});
+                    vi.mocked(client.fetchCapabilities).mockResolvedValue({});
                     vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
                         new MatrixError({
                             "errcode": "M_UNKNOWN",
@@ -409,7 +409,7 @@ describe("MembershipManager", () => {
                 it.each(["M_DELAY_TOO_LARGE", "ORG.MATRIX.MSC4140_DELAY_TOO_LARGE"])(
                     "retries with the maximum delay from the capabilities on %s",
                     async (errcode) => {
-                        vi.mocked(client.getCapabilities).mockResolvedValue({
+                        vi.mocked(client.fetchCapabilities).mockResolvedValue({
                             "m.delayed_events": { max_delay_ms: 7500 },
                         });
                         vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
@@ -428,6 +428,28 @@ describe("MembershipManager", () => {
                     },
                 );
 
+                it("refetches the capabilities if the cached maximum delay is out of date", async () => {
+                    vi.mocked(client.getCachedCapabilities).mockReturnValue({
+                        "m.delayed_events": { max_delay_ms: 20_000, max_scheduled: 100 },
+                    });
+                    vi.mocked(client.fetchCapabilities).mockResolvedValue({
+                        "m.delayed_events": { max_delay_ms: 7500, max_scheduled: 100 },
+                    });
+                    vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
+                        new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400),
+                    );
+                    const manager = new MembershipManager(
+                        { delayedLeaveEventDelayMs: 9000 },
+                        room,
+                        client,
+                        callSession,
+                    );
+                    manager.join([focus]);
+                    await vi.advanceTimersByTimeAsync(0);
+                    expect(delays()).toEqual([9000, 7500]);
+                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(1);
+                });
+
                 it("still handles the legacy M_MAX_DELAY_EXCEEDED error", async () => {
                     vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
                         new MatrixError({
@@ -445,7 +467,7 @@ describe("MembershipManager", () => {
                     manager.join([focus]);
                     await vi.advanceTimersByTimeAsync(0);
                     expect(delays()).toEqual([9000, 7500]);
-                    expect(client.getCapabilities).not.toHaveBeenCalled();
+                    expect(client.fetchCapabilities).not.toHaveBeenCalled();
                 });
 
                 it("halves the delay if the capabilities are not reachable (widget mode)", async () => {
@@ -463,7 +485,7 @@ describe("MembershipManager", () => {
                     await vi.advanceTimersByTimeAsync(0);
                     expect(delays()).toEqual([60_000, 30_000, 15_000]);
                     // We only try to reach the capabilities once.
-                    expect(client.getCapabilities).toHaveBeenCalledTimes(1);
+                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(1);
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
 
