@@ -359,8 +359,10 @@ describe("MembershipManager", () => {
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
 
-                it("does not change the delay if the capability has no maximum delay", async () => {
-                    vi.mocked(client.getCachedCapabilities).mockReturnValue({ "m.delayed_events": {} });
+                it("does not change the delay if it is below the maximum delay", async () => {
+                    vi.mocked(client.getCachedCapabilities).mockReturnValue({
+                        "m.delayed_events": { max_delay_ms: 20_000, max_scheduled: 100 },
+                    });
                     const manager = new MembershipManager(
                         { delayedLeaveEventDelayMs: 9000 },
                         room,
@@ -395,7 +397,10 @@ describe("MembershipManager", () => {
                 });
 
                 it.each([
-                    ["max_delay_ms is 0", { "org.matrix.msc4140.delayed_events": { max_delay_ms: 0 } }],
+                    [
+                        "max_delay_ms is 0",
+                        { "org.matrix.msc4140.delayed_events": { max_delay_ms: 0, max_scheduled: 100 } },
+                    ],
                     ["max_scheduled is 0", { "m.delayed_events": { max_delay_ms: 7500, max_scheduled: 0 } }],
                 ])("joins without a delayed leave event if %s", async (_, capabilities) => {
                     vi.mocked(client.getCachedCapabilities).mockReturnValue(capabilities);
@@ -410,7 +415,7 @@ describe("MembershipManager", () => {
                     "retries with the maximum delay from the capabilities on %s",
                     async (errcode) => {
                         vi.mocked(client.fetchCapabilities).mockResolvedValue({
-                            "m.delayed_events": { max_delay_ms: 7500 },
+                            "m.delayed_events": { max_delay_ms: 7500, max_scheduled: 100 },
                         });
                         vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
                             new MatrixError({ errcode }, 400),

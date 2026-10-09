@@ -38,14 +38,13 @@ export interface IProfileFieldsCapability extends ICapability {}
  * The limits a homeserver enforces on delayed events, as defined by
  * [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md).
  *
- * A field that is absent means the server does not enforce that limit.
  * A value of `0` in either field means that delayed events are disabled.
  */
 export interface IDelayedEventsCapability {
     /** The maximum delay the server allows for a delayed event, in milliseconds. */
-    max_delay_ms?: number;
+    max_delay_ms: number;
     /** The maximum number of delayed events a user may have scheduled at once. */
-    max_scheduled?: number;
+    max_scheduled: number;
 }
 
 export enum RoomVersionStability {

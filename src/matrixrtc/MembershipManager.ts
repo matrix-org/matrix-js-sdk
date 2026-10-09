@@ -892,7 +892,7 @@ export class MembershipManager
         if (capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
 
         const maxDelayAllowed = capability.max_delay_ms;
-        if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
+        if (this.delayedLeaveEventDelayMs > maxDelayAllowed) {
             this.logger.info(`Clamping the delayed leave event delay to the server maximum of ${maxDelayAllowed}ms`);
             this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
         }
