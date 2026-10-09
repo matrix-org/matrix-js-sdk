@@ -661,8 +661,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             return undefined;
         }
         const relatesTo = this.getWireContent()?.["m.relates_to"];
-        if (relatesTo?.rel_type === THREAD_RELATION_TYPE.name) {
-            return relatesTo.event_id;
+        if (this.isThreadRelation) {
+            return relatesTo?.event_id;
         }
         if (this.thread) {
             return this.thread.id;
@@ -686,12 +686,20 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             return false;
         }
 
-        const threadDetails = this.getServerAggregatedRelation<IThreadBundledRelationship>(THREAD_RELATION_TYPE.name);
+        const threadDetails = THREAD_RELATION_TYPE.findIn<IThreadBundledRelationship>(
+            this.getUnsigned()["m.relations"] ?? {},
+        );
 
         // Bundled relationships only returned when the sync response is limited
         // hence us having to check both bundled relation and inspect the thread
         // model
         return !!threadDetails || this.threadRootId === this.getId();
+    }
+
+    /** Whether this is a thread reply, independent of the server's preferred namespace. */
+    public get isThreadRelation(): boolean {
+        const relation = this.getRelation();
+        return !this.isState() && !!relation && THREAD_RELATION_TYPE.matches(relation.rel_type ?? "");
     }
 
     public get replyEventId(): string | undefined {
