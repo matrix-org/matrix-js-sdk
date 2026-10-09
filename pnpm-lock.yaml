@@ -117,7 +117,7 @@ importers:
         specifier: ^8.0.0
         version: 8.0.5
       '@matrix-org/matrix-sdk-crypto-wasm':
-        specifier: ^18.9.0
+        specifier: 18.9.0
         version: 18.9.0
       another-json:
         specifier: ^0.2.0
