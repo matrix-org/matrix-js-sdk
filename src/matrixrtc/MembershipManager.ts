@@ -521,6 +521,7 @@ export class MembershipManager
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
+                this.capabilitiesUnreachable = false;
                 this.setAndEmitDelayId(response.delay_id);
                 if (this.state.hasMemberStateEvent) {
                     // This action was scheduled because the previous delayed event was cancelled
@@ -930,7 +931,15 @@ export class MembershipManager
                     // TODO: Get the delayed events capability through the widget API instead, and remove the halving
                     // fallback below.
                     this.logger.info("Could not get the server capabilities to read the maximum delay:", e);
-                    this.capabilitiesUnreachable = true;
+                    if (
+                        e instanceof HTTPError &&
+                        e.httpStatus !== undefined &&
+                        e.httpStatus >= 400 &&
+                        e.httpStatus < 500 &&
+                        e.httpStatus !== 429
+                    ) {
+                        this.capabilitiesUnreachable = true;
+                    }
                 }
             }
             if (!this.applyDelayedEventsCapability(capabilities)) return false;
