@@ -883,7 +883,7 @@ describe("MatrixClient", function () {
         const roomId = "!room:example.org";
         const body = "This is the body";
         const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
-        const timeoutDelayOpts = { delay_ms: 2000 };
+        const timeoutDelayOpts = { delay: 2000 };
         const realTimeoutDelayOpts = { "org.matrix.msc4140.delay": 2000 };
 
         beforeEach(() => {

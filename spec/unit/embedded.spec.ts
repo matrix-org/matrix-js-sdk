@@ -438,7 +438,7 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
                 await client._unstable_sendDelayedEvent(
                     "!1:example.org",
-                    { delay_ms: 2000 },
+                    { delay: 2000 },
                     null,
                     "org.matrix.rageshake_request",
                     { request_id: 123 },
@@ -482,7 +482,7 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
                 await client._unstable_sendDelayedStateEvent(
                     "!1:example.org",
-                    { delay_ms: 2000 },
+                    { delay: 2000 },
                     "org.example.foo",
                     { hello: "world" },
                     "bar",
@@ -530,7 +530,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedEvent(
                         "!1:example.org",
-                        { delay_ms: 2000 },
+                        { delay: 2000 },
                         null,
                         "org.matrix.rageshake_request",
                         { request_id: 123 },
@@ -550,7 +550,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
-                        { delay_ms: 2000 },
+                        { delay: 2000 },
                         "org.example.foo",
                         { hello: "world" },
                         "bar",
@@ -620,7 +620,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedEvent(
                         "!1:example.org",
-                        { delay_ms: 2000 },
+                        { delay: 2000 },
                         null,
                         "org.matrix.rageshake_request",
                         { request_id: 123 },
@@ -633,7 +633,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
-                        { delay_ms: 2000 },
+                        { delay: 2000 },
                         "org.example.foo",
                         { hello: "world" },
                         "bar",
