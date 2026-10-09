@@ -883,7 +883,7 @@ describe("MatrixClient", function () {
         const roomId = "!room:example.org";
         const body = "This is the body";
         const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
-        const delayOpts = { delay: 2000 };
+        const delayMs = 2000;
         const realDelayOpts = { "org.matrix.msc4140.delay": 2000 };
         const delayData = { delay_id: "did" };
 
@@ -898,7 +898,7 @@ describe("MatrixClient", function () {
             await expect(
                 client._unstable_sendDelayedEvent(
                     roomId,
-                    delayOpts,
+                    delayMs,
                     null,
                     EventType.RoomMessage,
                     { ...content },
@@ -907,7 +907,7 @@ describe("MatrixClient", function () {
             ).rejects.toThrow(errorMessage);
 
             await expect(
-                client._unstable_sendDelayedStateEvent(roomId, delayOpts, EventType.RoomTopic, {
+                client._unstable_sendDelayedStateEvent(roomId, delayMs, EventType.RoomTopic, {
                     topic: "topic",
                 }),
             ).rejects.toThrow(errorMessage);
@@ -939,7 +939,7 @@ describe("MatrixClient", function () {
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                delayOpts,
+                delayMs,
                 null,
                 EventType.RoomMessage,
                 { ...content },
@@ -972,7 +972,7 @@ describe("MatrixClient", function () {
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                delayOpts,
+                delayMs,
                 threadId,
                 EventType.RoomMessage,
                 { ...content },
@@ -1014,7 +1014,7 @@ describe("MatrixClient", function () {
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                delayOpts,
+                delayMs,
                 threadId,
                 EventType.RoomMessage,
                 { ...content },
@@ -1067,7 +1067,7 @@ describe("MatrixClient", function () {
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                delayOpts,
+                delayMs,
                 threadId,
                 EventType.RoomMessage,
                 { ...content },
@@ -1090,7 +1090,7 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await client._unstable_sendDelayedStateEvent(roomId, delayOpts, EventType.RoomTopic, { ...content });
+            await client._unstable_sendDelayedStateEvent(roomId, delayMs, EventType.RoomTopic, { ...content });
         });
 
         describe("lookups", () => {

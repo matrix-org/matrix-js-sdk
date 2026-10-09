@@ -93,14 +93,22 @@ export interface ISendEventResponse {
     event_id: string;
 }
 
-export type SendDelayedEventRequestOpts = {
-    delay: number;
-};
+/** @deprecated Scheduling a delayed event with a `parent_delay_id` is no longer supported */
+export type SendDelayedEventRequestOpts = { parent_delay_id: string } | { delay: number; parent_delay_id?: string };
 
+/** @deprecated Scheduling a delayed event with a `parent_delay_id` is no longer supported */
 export function isSendDelayedEventRequestOpts(opts: object): opts is SendDelayedEventRequestOpts {
-    return "delay" in opts && typeof opts.delay === "number";
+    if ("parent_delay_id" in opts && typeof opts.parent_delay_id !== "string") {
+        // Invalid type, reject
+        return false;
+    }
+    if ("delay" in opts && typeof opts.delay !== "number") {
+        // Invalid type, reject.
+        return false;
+    }
+    // At least one of these fields must be specified.
+    return "delay" in opts || "parent_delay_id" in opts;
 }
-
 export type SendDelayedEventResponse = {
     delay_id: string;
 };

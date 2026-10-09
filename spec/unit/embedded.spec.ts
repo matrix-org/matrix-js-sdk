@@ -423,13 +423,9 @@ describe("RoomWidgetClient", () => {
             it("sends delayed message events", async () => {
                 await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                await client._unstable_sendDelayedEvent(
-                    "!1:example.org",
-                    { delay: 2000 },
-                    null,
-                    "org.matrix.rageshake_request",
-                    { request_id: 123 },
-                );
+                await client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                    request_id: 123,
+                });
                 expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
                     "org.matrix.rageshake_request",
                     { request_id: 123 },
@@ -447,7 +443,7 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
                 await client._unstable_sendDelayedStateEvent(
                     "!1:example.org",
-                    { delay: 2000 },
+                    2000,
                     "org.example.foo",
                     { hello: "world" },
                     "bar",
@@ -468,13 +464,9 @@ describe("RoomWidgetClient", () => {
                     event_id: `$${Math.random()}`,
                 });
                 await expect(
-                    client._unstable_sendDelayedEvent(
-                        "!1:example.org",
-                        { delay: 2000 },
-                        null,
-                        "org.matrix.rageshake_request",
-                        { request_id: 123 },
-                    ),
+                    client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                        request_id: 123,
+                    }),
                 ).rejects.toThrow();
             });
 
@@ -490,7 +482,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
-                        { delay: 2000 },
+                        2000,
                         "org.example.foo",
                         { hello: "world" },
                         "bar",
@@ -558,13 +550,9 @@ describe("RoomWidgetClient", () => {
             it("fails to send delayed message events", async () => {
                 await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
                 await expect(
-                    client._unstable_sendDelayedEvent(
-                        "!1:example.org",
-                        { delay: 2000 },
-                        null,
-                        "org.matrix.rageshake_request",
-                        { request_id: 123 },
-                    ),
+                    client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                        request_id: 123,
+                    }),
                 ).rejects.toThrow("Server does not support");
             });
 
@@ -573,7 +561,7 @@ describe("RoomWidgetClient", () => {
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
-                        { delay: 2000 },
+                        2000,
                         "org.example.foo",
                         { hello: "world" },
                         "bar",
