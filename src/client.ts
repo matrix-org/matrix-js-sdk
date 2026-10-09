@@ -588,6 +588,8 @@ export const STABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mut
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
+// A query parameter of the regular send endpoints, but a body field of the MSC4140 delayed event endpoint
+const UNSTABLE_MSC4354_STICKY_DURATION = "org.matrix.msc4354.sticky_duration_ms";
 
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
@@ -1291,6 +1293,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncedLeftRooms = false;
     protected clientOpts?: IStoredClientOpts;
     protected canResetTimelineCallback?: ResetTimelineCallback;
+
+    // Set once the server has answered M_UNRECOGNIZED to the MSC4140 delayed event endpoint
+    private delayedEventEndpointUnrecognised = false;
 
     public canSupport = new Map<Feature, ServerSupport>();
 
@@ -2954,7 +2959,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let queryOpts = queryDict;
         if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            return this.sendEventHttpRequest(event, delayOptsOrQuery, queryOpts);
+            return this.sendDelayedEventHttpRequest(event, delayOptsOrQuery, queryOpts);
         } else if (!queryOpts) {
             queryOpts = delayOptsOrQuery;
         }
@@ -3108,17 +3113,95 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse>;
-    private sendEventHttpRequest(
+    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse> {
+        const path = this.getSendEventPath(event);
+        return this.http
+            .authedRequest<ISendEventResponse>(Method.Put, path, queryDict, event.getWireContent())
+            .then((res) => {
+                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+                return res;
+            });
+    }
+
+    private sendDelayedEventHttpRequest(
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
-    ): Promise<SendDelayedEventResponse>;
-    private sendEventHttpRequest(
-        event: MatrixEvent,
-        queryOrDelayOpts?: SendDelayedEventRequestOpts | QueryDict,
+    ): Promise<SendDelayedEventResponse> {
+        const legacyPath = this.getSendEventPath(event);
+        return this.scheduleDelayedEvent(
+            {
+                roomId: event.getRoomId()!,
+                eventType: event.getWireType(),
+                txnId: event.getTxnId()!,
+                stateKey: event.isState() ? event.getStateKey() : undefined,
+                content: event.getWireContent(),
+            },
+            delayOpts,
+            legacyPath,
+            queryDict,
+        );
+    }
+
+    /**
+     * Schedules a delayed event through the dedicated MSC4140 endpoint.
+     *
+     * Servers implementing an older version of MSC4140 only accept the delay as a query parameter of the
+     * regular send endpoints, and nothing in `/versions` tells the two apart. When the dedicated endpoint is
+     * unrecognised, this falls back to `legacyPath` and remembers to do so for the lifetime of this client.
+     *
+     * @param legacyPath - the regular send endpoint for this event, used for the fallback.
+     * @param queryDict - query parameters to send on either endpoint. On the dedicated endpoint, the MSC4354
+     *     sticky duration is moved to the request body instead.
+     */
+    private async scheduleDelayedEvent(
+        event: { roomId: string; eventType: string; txnId: string; stateKey?: string; content: IContent },
+        delayOpts: SendDelayedEventRequestOpts,
+        legacyPath: string,
         queryDict?: QueryDict,
-    ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        requestOpts: IRequestOpts = {},
+    ): Promise<SendDelayedEventResponse> {
+        // The dedicated endpoint has no equivalent of a delay made only of a parent delay ID.
+        if (!this.delayedEventEndpointUnrecognised && "delay" in delayOpts) {
+            const path = utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
+                $roomId: event.roomId,
+                $eventType: event.eventType,
+                $txnId: event.txnId,
+            });
+            const { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration, ...otherQuery } = queryDict ?? {};
+            const body = {
+                delay_ms: delayOpts.delay,
+                ...(event.stateKey !== undefined && { state_key: event.stateKey }),
+                ...(stickyDuration !== undefined && { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration }),
+                content: event.content,
+            };
+            try {
+                return await this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, otherQuery, body, {
+                    ...requestOpts,
+                    prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+                });
+            } catch (e) {
+                if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
+                    throw e;
+                }
+                this.logger.debug("Server does not recognise the delayed event endpoint, using query parameters");
+                this.delayedEventEndpointUnrecognised = true;
+            }
+        }
+
+        return await this.http.authedRequest<SendDelayedEventResponse>(
+            Method.Put,
+            legacyPath,
+            { ...getUnstableDelayQueryOpts(delayOpts), ...queryDict },
+            event.content,
+            requestOpts,
+        );
+    }
+
+    /**
+     * Returns the path to PUT the given event to, assigning the event a transaction ID if it has none.
+     */
+    private getSendEventPath(event: MatrixEvent): string {
         let txnId = event.getTxnId();
         if (!txnId) {
             txnId = this.makeTxnId();
@@ -3128,44 +3211,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const pathParams = {
             $roomId: event.getRoomId()!,
             $eventType: event.getWireType(),
-            $stateKey: event.getStateKey()!,
             $txnId: txnId,
         };
-
-        let path: string;
 
         if (event.isState()) {
             let pathTemplate = "/rooms/$roomId/state/$eventType";
             if (event.getStateKey() && event.getStateKey()!.length > 0) {
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
-            path = utils.encodeUri(pathTemplate, pathParams);
+            return utils.encodeUri(pathTemplate, {
+                $stateKey: event.getStateKey()!,
+                ...pathParams,
+            });
         } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
-            path = utils.encodeUri(pathTemplate, {
+            return utils.encodeUri(pathTemplate, {
                 $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
-            path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
-        }
-
-        const delayOpts =
-            queryOrDelayOpts && isSendDelayedEventRequestOpts(queryOrDelayOpts) ? queryOrDelayOpts : undefined;
-        const queryOpts = !delayOpts ? queryOrDelayOpts : queryDict;
-        const content = event.getWireContent();
-        if (delayOpts) {
-            return this.http.authedRequest<SendDelayedEventResponse>(
-                Method.Put,
-                path,
-                { ...getUnstableDelayQueryOpts(delayOpts), ...queryOpts },
-                content,
-            );
-        } else {
-            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content).then((res) => {
-                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
-                return res;
-            });
+            return utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
     }
 
@@ -3579,7 +3644,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
             delayOpts,
             txnId,
         });
@@ -3617,7 +3682,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, getUnstableDelayQueryOpts(delayOpts), content as Body, opts);
+        return this.scheduleDelayedEvent(
+            { roomId, eventType, txnId: this.makeTxnId(), stateKey, content },
+            delayOpts,
+            path,
+            undefined,
+            opts,
+        );
     }
 
     /**
@@ -3648,7 +3719,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
             txnId,
         });
     }
