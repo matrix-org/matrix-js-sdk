@@ -70,25 +70,64 @@ export interface EncryptionKeysEventContent {
 }
 
 /**
- * THe content of a to-device event that contains encryption keys.
+ * The content of an `m.rtc.encryption_key` to-device event (sent with the unstable type
+ * {@link EventType.CallEncryptionKeysPrefix}).
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export interface EncryptionKeysToDeviceEventContent {
-    keys: { index: number; key: string };
+    /** The ID of the room that the slot is located in. */
+    room_id: string;
+    /**
+     * The `member.id` value of the sender's `m.rtc.member` event.
+     *
+     * Optional for backwards compatibility.
+     */
+    member_id?: string;
+    /**
+     * The key material.
+     *
+     * Optional for backwards compatibility.
+     */
+    media_key?: RTCEncryptionKeyMediaKey;
+    /**
+     * The key material in its deprecated format.
+     *
+     * @deprecated Use `media_key` instead unless you need backwards compatibility with older SDK versions.
+     */
+    keys?: RTCEncryptionKeyMediaKey;
     member: {
-        id: string;
-        // TODO Remove that it is claimed, need to get the sealed sender from decryption info
-        // Or add some validation on it based on the encryption info
+        /**
+         * The `member.id` value of the sender's `m.rtc.member` event.
+         *
+         * @deprecated Use `member_id` instead unless you need backwards compatibility with older SDK versions.
+         */
+        id?: string;
+        /**
+         * The device ID the sender claims to have sent their membership event from.
+         *
+         * Still required for now because the widget API does not expose encryption metadata and state events
+         * are never encrypted to begin with. Therefore, it would be impossible to determine the sending
+         * device otherwise.
+         */
         claimed_device_id: string;
     };
-    room_id: string;
-    session: {
-        application: string;
-        call_id: string;
-        scope: string;
-    };
-    // Why is this needed?
-    sent_ts?: number;
 }
+
+/**
+ * The key material shared in an `m.rtc.encryption_key` to-device event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export interface RTCEncryptionKeyMediaKey {
+    /**
+     * The rolling index of the key to distinguish it from other keys. The value is between 0 and 255 inclusive.
+     */
+    index: number;
+    /** The key in raw bytes encoded using unpadded base64. */
+    key: string;
+}
+
 /**
  * @deprecated Use `RTCNotificationType` instead.
  */
@@ -518,6 +557,8 @@ export type Statistics = {
         /**
          * The total age (in milliseconds) of all room events containing encryption keys that we have received.
          * We track the total age so that we can later calculate the average age of all keys received.
+         *
+         * @deprecated To-device key events no longer carry a timestamp, so this is not updated anymore and stays 0.
          */
         roomEventEncryptionKeysReceivedTotalAge: number;
     };
