@@ -6,7 +6,7 @@ overrides:
 
 allowBuilds:
     unrs-resolver: false
-    "@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/7c4ef4ed82d9a79d837c2655b034655f4771d226": true
+    "@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/c9a58fd1842d4d89afa601d2b1f61659c9cc150f": true
 
 minimumReleaseAgeExclude:
     - "@matrix-org/*"

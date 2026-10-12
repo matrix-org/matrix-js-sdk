@@ -74,16 +74,14 @@ interface ProtocolsPayload extends MSC4108v2025Payload {
 
 interface ProtocolPayload extends MSC4108v2025Payload {
     type: PayloadType.Protocol;
-    protocol: Exclude<string, "device_authorization_grant">;
+    protocol: string;
     device_id: string;
 }
 
 interface DeviceAuthorizationGrantProtocolPayload extends ProtocolPayload {
     protocol: "device_authorization_grant";
-    device_authorization_grant: {
-        verification_uri: string;
-        verification_uri_complete?: string;
-    };
+    verification_uri: string;
+    verification_uri_complete?: string;
 }
 
 function isDeviceAuthorizationGrantProtocolPayload(
@@ -327,10 +325,8 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
                 type: PayloadType.Protocol,
                 protocol: "device_authorization_grant",
                 device_id: deviceId,
-                device_authorization_grant: {
-                    verification_uri: dagResponse.verification_uri,
-                    verification_uri_complete: dagResponse.verification_uri_complete,
-                },
+                verification_uri: dagResponse.verification_uri,
+                verification_uri_complete: dagResponse.verification_uri_complete,
             };
 
             await this.send(protocol);
@@ -367,8 +363,11 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
             }
 
             if (isDeviceAuthorizationGrantProtocolPayload(payload)) {
-                const { device_authorization_grant: dag, device_id: expectingNewDeviceId } = payload;
-                const { verification_uri: verificationUri, verification_uri_complete: verificationUriComplete } = dag;
+                const {
+                    device_id: expectingNewDeviceId,
+                    verification_uri: verificationUri,
+                    verification_uri_complete: verificationUriComplete,
+                } = payload;
 
                 // MSC4108 step 4: assert that no device with this ID exists yet by expecting a 404
                 let deviceAlreadyExists = true;
@@ -475,7 +474,9 @@ export class MSC4108v2025SignInWithQR implements SignInWithQR {
      * The fifth (and final) step in the OIDC QR login process.
      * To be called after the new device has completed authentication.
      */
-    public async shareSecrets(): Promise<{ secrets?: Omit<SecretsPayload, "type"> }> {
+    public async shareSecrets(): Promise<{
+        secrets?: Omit<SecretsPayload, "type">;
+    }> {
         if (this.isNewDevice) {
             await this.send<SuccessPayload>({
                 type: PayloadType.Success,

@@ -33,6 +33,13 @@ import { type MSC4388RendezvousSession } from "../transports/MSC4388RendezvousSe
 import { logger } from "../../logger.ts";
 import { type MSC4108v2025Payload } from "../MSC4108v2025SignInWithQR.ts";
 
+// TODO: temp function for formatting additional authentication data for debugging purposes
+function formatAAD(aad: Uint8Array): string {
+    return Array.from(aad)
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+}
+
 /**
  * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4388)
  * secure rendezvous session protocol.
@@ -105,11 +112,10 @@ export class MSC4388SecureChannel {
         let unidirectionalChannel: UnidirectionalRecipientChannel;
         let candidateLoginInitiateMessage: string;
         try {
+            const aad = this.rendezvousSession.getAdditionalAuthenticationDataForReceive();
+            logger.info(`Decrypting payload with AAD: ${formatAAD(aad)}`);
             ({ channel: unidirectionalChannel, message: candidateLoginInitiateMessage } =
-                this.recipientChannel.establishChannel(
-                    loginInitiateMessage,
-                    this.rendezvousSession.getAdditionalAuthenticationDataForReceive(),
-                ));
+                this.recipientChannel.establishChannel(loginInitiateMessage, aad));
         } catch (e) {
             // the message could not be parsed or decrypted: either it wasn't sent by a device that scanned our QR
             // code, or it is bound to a different rendezvous session
@@ -129,10 +135,11 @@ export class MSC4388SecureChannel {
         }
         logger.info("LoginInitiateMessage received");
 
-        logger.info("Sending LoginOkMessage");
+        const aad = this.rendezvousSession.getAdditionalAuthenticationDataForSend();
+        logger.info(`Sending LoginOkMessage with AAD: ${formatAAD(aad)}`);
         const { channel, initialResponse: loginOkMessage } = unidirectionalChannel.establishBidirectionalChannel(
             "MATRIX_QR_CODE_LOGIN_OK",
-            this.rendezvousSession.getAdditionalAuthenticationDataForSend(),
+            aad,
         );
 
         await this.rendezvousSession.send(loginOkMessage);
@@ -151,11 +158,10 @@ export class MSC4388SecureChannel {
             throw new Error("Channel closed");
         }
 
+        const aad = this.rendezvousSession.getAdditionalAuthenticationDataForReceive();
+        logger.info(`Decrypting payload with AAD: ${formatAAD(aad)}`);
         try {
-            return this.establishedChannel.open(
-                ciphertext,
-                this.rendezvousSession.getAdditionalAuthenticationDataForReceive(),
-            );
+            return this.establishedChannel.open(ciphertext, aad);
         } catch (e) {
             // a payload that doesn't decrypt was not sealed by the other device with the expected sequence token
             logger.warn("Failed to decrypt payload from secure channel", e);
@@ -171,7 +177,10 @@ export class MSC4388SecureChannel {
             throw new Error("Channel closed");
         }
 
-        return this.establishedChannel.seal(plaintext, this.rendezvousSession.getAdditionalAuthenticationDataForSend());
+        const aad = this.rendezvousSession.getAdditionalAuthenticationDataForSend();
+        logger.info(`Encrypting payload with AAD: ${formatAAD(aad)}`);
+
+        return this.establishedChannel.seal(plaintext, aad);
     }
 
     /**

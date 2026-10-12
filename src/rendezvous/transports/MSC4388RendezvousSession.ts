@@ -45,16 +45,6 @@ export function encodeStringAsBytes8(input: string): Uint8Array {
 }
 
 /**
- * Normalises a homeserver base URL to the form used in the MSC4388 QR code so that the additional authentication
- * data computed by both devices is identical. This matches `matrix-sdk-crypto`: the URL is parsed and serialised,
- * and a trailing slash is dropped when the path is just `/`.
- */
-function normaliseBaseUrl(baseUrl: string): string {
-    const url = new URL(baseUrl);
-    return url.pathname === "/" ? url.href.replace(/\/$/, "") : url.href;
-}
-
-/**
  * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
  * insecure rendezvous session protocol.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
@@ -66,17 +56,24 @@ export class MSC4388RendezvousSession {
     public id?: string;
     private readonly client: MatrixClient;
     public onFailure?: RendezvousFailureListener;
+    /**
+     * The sequence token of the payload currently in the rendezvous session as far as we know: from the last
+     * `POST`/`PUT` response or the last `GET` that returned new data. It is the compare-and-swap token for our next
+     * `PUT` and the token that the additional authentication data is bound to.
+     */
     private sequenceToken?: string;
-    private lastSequenceTokenSent?: string;
-    private lastSequenceTokenReceived?: string;
+    /**
+     * The value of {@link sequenceToken} immediately before the last `GET` that returned new data, i.e. the token of
+     * the payload that the received payload replaced. Used as the additional authentication data when opening it.
+     */
+    private sequenceTokenBeforeLastReceive?: string;
     private expiresAt?: Date;
     private expiresTimer?: ReturnType<typeof setTimeout>;
     private _cancelled = false;
     private _ready = false;
 
     /**
-     * The server base URL for client-server connections, normalised to the form used in the QR code and in the
-     * additional authentication data of the secure channel.
+     * The server base URL for client-server connections.
      */
     public readonly baseUrl: string;
 
@@ -86,7 +83,7 @@ export class MSC4388RendezvousSession {
     public constructor({ onFailure, client }: { onFailure?: RendezvousFailureListener; client: MatrixClient }) {
         this.onFailure = onFailure;
         this.client = client;
-        this.baseUrl = normaliseBaseUrl(client.baseUrl);
+        this.baseUrl = client.baseUrl;
     }
 
     /**
@@ -139,7 +136,6 @@ export class MSC4388RendezvousSession {
 
             // irrespective of whether we created the rendezvous channel, store the sequence token
             this.sequenceToken = responseBody.sequence_token;
-            this.lastSequenceTokenSent = this.sequenceToken;
 
             logger.info(`Received new sequence_token after send: ${this.sequenceToken}`);
 
@@ -227,8 +223,8 @@ export class MSC4388RendezvousSession {
 
                 if (body.sequence_token !== this.sequenceToken) {
                     // we have new data
+                    this.sequenceTokenBeforeLastReceive = this.sequenceToken;
                     this.sequenceToken = body.sequence_token;
-                    this.lastSequenceTokenReceived = this.sequenceToken;
                     logger.info(`Received: ${body.data} with sequence_token ${this.sequenceToken}`);
                     return body.data;
                 }
@@ -325,23 +321,31 @@ export class MSC4388RendezvousSession {
 
     /**
      * The additional authentication data to use when sealing a payload to send over the secure channel.
-     * Per MSC4388 the sequence token is the one from the last payload that we received.
+     *
+     * The sequence token is the one of the payload that our `PUT` will replace, i.e. the compare-and-swap token that
+     * is sent in the request body. This matches matrix-rust-sdk. Note that the MSC4388 text instead says "the
+     * sequence token from the last `GET` that the device received", which gives the same value except when a device
+     * sends two payloads in a row (as the existing device does with LoginOkMessage followed by `m.login.protocols`),
+     * where the two definitions diverge.
      */
     public getAdditionalAuthenticationDataForSend(): Uint8Array {
-        if (!this.lastSequenceTokenReceived) {
+        if (!this.sequenceToken) {
             throw new Error("Rendezvous session not ready");
         }
-        return this.buildAdditionalAuthenticationData(this.lastSequenceTokenReceived);
+        return this.buildAdditionalAuthenticationData(this.sequenceToken);
     }
 
     /**
      * The additional authentication data to use when opening a payload received over the secure channel.
-     * Per MSC4388 the sequence token is the one returned by the last `PUT` (or initial `POST`) that we made.
+     *
+     * The sequence token is the one of the payload that the received payload replaced, i.e. the token we knew before
+     * the `GET` that returned it. This is the counterpart of {@link getAdditionalAuthenticationDataForSend} and
+     * matches matrix-rust-sdk. See there for how it relates to the MSC4388 text.
      */
     public getAdditionalAuthenticationDataForReceive(): Uint8Array {
-        if (!this.lastSequenceTokenSent) {
+        if (!this.sequenceTokenBeforeLastReceive) {
             throw new Error("Rendezvous session not ready");
         }
-        return this.buildAdditionalAuthenticationData(this.lastSequenceTokenSent);
+        return this.buildAdditionalAuthenticationData(this.sequenceTokenBeforeLastReceive);
     }
 }
