@@ -52,7 +52,6 @@ export interface RtcMembershipData {
         published: Transport[];
         can_subscribe: string[];
     };
-    versions: string[];
     msc4354_sticky_key?: string;
     sticky_key?: string;
 }
@@ -159,12 +158,6 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     ) {
         errors.push(prefix + "transports.can_subscribe must be an array of strings");
     }
-    if (data.versions === undefined || !Array.isArray(data.versions)) {
-        errors.push(prefix + "versions must be an array");
-    } else if (!data.versions.every((v) => typeof v === "string")) {
-        errors.push(prefix + "versions must be an array of strings");
-    }
-
     // optional fields
     if ((data.sticky_key ?? data.msc4354_sticky_key) === undefined) {
         errors.push(prefix + "sticky_key or msc4354_sticky_key must be a defined");

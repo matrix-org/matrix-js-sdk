@@ -71,7 +71,6 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         membership: "join",
     },
     slot_id: "m.call#ROOM",
-    versions: [],
     transports: {
         published: [
             {
