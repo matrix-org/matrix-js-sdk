@@ -249,7 +249,7 @@ describe("parseCallNotificationContent", () => {
             call_id: "",
             device_id: "DEVICE",
             scope: "m.room",
-            focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+            focus_active: { type: "livekit", focus_selection: "multi_sfu" },
             foci_preferred: [],
         };
 
@@ -455,7 +455,6 @@ describe("parseCallNotificationContent", () => {
             application: { type: "m.call" },
             member: { user_id: userId, device_id: "DEVICE", id: "MEMBER" },
             transports: { published: [], can_subscribe: [] },
-            versions: [],
             msc4354_sticky_key: "MEMBER",
         };
         // Left memberships only contain the slot ID and the sticky key.
@@ -527,7 +526,7 @@ describe("parseCallNotificationContent", () => {
                 call_id: "",
                 device_id: "DEVICE",
                 scope: "m.room",
-                focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+                focus_active: { type: "livekit", focus_selection: "multi_sfu" },
                 foci_preferred: [],
             };
 

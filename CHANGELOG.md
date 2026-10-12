@@ -1,3 +1,46 @@
+Changes in [43.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v43.0.0) (2026-09-29)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Bring OAuth token refresh into the js-sdk ([#5520](https://github.com/matrix-org/matrix-js-sdk/pull/5520)). Contributed by @dbkr.
+
+## ✨ Features
+
+* Update RTC notification and decline events as per MSC4075 ([#5544](https://github.com/matrix-org/matrix-js-sdk/pull/5544)). Contributed by @Johennes.
+* Add support of the stable room summary endpoint ([#5552](https://github.com/matrix-org/matrix-js-sdk/pull/5552)). Contributed by @florianduros.
+* Let applications publish their own data in MatrixRTC memberships ([#5550](https://github.com/matrix-org/matrix-js-sdk/pull/5550)). Contributed by @ara4n.
+* Bring OAuth token refresh into the js-sdk ([#5520](https://github.com/matrix-org/matrix-js-sdk/pull/5520)). Contributed by @dbkr.
+
+## 🐛 Bug Fixes
+
+* MatrixRTC: restart the delayed leave event before extending a membership's expiry ([#5522](https://github.com/matrix-org/matrix-js-sdk/pull/5522)). Contributed by @ara4n.
+* MatrixRTC: don't let a superseded membership recalculation overwrite a newer one ([#5523](https://github.com/matrix-org/matrix-js-sdk/pull/5523)). Contributed by @ara4n.
+* Preserve read receipts of different types during sync accumulation ([#5541](https://github.com/matrix-org/matrix-js-sdk/pull/5541)). Contributed by @rubinsh.
+* Fix sync.ts to emit state events when msc4222 state\_after is enabled ([#5542](https://github.com/matrix-org/matrix-js-sdk/pull/5542)). Contributed by @maheichyk.
+* Set hasCurrentUserParticipated when the current user sends a thread reply ([#5516](https://github.com/matrix-org/matrix-js-sdk/pull/5516)). Contributed by @nathanael-h.
+* Fix type definitions on `import|exportSecretsBundle` ([#5526](https://github.com/matrix-org/matrix-js-sdk/pull/5526)). Contributed by @richvdh.
+
+
+Changes in [42.4.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.4.0) (2026-09-15)
+==================================================================================================
+## ✨ Features
+
+* Add methods for ensuring a slot is open / closed ([#5524](https://github.com/matrix-org/matrix-js-sdk/pull/5524)). Contributed by @Johennes.
+* MSC4140: support getting a single delayed event ([#5504](https://github.com/matrix-org/matrix-js-sdk/pull/5504)). Contributed by @AndrewFerr.
+* Add livekit rtc cs api endpoints to client (and embedded client) ([#5496](https://github.com/matrix-org/matrix-js-sdk/pull/5496)). Contributed by @toger5.
+* Allow passing a signing function when setting up Rust crypto  ([#5483](https://github.com/matrix-org/matrix-js-sdk/pull/5483)). Contributed by @andybalaam.
+* Combine crypto-related `receiveSyncChanges` calls into one ([#5503](https://github.com/matrix-org/matrix-js-sdk/pull/5503)). Contributed by @kaylendog.
+* Log OAuth requests and responses ([#5506](https://github.com/matrix-org/matrix-js-sdk/pull/5506)). Contributed by @hughns.
+* Add support for key rotation participant limit ([#5486](https://github.com/matrix-org/matrix-js-sdk/pull/5486)). Contributed by @toger5.
+
+## 🐛 Bug Fixes
+
+* Treat an event as read if the user sent a later one ([#5525](https://github.com/matrix-org/matrix-js-sdk/pull/5525)). Contributed by @nathanael-h.
+* MatrixRTC: do not treat repeated local timeouts as unrecoverable ([#5518](https://github.com/matrix-org/matrix-js-sdk/pull/5518)). Contributed by @ara4n.
+* Don't fetch the client well-known when clientWellKnownPollPeriod is unset ([#5521](https://github.com/matrix-org/matrix-js-sdk/pull/5521)). Contributed by @langleyd.
+* Fix OAuth token revocation against a spec-compliant authorization server ([#5507](https://github.com/matrix-org/matrix-js-sdk/pull/5507)). Contributed by @hughns.
+
+
 Changes in [42.3.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v42.3.0) (2026-09-01)
 ==================================================================================================
 ## ✨ Features

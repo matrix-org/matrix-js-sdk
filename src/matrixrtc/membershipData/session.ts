@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { type IContent } from "../../matrix.ts";
-import { type RTCCallIntent, type Transport } from "../types.ts";
+import { type RTCCallCapability, type RTCCallIntent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 
 /**
@@ -48,7 +48,7 @@ export type SessionMembershipData = {
      */
     "focus_active": {
         type: "livekit" | string;
-        focus_selection: "oldest_membership" | "multi_sfu" | string;
+        focus_selection: "multi_sfu" | string;
     };
 
     /**
@@ -86,6 +86,11 @@ export type SessionMembershipData = {
      * something else.
      */
     "m.call.intent"?: RTCCallIntent;
+
+    /**
+     * The kinds of media this member's device is capable of handling, e.g. audio and/or video.
+     */
+    "capabilities"?: RTCCallCapability[];
 
     /**
      * The id used on the media backend.
@@ -136,6 +141,13 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
 
     if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
         errors.push(prefix + "m.call.intent must be a string");
+    }
+
+    if (
+        data.capabilities !== undefined &&
+        !(Array.isArray(data.capabilities) && data.capabilities.every((c: unknown) => typeof c === "string"))
+    ) {
+        errors.push(prefix + "capabilities must be an array of strings");
     }
 
     if (errors.length) {

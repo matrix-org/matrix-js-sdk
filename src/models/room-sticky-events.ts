@@ -59,9 +59,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @returns A positive value if event A will expire sooner, or a negative value if event B will expire sooner.
      */
     private static sortStickyEvent(eventA: StickyMatrixEvent, eventB: StickyMatrixEvent): number {
-        // First, compare by expiry (`origin_server_ts + sticky.duration_ms`).
-        const expiryA = eventA.getTs() + eventA.unstableStickyInfo!.duration_ms;
-        const expiryB = eventB.getTs() + eventB.unstableStickyInfo!.duration_ms;
+        // First, compare by expiry.
+        const expiryA = eventA.unstableStickyExpiresAt;
+        const expiryB = eventB.unstableStickyExpiresAt;
         if (expiryB !== expiryA) {
             return expiryB - expiryA;
         }

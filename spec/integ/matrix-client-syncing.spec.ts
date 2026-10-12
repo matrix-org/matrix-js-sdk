@@ -2569,6 +2569,31 @@ describe("MatrixClient syncing", () => {
                 await httpBackend!.flushAllExpected();
             },
         );
+
+        it("should keep a room that reached the store while the peek was in flight", async () => {
+            httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomOne)}/initialSync`).respond(200, {
+                room_id: roomOne,
+                membership: KnownMembership.Leave,
+                messages: { start: "start", end: "end", chunk: [] },
+                state: [],
+            });
+            const onRoom = vi.fn();
+            client!.on(ClientEvent.Room, onRoom);
+
+            const prom = client!.peekInRoom(roomOne);
+            // The room arrives through /sync before the peek's initialSync responds
+            const syncedRoom = new Room(roomOne, client!, selfUserId);
+            client!.store.storeRoom(syncedRoom);
+            await httpBackend!.flush(`/rooms/${encodeURIComponent(roomOne)}/initialSync`, 1);
+            const room = await prom;
+
+            expect(room).toBe(syncedRoom);
+            expect(client!.getRoom(roomOne)).toBe(syncedRoom);
+            expect(onRoom).not.toHaveBeenCalled();
+            // It stops peeking rather than polling /events for the room
+            expect(httpBackend!.requests.some((req) => req.path.includes("/events"))).toBe(false);
+            client!.off(ClientEvent.Room, onRoom);
+        });
     });
 
     describe("user account data", () => {

@@ -17,16 +17,18 @@ limitations under the License.
 import { type Mock, type Mocked } from "vitest";
 
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
-import { type CallMembership } from "../../../src/matrixrtc";
+import { type UnstableLivekitTransport, type CallMembership } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
 import { sessionMembershipTemplate, mockCallMembership } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { logger } from "../../../src/logger.ts";
 import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
-import { flushPromises } from "../../test-utils/flushPromises.ts";
 
 describe("RTCEncryptionManager", () => {
+    const transport: UnstableLivekitTransport = { type: "livekit", url: "ws://example.org" };
+    const legacyTransport: UnstableLivekitTransport = { type: "livekit", livekit_service_url: "http://example.org" };
+
     // The manager being tested
     let encryptionManager: RTCEncryptionManager;
     let getMembershipMock: Mock;
@@ -45,8 +47,8 @@ describe("RTCEncryptionManager", () => {
             off: vi.fn(),
         } as unknown as Mocked<ToDeviceKeyTransport>;
 
-        rtcIdentifierProvider = vi.fn().mockImplementation((userId: string, deviceId: string, memberId: string) => {
-            return `MOCKSHA<${userId}|${deviceId}|${memberId}>`;
+        rtcIdentifierProvider = vi.fn().mockImplementation((userId: string, memberId: string) => {
+            return `MOCKSHA<${userId}|${memberId}>`;
         });
 
         encryptionManager = new RTCEncryptionManager(
@@ -60,7 +62,7 @@ describe("RTCEncryptionManager", () => {
     });
 
     it("should start and stop the transport properly", () => {
-        encryptionManager.join(undefined);
+        encryptionManager.join(undefined, [transport]);
 
         expect(mockTransport.start).toHaveBeenCalledTimes(1);
         expect(mockTransport.on).toHaveBeenCalledTimes(1);
@@ -74,14 +76,13 @@ describe("RTCEncryptionManager", () => {
         it("Set up my key asap even if no key distribution is needed", async () => {
             getMembershipMock.mockReturnValue([]);
 
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             // After join it is too early, key might be lost as no one is listening yet
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
 
             encryptionManager.onMembershipsUpdate();
-            await flushPromises();
             // The key should have been rolled out immediately
-            expect(onEncryptionKeysChanged).toHaveBeenCalled();
+            await vi.waitFor(() => expect(onEncryptionKeysChanged).toHaveBeenCalled());
         });
 
         it("Should distribute keys to members on join", async () => {
@@ -93,7 +94,7 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.runOnlyPendingTimersAsync();
 
@@ -115,7 +116,7 @@ describe("RTCEncryptionManager", () => {
                     memberId: "@alice:example.org:DEVICE01",
                     userId: "@alice:example.org",
                 },
-                "@alice:example.org:DEVICE01",
+                "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
             );
         });
 
@@ -123,7 +124,7 @@ describe("RTCEncryptionManager", () => {
             let members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE", 1000)];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.runOnlyPendingTimersAsync();
 
@@ -181,7 +182,7 @@ describe("RTCEncryptionManager", () => {
 
             const gracePeriod = 15_000; // 15 seconds
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod }, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -231,10 +232,13 @@ describe("RTCEncryptionManager", () => {
             const gracePeriod = 3_000; // 3 seconds
             const useKeyDelay = gracePeriod + 2_000; // 5 seconds
             // initial rollout
-            encryptionManager.join({
-                useKeyDelay,
-                keyRotationGracePeriodMs: gracePeriod,
-            });
+            encryptionManager.join(
+                {
+                    useKeyDelay,
+                    keyRotationGracePeriodMs: gracePeriod,
+                },
+                [transport],
+            );
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -282,7 +286,7 @@ describe("RTCEncryptionManager", () => {
 
             const gracePeriod = 15_000; // 15 seconds
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod });
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod }, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -321,7 +325,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // initial rollout
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -371,7 +375,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // initial rollout
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -401,7 +405,7 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(10);
 
@@ -447,7 +451,7 @@ describe("RTCEncryptionManager", () => {
                     deviceId: "DEVICE01",
                     memberId: "@alice:example.org:DEVICE01",
                 },
-                "@alice:example.org:DEVICE01",
+                "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
             );
         });
 
@@ -463,7 +467,9 @@ describe("RTCEncryptionManager", () => {
 
             const gracePeriod = 1_000;
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 }, [
+                transport,
+            ]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -501,7 +507,9 @@ describe("RTCEncryptionManager", () => {
 
             const gracePeriod = 1_000;
             // initial rollout
-            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 });
+            encryptionManager.join({ keyRotationGracePeriodMs: gracePeriod, keyRotationParticipantLimit: 4 }, [
+                transport,
+            ]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -536,7 +544,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // initial rollout
-            encryptionManager.join({ keyRotationParticipantLimit: 3 });
+            encryptionManager.join({ keyRotationParticipantLimit: 3 }, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -564,7 +572,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // initial rollout
-            encryptionManager.join({ keyRotationParticipantLimit: 3 });
+            encryptionManager.join({ keyRotationParticipantLimit: 3 }, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(1);
 
@@ -598,7 +606,7 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join({ keyRotationParticipantLimit: 3 });
+            encryptionManager.join({ keyRotationParticipantLimit: 3 }, [transport]);
             expect(encryptionManager.isKeyRotationSuppressed).toBe(false);
 
             members.push(aStateBaseMembership("@carl:example.org", "CARLDEVICE"));
@@ -615,7 +623,7 @@ describe("RTCEncryptionManager", () => {
                 aStateBaseMembership("@carl:example.org", "CARLDEVICE"),
             ]);
 
-            encryptionManager.join({ manageMediaKeys: false, keyRotationParticipantLimit: 3 });
+            encryptionManager.join({ manageMediaKeys: false, keyRotationParticipantLimit: 3 }, [transport]);
 
             expect(encryptionManager.isKeyRotationSuppressed).toBe(false);
         });
@@ -629,7 +637,7 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join({ manageMediaKeys: false });
+            encryptionManager.join({ manageMediaKeys: false }, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.runOnlyPendingTimersAsync();
 
@@ -663,7 +671,7 @@ describe("RTCEncryptionManager", () => {
             const members = [aStateBaseMembership("@bob:example.org", "BOBDEVICE")];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join({ manageMediaKeys: false });
+            encryptionManager.join({ manageMediaKeys: false }, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(10);
 
@@ -688,7 +696,7 @@ describe("RTCEncryptionManager", () => {
             ];
             getMembershipMock.mockReturnValue(members);
 
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
             await vi.advanceTimersByTimeAsync(10);
 
@@ -714,7 +722,7 @@ describe("RTCEncryptionManager", () => {
                 0 /* Timestamp */,
             );
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(4);
+            await vi.waitFor(() => expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(4));
             expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
                 decodeBase64("AAAAAAAAAAA"),
                 0,
@@ -756,7 +764,7 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // Let's join
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             await vi.advanceTimersByTimeAsync(10);
 
             // Simulate Carl leaving then joining back, and key received out of order
@@ -809,9 +817,8 @@ describe("RTCEncryptionManager", () => {
             getMembershipMock.mockReturnValue(members);
 
             // Let's join
-            encryptionManager.join(undefined);
+            encryptionManager.join(undefined, [transport]);
             encryptionManager.onMembershipsUpdate();
-
             await vi.advanceTimersByTimeAsync(10);
 
             mockTransport.emit(
@@ -838,71 +845,73 @@ describe("RTCEncryptionManager", () => {
                 1000,
             );
 
-            const knownKeys = encryptionManager.getEncryptionKeys();
+            await vi.waitFor(() => {
+                const knownKeys = encryptionManager.getEncryptionKeys();
 
-            // My own key should be there
-            const myRing = knownKeys.get(
-                getEncryptionKeyMapKey({
-                    userId: "@alice:example.org",
-                    deviceId: "DEVICE01",
-                    memberId: "@alice:example.org:DEVICE01",
-                }),
-            );
-            expect(myRing).toBeDefined();
-            expect(myRing).toHaveLength(1);
-            expect(myRing![0]).toMatchObject(
-                expect.objectContaining({
-                    keyIndex: 0,
-                    key: expect.any(Uint8Array),
-                }),
-            );
+                // My own key should be there
+                const myRing = knownKeys.get(
+                    getEncryptionKeyMapKey({
+                        userId: "@alice:example.org",
+                        deviceId: "DEVICE01",
+                        memberId: "@alice:example.org:DEVICE01",
+                    }),
+                );
+                expect(myRing).toBeDefined();
+                expect(myRing).toHaveLength(1);
+                expect(myRing![0]).toMatchObject(
+                    expect.objectContaining({
+                        keyIndex: 0,
+                        key: expect.any(Uint8Array),
+                    }),
+                );
 
-            const carlRing = knownKeys.get(
-                getEncryptionKeyMapKey({
-                    userId: "@carl:example.org",
-                    deviceId: "CARLDEVICE",
-                    memberId: "@carl:example.org:CARLDEVICE",
-                }),
-            );
-            expect(carlRing).toBeDefined();
-            expect(carlRing).toHaveLength(2);
-            expect(carlRing![0]).toMatchObject(
-                expect.objectContaining({
-                    keyIndex: 0,
-                    key: decodeBase64("BBBBBBBBBBB"),
-                }),
-            );
-            expect(carlRing![1]).toMatchObject(
-                expect.objectContaining({
-                    keyIndex: 5,
-                    key: decodeBase64("CCCCCCCCCCC"),
-                }),
-            );
+                const carlRing = knownKeys.get(
+                    getEncryptionKeyMapKey({
+                        userId: "@carl:example.org",
+                        deviceId: "CARLDEVICE",
+                        memberId: "@carl:example.org:CARLDEVICE",
+                    }),
+                );
+                expect(carlRing).toBeDefined();
+                expect(carlRing).toHaveLength(2);
+                expect(carlRing![0]).toMatchObject(
+                    expect.objectContaining({
+                        keyIndex: 0,
+                        key: decodeBase64("BBBBBBBBBBB"),
+                    }),
+                );
+                expect(carlRing![1]).toMatchObject(
+                    expect.objectContaining({
+                        keyIndex: 5,
+                        key: decodeBase64("CCCCCCCCCCC"),
+                    }),
+                );
 
-            const bobRing = knownKeys.get(
-                getEncryptionKeyMapKey({
-                    userId: "@bob:example.org",
-                    deviceId: "BOBDEVICE2",
-                    memberId: "@bob:example.org:BOBDEVICE2",
-                }),
-            );
-            expect(bobRing).toBeDefined();
-            expect(bobRing).toHaveLength(1);
-            expect(bobRing![0]).toMatchObject(
-                expect.objectContaining({
-                    keyIndex: 0,
-                    key: decodeBase64("DDDDDDDDDDD"),
-                }),
-            );
+                const bobRing = knownKeys.get(
+                    getEncryptionKeyMapKey({
+                        userId: "@bob:example.org",
+                        deviceId: "BOBDEVICE2",
+                        memberId: "@bob:example.org:BOBDEVICE2",
+                    }),
+                );
+                expect(bobRing).toBeDefined();
+                expect(bobRing).toHaveLength(1);
+                expect(bobRing![0]).toMatchObject(
+                    expect.objectContaining({
+                        keyIndex: 0,
+                        key: decodeBase64("DDDDDDDDDDD"),
+                    }),
+                );
 
-            const bob1Ring = knownKeys.get(
-                getEncryptionKeyMapKey({
-                    userId: "@bob:example.org",
-                    deviceId: "BOBDEVICE",
-                    memberId: "@bob:example.org:BOBDEVICE",
-                }),
-            );
-            expect(bob1Ring).not.toBeDefined();
+                const bob1Ring = knownKeys.get(
+                    getEncryptionKeyMapKey({
+                        userId: "@bob:example.org",
+                        deviceId: "BOBDEVICE",
+                        memberId: "@bob:example.org:BOBDEVICE",
+                    }),
+                );
+                expect(bob1Ring).not.toBeDefined();
+            });
         });
     });
 
@@ -917,7 +926,7 @@ describe("RTCEncryptionManager", () => {
         getMembershipMock.mockReturnValue(members);
 
         // Let's join
-        encryptionManager.join(undefined);
+        encryptionManager.join(undefined, [transport]);
         encryptionManager.onMembershipsUpdate();
         await vi.advanceTimersByTimeAsync(10);
 
@@ -930,7 +939,7 @@ describe("RTCEncryptionManager", () => {
                 memberId: "@alice:example.org:DEVICE01",
                 userId: "@alice:example.org",
             },
-            "@alice:example.org:DEVICE01",
+            "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
         );
         onEncryptionKeysChanged.mockClear();
 
@@ -974,7 +983,7 @@ describe("RTCEncryptionManager", () => {
                 userId: "@alice:example.org",
                 memberId: "@alice:example.org:DEVICE01",
             },
-            "@alice:example.org:DEVICE01",
+            "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
         );
         expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
             expect.any(Uint8Array<ArrayBufferLike>),
@@ -984,7 +993,7 @@ describe("RTCEncryptionManager", () => {
                 memberId: "@alice:example.org:DEVICE01",
                 userId: "@alice:example.org",
             },
-            "@alice:example.org:DEVICE01",
+            "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
         );
 
         // Key `2` should only be distributed to the last membership
@@ -1002,49 +1011,72 @@ describe("RTCEncryptionManager", () => {
         );
     });
 
-    describe("RTC backend pseudonymous id", () => {
-        it("Should use pseudo rtcBackendIdentity if using sticky events", async () => {
+    describe("backend identity", () => {
+        it("uses hashed identity", async () => {
             getMembershipMock.mockReturnValue([]);
-            encryptionManager.join({
-                manageMediaKeys: true,
-                unstableSendStickyEvents: true,
-            });
+            encryptionManager.join({ manageMediaKeys: true }, [transport]);
             encryptionManager.onMembershipsUpdate();
 
-            await flushPromises();
-
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                expect.any(Uint8Array<ArrayBufferLike>),
-                0,
-                {
-                    deviceId: "DEVICE01",
-                    userId: "@alice:example.org",
-                    memberId: "@alice:example.org:DEVICE01",
-                },
-                "MOCKSHA<@alice:example.org|DEVICE01|@alice:example.org:DEVICE01>",
+            await vi.waitFor(() =>
+                expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+                    expect.any(Uint8Array<ArrayBufferLike>),
+                    0,
+                    {
+                        deviceId: "DEVICE01",
+                        userId: "@alice:example.org",
+                        memberId: "@alice:example.org:DEVICE01",
+                    },
+                    "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
+                ),
             );
         });
 
-        it("Should use legacy participant id if not using sticky event", async () => {
+        it("uses legacy concatenated identity in case of legacy transport", async () => {
             getMembershipMock.mockReturnValue([]);
-            encryptionManager.join({
-                manageMediaKeys: true,
-                unstableSendStickyEvents: false,
-            });
+            encryptionManager.join({ manageMediaKeys: true }, [legacyTransport]);
             encryptionManager.onMembershipsUpdate();
 
-            await flushPromises();
-
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                expect.any(Uint8Array<ArrayBufferLike>),
-                0,
-                {
-                    deviceId: "DEVICE01",
-                    userId: "@alice:example.org",
-                    memberId: "@alice:example.org:DEVICE01",
-                },
-                "@alice:example.org:DEVICE01",
+            await vi.waitFor(() =>
+                expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+                    expect.any(Uint8Array<ArrayBufferLike>),
+                    0,
+                    {
+                        deviceId: "DEVICE01",
+                        userId: "@alice:example.org",
+                        memberId: "@alice:example.org:DEVICE01",
+                    },
+                    "@alice:example.org:DEVICE01",
+                ),
             );
+        });
+
+        it("uses both identity formats in case of ambiguous transport", async () => {
+            getMembershipMock.mockReturnValue([]);
+            encryptionManager.join({ manageMediaKeys: true }, [{ ...transport, ...legacyTransport }]);
+            encryptionManager.onMembershipsUpdate();
+
+            await vi.waitFor(() => {
+                expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+                    expect.any(Uint8Array<ArrayBufferLike>),
+                    0,
+                    {
+                        deviceId: "DEVICE01",
+                        userId: "@alice:example.org",
+                        memberId: "@alice:example.org:DEVICE01",
+                    },
+                    "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
+                );
+                expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+                    expect.any(Uint8Array<ArrayBufferLike>),
+                    0,
+                    {
+                        deviceId: "DEVICE01",
+                        userId: "@alice:example.org",
+                        memberId: "@alice:example.org:DEVICE01",
+                    },
+                    "@alice:example.org:DEVICE01",
+                );
+            });
         });
 
         it("Should use early keys as soon as the membership is known", async () => {
@@ -1068,17 +1100,14 @@ describe("RTCEncryptionManager", () => {
             );
 
             getMembershipMock.mockReturnValue([]);
-            encryptionManager.join({
-                manageMediaKeys: true,
-                unstableSendStickyEvents: true,
-            });
+            encryptionManager.join({ manageMediaKeys: true }, [transport]);
             encryptionManager.onMembershipsUpdate();
-            await flushPromises();
 
             // In 2.0 mode the participant identity is pseudo hashed and known from
             // the rtc membership itself. If a key is received before we have processed
             // the membership, we cannot pass it to the media layer yet because we don't know
             // the rtcBackendIdentity to use.
+            await vi.waitFor(() => expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(1 /* only own key */));
             mockTransport.emit(
                 KeyTransportEvents.ReceivedKeys,
                 { userId: "@bob:example.org", deviceId: "BOBDEVICE", memberId: "@bob:example.org:BOBDEVICE" },
@@ -1086,8 +1115,6 @@ describe("RTCEncryptionManager", () => {
                 0 /* KeyId */,
                 0 /* Timestamp */,
             );
-
-            await flushPromises();
 
             // No membership yet, cannot process the key, so should not have called the callback
             expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(1 /* only own key */);
@@ -1107,19 +1134,20 @@ describe("RTCEncryptionManager", () => {
             const members = [aCallMembership("@bob:example.org", "BOBDEVICE", 1000, bobRtcId)];
             getMembershipMock.mockReturnValue(members);
             encryptionManager.onMembershipsUpdate();
-            await flushPromises();
 
-            expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
-            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
-                expect.any(Uint8Array<ArrayBufferLike>),
-                0,
-                {
-                    deviceId: "BOBDEVICE",
-                    userId: "@bob:example.org",
-                    memberId: "@bob:example.org:BOBDEVICE",
-                },
-                bobRtcId,
-            );
+            await vi.waitFor(() => {
+                expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(2);
+                expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+                    expect.any(Uint8Array<ArrayBufferLike>),
+                    0,
+                    {
+                        deviceId: "BOBDEVICE",
+                        userId: "@bob:example.org",
+                        memberId: "@bob:example.org:BOBDEVICE",
+                    },
+                    bobRtcId,
+                );
+            });
         });
     });
 
@@ -1127,12 +1155,12 @@ describe("RTCEncryptionManager", () => {
         userId: string,
         deviceId: string,
         ts: number = 1000,
-        rtcBackendIdentity: string,
+        backendIdentity: string,
     ): CallMembership {
         return mockCallMembership(
             { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
-            rtcBackendIdentity,
+            [backendIdentity],
         );
     }
 
@@ -1147,7 +1175,7 @@ describe("RTCEncryptionManager", () => {
         return mockCallMembership(
             { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
-            `${userId}|${deviceId}`,
+            [`${userId}|${deviceId}`],
         );
     }
 });

@@ -125,16 +125,33 @@ describe("RoomStickyEvents", () => {
                 expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
             });
 
+            it("should prefer the event with the later server-provided TTL over the later intended expiry", () => {
+                const now = Date.now();
+                // Intended to expire at now + 60000 but the server says there are only 5000 left
+                const longIntendedEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$long",
+                    origin_server_ts: now,
+                    msc4354_sticky: { duration_ms: 60000 },
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 5000 },
+                });
+                // Intended to expire at now + 30000 and the server agrees there are 29000 left
+                const shortIntendedEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$short",
+                    origin_server_ts: now + 1000,
+                    msc4354_sticky: { duration_ms: 30000 },
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 29000 },
+                });
+                add(longIntendedEv, shortIntendedEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([shortIntendedEv]);
+            });
+
             it("should tie break on the highest event ID when the intended expiry is equal", () => {
                 const now = Date.now();
                 // Both intended to expire at now + 15000
                 const lowIdEv = new MatrixEvent({ ...stickyEvent, event_id: "$aaa", origin_server_ts: now });
-                const highIdEv = new MatrixEvent({
-                    ...stickyEvent,
-                    event_id: "$zzz",
-                    origin_server_ts: now + 5000,
-                    msc4354_sticky: { duration_ms: 10000 },
-                });
+                const highIdEv = new MatrixEvent({ ...stickyEvent, event_id: "$zzz", origin_server_ts: now });
                 add(lowIdEv, highIdEv);
                 expect([...stickyEvents.getStickyEvents()]).toEqual([highIdEv]);
                 // The losing event is still retained as a predecessor for redaction purposes.
