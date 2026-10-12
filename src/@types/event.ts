@@ -112,6 +112,11 @@ export enum EventType {
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
+    /**
+     * To-device event type used to share MatrixRTC per-member encryption keys.
+     *
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
     CallEncryptionKeysPrefix = "io.element.call.encryption_keys",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
