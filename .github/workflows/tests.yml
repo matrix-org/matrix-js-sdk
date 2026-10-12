@@ -14,7 +14,7 @@ permissions: {} # No permissions required
 jobs:
     test:
         name: "Vitest [${{ matrix.specs }}] (Node ${{ matrix.node == '*' && 'latest' || matrix.node }})"
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         timeout-minutes: 10
         strategy:
             matrix:
@@ -27,7 +27,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@703c52620218391530e48b9e8870d5c0082e1b9b # v2.1.0
+              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
               with:
                   runtime: node@${{ matrix.node }}
                   cache: true
@@ -81,7 +81,7 @@ jobs:
             - element-web
             - complement-crypto
         if: always()
-        runs-on: ubuntu-24.04
+        runs-on: ubuntu-26.04
         permissions:
             contents: read
             pull-requests: read
@@ -116,7 +116,7 @@ jobs:
             - name: Diff Coverage
               id: coverage
               if: needs.test.result == 'success' && env.ENABLE_COVERAGE == 'true'
-              uses: Affanmir/diff-cover-action@a35ea05c1c458490473f6fc2233737e809678273 # v2.1.1
+              uses: Affanmir/diff-cover-action@0c892dd61c33b7bc2de45669677d23ede3e145fa # v2.2.0
               with:
                   compare-branch: origin/${{ github.base_ref || 'develop' }}
                   mode: coverage

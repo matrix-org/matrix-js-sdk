@@ -32,6 +32,7 @@ import {
     SyncAccumulator,
 } from "../../src/sync-accumulator";
 import { type IRoomSummary } from "../../src";
+import { MAX_STICKY_DURATION_MS } from "../../src/models/event";
 import * as utils from "../test-utils/test-utils";
 import { KnownMembership, type Membership } from "../../src/@types/membership";
 
@@ -1127,6 +1128,120 @@ describe("SyncAccumulator", function () {
             vi.setSystemTime(1000); // Expire the event
             sa.accumulate(syncSkeleton({}));
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+        });
+
+        describe("with a server-provided TTL", () => {
+            function stickyEventWithTtl(ttl: number, ts = 0): IStickyEvent {
+                return {
+                    ...stickyEvent(ts),
+                    unsigned: { age: 0, msc4354_sticky_duration_ttl_ms: ttl },
+                };
+            }
+
+            function savedSync(json: ReturnType<SyncAccumulator["getJSON"]>): ISyncResponse {
+                return {
+                    next_batch: json.nextBatch,
+                    rooms: json.roomsData,
+                    account_data: { events: json.accountData },
+                };
+            }
+
+            it("prefers the TTL over origin_server_ts + duration_ms for expiry", () => {
+                vi.setSystemTime(0);
+                // duration_ms says 1000, but the server says there are 5000 left
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [stickyEventWithTtl(5000)] } }));
+                vi.setSystemTime(2000);
+                sa.accumulate(syncSkeleton({}));
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toHaveLength(1);
+                vi.setSystemTime(5000);
+                sa.accumulate(syncSkeleton({}));
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+            });
+
+            it("recomputes the TTL and age relative to the time the data is read back", () => {
+                vi.setSystemTime(0);
+                const ev = stickyEventWithTtl(1000);
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+                vi.setSystemTime(400);
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
+                    { ...ev, unsigned: { age: 400, msc4354_sticky_duration_ttl_ms: 600 } },
+                ]);
+                // The input must not have been mutated
+                expect(ev.unsigned).toEqual({ age: 0, msc4354_sticky_duration_ttl_ms: 1000 });
+            });
+
+            it("leaves events without TTL or age untouched when the data is read back", () => {
+                vi.setSystemTime(0);
+                const ev = stickyEvent();
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+                vi.setSystemTime(400);
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
+            });
+
+            it("caps the TTL to the spec limit", () => {
+                vi.setSystemTime(0);
+                const ev = stickyEventWithTtl(MAX_STICKY_DURATION_MS * 10);
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
+                    { ...ev, unsigned: { age: 0, msc4354_sticky_duration_ttl_ms: MAX_STICKY_DURATION_MS } },
+                ]);
+                vi.setSystemTime(MAX_STICKY_DURATION_MS);
+                sa.accumulate(syncSkeleton({}));
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+            });
+
+            it("drops events whose TTL has elapsed when the data is read back", () => {
+                vi.setSystemTime(0);
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [stickyEventWithTtl(1000)] } }));
+                vi.setSystemTime(1000);
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+            });
+
+            it("keeps the TTL correct across a round trip through the database", () => {
+                vi.setSystemTime(0);
+                const ev = stickyEventWithTtl(1000);
+                sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+                const saved = sa.getJSON(true);
+
+                vi.setSystemTime(600);
+                const sa2 = new SyncAccumulator({ maxTimelineEntries: 10 });
+                sa2.accumulate(savedSync(saved), true);
+                expect(sa2.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([
+                    { ...ev, unsigned: { age: 600, msc4354_sticky_duration_ttl_ms: 400 } },
+                ]);
+
+                vi.setSystemTime(1200);
+                const sa3 = new SyncAccumulator({ maxTimelineEntries: 10 });
+                sa3.accumulate(savedSync(saved), true);
+                expect(sa3.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
+            });
+
+            it("recomputes the TTL of sticky events in the timeline", () => {
+                vi.setSystemTime(0);
+                const ev = stickyEventWithTtl(1000);
+                sa.accumulate(syncSkeleton({ timeline: { events: [ev], prev_batch: "p" } }));
+
+                vi.setSystemTime(400);
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].timeline.events).toEqual([
+                    { ...ev, unsigned: { age: 400, msc4354_sticky_duration_ttl_ms: 600 } },
+                ]);
+
+                // Timeline events stay in the timeline after expiry, but the TTL must not go negative
+                vi.setSystemTime(1500);
+                expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].timeline.events).toEqual([
+                    { ...ev, unsigned: { age: 1500, msc4354_sticky_duration_ttl_ms: 0 } },
+                ]);
+
+                // And the TTL survives a round trip through the database
+                vi.setSystemTime(0);
+                const saved = sa.getJSON(true);
+                vi.setSystemTime(250);
+                const sa2 = new SyncAccumulator({ maxTimelineEntries: 10 });
+                sa2.accumulate(savedSync(saved), true);
+                expect(sa2.getJSON().roomsData[Category.Join]["!foo:bar"].timeline.events).toEqual([
+                    { ...ev, unsigned: { age: 250, msc4354_sticky_duration_ttl_ms: 750 } },
+                ]);
+            });
         });
     });
 });

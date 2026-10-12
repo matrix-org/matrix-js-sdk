@@ -251,7 +251,9 @@ import {
     type LivekitGetTokenResponse,
     type Transport,
 } from "./matrixrtc/index.ts";
+import { type IRTCDeclineContent, RTC_NOTIFICATION_MAX_LIFETIME_MS } from "./matrixrtc/types.ts";
 import { RetentionPolicyService } from "./retentionPolicy.ts";
+import { fetchRoomSummary, type RoomSummary } from "./room-summary-api.ts";
 import { createRtcTransportsCachedValue } from "./rtcTransportsCachedValue.ts";
 import { createWellKnownCachedValue } from "./wellKnownCachedValue.ts";
 import { type PollingCachedValue } from "./pollingCachedValue.ts";
@@ -582,6 +584,7 @@ export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
+export const STABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms.stable";
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
@@ -882,25 +885,8 @@ interface IThirdPartyUser {
     fields: object;
 }
 
-/**
- * The summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
- * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
- */
-export interface RoomSummary extends Omit<IPublicRoomsChunkRoom, "canonical_alias" | "aliases"> {
-    /**
-     * The current membership of this user in the room.
-     * Usually "leave" if the room is fetched over federation.
-     */
-    "membership"?: Membership;
-    /**
-     * Version of the room.
-     */
-    "im.nheko.summary.room_version"?: string;
-    /**
-     * The encryption algorithm used for this room, if the room is encrypted.
-     */
-    "im.nheko.summary.encryption"?: string;
-}
+// Re-export for backwards compatibility
+export { type RoomSummary };
 
 interface IRoomHierarchy {
     rooms: IHierarchyRoom[];
@@ -1615,6 +1601,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC.stop();
 
         this.serverCapabilitiesService.stop();
+        this.retentionPolicyService?.stop();
 
         this.cachedRtcTransports.stop();
         this.cachedWellKnown.stop();
@@ -2793,7 +2780,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * If we expect that an event is part of a thread but is missing the relation
      * we need to add it manually, as well as the reply fallback
      */
-    private addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
+    protected addThreadRelationIfNeeded(content: IContent, threadId: string | null, roomId: string): void {
         if (threadId && !content["m.relates_to"]?.rel_type) {
             const isReply = !!content["m.relates_to"]?.["m.in_reply_to"];
             content["m.relates_to"] = {
@@ -2818,12 +2805,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     * Sends an event, adding it to the local echo and encrypting it if the room requires it.
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the sent event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2832,13 +2825,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }): Promise<ISendEventResponse>;
     /**
      * Sends a delayed event (MSC4140).
-     * @param eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param delayOpts - Properties of the delay for this event.
-     * @param txnId - Optional.
-     * @returns Promise which resolves: to an empty object `{}`
+     *
+     * @param params - What to send and where.
+     * @param params.roomId - The room to send the event to.
+     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
+     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
+     * @param params.delayOpts - Properties of the delay for this event.
+     * @param params.queryDict - Optional query parameters for the send request.
+     * @param params.txnId - Optional transaction ID. Generated if omitted.
+     * @returns Promise which resolves: to an object with the ID of the scheduled delayed event.
      * @returns Rejects: with an error response.
      */
-    private sendCompleteEvent(params: {
+    protected sendCompleteEvent(params: {
         roomId: string;
         threadId: string | null;
         eventObject: Partial<IEvent>;
@@ -2846,7 +2844,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict;
         txnId?: string;
     }): Promise<SendDelayedEventResponse>;
-    private sendCompleteEvent({
+    protected sendCompleteEvent({
         roomId,
         threadId,
         eventObject,
@@ -3976,17 +3974,38 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Declines a MatrixRTC notification.
      *
-     * @param roomId
-     * @param notificationEventId
-     * @returns
+     * The decline is sent as a sticky event (MSC4354) keyed on the notification's event ID, so that the
+     * user's other devices stop notifying. If the server doesn't support sticky events, a regular event is
+     * sent instead. That one still counts as a decline for any device that receives it, but it isn't
+     * re-delivered after a gappy or initial sync the way a sticky event is, so a device that was offline
+     * when it was sent keeps notifying until the notification's lifetime elapses.
+     *
+     * @param roomId The room the notification was received in.
+     * @param notificationEventId The event ID of the notification being declined.
+     * @param stickyDurationMs How long (in milliseconds) the decline should stay sticky. Must not be smaller
+     * than the notification's `lifetime`, otherwise the notification can become valid again once the decline
+     * expires. Defaults to the maximum lifetime a notification may have.
      * @throws May throw a `MatrixSafetyError` if content is deemed unsafe.
      * @see MatrixSafetyError
      */
-    public sendRtcDecline(roomId: string, notificationEventId: string): Promise<ISendEventResponse> {
-        return this.sendEvent(roomId, EventType.RTCDecline, {
+    public async sendRtcDecline(
+        roomId: string,
+        notificationEventId: string,
+        stickyDurationMs: number = RTC_NOTIFICATION_MAX_LIFETIME_MS,
+    ): Promise<ISendEventResponse> {
+        const content: IRTCDeclineContent = {
             "m.relates_to": { event_id: notificationEventId, rel_type: RelationType.Reference },
-        });
+            "msc4354_sticky_key": notificationEventId,
+        };
+        try {
+            return await this._unstable_sendStickyEvent(roomId, stickyDurationMs, null, EventType.RTCDecline, content);
+        } catch (error) {
+            if (!(error instanceof UnsupportedStickyEventsEndpointError)) throw error;
+            this.logger.debug("Server does not support sticky events, sending decline as a regular event");
+            return await this.sendEvent(roomId, EventType.RTCDecline, content);
+        }
     }
 
     /**
@@ -6182,36 +6201,42 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets a set of room IDs in common with another user.
+     * Determine if the server supports finding mutual rooms, as described by MSC2666.
      *
-     * Note: This endpoint is unstable, and can throw an `Error`.
-     *   Check progress on [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) for more details.
-     *
+     * @returns `true` if supported, otherwise `false`
+     */
+    public async doesServerSupportMutualRooms(): Promise<boolean> {
+        return (
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS))
+        );
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user, using the unstable
+     * Mutual Rooms API. Doesn't check for server support.
      * @param userId - The userId to check.
-     * @returns Promise which resolves to an array of rooms
+     * @returns Promise which resolves to an array of room IDs
      * @returns Rejects: with an error response.
      */
-    // TODO: on spec release, rename this to getMutualRooms
-    public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
-        // Initial variant of the MSC
-        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
+    private async getMutualRoomsUnstable(userId: string): Promise<string[]> {
+        // Accumulated rooms
+        const rooms: string[] = [];
 
         // Newer variant that renamed shared rooms to mutual rooms
         const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
-        // Latest variant that changed from path elements to query elements
+        // Latest unstable variant that changed from path elements to query elements
         const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
             UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
         );
 
-        if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
-            throw Error("Server does not support the Mutual Rooms API");
-        }
-
         let path;
         let query;
 
-        // Cascading unstable support switching.
         if (queryMutualRoomsSupport) {
             path = "/uk.half-shot.msc2666/user/mutual_rooms";
             query = { user_id: userId };
@@ -6223,10 +6248,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             query = {};
         }
 
-        // Accumulated rooms
-        const rooms: string[] = [];
         let token = null;
-
         do {
             const tokenQuery: Record<string, string> = {};
             if (token != null && queryMutualRoomsSupport) {
@@ -6250,6 +6272,67 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } while (token != null);
 
         return rooms;
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user, using the stable
+     * Mutual Rooms API. Doesn't check for server support.
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    private async getMutualRoomsStable(userId: string): Promise<string[]> {
+        const rooms: string[] = [];
+
+        let token = null;
+        do {
+            const query: Record<string, string> = { user_id: userId };
+            if (token != null) {
+                query["from"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch?: string;
+            }>(Method.Get, "/mutual_rooms", query, undefined, {
+                prefix: ClientPrefix.V1,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch !== undefined) {
+                token = res.next_batch;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user.
+     *
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    public async getMutualRooms(userId: string): Promise<string[]> {
+        if (!(await this.doesServerSupportMutualRooms())) {
+            throw Error("Server does not support the Mutual Rooms API");
+        }
+
+        // Stable version found in the spec
+        const stableMutualRoomsSupport =
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS));
+
+        // Handle unstable and stable support in separate functions since
+        // since they are different in enough ways to be annoying to do in one
+        // (token names are different, different prefix, no pagination in some
+        // versions, etc)
+        if (stableMutualRoomsSupport) return this.getMutualRoomsStable(userId);
+        else return this.getMutualRoomsUnstable(userId);
     }
 
     /**
@@ -8891,26 +8974,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Fetches the summary of a room as defined by an initial version of MSC3266 and implemented in Synapse
-     * Proposed at https://github.com/matrix-org/matrix-doc/pull/3266
+     * Fetches the summary of a room.
+     * https://spec.matrix.org/latest/client-server-api/#get_matrixclientv1room_summaryroomidoralias
+     *
+     * Uses the initial version of MSC3266, as implemented in older versions of Synapse, unless the
+     * server advertises support for the spec version which stabilised it.
+     *
      * @param roomIdOrAlias - The ID or alias of the room to get the summary of.
-     * @param via - The list of servers which know about the room if only an ID was provided.
+     * @param via - The servers to attempt to request the summary from, when the local server cannot
+     *              generate it (for instance, because it has no local user in the room).
      */
     public async getRoomSummary(roomIdOrAlias: string, via?: string[]): Promise<RoomSummary> {
-        const paramOpts = {
-            prefix: "/_matrix/client/unstable/im.nheko.summary",
-        };
-        try {
-            const path = utils.encodeUri("/summary/$roomid", { $roomid: roomIdOrAlias });
-            return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-        } catch (e) {
-            if (e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED") {
-                const path = utils.encodeUri("/rooms/$roomid/summary", { $roomid: roomIdOrAlias });
-                return await this.http.authedRequest(Method.Get, path, { via }, undefined, paramOpts);
-            } else {
-                throw e;
-            }
-        }
+        return fetchRoomSummary(this.http, await this.getVersions(), roomIdOrAlias, via);
     }
 
     /**

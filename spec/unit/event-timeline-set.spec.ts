@@ -431,6 +431,23 @@ describe("EventTimelineSet", () => {
             const event = mkThreadResponse(messageEvent);
             expect(eventTimelineSet.canContain(event)).toBeTruthy();
         });
+
+        it("should keep a relation whose parent comes later in the same batch", () => {
+            // Back-pagination adds newest first, so a relation precedes its parent
+            const parent = utils.mkMessage({ room: roomId, user: userA, msg: "Hi!", event: true });
+            const reference = utils.mkEvent(
+                {
+                    event: true,
+                    type: "org.example.reference",
+                    user: userA,
+                    room: roomId,
+                    content: { "m.relates_to": { rel_type: "m.reference", event_id: parent.getId() } },
+                },
+                room.client,
+            );
+            eventTimelineSet.addEventsToTimeline([reference, parent], true, false, eventTimeline, "foo");
+            expect(eventTimeline.getEvents().map((e) => e.getId())).toEqual([parent.getId(), reference.getId()]);
+        });
     });
 
     describe("handleRemoteEcho", () => {

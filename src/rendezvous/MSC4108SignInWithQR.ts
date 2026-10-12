@@ -36,7 +36,7 @@ import {
     type ValidatedAuthMetadata,
     waitForDeviceAuthorization,
 } from "../oauth/index.ts";
-import { type CryptoApi } from "../crypto-api/index.ts";
+import { type SignInWithQRSecrets, type SignInWithQRFlow } from "./SignInWithQRFlow.ts";
 
 /**
  * Enum representing the payload types transmissible over [MSC4108](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
@@ -106,7 +106,7 @@ interface AcceptedPayload extends MSC4108Payload {
     type: PayloadType.ProtocolAccepted;
 }
 
-interface SecretsPayload extends MSC4108Payload, Awaited<ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>>> {
+interface SecretsPayload extends MSC4108Payload, SignInWithQRSecrets {
     type: PayloadType.Secrets;
 }
 
@@ -115,7 +115,7 @@ interface SecretsPayload extends MSC4108Payload, Awaited<ReturnType<NonNullable<
  * sign in with QR + OAuth2 flow.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export class MSC4108SignInWithQR {
+export class MSC4108SignInWithQR implements SignInWithQRFlow {
     private readonly ourIntent: QrCodeIntent;
     private _code?: Uint8Array;
     private expectingNewDeviceId?: string;

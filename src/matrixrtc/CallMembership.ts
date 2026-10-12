@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { deepCompare } from "../utils.ts";
-import { type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
+import { type RTCCallCapability, type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
 import { computeSlotId, slotIdToDescription } from "./utils.ts";
@@ -28,6 +28,7 @@ import {
     MatrixRTCMembershipParseError,
 } from "./membershipData/index.ts";
 import { EventType } from "../@types/event.ts";
+import { isUnstableLivekitTransport } from "./LivekitTransport.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -68,6 +69,41 @@ type MembershipData =
     | { kind: MembershipKind.RTC; data: RtcMembershipData }
     | { kind: MembershipKind.Session; data: SessionMembershipData };
 
+function getDeviceId({ kind, data }: MembershipData): string {
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.member.device_id;
+        case MembershipKind.Session:
+            return data.device_id;
+    }
+}
+
+function getMemberId({ kind, data }: MembershipData, sender: string): string {
+    // the createdTs behaves equivalent to the membershipID.
+    // we only need the field for the legacy member events where we needed to update them
+    // synapse ignores sending state events if they have the same content.
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.member.id;
+        case MembershipKind.Session:
+            return (
+                // best case we have a client already publishing the right custom membershipId
+                data.membershipID ??
+                // alternatively we use the hardcoded jwt id default value (used until version 0.16.0)
+                `${sender}:${data.device_id}`
+            );
+    }
+}
+
+function getTransports({ kind, data }: MembershipData): Transport[] {
+    switch (kind) {
+        case MembershipKind.RTC:
+            return data.transports.published;
+        case MembershipKind.Session:
+            return data.foci_preferred;
+    }
+}
+
 type LimitedEvent = Pick<MatrixEvent, "getId" | "getSender" | "getTs" | "getType" | "getContent">;
 // TODO: Rename to RtcMembership once we removed the legacy SessionMembership is removed, to avoid confusion.
 export class CallMembership {
@@ -104,16 +140,22 @@ export class CallMembership {
      * @param matrixEvent The Matrix event to read.
      */
     public static async parseFromEvent(matrixEvent: LimitedEvent): Promise<CallMembership> {
+        const sender = matrixEvent.getSender();
+        if (sender === undefined) throw new Error("matrixEvent is missing sender field");
         const membershipData: MembershipData = this.membershipDataFromMatrixEvent(matrixEvent);
-        const rtcBackendIdentity =
-            membershipData.kind === MembershipKind.RTC
-                ? await computeRtcIdentityRaw(
-                      membershipData.data.member.user_id,
-                      membershipData.data.member.device_id,
-                      membershipData.data.member.id,
-                  )
-                : `${matrixEvent.getSender()}:${membershipData.data.device_id}`;
-        return new CallMembership(matrixEvent, membershipData, rtcBackendIdentity);
+        const livekitTransports = getTransports(membershipData).filter(isUnstableLivekitTransport);
+        const legacyIdentity = `${sender}:${getDeviceId(membershipData)}`;
+
+        const backendIdentities: string[] = [];
+        if (livekitTransports.some((t) => "url" in t)) {
+            backendIdentities.push(await computeRtcIdentityRaw(sender, getMemberId(membershipData, sender)));
+        }
+        if (livekitTransports.some((t) => "livekit_service_url" in t)) {
+            backendIdentities.push(legacyIdentity);
+        }
+
+        // rtcBackendIdentity is deprecated, so it's fine to always set it to the legacy identity.
+        return new CallMembership(matrixEvent, membershipData, backendIdentities, legacyIdentity);
     }
 
     public static equal(a?: CallMembership, b?: CallMembership): boolean {
@@ -131,21 +173,27 @@ export class CallMembership {
      * Use `parseFromEvent`.
      * Constructor should only be used by tests.
      * @private
-     * @param matrixEvent
-     * @param membershipData
-     * @param rtcBackendIdentity
      */
     public constructor(
         /** The Matrix event that this membership is based on */
         private readonly matrixEvent: LimitedEvent,
         private readonly membershipData: MembershipData,
+        /**
+         * Possible identities which this member may have on the backends of
+         * their published transports.
+         */
+        public readonly backendIdentities: string[],
+        /**
+         * @deprecated Check the backend for the existence of any of
+         * {@link backendIdentities} instead.
+         */
         public readonly rtcBackendIdentity: string,
     ) {
         const eventId = matrixEvent.getId();
         const sender = matrixEvent.getSender();
 
-        if (eventId === undefined) throw new Error("parentEvent is missing eventId field");
-        if (sender === undefined) throw new Error("parentEvent is missing sender field");
+        if (eventId === undefined) throw new Error("matrixEvent is missing eventId field");
+        if (sender === undefined) throw new Error("matrixEvent is missing sender field");
 
         this.logger = logger.getChild(`[CallMembership ${sender}:${this.deviceId}]`);
         this.matrixEventData = { eventId, sender };
@@ -157,14 +205,7 @@ export class CallMembership {
     }
 
     public get userId(): string {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.member.user_id;
-            case MembershipKind.Session:
-            default:
-                return this.matrixEventData.sender;
-        }
+        return this.matrixEventData.sender;
     }
 
     public get eventId(): string {
@@ -226,14 +267,7 @@ export class CallMembership {
     }
 
     public get deviceId(): string {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.member.device_id;
-            case MembershipKind.Session:
-            default:
-                return data.device_id;
-        }
+        return getDeviceId(this.membershipData);
     }
 
     public get callIntent(): RTCCallIntent | undefined {
@@ -242,6 +276,14 @@ export class CallMembership {
             return intent;
         }
         this.logger.warn("RTC membership has invalid m.call.intent");
+        return undefined;
+    }
+
+    public get callCapabilities(): RTCCallCapability[] | undefined {
+        const capabilities = this.applicationData["capabilities"];
+        if (capabilities === undefined) return undefined;
+        if (Array.isArray(capabilities) && capabilities.every((c) => typeof c === "string")) return capabilities;
+        this.logger.warn("RTC membership has invalid capabilities");
         return undefined;
     }
 
@@ -255,14 +297,6 @@ export class CallMembership {
             return { application: data.application.type, id };
         }
         return slotIdToDescription(this.slotId);
-    }
-
-    /**
-     * The application `type`.
-     * @deprecated Use @see applicationData
-     */
-    public get application(): string {
-        return this.applicationData.type;
     }
 
     /**
@@ -301,8 +335,8 @@ export class CallMembership {
     /**
      * This computes the membership ID for the membership.
      * For the sticky event based rtcSessionData this is trivial it is `member.id`.
-     * This is not supposed to be used to identity on an rtc backend. This is just a nouance for
-     * a generated (sha256) anonymised identity. Only send `rtcBackendIdentity` to any rtc backend service.
+     * This is not supposed to be used to identity on an rtc backend. This is just a nuance for
+     * a generated (sha256) anonymised identity. Only send {@link backendIdentities} to any rtc backend service.
      *
      * For the legacy sessionMemberEvents it is a bit more complex. Here we sometimes do not have this data
      * in the event content and we expected the SFU and the client to use `${this.matrixEventData.sender}:${data.device_id}`.
@@ -313,37 +347,14 @@ export class CallMembership {
      * It is also possible for a session event to set a custom membershipID. in that case this will be used.
      */
     public get memberId(): string {
-        // the createdTs behaves equivalent to the membershipID.
-        // we only need the field for the legacy member events where we needed to update them
-        // synapse ignores sending state events if they have the same content.
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case "rtc":
-                return data.member.id;
-            case "session":
-                return (
-                    // best case we have a client already publishing the right custom membershipId
-                    data.membershipID ??
-                    // alternativly we use the hard coded jwt id defuatl value (used until version 0.16.0)
-                    `${this.matrixEventData.sender}:${data.device_id}`
-                );
-            default:
-                throw Error("Not possible to get memberID without knowing the membership event kind");
-        }
-    }
-
-    /**
-     * @deprecated renamed to `memberId`
-     */
-    public get membershipID(): string {
-        return this.memberId;
+        return getMemberId(this.membershipData, this.matrixEventData.sender);
     }
 
     public createdTs(): number {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
-                // TODO we need to read the referenced (relation) event if available to get the real created_ts
+                // TODO Do we need this to represent the TS of the original join?
                 return this.matrixEvent.getTs();
             case MembershipKind.Session:
             default:
@@ -406,34 +417,20 @@ export class CallMembership {
      * Directly relates to the `transports.published` field.
      *
      * ## Legacy session membership
-     * In case of a legacy session membership (m.call.member) this will return the selected transport where
-     * media is published. How this selection happens depends on the `focus_active` field of the session membership.
-     * If the `focus_selection` is `oldest_membership` this will return the transport of the oldest membership
-     * in the room (based on the `created_ts` field of the session membership).
-     * If the `focus_selection` is `multi_sfu` it will return the first transport of the `foci_preferred` list.
-     * (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
-     * @param oldestMembership For backwards compatibility with session membership (legacy). Unused in case of RTC membership.
-     * Always required to make the consumer not care if it deals with RTC or session memberships.
+     * In case of a legacy session membership (m.call.member) this will return the first transport of the
+     * `foci_preferred` list. (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
+     *
+     * @param _oldestMembership Deprecated and unused.
+     *
      * @returns The transport this membership uses to publish media or undefined if no transport is available.
      */
-    public getTransport(oldestMembership: CallMembership): Transport | undefined {
+    public getTransport(_oldestMembership?: CallMembership): Transport | undefined {
         const { kind, data } = this.membershipData;
         switch (kind) {
             case MembershipKind.RTC:
                 return data.transports.published[0];
             case MembershipKind.Session:
-                switch (data.focus_active.focus_selection) {
-                    case "oldest_membership":
-                        if (CallMembership.equal(this, oldestMembership)) return data.foci_preferred[0];
-                        if (oldestMembership !== undefined) return oldestMembership.getTransport(oldestMembership);
-                        break;
-                    case "multi_sfu":
-                        return data.foci_preferred[0];
-                    default:
-                        // `focus_selection` not understood.
-                        return undefined;
-                }
-                break;
+                return data.foci_preferred[0];
             default:
                 return undefined;
         }
@@ -444,13 +441,6 @@ export class CallMembership {
      * Or the value of the `foci_preferred` field for legacy session memberships (m.call.member).
      */
     public get transports(): Transport[] {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.transports.published;
-            case MembershipKind.Session:
-            default:
-                return data.foci_preferred;
-        }
+        return getTransports(this.membershipData);
     }
 }
