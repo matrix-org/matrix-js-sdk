@@ -746,7 +746,7 @@ export class RoomWidgetClient extends MatrixClient {
         const serverName = body.server_name ?? this.getDomain();
         if (serverName === null) throw new Error("Cannot determine the server name to request a token from");
         const { jwt } = await this.widgetApi
-            .getRtcLivekitToken({ ...body, server_name: serverName })
+            .getRtcLivekitToken(asWidgetRequest({ ...body, server_name: serverName }))
             .catch(timeoutToConnectionError);
         return { jwt };
     }
@@ -763,7 +763,7 @@ export class RoomWidgetClient extends MatrixClient {
     public override async _unstable_delegateDelayedLeave(
         body: LivekitDelegateDelayedLeaveRequest,
     ): Promise<EmptyObject> {
-        await this.widgetApi.delegateRtcLivekitDelayedLeave(body).catch(timeoutToConnectionError);
+        await this.widgetApi.delegateRtcLivekitDelayedLeave(asWidgetRequest(body)).catch(timeoutToConnectionError);
         return {};
     }
 
@@ -1000,4 +1000,17 @@ function timeoutToConnectionError(error: unknown): never {
         throw new ConnectionError("widget api timeout");
     }
     throw error;
+}
+
+/**
+ * Launders a MatrixRTC request into whatever type the widget API's method expects.
+ *
+ * Element Web type-checks this file against its own copy of matrix-widget-api, which may still be 1.19
+ * and expect `member` where we now send `member_id` (MSC4195). The host forwards the body to the
+ * homeserver as is, so the shape we send is what matters, not the one the local types describe.
+ *
+ * TODO: Remove once Element Web is on matrix-widget-api 1.20.
+ */
+function asWidgetRequest<T>(request: unknown): T {
+    return request as T;
 }
