@@ -2969,20 +2969,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         delayOrQueryDict?: number | SendDelayedEventRequestOpts | QueryDict,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        if (
-            typeof delayOrQueryDict === "number" ||
-            (delayOrQueryDict && isSendDelayedEventRequestOpts(delayOrQueryDict))
-        ) {
-            let delayMs: number;
-            if (typeof delayOrQueryDict === "number") {
-                delayMs = delayOrQueryDict;
-            } else if (delayOrQueryDict.parent_delay_id !== undefined) {
-                throw new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
-            } else {
-                // Cast is known to be correct by process of elimination on the union
-                delayMs = (delayOrQueryDict as { delay: number }).delay;
-            }
-            return this.sendEventHttpRequest(event, delayMs, queryDict);
+        if (this.isDelayMsOrOpts(delayOrQueryDict)) {
+            return this.sendEventHttpRequest(event, this.getDelayMsFromArg(delayOrQueryDict), queryDict);
         }
         queryDict = delayOrQueryDict;
         try {
@@ -3546,7 +3534,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async _unstable_sendDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
-        delayMs: number,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         threadId: string | null,
         eventType: K,
         content: TimelineEvents[K],
@@ -3558,6 +3546,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "sendDelayedEvent",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
         return this.sendCompleteEvent({
@@ -3581,7 +3570,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
         stickDuration: number,
-        delayMs: number,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         threadId: string | null,
         eventType: K,
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
@@ -3593,6 +3582,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "getDelayedEvents",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
             throw new UnsupportedStickyEventsEndpointError(
                 "Server does not support the sticky events",
@@ -3621,7 +3611,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayMs: number,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
@@ -3633,6 +3623,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "sendDelayedStateEvent",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
         const pathParams = {
             $roomId: roomId,
@@ -9135,6 +9126,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         logger.error("Issuer configuration not valid");
         throw new Error(OAuth2Error.OpSupport);
     }
+
+    /** @deprecated Present only to assist fully dropping support for {@link SendDelayedEventRequestOpts} */
+    protected readonly isDelayMsOrOpts = (
+        opt: number | SendDelayedEventRequestOpts | QueryDict | undefined,
+    ): opt is number | SendDelayedEventRequestOpts => {
+        return typeof opt === "number" || (!!opt && isSendDelayedEventRequestOpts(opt));
+    };
+
+    /** @deprecated Present only to assist fully dropping support for {@link SendDelayedEventRequestOpts} */
+    protected readonly getDelayMsFromArg = (delayMsOrOpts: number | SendDelayedEventRequestOpts): number => {
+        if (typeof delayMsOrOpts === "number") {
+            return delayMsOrOpts;
+        } else if (delayMsOrOpts.parent_delay_id === undefined) {
+            // Cast is known to be correct by process of elimination on the union
+            return (delayMsOrOpts as any).delay;
+        } else {
+            throw new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+        }
+    };
 }
 
 /**

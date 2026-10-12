@@ -44,7 +44,6 @@ import {
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
     UpdateDelayedEventAction,
-    isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents, type TimelineEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -443,15 +442,8 @@ export class RoomWidgetClient extends MatrixClient {
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let delayMs: number | undefined;
-        if (typeof delayOrQueryDict === "number") {
-            delayMs = delayOrQueryDict;
-        } else if (delayOrQueryDict && isSendDelayedEventRequestOpts(delayOrQueryDict)) {
-            if (delayOrQueryDict.parent_delay_id !== undefined) {
-                throw new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
-            } else {
-                // Cast is known to be correct by process of elimination on the union
-                delayMs = (delayOrQueryDict as { delay?: number }).delay;
-            }
+        if (this.isDelayMsOrOpts(delayOrQueryDict)) {
+            delayMs = this.getDelayMsFromArg(delayOrQueryDict);
         } else {
             queryDict = delayOrQueryDict;
         }
@@ -527,7 +519,7 @@ export class RoomWidgetClient extends MatrixClient {
      */
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayMs: number,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
@@ -538,6 +530,7 @@ export class RoomWidgetClient extends MatrixClient {
                 "sendDelayedStateEvent",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
         const response = await this.widgetApi
             .sendStateEvent(eventType, stateKey, content, roomId, delayMs)

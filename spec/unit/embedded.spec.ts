@@ -407,6 +407,9 @@ describe("RoomWidgetClient", () => {
     });
 
     describe("delayed events", () => {
+        const delayMs = 2000;
+        const delayOpts = { delay: delayMs };
+
         describe("when supported", () => {
             const doesServerSupportUnstableFeatureMock = vi.fn((feature) =>
                 Promise.resolve(feature === "org.matrix.msc4140"),
@@ -420,22 +423,28 @@ describe("RoomWidgetClient", () => {
                 doesServerSupportUnstableFeatureMock.mockReset();
             });
 
-            it("sends delayed message events", async () => {
+            it.each([delayMs, delayOpts])("sends delayed message events", async (delayMsOrOpts) => {
                 await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
-                await client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
-                    request_id: 123,
-                });
+                await client._unstable_sendDelayedEvent(
+                    "!1:example.org",
+                    delayMsOrOpts,
+                    null,
+                    "org.matrix.rageshake_request",
+                    {
+                        request_id: 123,
+                    },
+                );
                 expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
                     "org.matrix.rageshake_request",
                     { request_id: 123 },
                     "!1:example.org",
-                    2000,
+                    delayMs,
                     undefined,
                 );
             });
 
-            it("sends delayed state events", async () => {
+            it.each([delayMs, delayOpts])("sends delayed state events", async (delayMsOrOpts) => {
                 await makeClient({
                     sendDelayedEvents: true,
                     sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
@@ -443,7 +452,7 @@ describe("RoomWidgetClient", () => {
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
                 await client._unstable_sendDelayedStateEvent(
                     "!1:example.org",
-                    2000,
+                    delayMsOrOpts,
                     "org.example.foo",
                     { hello: "world" },
                     "bar",
@@ -453,7 +462,52 @@ describe("RoomWidgetClient", () => {
                     "bar",
                     { hello: "world" },
                     "!1:example.org",
-                    2000,
+                    delayMs,
+                );
+            });
+
+            describe("parent_delay_id", () => {
+                const error = new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+
+                it.each([{}, delayOpts])(
+                    "rejects sending a delayed message event with a parent_delay_id",
+                    async (delayOpts) => {
+                        await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                        expect(widgetApi.requestCapability).toHaveBeenCalledWith(
+                            MatrixCapabilities.MSC4157SendDelayedEvent,
+                        );
+                        await expect(
+                            client._unstable_sendDelayedEvent(
+                                "!1:example.org",
+                                { parent_delay_id: "d0", ...delayOpts },
+                                null,
+                                "org.matrix.rageshake_request",
+                                { request_id: 123 },
+                            ),
+                        ).rejects.toThrow(error);
+                    },
+                );
+
+                it.each([{}, delayOpts])(
+                    "rejects sending a delayed state event with a parent_delay_id",
+                    async (delayOpts) => {
+                        await makeClient({
+                            sendDelayedEvents: true,
+                            sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
+                        });
+                        expect(widgetApi.requestCapability).toHaveBeenCalledWith(
+                            MatrixCapabilities.MSC4157SendDelayedEvent,
+                        );
+                        await expect(
+                            client._unstable_sendDelayedStateEvent(
+                                "!1:example.org",
+                                { parent_delay_id: "d0", ...delayOpts },
+                                "org.example.foo",
+                                { hello: "world" },
+                                "bar",
+                            ),
+                        ).rejects.toThrow(error);
+                    },
                 );
             });
 

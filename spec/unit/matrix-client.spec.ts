@@ -884,6 +884,7 @@ describe("MatrixClient", function () {
         const body = "This is the body";
         const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
         const delayMs = 2000;
+        const delayOpts = { delay: delayMs };
         const realDelayOpts = { "org.matrix.msc4140.delay": 2000 };
         const delayData = { delay_id: "did" };
 
@@ -925,7 +926,7 @@ describe("MatrixClient", function () {
         });
 
         // eslint-disable-next-line @vitest/expect-expect
-        it("works with null threadId", async () => {
+        it.each([delayMs, delayOpts])("can send a delayed message event", async (delayMsOrOpts) => {
             const txnId = client.makeTxnId();
             httpLookups = [
                 {
@@ -939,7 +940,7 @@ describe("MatrixClient", function () {
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                delayMs,
+                delayMsOrOpts,
                 null,
                 EventType.RoomMessage,
                 { ...content },
@@ -1050,8 +1051,7 @@ describe("MatrixClient", function () {
         });
 
         // eslint-disable-next-line @vitest/expect-expect
-        it("can send a delayed state event", async () => {
-            httpLookups = [];
+        it.each([delayMs, delayOpts])("can send a delayed state event", async (delayMsOrOpts) => {
             const content = { topic: "The year 2000" };
 
             httpLookups = [
@@ -1064,7 +1064,42 @@ describe("MatrixClient", function () {
                 },
             ];
 
-            await client._unstable_sendDelayedStateEvent(roomId, delayMs, EventType.RoomTopic, { ...content });
+            await client._unstable_sendDelayedStateEvent(roomId, delayMsOrOpts, EventType.RoomTopic, { ...content });
+        });
+
+        describe("parent_delay_id", () => {
+            const error = new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+
+            it.each([{}, delayOpts])(
+                "rejects sending a delayed message event with a parent_delay_id",
+                async (delayOpts) => {
+                    await expect(
+                        client._unstable_sendDelayedEvent(
+                            roomId,
+                            { parent_delay_id: "d0", ...delayOpts },
+                            null,
+                            EventType.RoomMessage,
+                            { ...content },
+                        ),
+                    ).rejects.toThrow(error);
+                },
+            );
+
+            it.each([{}, delayOpts])(
+                "rejects sending a delayed state event with a parent_delay_id",
+                async (delayOpts) => {
+                    const error = new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+                    const content = { topic: "The year 2000" };
+                    await expect(
+                        client._unstable_sendDelayedStateEvent(
+                            roomId,
+                            { parent_delay_id: "d0", ...delayOpts },
+                            EventType.RoomTopic,
+                            { ...content },
+                        ),
+                    ).rejects.toThrow(error);
+                },
+            );
         });
 
         describe("lookups", () => {
