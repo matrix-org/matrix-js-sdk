@@ -1100,6 +1100,21 @@ describe("MatrixClient", function () {
                     ).rejects.toThrow(error);
                 },
             );
+
+            it.each([{}, delayOpts])("prevents subclasses from using a parent_delay_id", async (delayOpts) => {
+                class Subclass extends MatrixClient {
+                    async sendCompleteEventWithParentDelayId() {
+                        return this.sendCompleteEvent({
+                            roomId,
+                            threadId: null,
+                            eventObject: {},
+                            delayOpts: { parent_delay_id: "d0", ...delayOpts },
+                        });
+                    }
+                }
+                Object.setPrototypeOf(client, Subclass.prototype);
+                await expect((client as Subclass).sendCompleteEventWithParentDelayId()).rejects.toThrow(error);
+            });
         });
 
         describe("lookups", () => {

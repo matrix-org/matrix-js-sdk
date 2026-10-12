@@ -2854,16 +2854,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         params: SendEventParams | SendDelayedEventParams,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         const { roomId, threadId, eventObject, queryDict } = params;
-        if ("delayOpts" in params && params.delayOpts?.parent_delay_id !== undefined) {
-            throw new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
-        }
         const delayMs =
             "delayMs" in params
                 ? params.delayMs
-                : "delayOpts" in params && "delay" in params.delayOpts
-                  ? params.delayOpts.delay
+                : "delayOpts" in params
+                  ? this.getDelayMsFromOpts(params.delayOpts)
                   : undefined;
-
         const txnId = params.txnId || this.makeTxnId();
 
         // We always construct a MatrixEvent when sending because the store and scheduler use them.
@@ -9136,15 +9132,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /** @deprecated Present only to assist fully dropping support for {@link SendDelayedEventRequestOpts} */
     protected readonly getDelayMsFromArg = (delayMsOrOpts: number | SendDelayedEventRequestOpts): number => {
-        if (typeof delayMsOrOpts === "number") {
-            return delayMsOrOpts;
-        } else if (delayMsOrOpts.parent_delay_id === undefined) {
-            // Cast is known to be correct by process of elimination on the union
-            return (delayMsOrOpts as any).delay;
-        } else {
+        return typeof delayMsOrOpts === "number" ? delayMsOrOpts : this.getDelayMsFromOpts(delayMsOrOpts);
+    };
+
+    private getDelayMsFromOpts(opts: SendDelayedEventRequestOpts): number {
+        if (opts.parent_delay_id !== undefined) {
             throw new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
         }
-    };
+        // Cast is known to be correct by process of elimination on the union
+        return (opts as any).delay;
+    }
 }
 
 /**
