@@ -432,29 +432,8 @@ describe("MembershipManager", () => {
                     expect(delays()).toEqual([9000]);
                 });
 
-                it("still tries if the capability is absent (Synapse before 1.157.0)", async () => {
-                    vi.mocked(client.getCachedCapabilities).mockReturnValue({});
-                    vi.mocked(client.fetchCapabilities).mockResolvedValue({});
-                    vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
-                        new MatrixError({
-                            "errcode": "M_UNKNOWN",
-                            "org.matrix.msc4140.errcode": "M_MAX_DELAY_EXCEEDED",
-                            "org.matrix.msc4140.max_delay": 7500,
-                        }),
-                    );
-                    const manager = new MembershipManager(
-                        { delayedLeaveEventDelayMs: 9000 },
-                        room,
-                        client,
-                        callSession,
-                    );
-                    manager.join([focus]);
-                    await vi.advanceTimersByTimeAsync(0);
-                    expect(delays()).toEqual([9000, 7500]);
-                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                });
-
                 it.each([
+                    ["the capability is absent", {}],
                     [
                         "max_delay_ms is 0",
                         { "org.matrix.msc4140.delayed_events": { max_delay_ms: 0, max_scheduled: 100 } },
@@ -511,6 +490,26 @@ describe("MembershipManager", () => {
                     await vi.advanceTimersByTimeAsync(0);
                     expect(delays()).toEqual([9000, 7500]);
                     expect(client.fetchCapabilities).toHaveBeenCalledTimes(1);
+                });
+
+                it("joins without a delayed leave event if the fetched capabilities do not advertise delayed events", async () => {
+                    vi.mocked(client.fetchCapabilities).mockImplementation(() => {
+                        vi.mocked(client.getCachedCapabilities).mockReturnValue({});
+                        return Promise.resolve({});
+                    });
+                    vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValueOnce(
+                        new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400),
+                    );
+                    const manager = new MembershipManager(
+                        { delayedLeaveEventDelayMs: 9000 },
+                        room,
+                        client,
+                        callSession,
+                    );
+                    manager.join([focus]);
+                    await vi.advanceTimersByTimeAsync(0);
+                    expect(delays()).toEqual([9000]);
+                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                 });
 
                 it("still handles the legacy M_MAX_DELAY_EXCEEDED error", async () => {

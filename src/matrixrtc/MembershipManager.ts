@@ -1103,17 +1103,13 @@ export class MembershipManager
      * Apply the limits of the delayed events capability ([MSC4140](https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md))
      * by clamping the delay of the delayed leave event to the advertised maximum.
      * @param capabilities the homeserver capabilities, or undefined if they are not known.
-     * @returns false if the capabilities say that delayed events are disabled, true otherwise
-     * (also if the capabilities are not known).
+     * @returns false if the capabilities do not advertise delayed events or say that they are disabled, true
+     * otherwise (also if the capabilities are not known).
      */
     private applyDelayedEventsCapability(capabilities: Capabilities | undefined): boolean {
         if (!capabilities) return true;
         const capability = capabilities["m.delayed_events"] ?? capabilities["org.matrix.msc4140.delayed_events"];
-        // The MSC says to treat an absent capability as disabled. We do not: Synapse before 1.157.0 supports delayed
-        // events without advertising the capability, so we attempt the request and rely on the error handling instead.
-        // TODO: Treat an absent capability as disabled once Synapse before 1.157.0 is no longer deployed
-        // (to revisit from 2026-11-18).
-        if (!capability) return true;
+        if (!capability) return false;
         // A `0` in either field means that delayed events are disabled.
         if (capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
 
