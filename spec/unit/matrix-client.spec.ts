@@ -4077,7 +4077,7 @@ describe("MatrixClient", function () {
                     .mockResolvedValue({ rtc_transports: [] });
 
                 await expect(client._unstable_getRTCTransports()).rejects.toMatchObject({
-                    errcode: "M_NOT_FOUND",
+                    errcode: "M_UNRECOGNIZED",
                     httpStatus: 404,
                 });
                 expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
@@ -4098,7 +4098,7 @@ describe("MatrixClient", function () {
 
             for (let i = 0; i < 3; i++) {
                 await expect(client.cachedRtcTransports.wait()).rejects.toMatchObject({
-                    errcode: "M_NOT_FOUND",
+                    errcode: "M_UNRECOGNIZED",
                     httpStatus: 404,
                 });
             }
