@@ -41,7 +41,11 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
+import {
+    type RtcLeftMembershipData,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
 import { deepCompare } from "../utils.ts";
 
@@ -764,6 +768,9 @@ export class MembershipManager
         );
     };
 
+    /** Sends the event that marks our membership as left. */
+    protected clientSendLeaveMembership: () => Promise<ISendEventResponse> = () => this.clientSendMembership({});
+
     private async sendJoinEvent(): Promise<ActionUpdate> {
         const myMembership = this.makeMyMembership(this.membershipEventExpiryMs);
         return await this.clientSendMembership(myMembership)
@@ -987,7 +994,7 @@ export class MembershipManager
             });
     }
     private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
-        return await this.clientSendMembership({})
+        return await this.clientSendLeaveMembership()
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
@@ -1399,7 +1406,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             { delay: this.delayedLeaveEventDelayMs },
             null,
             EventType.RTCMembership,
-            { slot_id: computeSlotId(this.slotDescription), msc4354_sticky_key: this.memberId },
+            this.makeMyLeftMembership(),
         );
 
     protected clientSendMembership: (
@@ -1413,6 +1420,15 @@ export class StickyEventMembershipManager extends MembershipManager {
             { slot_id: computeSlotId(this.slotDescription), ...myMembership, msc4354_sticky_key: this.memberId },
         );
     };
+
+    protected clientSendLeaveMembership: () => Promise<ISendEventResponse> = () =>
+        this.clientWithSticky._unstable_sendStickyEvent(
+            this.room.roomId,
+            MEMBERSHIP_STICKY_DURATION_MS,
+            null,
+            EventType.RTCMembership,
+            this.makeMyLeftMembership(),
+        );
 
     private static nameMap = new Map([
         ["sendStateEvent", "_unstable_sendStickyEvent"],
@@ -1441,7 +1457,18 @@ export class StickyEventMembershipManager extends MembershipManager {
             },
             slot_id: computeSlotId(this.slotDescription),
             transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
-            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
+            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId, membership: "join" },
+        };
+    }
+
+    /**
+     * The content of the `m.rtc.member` event that marks our membership as left.
+     */
+    protected makeMyLeftMembership(): RtcLeftMembershipData {
+        return {
+            slot_id: computeSlotId(this.slotDescription),
+            member: { id: this.memberId, membership: "leave" },
+            msc4354_sticky_key: this.memberId,
         };
     }
 }
