@@ -1,6 +1,6 @@
 {
     "name": "matrix-js-sdk",
-    "version": "43.0.0",
+    "version": "44.0.0",
     "description": "Matrix Client-Server SDK for Javascript",
     "engines": {
         "node": ">=22.0.0"
@@ -8,7 +8,7 @@
     "devEngines": {
         "packageManager": {
             "name": "pnpm",
-            "version": "12.3.4",
+            "version": "12.11.2",
             "onFail": "download"
         }
     },
@@ -97,7 +97,7 @@
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
         "matrix-mock-request": "^2.5.0",
-        "oxfmt": "^0.71.0",
+        "oxfmt": "^0.72.0",
         "oxlint": "^1.70.0",
         "oxlint-tsgolint": "^7.0.0",
         "typedoc": "^0.28.1",
