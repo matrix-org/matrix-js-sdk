@@ -110,4 +110,9 @@ export interface IMembershipManager extends TypedEventEmitter<
      * `SessionConfig.applicationData`), re-sending the membership if it changed.
      */
     updateApplicationData(applicationData: Record<string, unknown>): Promise<void>;
+
+    /**
+     * Call this when the slot state event of the session has been updated.
+     */
+    onRtcSlotUpdate?(): Promise<void>;
 }

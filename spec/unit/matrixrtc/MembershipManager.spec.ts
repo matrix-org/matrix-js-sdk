@@ -32,6 +32,8 @@ import {
     makeMockRoom,
     sessionMembershipTemplate,
     mockCallMembership,
+    mockRoomState,
+    mockSlotEvent,
     type MockClient,
 } from "./mocks.ts";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
@@ -1579,6 +1581,113 @@ describe("MembershipManager", () => {
                     );
                     // ..once
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
+                });
+
+                it("omits slot_event_id when no slot event exists", async () => {
+                    const memberManager = new StickyEventMembershipManager(
+                        undefined,
+                        room,
+                        client,
+                        callSession,
+                        "@alice:example.org:AAAAAAA_m.call",
+                    );
+                    memberManager.join([focus]);
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+
+                    const content = vi.mocked(client._unstable_sendStickyEvent).mock.calls[0][4] as Record<
+                        string,
+                        unknown
+                    >;
+                    expect(content).not.toHaveProperty("slot_event_id");
+                });
+
+                it("includes the ID of the current slot event as slot_event_id", async () => {
+                    const slotEvent = mockSlotEvent(callSession, { status: "open" }, room.roomId);
+                    mockRoomState(room, [sessionMembershipTemplate], slotEvent);
+                    const memberManager = new StickyEventMembershipManager(
+                        undefined,
+                        room,
+                        client,
+                        callSession,
+                        "@alice:example.org:AAAAAAA_m.call",
+                    );
+                    memberManager.join([focus]);
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
+                        room.roomId,
+                        MAX_STICKY_DURATION_MS,
+                        null,
+                        "org.matrix.msc4143.rtc.member",
+                        expect.objectContaining({ slot_id: "m.call#ROOM", slot_event_id: slotEvent.getId() }),
+                    );
+                    // The leave event doesn't carry the slot event ID.
+                    const leaveContent = vi.mocked(client._unstable_sendStickyDelayedEvent).mock.calls[0][5];
+                    expect(leaveContent).not.toHaveProperty("slot_event_id");
+                });
+            });
+
+            describe("onRtcSlotUpdate()", () => {
+                async function joinWithSlotEvent(): Promise<StickyEventMembershipManager> {
+                    const slotEvent = mockSlotEvent(callSession, { status: "open" }, room.roomId);
+                    mockRoomState(room, [sessionMembershipTemplate], slotEvent);
+                    const memberManager = new StickyEventMembershipManager(
+                        undefined,
+                        room,
+                        client,
+                        callSession,
+                        "@alice:example.org:AAAAAAA_m.call",
+                    );
+                    memberManager.join([focus]);
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                    await vi.advanceTimersByTimeAsync(1);
+                    await memberManager.onRTCSessionMemberUpdate([
+                        mockCallMembership(
+                            { ...sessionMembershipTemplate, user_id: "@alice:example.org" },
+                            room.roomId,
+                        ),
+                    ]);
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledTimes(1);
+                    return memberManager;
+                }
+
+                it("re-sends the membership with the new slot_event_id when the slot event changed", async () => {
+                    const memberManager = await joinWithSlotEvent();
+
+                    const newSlotEvent = mockSlotEvent(callSession, { status: "open" }, room.roomId);
+                    mockRoomState(room, [sessionMembershipTemplate], newSlotEvent);
+                    await memberManager.onRtcSlotUpdate();
+
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledTimes(2);
+                    expect(client._unstable_sendStickyEvent).toHaveBeenLastCalledWith(
+                        room.roomId,
+                        MAX_STICKY_DURATION_MS,
+                        null,
+                        "org.matrix.msc4143.rtc.member",
+                        expect.objectContaining({ slot_event_id: newSlotEvent.getId() }),
+                    );
+                });
+
+                it("does not re-send the membership when the slot event is unchanged", async () => {
+                    const memberManager = await joinWithSlotEvent();
+
+                    await memberManager.onRtcSlotUpdate();
+
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledTimes(1);
+                });
+
+                it("does not send anything before joining", async () => {
+                    const memberManager = new StickyEventMembershipManager(
+                        undefined,
+                        room,
+                        client,
+                        callSession,
+                        "@alice:example.org:AAAAAAA_m.call",
+                    );
+
+                    await memberManager.onRtcSlotUpdate();
+
+                    expect(client._unstable_sendStickyEvent).not.toHaveBeenCalled();
                 });
             });
             it("sends a leave event with member.membership leave when the scheduled delayed leave is gone", async () => {

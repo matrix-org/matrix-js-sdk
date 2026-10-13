@@ -36,6 +36,7 @@ export type RtcMembershipStatus = "join" | "leave";
  */
 export interface RtcMembershipData {
     slot_id: string;
+    slot_event_id?: string;
     member: {
         user_id: string;
         device_id: string;
@@ -63,6 +64,7 @@ export interface RtcMembershipData {
  */
 export interface RtcLeftMembershipData {
     slot_id: string;
+    slot_event_id?: string;
     member: {
         id: string;
         membership: "leave";
@@ -104,6 +106,10 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
         } catch (ex) {
             errors.push(prefix + `slot_id was badly formed${ex instanceof Error ? `: ${ex.message}` : ""}`);
         }
+    }
+    // Events predating `slot_event_id` omit it, so it is only validated when present.
+    if (data.slot_event_id !== undefined && typeof data.slot_event_id !== "string") {
+        errors.push(prefix + "slot_event_id must be string");
     }
 
     if (typeof data.member !== "object" || data.member === null) {

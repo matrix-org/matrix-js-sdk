@@ -140,6 +140,9 @@ describe("CallMembership", () => {
             it("returns correct eventId", () => {
                 expect(membership.eventId).toBe("$eventid");
             });
+            it("returns undefined slotEventId", () => {
+                expect(membership.slotEventId).toBeUndefined();
+            });
             it("returns correct slot_id", () => {
                 // slot_id is application and call_id dependent. So we create
                 // a membership for each possible combination
@@ -281,6 +284,25 @@ describe("CallMembership", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_id: "m.call#" });
             }).not.toThrow();
+        });
+
+        it("accepts membership without slot_event_id for compatibility with older events", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_event_id: undefined });
+            }).not.toThrow();
+        });
+        it("accepts membership with a string slot_event_id", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_event_id: "$slot" });
+            }).not.toThrow();
+        });
+        it("rejects membership with a non-string slot_event_id", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_event_id: 1 });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, slot_event_id: null });
+            }).toThrow();
         });
 
         it("rejects membership with no application", () => {
@@ -445,6 +467,16 @@ describe("CallMembership", () => {
             it("returns correct slot_id", () => {
                 expect(membership.slotId).toBe("m.call#");
                 expect(membership.slotDescription).toStrictEqual({ id: "", application: "m.call" });
+            });
+            it("returns undefined slotEventId if not present", () => {
+                expect(membership.slotEventId).toBeUndefined();
+            });
+            it("returns correct slotEventId", () => {
+                const withSlotEventId = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    slot_event_id: "$slot",
+                });
+                expect(withSlotEventId.slotEventId).toBe("$slot");
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");

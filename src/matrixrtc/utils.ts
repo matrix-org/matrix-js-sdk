@@ -17,6 +17,7 @@ limitations under the License.
 import { getEncryptionKeyMapKey, type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 import type { InboundEncryptionSession, EncryptionKeyMapKey, RtcSlotEventContent, SlotDescription } from "./types.ts";
 import type { Room } from "../models/room.ts";
+import type { MatrixEvent } from "../models/event.ts";
 import { EventTimeline } from "../models/event-timeline.ts";
 import { EventType } from "../@types/event.ts";
 
@@ -72,22 +73,45 @@ export function computeSlotId(slotDescription: SlotDescription): string {
 }
 
 /**
+ * Reads the slot state event for the given slot description.
+ *
+ * @returns The slot event, or `undefined` if no slot event exists for the given description.
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export function getSlotEvent(
+    room: Pick<Room, "getLiveTimeline">,
+    slotDescription: SlotDescription,
+): MatrixEvent | undefined {
+    const slotId = computeSlotId(slotDescription);
+    return (
+        room.getLiveTimeline().getState(EventTimeline.FORWARDS)?.getStateEvents(EventType.RTCSlot, slotId) ?? undefined
+    );
+}
+
+/**
  * Reads the slot state event's content for the given slot description.
  *
  * @returns The slot event's content, or `undefined` if no slot event exists for the given description.
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export function getSlotEventContent(
     room: Pick<Room, "getLiveTimeline">,
     slotDescription: SlotDescription,
 ): RtcSlotEventContent | undefined {
-    const slotId = computeSlotId(slotDescription);
-    const slotEvent = room
-        .getLiveTimeline()
-        .getState(EventTimeline.FORWARDS)
-        ?.getStateEvents(EventType.RTCSlot, slotId);
-    if (!slotEvent) return undefined;
+    return getSlotEvent(room, slotDescription)?.getContent<RtcSlotEventContent>();
+}
 
-    return slotEvent.getContent<RtcSlotEventContent>();
+/**
+ * Reads the slot state event's ID for the given slot description.
+ *
+ * @returns The slot event's ID, or `undefined` if no slot event exists for the given description.
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export function getSlotEventId(
+    room: Pick<Room, "getLiveTimeline">,
+    slotDescription: SlotDescription,
+): string | undefined {
+    return getSlotEvent(room, slotDescription)?.getId();
 }
 
 /**

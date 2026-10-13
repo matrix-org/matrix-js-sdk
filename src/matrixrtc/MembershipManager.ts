@@ -45,7 +45,7 @@ import {
     type RtcMembershipData,
     type SessionMembershipData,
 } from "./membershipData/index.ts";
-import { computeSlotId } from "./utils.ts";
+import { computeSlotId, getSlotEventId } from "./utils.ts";
 import { deepCompare } from "../utils.ts";
 
 /* MembershipActionTypes:
@@ -217,8 +217,8 @@ export class MembershipManager
     extends TypedEventEmitter<MembershipManagerEvent, MembershipManagerEventHandlerMap>
     implements IMembershipManager
 {
-    private activated = false;
-    private readonly logger: Logger;
+    protected activated = false;
+    protected readonly logger: Logger;
     protected callIntent: RTCCallIntent | undefined;
     protected callCapabilities: RTCCallCapability[] | undefined;
     protected applicationData: Record<string, unknown> | undefined;
@@ -755,7 +755,7 @@ export class MembershipManager
     /** Sends the event that marks our membership as left. */
     protected clientSendLeaveMembership: () => Promise<ISendEventResponse> = () => this.clientSendMembership({});
 
-    private async sendJoinEvent(): Promise<ActionUpdate> {
+    protected async sendJoinEvent(): Promise<ActionUpdate> {
         const myMembership = this.makeMyMembership(this.membershipEventExpiryMs);
         return await this.clientSendMembership(myMembership)
             .then(() => {
@@ -1301,7 +1301,7 @@ export class MembershipManager
 export class StickyEventMembershipManager extends MembershipManager {
     public constructor(
         joinConfig: (SessionConfig & MembershipConfig) | undefined,
-        room: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
+        private readonly roomWithTimeline: Pick<Room, "getLiveTimeline" | "roomId" | "getVersion">,
         private readonly clientWithSticky: MembershipManagerClient &
             Pick<MatrixClient, "_unstable_sendStickyEvent" | "_unstable_sendStickyDelayedEvent">,
         sessionDescription: SlotDescription,
@@ -1310,7 +1310,26 @@ export class StickyEventMembershipManager extends MembershipManager {
         private readonly memberId: string,
         parentLogger?: Logger,
     ) {
-        super(joinConfig, room, clientWithSticky, sessionDescription, parentLogger);
+        super(joinConfig, roomWithTimeline, clientWithSticky, sessionDescription, parentLogger);
+    }
+
+    /** The `slot_event_id` we last sent in our membership, or `undefined` if we didn't send one. */
+    private sentSlotEventId?: string;
+
+    /**
+     * Re-sends our membership if the slot state event changed since we last sent it.
+     */
+    public async onRtcSlotUpdate(): Promise<void> {
+        if (!this.activated || !this.ownMembership) return;
+        if (this.currentSlotEventId() === this.sentSlotEventId) return;
+        await this.sendJoinEvent();
+    }
+
+    /**
+     * The event ID of the current slot state event for this session, or `undefined` if there is none.
+     */
+    private currentSlotEventId(): string | undefined {
+        return getSlotEventId(this.roomWithTimeline, this.slotDescription);
     }
 
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
@@ -1362,6 +1381,13 @@ export class StickyEventMembershipManager extends MembershipManager {
      * @returns Only returns `RtcMembershipData`
      */
     protected makeMyMembership(): RtcMembershipData {
+        // Callers aren't (yet) required to open the slot before joining, so we omit
+        // the property when no slot event exists.
+        const slotEventId = this.currentSlotEventId();
+        if (slotEventId === undefined) {
+            this.logger.warn("No slot event found, sending membership without slot_event_id");
+        }
+        this.sentSlotEventId = slotEventId;
         return {
             application: {
                 ...this.applicationData,
@@ -1370,6 +1396,7 @@ export class StickyEventMembershipManager extends MembershipManager {
                 ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
+            ...(slotEventId !== undefined ? { slot_event_id: slotEventId } : {}),
             transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId, membership: "join" },
         };

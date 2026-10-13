@@ -266,6 +266,22 @@ export class CallMembership {
         }
     }
 
+    /**
+     * The event ID of the `m.rtc.slot` state event that this membership is using.
+     *
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
+    public get slotEventId(): string | undefined {
+        const { kind, data } = this.membershipData;
+        switch (kind) {
+            case MembershipKind.RTC:
+                return data.slot_event_id;
+            case MembershipKind.Session:
+            default:
+                return undefined;
+        }
+    }
+
     public get deviceId(): string {
         return getDeviceId(this.membershipData);
     }

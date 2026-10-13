@@ -1182,6 +1182,7 @@ describe("MatrixRTCSession", () => {
             await sess.initialMembershipCalculated;
 
             expect(sess.getRtcSlot()).toBeUndefined();
+            expect(sess.getRtcSlotEventId()).toBeUndefined();
             expect(sess.isSlotClosed()).toBeUndefined();
             expect(sess.isSlotOpen()).toBeUndefined();
         });
@@ -1193,8 +1194,26 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [], slotEvent);
 
             expect(sess.getRtcSlot()).toEqual(openSlotContent);
+            expect(sess.getRtcSlotEventId()).toEqual(slotEvent.getId());
             expect(sess.isSlotClosed()).toBe(false);
             expect(sess.isSlotOpen()).toBe(true);
+        });
+
+        it("notifies the membership manager when the slot event changes", async () => {
+            const mockRoom = makeMockRoom([], false);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            sess.join(owmMemberIdentity, [mockFocus], { unstableSendStickyEvents: true });
+            const onRtcSlotUpdate = vi.fn().mockResolvedValue(undefined);
+            sess["membershipManager"]!.onRtcSlotUpdate = onRtcSlotUpdate;
+
+            const otherSlotEvent = mockSlotEvent({ ...callSession, id: "OTHER" }, openSlotContent, mockRoom.roomId);
+            mockRoom.emit(RoomStateEvent.Events, otherSlotEvent, {} as any, null);
+            expect(onRtcSlotUpdate).not.toHaveBeenCalled();
+
+            const slotEvent = mockSlotEvent(callSession, openSlotContent, mockRoom.roomId);
+            mockRoom.emit(RoomStateEvent.Events, slotEvent, {} as any, null);
+            expect(onRtcSlotUpdate).toHaveBeenCalledTimes(1);
         });
 
         it("getRtcSlot returns the raw content and isSlotClosed is true when the slot is closed", () => {

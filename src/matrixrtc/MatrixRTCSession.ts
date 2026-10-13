@@ -52,7 +52,7 @@ import { ToDeviceKeyTransport } from "./ToDeviceKeyTransport.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
 import { type IContent, type MatrixEvent } from "../models/event.ts";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../models/room-sticky-events.ts";
-import { computeSlotId, getSlotEventContent, isSlotClosed, isSlotOpen } from "./utils.ts";
+import { computeSlotId, getSlotEventContent, getSlotEventId, isSlotClosed, isSlotOpen } from "./utils.ts";
 
 /**
  * Events emitted by MatrixRTCSession
@@ -347,6 +347,18 @@ export class MatrixRTCSession extends TypedEventEmitter<
      */
     public getRtcSlot(): RtcSlotEventContent | undefined {
         return getSlotEventContent(this.roomSubset, this.slotDescription);
+    }
+
+    /**
+     * Reads the current slot state event's ID for this session.
+     *
+     * Members whose {@link CallMembership.slotEventId} differs from this haven't seen the current version
+     * of the slot yet (or predate the `slot_event_id` property).
+     *
+     * @returns The slot event's ID, or `undefined` if no slot event exists for this session.
+     */
+    public getRtcSlotEventId(): string | undefined {
+        return getSlotEventId(this.roomSubset, this.slotDescription);
     }
 
     /**
@@ -828,6 +840,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
         if (event.getType() !== EventType.RTCSlot) return;
         if (event.getStateKey() !== computeSlotId(this.slotDescription)) return;
         void this.ensureRecalculateSessionMembers();
+        this.membershipManager?.onRtcSlotUpdate?.().catch((error) => {
+            this.logger.error("Failed to update membership after slot update", error);
+        });
     };
 
     /**

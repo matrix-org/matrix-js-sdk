@@ -14,7 +14,39 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { computeRtcIdentityRaw } from "../../../src/matrixrtc/membershipData/index.ts";
+import { computeRtcIdentityRaw, isLeftMembershipContent } from "../../../src/matrixrtc/membershipData/index.ts";
+
+describe("isLeftMembershipContent", () => {
+    it("detects left memberships via member.membership", () => {
+        expect(
+            isLeftMembershipContent({
+                slot_id: "m.call#ROOM",
+                slot_event_id: "$slot",
+                member: { id: "MEMBER", membership: "leave" },
+                msc4354_sticky_key: "MEMBER",
+            }),
+        ).toBe(true);
+    });
+
+    it("detects left memberships predating member.membership", () => {
+        expect(isLeftMembershipContent({ slot_id: "m.call#ROOM", msc4354_sticky_key: "MEMBER" })).toBe(true);
+        expect(
+            isLeftMembershipContent({ slot_id: "m.call#ROOM", slot_event_id: "$slot", msc4354_sticky_key: "MEMBER" }),
+        ).toBe(true);
+    });
+
+    it("does not treat joined memberships as left", () => {
+        expect(
+            isLeftMembershipContent({
+                slot_id: "m.call#ROOM",
+                slot_event_id: "$slot",
+                member: { id: "MEMBER", membership: "join" },
+                application: { type: "m.call" },
+                msc4354_sticky_key: "MEMBER",
+            }),
+        ).toBe(false);
+    });
+});
 
 describe("computeRtcIdentityRaw", () => {
     it("should compute the correct identity hash", async () => {
