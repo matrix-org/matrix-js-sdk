@@ -53,9 +53,8 @@ describe("FetchHttpApi", () => {
     const prefix = ClientPrefix.V3;
     const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
 
-    /** The URL a `fetch` was called with, as a string. */
-    const requestUrl = (resource: RequestInfo | URL): string =>
-        resource instanceof Request ? resource.url : resource.toString();
+    /** The URL a `fetch` was called with, as a string. The SDK only ever passes a `URL` or a string. */
+    const requestUrl = (resource: RequestInfo | URL): string => (resource as URL | string).toString();
 
     /**
      * Wraps a mocked `fetchFn` so that it only sees requests to the homeserver: requests to any other origin,
