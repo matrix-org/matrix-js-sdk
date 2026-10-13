@@ -240,10 +240,14 @@ export class TokenManager {
     ): Promise<TokenRefresher> {
         const metadata = await authMetaDataCallback();
 
-        const oauth2 = new OAuth2(metadata, {
-            clientId: config.clientId,
-            deviceId: config.deviceId,
-        });
+        const oauth2 = new OAuth2(
+            metadata,
+            {
+                clientId: config.clientId,
+                deviceId: config.deviceId,
+            },
+            this.opts.logger,
+        );
 
         return new TokenRefresher(oauth2, (tokens) => this.opts.onTokenRefresh?.(tokens));
     }
