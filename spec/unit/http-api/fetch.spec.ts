@@ -53,6 +53,23 @@ describe("FetchHttpApi", () => {
     const prefix = ClientPrefix.V3;
     const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
 
+    /** The URL a `fetch` was called with, as a string. The SDK only ever passes a `URL` or a string. */
+    const requestUrl = (resource: RequestInfo | URL): string => (resource as URL | string).toString();
+
+    /**
+     * Wraps a mocked `fetchFn` so that it only sees requests to the homeserver: requests to any other origin,
+     * i.e. the authorization server, are handed to `fetchMock` instead. The SDK makes its authorization server
+     * requests via `fetchFn` too, so this lets a test stub the homeserver with a simple mock whilst stubbing the
+     * authorization server with `fetchMock` routes.
+     */
+    function homeserverOnly(fetchFn: MockedFunction<Window["fetch"]>): typeof globalThis.fetch {
+        const homeserverOrigin = new URL(baseUrl).origin;
+        return (resource, init) =>
+            new URL(requestUrl(resource)).origin === homeserverOrigin
+                ? fetchFn(resource, init)
+                : fetchMock.fetchHandler(resource, init);
+    }
+
     beforeEach(() => {
         vi.useRealTimers();
     });
@@ -390,7 +407,7 @@ describe("FetchHttpApi", () => {
 
                 describe("with an oauth2ClientConfig", () => {
                     const makeOAuthApi = (
-                        fetchFn: MockedFunction<Window["fetch"]>,
+                        fetchFn: typeof globalThis.fetch,
                         extraOpts: Partial<IHttpOpts> = {},
                     ): { api: FetchHttpApi<any>; emitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap> } => {
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
@@ -415,7 +432,7 @@ describe("FetchHttpApi", () => {
                             body: { errcode: "M_UNKNOWN", error: "failed" },
                         });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
@@ -426,7 +443,7 @@ describe("FetchHttpApi", () => {
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
                         fetchMock.post(authMetadata.token_endpoint, { throws: new Error("transitive fault") });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             new TokenRefreshError(unknownTokenErr),
                         );
@@ -446,7 +463,7 @@ describe("FetchHttpApi", () => {
                             .fn()
                             .mockResolvedValueOnce(unknownTokenResponse)
                             .mockResolvedValueOnce(okayResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
                             headers: {},
                         });
@@ -474,7 +491,7 @@ describe("FetchHttpApi", () => {
                             warn: vi.fn(),
                             error: vi.fn(),
                         } as unknown as Mocked<Logger>;
-                        const { api } = makeOAuthApi(fetchFn, { logger });
+                        const { api } = makeOAuthApi(homeserverOnly(fetchFn), { logger });
 
                         await api.authedRequest(Method.Post, "/account/password");
 
@@ -502,7 +519,7 @@ describe("FetchHttpApi", () => {
                         // fetch doesn't like our new or old tokens
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
@@ -543,13 +560,39 @@ describe("FetchHttpApi", () => {
 
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const { api } = makeOAuthApi(fetchFn);
+                        const { api } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
 
                         // We should have seen the 3 token refreshes, as above.
                         expect(fetchMock).toHaveFetchedTimes(3, authMetadata.token_endpoint);
+                    });
+
+                    it("should make token refresh requests via fetchFn", async () => {
+                        const homeserverResponses = [unknownTokenResponse, okayResponse];
+                        const fetchFn = vi.fn((resource: URL | RequestInfo): Promise<Response> => {
+                            if (requestUrl(resource) === authMetadata.token_endpoint) {
+                                return Promise.resolve(
+                                    new Response(JSON.stringify(makeTokenResponse("new-access-token", "new-refresh")), {
+                                        status: 200,
+                                        headers: { "Content-Type": "application/json" },
+                                    }),
+                                );
+                            }
+                            return Promise.resolve(homeserverResponses.shift() as unknown as Response);
+                        });
+                        const { api } = makeOAuthApi(fetchFn);
+
+                        await expect(api.authedRequest(Method.Get, "/path")).resolves.toEqual({ x: 1 });
+
+                        expect(fetchFn).toHaveBeenCalledWith(
+                            authMetadata.token_endpoint,
+                            expect.objectContaining({ method: "POST" }),
+                        );
+                        expect(fetchMock).not.toHaveFetched(authMetadata.token_endpoint);
+                        expect(api.opts.accessToken).toBe("new-access-token");
+                        expect(api.opts.refreshToken).toBe("new-refresh");
                     });
                 });
             });
@@ -755,7 +798,7 @@ describe("FetchHttpApi", () => {
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
-            fetchFn,
+            fetchFn: homeserverOnly(fetchFn),
             oauth2ClientConfig,
             authMetadataCallback: () => Promise.resolve(authMetadata),
             accessToken: "ACCESS_TOKEN",
