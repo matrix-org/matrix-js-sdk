@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { deepCompare } from "../utils.ts";
+import { deepCompare, getServerNameFromUserId } from "../utils.ts";
 import { type RTCCallCapability, type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
@@ -214,8 +214,7 @@ export class CallMembership {
      * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
      */
     public get serverName(): string {
-        const userId = this.userId;
-        return userId.substring(userId.indexOf(":") + 1);
+        return getServerNameFromUserId(this.userId);
     }
 
     /**

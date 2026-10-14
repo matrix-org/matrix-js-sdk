@@ -329,6 +329,16 @@ export function removeHiddenChars(str: string): string {
 }
 
 /**
+ * Extracts the server name from a Matrix user ID.
+ *
+ * @param userId - The Matrix user ID.
+ * @returns The server name part of the user ID.
+ */
+export function getServerNameFromUserId(userId: string): string {
+    return userId.substring(userId.indexOf(":") + 1);
+}
+
+/**
  * Removes the direction override characters from a string
  * @returns string with chars removed
  */
