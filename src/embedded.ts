@@ -70,6 +70,7 @@ import {
     UnsupportedDelayedEventsEndpointError,
     UnsupportedStickyEventsEndpointError,
 } from "./matrix.ts";
+import { type Capabilities } from "./serverCapabilities.ts";
 
 interface IStateEventRequest {
     eventType: string;
@@ -188,6 +189,7 @@ export class RoomWidgetClient extends MatrixClient {
     private readonly roomStateSynced: Promise<void>;
     private lifecycle?: AbortController;
     private syncState: SyncState | null = null;
+    private hostCapabilities?: Capabilities;
 
     private pendingSendingEventsTxId: { type: string; id: string | undefined; txId: string }[] = [];
     private eventEmitter = new TypedEventEmitter<keyof EventHandlerMap, EventHandlerMap>();
@@ -358,6 +360,8 @@ export class RoomWidgetClient extends MatrixClient {
         this.store.storeRoom(this.room);
 
         await this.widgetApiReady;
+
+        void this.prefetchCapabilities();
 
         // sync room state:
         if (await this.supportUpdateState()) {
@@ -703,6 +707,60 @@ export class RoomWidgetClient extends MatrixClient {
             .sendToDevice(eventType, false, recursiveMapToObject(contentMap))
             .catch(timeoutToConnectionError);
         return {};
+    }
+
+    /**
+     * Gets the capabilities of the homeserver, returning cached ones if available.
+     *
+     * Overrides {@link MatrixClient.getCapabilities}: see {@link fetchCapabilities}.
+     */
+    public override async getCapabilities(): Promise<Capabilities> {
+        return this.getCachedCapabilities() ?? (await this.fetchCapabilities());
+    }
+
+    /**
+     * Gets the cached capabilities of the homeserver. If none have been fetched yet,
+     * return undefined.
+     *
+     * Overrides {@link MatrixClient.getCachedCapabilities}: see {@link fetchCapabilities}.
+     */
+    public override getCachedCapabilities(): Capabilities | undefined {
+        return this.hostCapabilities ?? super.getCachedCapabilities();
+    }
+
+    /**
+     * Fetches the latest capabilities of the homeserver.
+     *
+     * Overrides {@link MatrixClient.fetchCapabilities}: a widget cannot make authenticated homeserver
+     * calls itself, so we ask the host over the widget API instead (MSC4157), if the host supports it.
+     * The host only returns the delayed events capability (`m.delayed_events`).
+     */
+    public override async fetchCapabilities(): Promise<Capabilities> {
+        if (!(await this.supportsDelayedEventsCapability())) return super.fetchCapabilities();
+        return this.fetchCapabilitiesFromHost();
+    }
+
+    // TODO: Bump matrix-widget-api to the release that adds getDelayedEventsCapability (MSC4157).
+    private async supportsDelayedEventsCapability(): Promise<boolean> {
+        return (await this.widgetApi.getClientVersions()).includes(
+            UnstableApiVersion.MSC4157_DELAYED_EVENTS_CAPABILITY,
+        );
+    }
+
+    private async fetchCapabilitiesFromHost(): Promise<Capabilities> {
+        const response = await this.widgetApi.getDelayedEventsCapability().catch(timeoutToConnectionError);
+        const capability = response["m.delayed_events"];
+        this.hostCapabilities = capability ? { "m.delayed_events": capability } : {};
+        return this.hostCapabilities;
+    }
+
+    private async prefetchCapabilities(): Promise<void> {
+        if (!this.capabilities.sendDelayedEvents) return;
+        try {
+            if (await this.supportsDelayedEventsCapability()) await this.fetchCapabilitiesFromHost();
+        } catch (e) {
+            logger.warn("Failed to get the delayed events capability from the host", e);
+        }
     }
 
     public async getOpenIdToken(): Promise<IOpenIDToken> {

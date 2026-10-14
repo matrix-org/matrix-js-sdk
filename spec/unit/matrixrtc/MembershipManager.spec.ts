@@ -17,7 +17,6 @@ limitations under the License.
 import { type Mock, type MockedFunction } from "vitest";
 
 import {
-    ConnectionError,
     type EmptyObject,
     EventType,
     HTTPError,
@@ -532,111 +531,43 @@ describe("MembershipManager", () => {
                     expect(client.fetchCapabilities).not.toHaveBeenCalled();
                 });
 
-                // TODO: Replace these two widget mode tests once the widget API exposes the delayed events capability.
-                it("halves the delay if the capabilities are not reachable (widget mode)", async () => {
-                    const error = new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400);
-                    vi.mocked(client._unstable_sendDelayedStateEvent)
-                        .mockRejectedValueOnce(error)
-                        .mockRejectedValueOnce(error);
-                    const manager = new MembershipManager(
-                        { delayedLeaveEventDelayMs: 60_000 },
-                        room,
-                        client,
-                        callSession,
-                    );
-                    manager.join([focus]);
-                    await vi.advanceTimersByTimeAsync(0);
-                    expect(delays()).toEqual([60_000, 30_000, 15_000]);
-                    // We only try to reach the capabilities once.
-                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(1);
-                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
-                });
-
-                it("fetches the capabilities again after a network error", async () => {
-                    vi.mocked(client.fetchCapabilities).mockRejectedValue(new ConnectionError("fetch failed"));
-                    const error = new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400);
-                    vi.mocked(client._unstable_sendDelayedStateEvent)
-                        .mockRejectedValueOnce(error)
-                        .mockRejectedValueOnce(error);
-                    const manager = new MembershipManager(
-                        { delayedLeaveEventDelayMs: 60_000 },
-                        room,
-                        client,
-                        callSession,
-                    );
-                    manager.join([focus]);
-                    await vi.advanceTimersByTimeAsync(0);
-                    expect(delays()).toEqual([60_000, 30_000, 15_000]);
-                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(2);
-                });
-
-                it("fetches the capabilities again once a delayed event was accepted", async () => {
-                    const error = new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400);
-                    vi.mocked(client._unstable_sendDelayedStateEvent)
-                        .mockRejectedValueOnce(error)
-                        .mockResolvedValueOnce({ delay_id: "id" })
-                        .mockRejectedValueOnce(error);
-                    vi.mocked(client._unstable_restartScheduledDelayedEvent).mockRejectedValueOnce(
-                        new MatrixError({ errcode: "M_NOT_FOUND" }),
-                    );
-                    const manager = new MembershipManager(
-                        { delayedLeaveEventDelayMs: 60_000 },
-                        room,
-                        client,
-                        callSession,
-                    );
-                    manager.join([focus]);
-                    await vi.advanceTimersByTimeAsync(1);
-                    expect(delays()).toEqual([60_000, 30_000, 30_000, 15_000]);
-                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(2);
-                });
-
-                it("fetches the capabilities again once the unreachable period is over", async () => {
-                    const error = new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400);
-                    const rateLimitError = new MatrixError(
-                        { errcode: "M_LIMIT_EXCEEDED" },
-                        429,
-                        undefined,
-                        undefined,
-                        new Headers({ "Retry-After": "360" }),
-                    );
-                    vi.mocked(client._unstable_sendDelayedStateEvent)
-                        .mockRejectedValueOnce(error)
-                        .mockRejectedValueOnce(rateLimitError)
-                        .mockRejectedValueOnce(error);
-                    const manager = new MembershipManager(
-                        { delayedLeaveEventDelayMs: 60_000 },
-                        room,
-                        client,
-                        callSession,
-                    );
-                    manager.join([focus]);
-                    await vi.advanceTimersByTimeAsync(0);
-                    expect(delays()).toEqual([60_000, 30_000]);
-                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(1);
-
-                    await vi.advanceTimersByTimeAsync(360_000);
-                    expect(delays()).toEqual([60_000, 30_000, 30_000, 15_000]);
-                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(2);
-                });
-
-                it("joins without a delayed leave event once halving goes below the restart interval", async () => {
+                it("joins without a delayed leave event if the capabilities are not reachable", async () => {
                     vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValue(
                         new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400),
                     );
                     const manager = new MembershipManager(
-                        { delayedLeaveEventDelayMs: 30_000, delayedLeaveEventRestartMs: 5000 },
+                        { delayedLeaveEventDelayMs: 60_000 },
                         room,
                         client,
                         callSession,
                     );
                     manager.join([focus]);
                     await vi.advanceTimersByTimeAsync(0);
-                    // The last attempt happens after the join. It must not make the manager throw.
-                    expect(delays()).toEqual([30_000, 15_000, 7500, 7500]);
+                    expect(delays()).toEqual([60_000, 60_000]);
+                    expect(client.fetchCapabilities).toHaveBeenCalledTimes(2);
                     expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                     await vi.advanceTimersByTimeAsync(60_000);
-                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(4);
+                    expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+                    expect(manager.status).toBe(Status.Connected);
+                });
+
+                it("joins without a delayed leave event if the capabilities do not lower the delay", async () => {
+                    vi.mocked(client.fetchCapabilities).mockResolvedValue({
+                        "m.delayed_events": { max_delay_ms: 60_000, max_scheduled: 100 },
+                    });
+                    vi.mocked(client._unstable_sendDelayedStateEvent).mockRejectedValue(
+                        new MatrixError({ errcode: "M_DELAY_TOO_LARGE" }, 400),
+                    );
+                    const manager = new MembershipManager(
+                        { delayedLeaveEventDelayMs: 60_000 },
+                        room,
+                        client,
+                        callSession,
+                    );
+                    manager.join([focus]);
+                    await vi.advanceTimersByTimeAsync(0);
+                    expect(delays()).toEqual([60_000, 60_000]);
+                    expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
                     expect(manager.status).toBe(Status.Connected);
                 });
             });

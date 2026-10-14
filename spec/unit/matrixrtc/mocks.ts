@@ -110,7 +110,7 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
         getDeviceId: vi.fn(() => deviceId),
         getUserId: vi.fn(() => userId),
-        // By default the capabilities are not reachable, as it is the case in widget mode.
+        // By default the capabilities are not reachable, as in widget mode when the host does not support MSC4157.
         fetchCapabilities: vi
             .fn()
             .mockRejectedValue(new MatrixError({ errcode: "M_MISSING_TOKEN", error: "Missing access token" }, 401)),

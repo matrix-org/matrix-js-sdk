@@ -99,7 +99,6 @@ On Leave: ─────────  STOP ALL ABOVE
  * of time.
  */
 const MEMBERSHIP_STICKY_DURATION_MS = 60 * 60 * 1000; // 60 minutes
-const CAPABILITIES_UNREACHABLE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * The different types of actions the MembershipManager can take.
@@ -430,8 +429,6 @@ export class MembershipManager
 
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
-    // Set once fetching the server capabilities failed (widget mode), so we do not try again on every retry.
-    private capabilitiesUnreachableUntil = 0;
 
     private get networkErrorRetryMs(): number {
         return this.joinConfig?.networkErrorRetryMs ?? 3_000;
@@ -537,7 +534,6 @@ export class MembershipManager
         // In the `then` and `catch` block we treat both cases differently. "if (this.state.hasMemberStateEvent) {} else {}"
 
         // Clamp the delay to the advertised maximum before the first attempt, so that the server never has to reject it.
-        // The capabilities are not available in widget mode. In that case we rely on the error handling below.
         if (!this.applyDelayedEventsCapability(this.client.getCachedCapabilities())) {
             this.logger.info("Not using delayed event because the server capabilities say they are disabled");
             if (this.state.hasMemberStateEvent) return {};
@@ -549,7 +545,6 @@ export class MembershipManager
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
-                this.capabilitiesUnreachableUntil = 0;
                 this.setAndEmitDelayId(response.delay_id);
                 if (this.state.hasMemberStateEvent) {
                     // This action was scheduled because the previous delayed event was cancelled
@@ -576,7 +571,7 @@ export class MembershipManager
                     // due to lack of https://github.com/element-hq/synapse/pull/17810
 
                     // Don't do any other delayed event work if its not supported,
-                    // or if we gave up on finding a delay that the server accepts.
+                    // or if the server rejects the delay and its capabilities do not give a lower one.
                     if (this.isUnsupportedDelayedEndpoint(e) || this.isDelayTooLargeError(e)) return {};
                     throw Error("Could not send delayed event, even though delayed events are supported. " + e);
                 } else {
@@ -1150,35 +1145,15 @@ export class MembershipManager
         if (this.isDelayTooLargeError(error)) {
             // The error does not carry the limit. It is advertised in the capabilities.
             const previousDelay = this.delayedLeaveEventDelayMs;
-            let capabilities: Capabilities | undefined;
-            if (Date.now() >= this.capabilitiesUnreachableUntil) {
-                try {
-                    capabilities = await this.client.fetchCapabilities();
-                } catch (e) {
-                    // This is expected in widget mode where the client cannot talk to the homeserver.
-                    // TODO: Get the delayed events capability through the widget API instead, and remove the halving
-                    // fallback below.
-                    this.logger.info("Could not get the server capabilities to read the maximum delay:", e);
-                    if (
-                        e instanceof HTTPError &&
-                        e.httpStatus !== undefined &&
-                        e.httpStatus >= 400 &&
-                        e.httpStatus < 500 &&
-                        e.httpStatus !== 429
-                    ) {
-                        this.capabilitiesUnreachableUntil = Date.now() + CAPABILITIES_UNREACHABLE_DURATION_MS;
-                    }
-                }
+            let capabilities: Capabilities;
+            try {
+                capabilities = await this.client.fetchCapabilities();
+            } catch (e) {
+                this.logger.info("Could not get the server capabilities to read the maximum delay:", e);
+                return false;
             }
             if (!this.applyDelayedEventsCapability(capabilities)) return false;
-
-            if (this.delayedLeaveEventDelayMs >= previousDelay) {
-                // We do not know the limit (or it is not the one the server enforces): halve the delay until the server
-                // accepts it. We give up once the event would time out before we get to restart it.
-                const halvedDelay = Math.floor(previousDelay / 2);
-                if (halvedDelay <= this.delayedLeaveEventRestartMs) return false;
-                this.delayedLeaveEventDelayMsOverride = halvedDelay;
-            }
+            if (this.delayedLeaveEventDelayMs >= previousDelay) return false;
             this.logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
             return true;
         }

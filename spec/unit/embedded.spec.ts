@@ -113,6 +113,7 @@ class MockWidgetApi extends EventEmitter {
     public requestCapabilityToDelegateRtcLivekitDelayedLeave = vi.fn().mockResolvedValue(undefined);
     public getRtcLivekitToken = vi.fn(async () => ({ jwt: "" }));
     public delegateRtcLivekitDelayedLeave = vi.fn(async () => ({}));
+    public getDelayedEventsCapability = vi.fn();
     public sendContentLoaded = vi.fn().mockResolvedValue(undefined);
 
     public transport = {
@@ -660,6 +661,99 @@ describe("RoomWidgetClient", () => {
                     await expect(updateDelayedEvent.call(client, "id")).rejects.toThrow("Server does not support");
                 }
             });
+        });
+    });
+
+    describe("delayed events capability", () => {
+        const capability = { max_delay_ms: 60000, max_scheduled: 10 };
+        const widgetCapabilities: ICapabilities = {
+            sendDelayedEvents: true,
+            sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
+        };
+
+        beforeEach(() => {
+            widgetApi = new MockWidgetApi([
+                UnstableApiVersion.MSC2762_UPDATE_STATE,
+                UnstableApiVersion.MSC4157_DELAYED_EVENTS_CAPABILITY,
+            ]) as unknown as MockedObject<WidgetApi>;
+            widgetApi.getDelayedEventsCapability.mockResolvedValue({ "m.delayed_events": capability });
+        });
+
+        it("gets the capability from the host on start", async () => {
+            await makeClient(widgetCapabilities);
+            await flushPromises();
+
+            expect(widgetApi.getDelayedEventsCapability).toHaveBeenCalled();
+            expect(client.getCachedCapabilities()).toEqual({ "m.delayed_events": capability });
+        });
+
+        it("remembers that the homeserver does not advertise the capability", async () => {
+            widgetApi.getDelayedEventsCapability.mockResolvedValue({});
+            await makeClient(widgetCapabilities);
+            await flushPromises();
+
+            expect(client.getCachedCapabilities()).toEqual({});
+        });
+
+        it("does not ask the host on start when not opted in to sending delayed events", async () => {
+            await makeClient({ sendState: widgetCapabilities.sendState });
+            await flushPromises();
+
+            expect(widgetApi.getDelayedEventsCapability).not.toHaveBeenCalled();
+            expect(client.getCachedCapabilities()).toBeUndefined();
+        });
+
+        it("keeps the capabilities unknown when the host fails on start", async () => {
+            widgetApi.getDelayedEventsCapability.mockRejectedValue(new Error("Missing capability"));
+            await makeClient(widgetCapabilities);
+            await flushPromises();
+
+            expect(client.getCachedCapabilities()).toBeUndefined();
+        });
+
+        it("gets the capability from the host when none is cached", async () => {
+            widgetApi.getDelayedEventsCapability.mockRejectedValueOnce(new Error("Request timed out"));
+            await makeClient(widgetCapabilities);
+            await flushPromises();
+
+            expect(await client.getCapabilities()).toEqual({ "m.delayed_events": capability });
+            expect(client.getCachedCapabilities()).toEqual({ "m.delayed_events": capability });
+        });
+
+        it("fetches the capability again from the host", async () => {
+            await makeClient(widgetCapabilities);
+            await flushPromises();
+
+            const newCapability = { max_delay_ms: 30000, max_scheduled: 10 };
+            widgetApi.getDelayedEventsCapability.mockResolvedValue({ "m.delayed_events": newCapability });
+            expect(await client.fetchCapabilities()).toEqual({ "m.delayed_events": newCapability });
+            expect(await client.getCapabilities()).toEqual({ "m.delayed_events": newCapability });
+            expect(widgetApi.getDelayedEventsCapability).toHaveBeenCalledTimes(2);
+        });
+
+        it("maps a widget timeout to a ConnectionError", async () => {
+            widgetApi.getDelayedEventsCapability.mockRejectedValue(new Error("Request timed out"));
+            await makeClient({});
+
+            await expect(client.fetchCapabilities()).rejects.toThrow(ConnectionError);
+        });
+
+        it("fetches the capabilities from the homeserver when the host does not support the action", async () => {
+            widgetApi = new MockWidgetApi([
+                UnstableApiVersion.MSC2762_UPDATE_STATE,
+            ]) as unknown as MockedObject<WidgetApi>;
+            const fetchCapabilities = vi.spyOn(MatrixClient.prototype, "fetchCapabilities").mockResolvedValue({});
+            try {
+                await makeClient(widgetCapabilities);
+                await flushPromises();
+                expect(client.getCachedCapabilities()).toBeUndefined();
+
+                await client.fetchCapabilities();
+                expect(fetchCapabilities).toHaveBeenCalled();
+                expect(widgetApi.getDelayedEventsCapability).not.toHaveBeenCalled();
+            } finally {
+                fetchCapabilities.mockRestore();
+            }
         });
     });
 
