@@ -208,6 +208,27 @@ export class CallMembership {
         return this.matrixEventData.sender;
     }
 
+    /**
+     * The server name of the homeserver this member belongs to.
+     *
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
+    public get serverName(): string {
+        const userId = this.userId;
+        return userId.substring(userId.indexOf(":") + 1);
+    }
+
+    /**
+     * Resolves the homeserver that provides the specified transport.
+     *
+     * @param transport One of the transports in {@link transports}.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+     */
+    public getTransportServerName(transport: Transport): string {
+        // Use the transport's own `server_name` if available. Otherwise fall back to the sender's server name.
+        return typeof transport.server_name === "string" ? transport.server_name : this.serverName;
+    }
+
     public get eventId(): string {
         return this.matrixEventData.eventId;
     }
