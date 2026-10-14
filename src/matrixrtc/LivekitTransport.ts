@@ -63,6 +63,14 @@ type ServiceUrl = {
  * a session member in unstable MSC4195 implementations: `url` only,
  * `livekit_service_url` only, or both during the migration.
  */
+/**
+* Any LiveKit transport that can be advertised by a homeserver or published by
+* a session member in unstable MSC4195 implementations: `url` only,
+* `livekit_service_url` only, or both during the migration.
+*  
+* It uses the `Unstable` prefix as the MSC is not yet stable and it includes the
+* `livekit_service_url` case which is only here for compatibility reasons.
+*/
 export type UnstableLivekitTransport =
     // Latest MSC4195 variant, with `url`. Indicates that both publishers and
     // subscribers will use the /_matrix/client/v1/rtc/livekit/get_token
