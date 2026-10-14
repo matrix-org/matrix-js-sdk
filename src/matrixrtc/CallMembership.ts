@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { deepCompare, getServerNameFromUserId } from "../utils.ts";
+import { deepCompare } from "../utils.ts";
 import { type RTCCallCapability, type RTCCallIntent, type Transport, type SlotDescription } from "./types.ts";
 import { type MatrixEvent } from "../models/event.ts";
 import { type Logger, logger } from "../logger.ts";
@@ -206,26 +206,6 @@ export class CallMembership {
 
     public get userId(): string {
         return this.matrixEventData.sender;
-    }
-
-    /**
-     * The server name of the homeserver this member belongs to.
-     *
-     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
-     */
-    public get serverName(): string {
-        return getServerNameFromUserId(this.userId);
-    }
-
-    /**
-     * Resolves the homeserver that provides the specified transport.
-     *
-     * @param transport One of the transports in {@link transports}.
-     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
-     */
-    public getTransportServerName(transport: Transport): string {
-        // Use the transport's own `server_name` if available. Otherwise fall back to the sender's server name.
-        return typeof transport.server_name === "string" ? transport.server_name : this.serverName;
     }
 
     public get eventId(): string {

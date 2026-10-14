@@ -283,31 +283,6 @@ describe("CallMembership", () => {
             }).not.toThrow();
         });
 
-        describe("transport server name", () => {
-            it("parses the server name from the sender", () => {
-                const membership = createCallMembership(makeMockEvent(), membershipTemplate);
-                expect(membership.serverName).toBe("example.org");
-            });
-
-            it("resolves a transport without server_name to the sender's homeserver", () => {
-                const transport = { type: "livekit", url: "wss://livekit.example.org" };
-                const membership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    transports: { published: [transport], can_subscribe: ["livekit"] },
-                });
-                expect(membership.getTransportServerName(membership.getTransport()!)).toBe("example.org");
-            });
-
-            it("resolves a transport with server_name to that homeserver", () => {
-                const transport = { type: "livekit", url: "wss://livekit.bob.com", server_name: "bob.com" };
-                const membership = createCallMembership(makeMockEvent(), {
-                    ...membershipTemplate,
-                    transports: { published: [transport], can_subscribe: ["livekit"] },
-                });
-                expect(membership.getTransportServerName(membership.getTransport()!)).toBe("bob.com");
-            });
-        });
-
         it("rejects membership with no application", () => {
             expect(() => {
                 createCallMembership(makeMockEvent(), { ...membershipTemplate, application: undefined });
