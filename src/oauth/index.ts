@@ -59,6 +59,16 @@ type Context = {
     codeVerifier?: string;
 };
 
+/**
+ * Options controlling how an {@link OAuth2} instance makes HTTP requests to the authorization server.
+ */
+export interface OAuth2HttpOptions {
+    /**
+     * The function to invoke for HTTP requests. Defaults to the global `fetch`.
+     */
+    fetchFn?: typeof globalThis.fetch;
+}
+
 export class OAuth2 {
     /**
      * Attempts dynamic registration against the configured registration endpoint.
@@ -139,11 +149,13 @@ export class OAuth2 {
      * @param context - The persistent context needed for the OAuth flows.
      * @param logger - Optional logger to use for the requests made by this instance,
      *     defaults to the root logger of the js-sdk.
+     * @param httpOptions - Optional settings controlling how this instance makes HTTP requests.
      */
     public constructor(
         public readonly metadata: ValidatedAuthMetadata,
         context: Context,
         private readonly logger: Logger = rootLogger,
+        private readonly httpOptions: OAuth2HttpOptions = {},
     ) {
         this.context = {
             clientId: context.clientId,
@@ -267,6 +279,7 @@ export class OAuth2 {
             metadata: this.metadata,
             clientId: this.context.clientId,
             logger: this.logger,
+            fetchFn: this.httpOptions.fetchFn,
         });
     }
 
@@ -284,11 +297,14 @@ export class OAuth2 {
             metadata: this.metadata,
             clientId: this.context.clientId,
             logger: this.logger,
+            fetchFn: this.httpOptions.fetchFn,
         });
     }
 
     /**
      * Make a request to one of the OAuth 2.0 endpoints, throwing if it responds with an error.
+     *
+     * The request is made using the `fetchFn` given in {@link OAuth2HttpOptions}.
      * @returns the {@link Response}, for the caller to parse if the endpoint returns a body.
      */
     private async fetch(
@@ -297,14 +313,19 @@ export class OAuth2 {
         error: OAuth2Error,
     ): Promise<Response> {
         const url = this.metadata[`${target}_endpoint`];
-        const res = await fetchWithLogging(this.logger, url, {
-            method: Method.Post,
-            headers: {
-                "Content-Type": "application/x-www-form-urlencoded",
-                "Accept": "application/json",
+        const res = await fetchWithLogging(
+            this.logger,
+            url,
+            {
+                method: Method.Post,
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "Accept": "application/json",
+                },
+                body: params,
             },
-            body: params,
-        });
+            this.httpOptions.fetchFn,
+        );
 
         if (res.status >= 400) {
             let body: unknown;
