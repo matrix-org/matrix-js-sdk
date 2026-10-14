@@ -19,11 +19,33 @@ import { type WidgetApiResponseError } from "matrix-widget-api";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type IKeyTransport, KeyTransportEvents, type KeyTransportEventsHandlerMap } from "./IKeyTransport.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
-import { type EncryptionKeysToDeviceEventContent, type ParticipantDeviceInfo, type Statistics } from "./types.ts";
+import {
+    type EncryptionKeysToDeviceEventContent,
+    type ParticipantDeviceInfo,
+    type RTCEncryptionKeyMediaKey,
+    type Statistics,
+} from "./types.ts";
 import { ClientEvent, type MatrixClient } from "../client.ts";
 import type { MatrixEvent } from "../models/event.ts";
 import { EventType } from "../@types/event.ts";
 import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
+
+/**
+ * The information extracted from a validated key event.
+ */
+interface ReceivedKey {
+    mediaKey: RTCEncryptionKeyMediaKey;
+    memberId?: string;
+    deviceId: string;
+}
+
+/** Returns the given value as a media key if it is a valid one, otherwise `undefined`. */
+function parseMediaKey(mediaKey: unknown): RTCEncryptionKeyMediaKey | undefined {
+    if (typeof mediaKey !== "object" || mediaKey === null) return undefined;
+    const { key, index } = mediaKey as Partial<RTCEncryptionKeyMediaKey>;
+    if (typeof key !== "string" || key === "" || typeof index !== "number") return undefined;
+    return mediaKey as RTCEncryptionKeyMediaKey;
+}
 
 export class NotSupportedError extends Error {
     public constructor(message?: string) {
@@ -67,22 +89,21 @@ export class ToDeviceKeyTransport
     }
 
     public async sendKey(keyBase64Encoded: string, index: number, members: ParticipantDeviceInfo[]): Promise<void> {
+        const mediaKey = {
+            index: index,
+            key: keyBase64Encoded,
+        };
         const content: EncryptionKeysToDeviceEventContent = {
-            keys: {
-                index: index,
-                key: keyBase64Encoded,
-            },
             room_id: this.roomId,
+            member_id: this.membership.memberId,
+            media_key: mediaKey,
+            // Deprecated but still sent for backwards compatibility.
+            keys: mediaKey,
             member: {
                 claimed_device_id: this.membership.deviceId,
+                // Deprecated but still sent for backwards compatibility.
                 id: this.membership.memberId,
             },
-            session: {
-                call_id: "",
-                application: "m.call",
-                scope: "m.room",
-            },
-            sent_ts: Date.now(),
         };
 
         const targets = members
@@ -119,30 +140,22 @@ export class ToDeviceKeyTransport
         }
     }
 
-    private receiveCallKeyEvent(fromUser: string, content: EncryptionKeysToDeviceEventContent): void {
+    private receiveCallKeyEvent(fromUser: string, { mediaKey, memberId, deviceId }: ReceivedKey): void {
         // The event has already been validated at this point.
 
         this.statistics.counters.roomEventEncryptionKeysReceived += 1;
-
-        // What is this, and why is it needed?
-        // Also to device events do not have an origin server ts
-        const now = Date.now();
-        const age = now - (typeof content.sent_ts === "number" ? content.sent_ts : now);
-        this.statistics.totals.roomEventEncryptionKeysReceivedTotalAge += age;
-
-        const hardcodedMemberIdAlternative = `${fromUser}:${content.member.claimed_device_id}`;
 
         this.emit(
             KeyTransportEvents.ReceivedKeys,
             // TODO userId this is claimed information, deviceId is claimed information
             {
                 userId: fromUser,
-                deviceId: content.member.claimed_device_id,
-                memberId: content.member.id ?? hardcodedMemberIdAlternative,
+                deviceId,
+                memberId: memberId ?? `${fromUser}:${deviceId}`,
             },
-            content.keys.key,
-            content.keys.index,
-            now,
+            mediaKey.key,
+            mediaKey.index,
+            Date.now(),
         );
     }
 
@@ -160,16 +173,17 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        const content = this.getValidEventContent(event);
-        if (!content) return;
+        const receivedKey = this.getValidEventContent(event);
+        if (!receivedKey) return;
 
         if (!event.getSender()) return;
 
-        this.receiveCallKeyEvent(event.getSender()!, content);
+        this.receiveCallKeyEvent(event.getSender()!, receivedKey);
     };
 
-    private getValidEventContent(event: MatrixEvent): EncryptionKeysToDeviceEventContent | undefined {
-        const content = event.getContent();
+    /** Validates a received key event and extracts the key information from it. */
+    private getValidEventContent(event: MatrixEvent): ReceivedKey | undefined {
+        const content = event.getContent<Partial<EncryptionKeysToDeviceEventContent>>();
         const roomId = content.room_id;
         if (!roomId) {
             // Invalid event
@@ -181,17 +195,26 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        if (!content.keys || !content.keys.key || typeof content.keys.index !== "number") {
-            this.logger.warn("Malformed Event: Missing keys field");
+        // Prefer `media_key` and fall back to the deprecated `keys` property for backwards compatibility.
+        const mediaKey = parseMediaKey(content.media_key) ?? parseMediaKey(content.keys);
+        if (!mediaKey) {
+            this.logger.warn("Malformed Event: Missing media key");
             return;
         }
 
-        if (!content.member || !content.member.claimed_device_id) {
+        // Prefer `member_id` and fall back to the deprecated `member.id` property for backwards compatibility.
+        const memberId = content.member_id ?? content.member?.id;
+        if (memberId !== undefined && typeof memberId !== "string") {
+            this.logger.warn("Malformed Event: Invalid member id");
+            return;
+        }
+
+        const deviceId = content.member?.claimed_device_id;
+        if (!deviceId || typeof deviceId !== "string") {
             this.logger.warn("Malformed Event: Missing claimed_device_id");
             return;
         }
 
-        // TODO check for session related fields once the to-device encryption uses the new format.
-        return content as EncryptionKeysToDeviceEventContent;
+        return { mediaKey, memberId, deviceId };
     }
 }

@@ -1354,12 +1354,11 @@ describe("RoomWidgetClient", () => {
     });
 
     describe("LiveKit token", () => {
-        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
         const body = {
             url: "wss://livekit.example.org",
             room_id: "!1:example.org",
             slot_id: "m.call#ROOM",
-            member,
+            member_id: "xyzABCDEF10123",
         };
 
         it("requests the capability when opted in", async () => {
@@ -1417,7 +1416,7 @@ describe("RoomWidgetClient", () => {
             url: "wss://livekit.example.org",
             room_id: "!1:example.org",
             slot_id: "m.call#ROOM",
-            member: { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" },
+            member_id: "xyzABCDEF10123",
             delay_id: "1234567890",
         };
 

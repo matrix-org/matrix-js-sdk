@@ -61,7 +61,11 @@ import {
     type RtcSlotEventContent,
 } from "../matrixrtc/types.ts";
 import { type M_POLL_END, type M_POLL_START, type PollEndEventContent, type PollStartEventContent } from "./polls.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "../matrixrtc/membershipData/index.ts";
+import {
+    type RtcLeftMembershipData,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "../matrixrtc/membershipData/index.ts";
 import { type LocalNotificationSettings } from "./local_notifications.ts";
 import { type IPushRules } from "./PushRules.ts";
 import { type SecretInfo, type SecretStorageKeyDescription } from "../secret-storage.ts";
@@ -112,6 +116,11 @@ export enum EventType {
     CallReplaces = "m.call.replaces",
     CallAssertedIdentity = "m.call.asserted_identity",
     CallAssertedIdentityPrefix = "org.matrix.call.asserted_identity",
+    /**
+     * To-device event type used to share MatrixRTC per-member encryption keys.
+     *
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
     CallEncryptionKeysPrefix = "io.element.call.encryption_keys",
     KeyVerificationRequest = "m.key.verification.request",
     KeyVerificationStart = "m.key.verification.start",
@@ -361,7 +370,11 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
-    [EventType.RTCMembership]: RtcMembershipData | { slot_id: string; msc4354_sticky_key: string };
+    [EventType.RTCMembership]:
+        | RtcMembershipData
+        | RtcLeftMembershipData
+        // Left memberships predating `member.membership` only carry the slot ID and the sticky key.
+        | { slot_id: string; msc4354_sticky_key: string };
 }
 
 /**
