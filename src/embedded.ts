@@ -831,7 +831,7 @@ export class RoomWidgetClient extends MatrixClient {
             // This could theoretically be an event send by this device
             // In that case we need to update the txId of the event because the embedded client/widget
             // knows this event with a different transaction Id than what was used by the host client.
-            event.getSender() === this.getUserId() &&
+            event.getStableId() === (this.getRoom(event.getRoomId())?.getMyStableId() ?? this.getUserId()) &&
             // We optimize by not blocking events from types that we have not send
             // with this client.
             this.pendingSendingEventsTxId.some((p) => event.getType() === p.type)

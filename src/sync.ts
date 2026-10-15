@@ -53,6 +53,7 @@ import {
     type IToDeviceEvent,
     type ReceivedToDeviceMessage,
 } from "./sync-accumulator.ts";
+import { MEMBER_INFO_FIELD } from "./models/member-info.ts";
 import { MatrixEvent } from "./models/event.ts";
 import { type MatrixError, Method } from "./http-api/index.ts";
 import { type ISavedSync } from "./store/index.ts";
@@ -1271,6 +1272,13 @@ export class SyncApi {
         await Promise.all(
             joinRooms.map(async (joinObj) => {
                 const room = joinObj.room;
+
+                // Apply the stable ID -> user ID mapping before anything reads the events
+                // below: members resolve their user ID through it, and their display names
+                // are derived from that. The full map comes down on an initial sync (and on
+                // a replay from the store, which is accumulated into one), deltas after that.
+                room.applyMemberInfo(joinObj[MEMBER_INFO_FIELD], !syncEventData.oldSyncToken);
+
                 const stateEvents = this.mapSyncEventsFormat(joinObj.state, room);
                 const stateAfterEvents = this.mapSyncEventsFormat(joinObj["org.matrix.msc4222.state_after"], room);
                 // Prevent events from being decrypted ahead of time
@@ -1525,6 +1533,11 @@ export class SyncApi {
         await Promise.all(
             leaveRooms.map(async (leaveObj) => {
                 const room = leaveObj.room;
+
+                // As for joined rooms: the mapping has to be in place before the events
+                // below are turned into members.
+                room.applyMemberInfo(leaveObj[MEMBER_INFO_FIELD], !syncEventData.oldSyncToken);
+
                 const { timelineEvents, stateEvents, stateAfterEvents } = await this.mapAndInjectRoomEvents(leaveObj);
                 const accountDataEvents = this.mapSyncEventsFormat(leaveObj.account_data);
 

@@ -19,6 +19,7 @@ import { removeDirectionOverrideChars, removeHiddenChars } from "../utils.ts";
 import { type User } from "./user.ts";
 import { type MatrixEvent } from "./event.ts";
 import { type RoomState } from "./room-state.ts";
+import { MemberInfoMap } from "./member-info.ts";
 import { logger } from "../logger.ts";
 import { TypedEventEmitter } from "./typed-event-emitter.ts";
 import { EventType } from "../@types/event.ts";
@@ -141,17 +142,62 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
      * Construct a new room member.
      *
      * @param roomId - The room ID of the member.
-     * @param userId - The user ID of the member.
+     * @param stableId - The stable ID of the member: the opaque identifier which
+     *     identifies this room member (MSC4428). In a room without member keys this is
+     *     the member's user ID.
+     * @param memberInfo - The room's mapping from stable IDs to user IDs. Shared by
+     *     reference with the room, so that the member's resolved {@link userId} follows
+     *     the mapping as the server updates it. Defaults to an empty mapping, under which
+     *     the stable ID is taken to be the user ID.
      */
     public constructor(
         public readonly roomId: string,
-        public readonly userId: string,
+        public readonly stableId: string,
+        private readonly memberInfo: MemberInfoMap = new MemberInfoMap(),
     ) {
         super();
 
-        this.name = userId;
-        this.rawDisplayName = userId;
+        this.name = this.userId;
+        this.rawDisplayName = this.userId;
         this.updateModifiedTime();
+    }
+
+    /**
+     * The user ID of this room member, resolved through the room's `member_info` mapping.
+     *
+     * In a room without member keys this is simply the member's stable ID, so this is
+     * unchanged from the historical behaviour. In a room with member keys it is the user
+     * the server says is behind the member's key.
+     *
+     * Where the server cannot name a user (the member has been erased, or the claim is
+     * unverified) this falls back to the stable ID so that callers always have something
+     * to key on; use {@link resolvedUserId} to tell the two apart, and do not present an
+     * unresolved member's ID to the user.
+     *
+     * This is *not* the right thing to key room state on: use {@link stableId} for that.
+     */
+    public get userId(): string {
+        return this.memberInfo.getUserId(this.stableId) ?? this.stableId;
+    }
+
+    /**
+     * The user ID of this room member as the server resolves it.
+     *
+     * @returns the user ID; `null` if the server has a mapping but cannot name a user
+     *     (erased, or an unverified claim); `undefined` if there is no mapping at all,
+     *     which means the stable ID is itself the user ID.
+     */
+    public get resolvedUserId(): string | null | undefined {
+        return this.memberInfo.getUserId(this.stableId);
+    }
+
+    /**
+     * @returns true if the server has told us it cannot name the user behind this member.
+     *     Such a member should be shown as an unknown user, with no profile, DM or invite
+     *     actions offered.
+     */
+    public get isUnresolved(): boolean {
+        return this.resolvedUserId === null;
     }
 
     /**
@@ -205,7 +251,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
             );
         }
 
-        this.disambiguate = shouldDisambiguate(this.userId, displayName, roomState);
+        this.disambiguate = shouldDisambiguate(this.stableId, displayName, roomState);
 
         const oldName = this.name;
         this.name = calculateDisplayName(this.userId, displayName, this.disambiguate);
@@ -244,7 +290,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         }
 
         const displayName = this.events.member.getDirectionalContent().displayname ?? "";
-        const newDisambiguate = shouldDisambiguate(this.userId, displayName, roomState);
+        const newDisambiguate = shouldDisambiguate(this.stableId, displayName, roomState);
 
         if (newDisambiguate === this.disambiguate) {
             return false;
@@ -261,6 +307,41 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         }
 
         return false;
+    }
+
+    /**
+     * Recalculate this member's name after the room's `member_info` mapping changed.
+     *
+     * The name and raw display name fall back to the member's user ID when they have no
+     * display name, and the disambiguation suffix contains it, so both have to be
+     * recomputed when the user ID this member resolves to changes.
+     *
+     * @param roomState - The current room state, used for disambiguation.
+     * @returns true if the member's name changed as a result.
+     *
+     * @remarks
+     * Fires {@link RoomMemberEvent.Name}
+     */
+    public onMemberInfoChanged(roomState?: RoomState): boolean {
+        const displayName = this.events.member?.getDirectionalContent().displayname ?? "";
+
+        this.disambiguate = shouldDisambiguate(this.stableId, displayName, roomState);
+
+        const oldName = this.name;
+        this.name = calculateDisplayName(this.userId, displayName, this.disambiguate);
+
+        this.rawDisplayName = removeDirectionOverrideChars(displayName);
+        if (!this.rawDisplayName || !removeHiddenChars(this.rawDisplayName)) {
+            this.rawDisplayName = this.userId;
+        }
+
+        if (oldName === this.name) return false;
+
+        this.updateModifiedTime();
+        if (this.events.member) {
+            this.emit(RoomMemberEvent.Name, this.events.member, this, oldName);
+        }
+        return true;
     }
 
     /**
@@ -330,7 +411,7 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
         return (
             this.membership === KnownMembership.Leave &&
             this.events.member !== undefined &&
-            this.events.member.getSender() !== this.events.member.getStateKey()
+            this.events.member.getStableId() !== this.events.member.getStateKey()
         );
     }
 
@@ -434,8 +515,13 @@ export class RoomMember extends TypedEventEmitter<RoomMemberEvent, RoomMemberEve
 export const MXID_PATTERN = /@.+:.+/;
 const LTR_RTL_PATTERN = /[\u200E\u200F\u202A-\u202F]/;
 
-function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?: RoomState): boolean {
-    if (!displayName || displayName === selfUserId) return false;
+/**
+ * @param selfStableId - the stable ID of the member whose name is being calculated. The
+ *     display name cache in {@link RoomState} is keyed by stable ID, so the comparison
+ *     against other members must be too.
+ */
+function shouldDisambiguate(selfStableId: string, displayName?: string, roomState?: RoomState): boolean {
+    if (!displayName || displayName === selfStableId) return false;
     if (!roomState) return false;
 
     const strippedDisplayName = removeHiddenChars(displayName);
@@ -456,8 +542,8 @@ function shouldDisambiguate(selfUserId: string, displayName?: string, roomState?
 
     // Also show mxid if there are other people with the same or similar
     // displayname, after hidden character removal.
-    const userIds = roomState.getUserIdsWithDisplayName(displayName);
-    if (userIds.some((u) => u !== selfUserId)) return true;
+    const stableIds = roomState.getUserIdsWithDisplayName(displayName);
+    if (stableIds.some((u) => u !== selfStableId)) return true;
 
     return false;
 }

@@ -112,8 +112,11 @@ export class EventTimeline {
     public constructor(private readonly eventTimelineSet: EventTimelineSet) {
         this.roomId = eventTimelineSet.room?.roomId ?? null;
         if (this.roomId) {
-            this.startState = new RoomState(this.roomId);
-            this.endState = new RoomState(this.roomId);
+            // Share the room's stable ID -> user ID mapping (MSC4428) with both states:
+            // it belongs to the room, not to a point in its history.
+            const memberInfo = eventTimelineSet.room?.memberInfo;
+            this.startState = new RoomState(this.roomId, undefined, memberInfo);
+            this.endState = new RoomState(this.roomId, undefined, memberInfo);
         }
 
         // this is used by client.js

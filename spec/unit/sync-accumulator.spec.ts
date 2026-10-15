@@ -1244,6 +1244,55 @@ describe("SyncAccumulator", function () {
             });
         });
     });
+
+    describe("MSC4428 member_info", () => {
+        const MEMBER_INFO = "org.matrix.msc4428.member_info";
+        const ALICE_KEY = "@euEdVN1DimRHWErEnH3KVVNXduH3SiqMW7yMfO7qVOg";
+        const BOB_KEY = "@oG9tWFba7ul1sREui6GTYvJDW8qkoTAxMNWsIexIu-g";
+
+        const memberInfoOf = (sa: SyncAccumulator): unknown =>
+            (sa.getJSON().roomsData[Category.Join]["!foo:bar"] as any)[MEMBER_INFO];
+
+        it("is absent for a server which does not send it", () => {
+            sa.accumulate(syncSkeleton({ timeline: { events: [], prev_batch: "t" } }));
+
+            expect(memberInfoOf(sa)).toBeUndefined();
+        });
+
+        it("is kept from an initial sync", () => {
+            sa.accumulate(syncSkeleton({ [MEMBER_INFO]: { [ALICE_KEY]: { user_id: "@alice:localhost" } } }));
+
+            expect(memberInfoOf(sa)).toEqual({ [ALICE_KEY]: { user_id: "@alice:localhost" } });
+        });
+
+        it("accumulates deltas into the full map", () => {
+            // The server only sends the whole map once; a client restoring from the store
+            // gets what we hand back as if it were an initial sync, so it has to be whole.
+            sa.accumulate(syncSkeleton({ [MEMBER_INFO]: { [ALICE_KEY]: { user_id: "@alice:localhost" } } }));
+            sa.accumulate(syncSkeleton({ [MEMBER_INFO]: { [BOB_KEY]: { user_id: "@bob:localhost" } } }));
+
+            expect(memberInfoOf(sa)).toEqual({
+                [ALICE_KEY]: { user_id: "@alice:localhost" },
+                [BOB_KEY]: { user_id: "@bob:localhost" },
+            });
+        });
+
+        it("lets a later delta overwrite an entry", () => {
+            sa.accumulate(syncSkeleton({ [MEMBER_INFO]: { [ALICE_KEY]: { user_id: "@alice:localhost" } } }));
+            sa.accumulate(syncSkeleton({ [MEMBER_INFO]: { [ALICE_KEY]: { user_id: null } } }));
+
+            expect(memberInfoOf(sa)).toEqual({ [ALICE_KEY]: { user_id: null } });
+        });
+
+        it("survives a round trip through the store", () => {
+            sa.accumulate(syncSkeleton({ [MEMBER_INFO]: { [ALICE_KEY]: { user_id: "@alice:localhost" } } }));
+
+            const sa2 = new SyncAccumulator({ maxTimelineEntries: 10 });
+            sa2.accumulate({ next_batch: "abc", rooms: sa.getJSON().roomsData } as unknown as ISyncResponse, true);
+
+            expect(memberInfoOf(sa2)).toEqual({ [ALICE_KEY]: { user_id: "@alice:localhost" } });
+        });
+    });
 });
 
 function syncSkeleton(

@@ -9,3 +9,12 @@ allowBuilds:
 minimumReleaseAgeExclude:
     - "@matrix-org/*"
     - matrix-widget-api@1.20.0
+
+supportedArchitectures:
+    os:
+        - darwin
+        - linux
+    cpu:
+        - arm64
+    libc:
+        - glibc

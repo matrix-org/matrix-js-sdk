@@ -50,6 +50,13 @@ import { type EmptyObject } from "../@types/common.ts";
 
 export { EventStatus } from "./event-status.ts";
 
+/**
+ * The field in `unsigned` carrying the stable ID of the event's sender.
+ *
+ * @see https://github.com/matrix-org/matrix-spec-proposals/pull/4428
+ */
+export const UNSIGNED_STABLE_ID_FIELD = "org.matrix.msc4428.stable_id";
+
 export interface IContent {
     [key: string]: any;
     "msgtype"?: MsgType | string;
@@ -77,6 +84,7 @@ export interface IUnsigned {
     [UNSIGNED_THREAD_ID_FIELD.name]?: string;
     "membership"?: Membership;
     "io.element.msc4115.membership"?: Membership;
+    [UNSIGNED_STABLE_ID_FIELD]?: string;
 }
 
 export interface IThreadBundledRelationship {
@@ -348,7 +356,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // If an event is an m.room.member state event then we should set the sentinels again in case setEventMetadata
         // was already called before the state was applied and thus the sentinel points at the member from before this event.
         const affectsSelf =
-            this.isState() && this.getType() === EventType.RoomMember && this.getSender() === this.getStateKey();
+            this.isState() && this.getType() === EventType.RoomMember && this.getStableId() === this.getStateKey();
 
         let changed = false;
         // When we try to generate a sentinel member before we have that member
@@ -357,7 +365,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         // check this to avoid overriding non-sentinel members by sentinel ones
         // when adding the event to a filtered timeline
         if (affectsSelf || !this.sender?.events?.member) {
-            const newSender = stateContext.getSentinelMember(this.getSender()!);
+            const newSender = stateContext.getSentinelMember(this.getStableId()!);
             if (newSender !== this.sender) changed = true;
             this.sender = newSender;
         }
@@ -536,6 +544,25 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      */
     public getSender(): string | undefined {
         return this.event.sender; // v2 / v1
+    }
+
+    /**
+     * Get the stable ID of this event's sender: the opaque identifier of the room
+     * member who sent it (MSC4428).
+     *
+     * This is the identifier that {@link RoomState.members} is keyed by, and is what
+     * should be used to find the {@link RoomMember} who sent an event. It is *not*
+     * necessarily a user ID: resolve it with {@link Room.getUserIdForStableId} to find
+     * the user behind it.
+     *
+     * Falls back to the `sender` field for servers which do not implement MSC4428,
+     * where the two are the same thing. A future room version may remove `sender`
+     * entirely, in which case this returns `undefined` for such a server.
+     *
+     * @returns The stable ID of the sender, e.g. `@alice:matrix.org`
+     */
+    public getStableId(): string | undefined {
+        return this.getUnsigned()[UNSIGNED_STABLE_ID_FIELD] ?? this.getSender();
     }
 
     /**

@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { RoomMember } from "./room-member.ts";
+import { MemberInfoMap } from "./member-info.ts";
 import { logger } from "../logger.ts";
 import { isNumber, removeHiddenChars } from "../utils.ts";
 import { EventType, UNSTABLE_MSC2716_MARKER } from "../@types/event.ts";
@@ -143,10 +144,10 @@ type KeysMatching<T, V> = { [K in keyof T]-?: T[K] extends V ? K : never }[keyof
 
 export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap> {
     public readonly reEmitter = new TypedReEmitter<EmittedEvents, EventHandlerMap>(this);
-    private sentinels: Record<string, RoomMember> = {}; // userId: RoomMember
-    // stores fuzzy matches to a list of userIDs (applies utils.removeHiddenChars to keys)
-    private displayNameToUserIds = new Map<string, string[]>();
-    private userIdsToDisplayNames: Record<string, string> = {};
+    private sentinels: Record<string, RoomMember> = {}; // stableId: RoomMember
+    // stores fuzzy matches to a list of stable IDs (applies utils.removeHiddenChars to keys)
+    private displayNameToStableIds = new Map<string, string[]>();
+    private stableIdsToDisplayNames: Record<string, string> = {};
     private tokenToInvite: Record<string, MatrixEvent> = {}; // 3pid invite state_key to m.room.member invite
     private joinedMemberCount: number | null = null; // cache of the number of joined members
     // joined members count from summary api
@@ -161,8 +162,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     private modified = -1;
 
     // XXX: Should be read-only
-    // The room member dictionary, keyed on the user's ID.
-    public members: Record<string, RoomMember> = {}; // userId: RoomMember
+    // The room member dictionary, keyed on the member's stable ID (MSC4428), which in a
+    // room without member keys is their user ID. Use getMember(), which also accepts a
+    // user ID, rather than indexing this directly.
+    public members: Record<string, RoomMember> = {}; // stableId: RoomMember
     // The state events dictionary, keyed on the event type and then the state_key value.
     public events = new Map<string, Map<string, MatrixEvent>>(); // Map<eventType, Map<stateKey, MatrixEvent>>
     // The pagination token for this state.
@@ -205,6 +208,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     public constructor(
         public readonly roomId: string,
         private oobMemberFlags = { status: OobStatus.NotStarted },
+        public readonly memberInfo: MemberInfoMap = new MemberInfoMap(),
     ) {
         super();
         this.updateModifiedTime();
@@ -293,12 +297,24 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Get a room member by their user ID.
-     * @param userId - The room member's user ID.
+     * Get a room member by their stable ID, or by their user ID.
+     *
+     * Members are keyed by stable ID (MSC4428), which in a room without member keys is
+     * the member's user ID. For convenience, and so that callers which legitimately start
+     * from a user ID (our own ID, a read receipt, a typing notification) do not each have
+     * to resolve it, an ID which does not match a member directly is resolved through the
+     * room's `member_info` mapping and looked up again. The two identifier spaces cannot
+     * collide, so this is unambiguous.
+     *
+     * @param id - The room member's stable ID, or their user ID.
      * @returns The member or null if they do not exist.
      */
-    public getMember(userId: string): RoomMember | null {
-        return this.members[userId] || null;
+    public getMember(id: string): RoomMember | null {
+        const direct = this.members[id];
+        if (direct) return direct;
+
+        const stableId = this.memberInfo.getStableId(id);
+        return (stableId !== undefined && this.members[stableId]) || null;
     }
 
     /**
@@ -307,20 +323,22 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * may no longer be represented correctly by Room.currentState or Room.oldState.
      * The term 'sentinel' refers to the fact that this RoomMember is an unchanging
      * guardian for state at this particular point in time.
-     * @param userId - The room member's user ID.
+     * @param stableId - The room member's stable ID (MSC4428), which in a room without
+     *     member keys is their user ID. Unlike {@link getMember} this does not accept a
+     *     user ID: it is called with an event's sender, which is always a stable ID.
      * @returns The member or null if they do not exist.
      */
-    public getSentinelMember(userId: string): RoomMember | null {
-        if (!userId) return null;
-        let sentinel = this.sentinels[userId];
+    public getSentinelMember(stableId: string): RoomMember | null {
+        if (!stableId) return null;
+        let sentinel = this.sentinels[stableId];
 
         if (sentinel === undefined) {
-            sentinel = new RoomMember(this.roomId, userId);
-            const member = this.members[userId];
+            sentinel = new RoomMember(this.roomId, stableId, this.memberInfo);
+            const member = this.members[stableId];
             if (member?.events.member) {
                 sentinel.setMembershipEvent(member.events.member, this);
             }
-            this.sentinels[userId] = sentinel;
+            this.sentinels[stableId] = sentinel;
         }
         return sentinel;
     }
@@ -364,7 +382,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
      * @returns the copy of the room state
      */
     public clone(): RoomState {
-        const copy = new RoomState(this.roomId, this.oobMemberFlags);
+        // The member info mapping is shared by reference: it is a property of the room,
+        // not of a point in its state, and every clone must see the same mapping.
+        const copy = new RoomState(this.roomId, this.oobMemberFlags, this.memberInfo);
 
         // Ugly hack: because setStateEvents will mark
         // members as susperseding future out of bound members
@@ -394,7 +414,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             // copy markOutOfBand flags
             this.getMembers().forEach((member) => {
                 if (member.isOutOfBand()) {
-                    copy.getMember(member.userId)?.markOutOfBand();
+                    copy.getMember(member.stableId)?.markOutOfBand();
                 }
             });
         }
@@ -438,7 +458,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // Track display names that change so we can recalculate disambiguation
         const affectedDisplayNames = new Set<string>();
         // Track userIds whose membership events we process so we don't emit duplicate events
-        const processedMemberUserIds = new Set<string>();
+        const processedMemberStableIds = new Set<string>();
 
         stateEvents.forEach((event) => {
             if (event.getRoomId() !== this.roomId || !event.isState()) return;
@@ -450,10 +470,10 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             const lastStateEvent = this.getStateEventMatching(event);
             this.setStateEvent(event);
             if (event.getType() === EventType.RoomMember) {
-                const userId = event.getStateKey()!;
-                processedMemberUserIds.add(userId);
+                const stableId = event.getStateKey()!;
+                processedMemberStableIds.add(stableId);
                 const newDisplayName = event.getContent().displayname ?? "";
-                const oldDisplayName = this.userIdsToDisplayNames[userId];
+                const oldDisplayName = this.stableIdsToDisplayNames[stableId];
 
                 // Track both old and new display names for disambiguation recalculation
                 if (oldDisplayName) {
@@ -465,7 +485,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                     if (strippedNew) affectedDisplayNames.add(strippedNew);
                 }
 
-                this.updateDisplayNameCache(userId, newDisplayName);
+                this.updateDisplayNameCache(stableId, newDisplayName);
                 this.updateThirdPartyTokenCache(event);
             }
             this.emit(RoomStateEvent.Events, event, this, lastStateEvent);
@@ -480,7 +500,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             if (event.getRoomId() !== this.roomId || !event.isState()) return;
 
             if (event.getType() === EventType.RoomMember) {
-                const userId = event.getStateKey()!;
+                const stableId = event.getStateKey()!;
 
                 // leave events apparently elide the displayname or avatar_url,
                 // so let's fake one up so that we don't leak user ids
@@ -494,7 +514,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                         event.getContent().displayname || event.getPrevContent().displayname;
                 }
 
-                const member = this.getOrCreateMember(userId, event);
+                const member = this.getOrCreateMember(stableId, event);
                 member.setMembershipEvent(event, this);
                 this.updateMember(member);
                 this.emit(RoomStateEvent.Members, event, this, member);
@@ -516,7 +536,7 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                     const oldLastModified = member.getLastModifiedTime();
 
                     if (createEvent) {
-                        const pl = powerLevelForUserId(member.userId, event, creators);
+                        const pl = powerLevelForStableId(member.stableId, event, creators);
                         member.setPowerLevel(pl, event);
                     }
                     if (oldLastModified !== member.getLastModifiedTime()) {
@@ -535,20 +555,20 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         // This ensures that when a user changes their name to match (or stop matching)
         // another user, all affected users' disambiguation flags are updated correctly.
         if (affectedDisplayNames.size > 0) {
-            // Collect all affected user IDs first to avoid duplicate processing
-            const affectedUserIds = new Set<string>();
+            // Collect all affected members first to avoid duplicate processing
+            const affectedStableIds = new Set<string>();
             for (const displayName of affectedDisplayNames) {
-                const userIds = this.displayNameToUserIds.get(displayName) ?? [];
-                userIds.forEach((id) => affectedUserIds.add(id));
+                const stableIds = this.displayNameToStableIds.get(displayName) ?? [];
+                stableIds.forEach((id) => affectedStableIds.add(id));
             }
 
             // Process each affected member once, excluding those whose membership
             // events were already processed (they already got their events emitted)
-            for (const userId of affectedUserIds) {
-                if (processedMemberUserIds.has(userId)) {
+            for (const stableId of affectedStableIds) {
+                if (processedMemberStableIds.has(stableId)) {
                     continue;
                 }
-                const member = this.members[userId];
+                const member = this.members[stableId];
                 if (member?.events.member) {
                     const nameChanged = member.recalculateDisambiguatedName(this);
                     if (nameChanged) {
@@ -608,24 +628,24 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Looks up a member by the given userId, and if it doesn't exist,
+     * Looks up a member by the given stable ID, and if it doesn't exist,
      * create it and emit the `RoomState.newMember` event.
      * This method makes sure the member is added to the members dictionary
      * before emitting, as this is done from setStateEvents and setOutOfBandMember.
-     * @param userId - the id of the user to look up
+     * @param stableId - the stable ID of the room member to look up
      * @param event - the membership event for the (new) member. Used to emit.
      * @returns the member, existing or newly created.
      *
      * @remarks
      * Fires {@link RoomStateEvent.NewMember}
      */
-    private getOrCreateMember(userId: string, event: MatrixEvent): RoomMember {
-        let member = this.members[userId];
+    private getOrCreateMember(stableId: string, event: MatrixEvent): RoomMember {
+        let member = this.members[stableId];
         if (!member) {
-            member = new RoomMember(this.roomId, userId);
+            member = new RoomMember(this.roomId, stableId, this.memberInfo);
             // add member to members before emitting any events,
             // as event handlers often lookup the member
-            this.members[userId] = member;
+            this.members[stableId] = member;
             this.emit(RoomStateEvent.NewMember, event, this, member);
         }
         return member;
@@ -700,8 +720,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         const createEvent = this.getStateEvents(EventType.RoomCreate, "");
         const pwrLvlEvent = this.getStateEvents(EventType.RoomPowerLevels, "");
         if (pwrLvlEvent && createEvent) {
-            const powerLevel = powerLevelForUserId(
-                member.userId,
+            const powerLevel = powerLevelForStableId(
+                member.stableId,
                 pwrLvlEvent,
                 getCreators(this.getRoomVersion(), createEvent),
             );
@@ -710,9 +730,9 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         }
 
         // blow away the sentinel which is now outdated
-        delete this.sentinels[member.userId];
+        delete this.sentinels[member.stableId];
 
-        this.members[member.userId] = member;
+        this.members[member.stableId] = member;
         this.joinedMemberCount = null;
         this.invitedMemberCount = null;
     }
@@ -797,25 +817,63 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         if (stateEvent.getType() !== EventType.RoomMember) {
             return;
         }
-        const userId = stateEvent.getStateKey()!;
-        const existingMember = this.getMember(userId);
+        const stableId = stateEvent.getStateKey()!;
+        const existingMember = this.members[stableId];
         // never replace members received as part of the sync
         if (existingMember && !existingMember.isOutOfBand()) {
             return;
         }
 
-        const member = this.getOrCreateMember(userId, stateEvent);
+        const member = this.getOrCreateMember(stableId, stateEvent);
         member.setMembershipEvent(stateEvent, this);
         // needed to know which members need to be stored seperately
         // as they are not part of the sync accumulator
         // this is cleared by setMembershipEvent so when it's updated through /sync
         member.markOutOfBand();
 
-        this.updateDisplayNameCache(member.userId, member.name);
+        this.updateDisplayNameCache(member.stableId, member.name);
 
         this.setStateEvent(stateEvent);
         this.updateMember(member);
         this.emit(RoomStateEvent.Members, stateEvent, this, member);
+    }
+
+    /**
+     * Apply a change to the room's stable ID -> user ID mapping, refreshing any members
+     * whose resolved user ID changed.
+     *
+     * The mapping object itself is shared with the {@link Room} and every other
+     * {@link RoomState} of that room, so it has usually already been updated by the time
+     * this is called; this method exists to recalculate the derived state (names, display
+     * name cache) and to notify listeners.
+     *
+     * @param changedStableIds - The stable IDs whose resolved user ID changed, as returned
+     *     by {@link MemberInfoMap.applyFull} or {@link MemberInfoMap.applyDelta}.
+     *
+     * @remarks
+     * Fires {@link RoomStateEvent.Members}
+     */
+    public onMemberInfoChanged(changedStableIds: string[]): void {
+        let any = false;
+        for (const stableId of changedStableIds) {
+            const member = this.members[stableId];
+            if (!member) continue;
+
+            // The sentinel captured the old resolved user ID; it is now out of date.
+            delete this.sentinels[stableId];
+
+            if (member.onMemberInfoChanged(this)) {
+                this.updateDisplayNameCache(stableId, member.name);
+            }
+            any = true;
+            if (member.events.member) {
+                this.emit(RoomStateEvent.Members, member.events.member, this, member);
+            }
+        }
+        if (any) {
+            this.updateModifiedTime();
+            this.emit(RoomStateEvent.Update, this);
+        }
     }
 
     /**
@@ -855,33 +913,35 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
     }
 
     /**
-     * Get user IDs with the specified or similar display names.
-     * @param displayName - The display name to get user IDs from.
-     * @returns An array of user IDs or an empty array.
+     * Get the stable IDs of the room members with the specified or similar display names.
+     * @param displayName - The display name to get stable IDs from.
+     * @returns An array of stable IDs or an empty array. In a room without member keys
+     *     these are user IDs, as they have always been.
      */
     public getUserIdsWithDisplayName(displayName: string): string[] {
-        return this.displayNameToUserIds.get(removeHiddenChars(displayName)) ?? [];
+        return this.displayNameToStableIds.get(removeHiddenChars(displayName)) ?? [];
     }
 
     /**
      * Returns true if userId is in room, event is not redacted and either sender of
      * mxEvent or has power level sufficient to redact events other than their own.
      * @param mxEvent - The event to test permission for
-     * @param userId - The user ID of the user to test permission for
+     * @param id - The stable ID, or the user ID, of the user to test permission for
      * @returns true if the given used ID can redact given event
      */
-    public maySendRedactionForEvent(mxEvent: MatrixEvent, userId: string): boolean {
-        const member = this.getMember(userId);
+    public maySendRedactionForEvent(mxEvent: MatrixEvent, id: string): boolean {
+        const member = this.getMember(id);
         if (!member || member.membership === KnownMembership.Leave) return false;
 
         if (mxEvent.status || mxEvent.isRedacted()) return false;
 
         // The user may have been the sender, but they can't redact their own message
         // if redactions are blocked.
-        const canRedact = this.maySendEvent(EventType.RoomRedaction, userId);
+        const canRedact = this.maySendEvent(EventType.RoomRedaction, id);
 
         if (!canRedact) return false;
-        if (mxEvent.getSender() === userId) return true;
+        // Compare stable IDs: the event's sender is one, and `id` may be either.
+        if (mxEvent.getStableId() === member.stableId) return true;
 
         return this.hasSufficientPowerLevelFor("redact", member.powerLevel);
     }
@@ -1152,48 +1212,52 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.tokenToInvite[token] = memberEvent;
     }
 
-    private updateDisplayNameCache(userId: string, displayName: string): void {
-        const oldName = this.userIdsToDisplayNames[userId];
+    private updateDisplayNameCache(stableId: string, displayName: string): void {
+        const oldName = this.stableIdsToDisplayNames[stableId];
 
-        delete this.userIdsToDisplayNames[userId];
+        delete this.stableIdsToDisplayNames[stableId];
         if (oldName) {
             // Remove the old name from the cache.
-            // We clobber the user_id > name lookup but the name -> [user_id] lookup
-            // means we need to remove that user ID from that array rather than nuking
+            // We clobber the stable_id > name lookup but the name -> [stable_id] lookup
+            // means we need to remove that stable ID from that array rather than nuking
             // the lot.
             const strippedOldName = removeHiddenChars(oldName);
 
-            const existingUserIds = this.displayNameToUserIds.get(strippedOldName);
-            if (existingUserIds) {
-                // remove this user ID from this array
-                const filteredUserIDs = existingUserIds.filter((id) => id !== userId);
-                this.displayNameToUserIds.set(strippedOldName, filteredUserIDs);
+            const existingStableIds = this.displayNameToStableIds.get(strippedOldName);
+            if (existingStableIds) {
+                // remove this stable ID from this array
+                const filtered = existingStableIds.filter((id) => id !== stableId);
+                this.displayNameToStableIds.set(strippedOldName, filtered);
             }
         }
 
-        this.userIdsToDisplayNames[userId] = displayName;
+        this.stableIdsToDisplayNames[stableId] = displayName;
 
         const strippedDisplayname = displayName && removeHiddenChars(displayName);
         // an empty stripped displayname (undefined/'') will be set to MXID in room-member.js
         if (strippedDisplayname) {
-            const arr = this.displayNameToUserIds.get(strippedDisplayname) ?? [];
-            arr.push(userId);
-            this.displayNameToUserIds.set(strippedDisplayname, arr);
+            const arr = this.displayNameToStableIds.get(strippedDisplayname) ?? [];
+            arr.push(stableId);
+            this.displayNameToStableIds.set(strippedDisplayname, arr);
         }
     }
 }
 
 /**
- * Get the set of creator user IDs for a room: empty if the room is not a 'hydra' room, otherwise
+ * Get the set of creator stable IDs for a room: empty if the room is not a 'hydra' room, otherwise
  * computed from the sender of the m.room.create event plus the additional_creators field.
+ *
+ * These are stable IDs rather than user IDs: in a room with member keys both the create event's
+ * sender and the entries of `additional_creators` are member keys.
+ *
  * @param roomVersion The version of the room
  * @param roomCreateEvent The m.room.create event for the room
- * @returns A set of user IDs of the creators of the room.
+ * @returns A set of stable IDs of the creators of the room.
  */
 function getCreators(roomVersion: string, roomCreateEvent: MatrixEvent | null): Set<string> {
     const creators = new Set<string>();
     if (shouldUseHydraForRoomVersion(roomVersion) && roomCreateEvent) {
-        const roomCreateSender = roomCreateEvent.getSender();
+        const roomCreateSender = roomCreateEvent.getStableId();
         if (roomCreateSender) creators.add(roomCreateSender);
         const additionalCreators = roomCreateEvent.getDirectionalContent().additional_creators;
         if (Array.isArray(additionalCreators)) additionalCreators.forEach((c) => creators.add(c));
@@ -1202,22 +1266,23 @@ function getCreators(roomVersion: string, roomCreateEvent: MatrixEvent | null): 
 }
 
 /**
- *
- * @param userId The user ID to compute the power level for
- * @param powerLevelEvents The power level event for the room
- * @param creators The set of creator user IDs for the room if the room is a 'hydra' room, otherwise the empty set.
+ * @param stableId The stable ID of the room member to compute the power level for. The keys
+ *     of `content.users`, and the creators, are stable IDs: in a room with member keys they
+ *     are member keys rather than user IDs.
+ * @param powerLevelEvent The power level event for the room
+ * @param creators The set of creator stable IDs for the room if the room is a 'hydra' room, otherwise the empty set.
  */
-function powerLevelForUserId(userId: string, powerLevelEvent: MatrixEvent, creators: Set<string>): number {
-    if (creators.has(userId)) {
+function powerLevelForStableId(stableId: string, powerLevelEvent: MatrixEvent, creators: Set<string>): number {
+    if (creators.has(stableId)) {
         // As of "Hydra", If the user is a creator, they always have the highest power level
         return Infinity;
     } else {
         const evContent = powerLevelEvent.getDirectionalContent();
 
-        const users: { [userId: string]: number } = evContent.users || {};
+        const users: { [stableId: string]: number } = evContent.users || {};
 
-        if (users[userId] !== undefined && Number.isInteger(users[userId])) {
-            return users[userId];
+        if (users[stableId] !== undefined && Number.isInteger(users[stableId])) {
+            return users[stableId];
         } else if (evContent.users_default !== undefined) {
             return evContent.users_default;
         } else {

@@ -49,6 +49,8 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
     private relationEventIds = new Set<string>();
     private relations = new Set<MatrixEvent>();
     private annotationsByKey: Record<string, Set<MatrixEvent>> = {};
+    // keyed by the sender's stable ID (MSC4428), which in a room without member keys
+    // is their user ID
     private annotationsBySender: Record<string, Set<MatrixEvent>> = {};
     private sortedAnnotationsByKey: [string, Set<MatrixEvent>][] = [];
     private targetEvent: MatrixEvent | null = null;
@@ -190,7 +192,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return bEvents.size - aEvents.size;
         });
 
-        const sender = event.getSender()!;
+        const sender = event.getStableId()!;
         let eventsFromSender = this.annotationsBySender[sender];
         if (!eventsFromSender) {
             eventsFromSender = this.annotationsBySender[sender] = new Set();
@@ -215,7 +217,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             });
         }
 
-        const sender = event.getSender()!;
+        const sender = event.getStableId()!;
         const eventsFromSender = this.annotationsBySender[sender];
         if (eventsFromSender) {
             eventsFromSender.delete(event);
@@ -276,6 +278,9 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
      *
      * An object with each relation sender as a key and the matching Set of
      * events for that sender as a value.
+     *
+     * Keyed by the sender's stable ID (MSC4428): use {@link Room.getMyStableId} rather
+     * than the user ID to find our own annotations.
      */
     public getAnnotationsBySender(): Record<string, Set<MatrixEvent>> | null {
         if (this.relationType !== RelationType.Annotation) {
@@ -310,7 +315,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         const minTs = replaceRelation?.origin_server_ts;
 
         const lastReplacement = this.getRelations().reduce<MatrixEvent | null>((last, event) => {
-            if (event.getSender() !== this.targetEvent!.getSender()) {
+            if (event.getStableId() !== this.targetEvent!.getStableId()) {
                 return last;
             }
             if (minTs && minTs > event.getTs()) {
