@@ -259,7 +259,6 @@ describe("CallMembership", () => {
             },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
             transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
-            versions: [],
             msc4354_sticky_key: "abc123",
         };
 
@@ -331,6 +330,46 @@ describe("CallMembership", () => {
                 createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
                     member: { id: "test", device_id: "test", user_id: "@test-wrong-user:user.id" },
+                });
+            }).toThrow();
+        });
+
+        it("accepts membership without member.membership for compatibility with older events", () => {
+            const { membership: _membership, ...legacyMember } = membershipTemplate.member;
+            expect(() => {
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, member: legacyMember });
+            }).not.toThrow();
+        });
+
+        it("accepts membership with member.membership join", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: "join" },
+                });
+            }).not.toThrow();
+        });
+
+        it("rejects membership with member.membership leave", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: "leave" },
+                });
+            }).toThrow();
+        });
+
+        it("rejects membership with unknown member.membership", () => {
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: "knock" },
+                });
+            }).toThrow();
+            expect(() => {
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    member: { ...membershipTemplate.member, membership: 1 },
                 });
             }).toThrow();
         });

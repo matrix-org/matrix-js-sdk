@@ -209,7 +209,8 @@ describe("MatrixClient", function () {
 
     const RTC_TRANSPORT_RESPONSE: HttpLookup = {
         method: "GET",
-        path: "/rtc/transports/",
+        path: "/rtc/transports",
+        prefix: "/_matrix/client/unstable/org.matrix.msc4143",
         data: { rtc_transports: [] },
     };
 
@@ -402,6 +403,7 @@ describe("MatrixClient", function () {
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
             "org.matrix.msc3440.stable": true,
+            "org.matrix.msc4143": true,
         };
 
         makeClient();
@@ -1907,7 +1909,8 @@ describe("MatrixClient", function () {
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
                     if (state === "ERROR" && httpLookups.length > 0) {
-                        expect(httpLookups.length).toEqual(3);
+                        // RTC discovery may still be waiting for the /versions support check.
+                        expect(httpLookups.filter((lookup) => lookup !== RTC_TRANSPORT_RESPONSE)).toHaveLength(3);
                         expect(client.retryImmediately()).toBe(true);
                         vi.advanceTimersByTime(1);
                     } else if (state === "PREPARED" && httpLookups.length === 0) {
@@ -2301,7 +2304,7 @@ describe("MatrixClient", function () {
                             `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
                             `/${encodeURIComponent(txnId)}`,
                         expectBody: {
-                            "reason": "redaction test",
+                            reason: "redaction test",
                             ["org.matrix.msc3912.with_relations"]: ["m.reference"],
                         },
                         data: { event_id: eventId },
@@ -4041,6 +4044,7 @@ describe("MatrixClient", function () {
 
     describe("_unstable_getRTCTransports", () => {
         it("makes a well-formed request", async () => {
+            unstableFeatures["org.matrix.msc4143"] = true;
             httpLookups = [
                 {
                     method: "GET",
@@ -4055,19 +4059,62 @@ describe("MatrixClient", function () {
                     extra_field: "foobar",
                 },
             ]);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(
+                Method.Get,
+                "/_matrix/client/versions",
+                undefined,
+                undefined,
+                { prefix: "" },
+            );
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it.each([{ unstable_features: { "org.matrix.msc4143": false } }, { unstable_features: {} }, {}])(
+            "does not request transports when support is not advertised: %j",
+            async (versionsResponse) => {
+                vi.mocked(client.http.authedRequest)
+                    .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
+                    .mockResolvedValue({ rtc_transports: [] });
+
+                await expect(client._unstable_getRTCTransports()).rejects.toMatchObject({
+                    errcode: "M_UNRECOGNIZED",
+                    httpStatus: 404,
+                });
+                expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
+                expect(client.http.authedRequest).toHaveBeenCalledWith(
+                    Method.Get,
+                    "/_matrix/client/versions",
+                    undefined,
+                    undefined,
+                    { prefix: "" },
+                );
+            },
+        );
+
+        it("caches unsupported discovery without requesting transports", async () => {
+            vi.mocked(client.http.authedRequest)
+                .mockResolvedValueOnce({ versions: ["v1.1"], unstable_features: {} })
+                .mockResolvedValue({ rtc_transports: [] });
+
+            for (let i = 0; i < 3; i++) {
+                await expect(client.cachedRtcTransports.wait()).rejects.toMatchObject({
+                    errcode: "M_UNRECOGNIZED",
+                    httpStatus: 404,
+                });
+            }
+
+            expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
         });
     });
 
     describe("MSC4195 LiveKit endpoints", () => {
-        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
-
         describe("_unstable_getLivekitToken", () => {
             it("makes a well-formed request", async () => {
                 const body = {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                 } satisfies LivekitGetTokenRequest;
                 httpLookups = [
                     {
@@ -4087,7 +4134,7 @@ describe("MatrixClient", function () {
                     url: "wss://livekit.remote.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                     server_name: "remote.example.com",
                 } satisfies LivekitGetTokenRequest;
                 httpLookups = [
@@ -4117,7 +4164,7 @@ describe("MatrixClient", function () {
                         url: "wss://not-an-sfu.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
-                        member,
+                        member_id: "xyzABCDEF10123",
                     }),
                 ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
                 expect(httpLookups.length).toEqual(0);
@@ -4130,7 +4177,7 @@ describe("MatrixClient", function () {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                     delay_id: "1234567890",
                 } satisfies LivekitDelegateDelayedLeaveRequest;
                 httpLookups = [
@@ -4160,7 +4207,7 @@ describe("MatrixClient", function () {
                         url: "wss://livekit.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
-                        member,
+                        member_id: "xyzABCDEF10123",
                         delay_id: "1234567890",
                     }),
                 ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));

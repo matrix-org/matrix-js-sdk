@@ -38,7 +38,13 @@ const REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS = 60 * 1000;
 
 type Opts = Pick<
     IHttpOpts,
-    "onTokenRefresh" | "logger" | "refreshToken" | "accessToken" | "oauth2ClientConfig" | "authMetadataCallback"
+    | "onTokenRefresh"
+    | "logger"
+    | "refreshToken"
+    | "accessToken"
+    | "oauth2ClientConfig"
+    | "authMetadataCallback"
+    | "fetchFn"
 >;
 
 /**
@@ -240,10 +246,15 @@ export class TokenManager {
     ): Promise<TokenRefresher> {
         const metadata = await authMetaDataCallback();
 
-        const oauth2 = new OAuth2(metadata, {
-            clientId: config.clientId,
-            deviceId: config.deviceId,
-        });
+        const oauth2 = new OAuth2(
+            metadata,
+            {
+                clientId: config.clientId,
+                deviceId: config.deviceId,
+            },
+            this.opts.logger,
+            { fetchFn: this.opts.fetchFn },
+        );
 
         return new TokenRefresher(oauth2, (tokens) => this.opts.onTokenRefresh?.(tokens));
     }
