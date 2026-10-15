@@ -22,6 +22,22 @@ limitations under the License.
 export const MEMBER_INFO_FIELD = "org.matrix.msc4428.member_info";
 
 /**
+ * The grammar of a member key (MSC4430): `@` followed by 43 url-safe base64 characters.
+ * A user ID can never match it, as it always contains a `:`.
+ */
+const MEMBER_KEY_PATTERN = /^@[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Is this stable ID a member key rather than a user ID?
+ *
+ * Deliberately strict: anything which is not recognisably a member key is treated as a
+ * user ID, which is what every room without member keys contains.
+ */
+export function isMemberKey(id: string): boolean {
+    return MEMBER_KEY_PATTERN.test(id);
+}
+
+/**
  * The wire form of a single entry in a `member_info` map: the server's current
  * claim about which user is behind a stable ID.
  */
@@ -106,6 +122,21 @@ export class MemberInfoMap {
             if (this.setEntry(stableId, content![stableId])) changed.push(stableId);
         }
         return changed;
+    }
+
+    /**
+     * Record the server's signed `localpart`/`domain` claim from a member event as a
+     * mapping, but only where the authoritative `member_info` says nothing.
+     *
+     * An invited room is served as stripped state with no `member_info` at all, so the
+     * claim is the only thing naming its members. A real mapping always wins: this never
+     * overwrites an existing entry, including an explicit `null`.
+     *
+     * @returns true if an entry was added.
+     */
+    public applyClaim(stableId: string, userId: string): boolean {
+        if (this.forward.has(stableId)) return false;
+        return this.setEntry(stableId, { user_id: userId });
     }
 
     /**

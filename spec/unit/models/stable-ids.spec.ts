@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { type MatrixClient, MatrixEvent, EventType, RoomStateEvent } from "../../../src";
+import { MatrixClient, MatrixEvent, EventType, RoomStateEvent } from "../../../src";
 import { Room } from "../../../src/models/room";
 import { UNSIGNED_STABLE_ID_FIELD } from "../../../src/models/event";
 import { KnownMembership } from "../../../src/@types/membership";
@@ -363,6 +363,134 @@ describe("lazy-loaded members", () => {
 
         expect(room.getMember(BOB)!.userId).toEqual(BOB);
         expect(room.getMember(BOB)!.stableId).toEqual(BOB);
+    });
+});
+
+describe("invited rooms", () => {
+    /**
+     * An invite's stripped `invite_state` carries no `member_info`, so the only thing
+     * naming the members is the server's signed localpart/domain claim in the member
+     * event content.
+     */
+    function invitedRoom(): Room {
+        const room = new Room(ROOM_ID, createClient(), ALICE);
+        room.currentState.setStateEvents([
+            memberEvent(BOB_KEY, KnownMembership.Join, { displayname: "bob", localpart: "bob" }),
+            memberEvent(ALICE_KEY, KnownMembership.Invite, {
+                displayname: "alice",
+                localpart: "alice",
+                sender: BOB_KEY,
+            }),
+        ]);
+        return room;
+    }
+
+    it("finds our own member key through the server's claim", () => {
+        // Without this the room never renders as an invite: our membership is not found.
+        expect(invitedRoom().getMyStableId()).toEqual(ALICE_KEY);
+    });
+
+    it("finds our own membership, so the room is seen as invited", () => {
+        const room = invitedRoom();
+
+        room.recalculate();
+
+        expect(room.getMyMembership()).toEqual(KnownMembership.Invite);
+    });
+
+    it("names the inviter through the server's claim", () => {
+        expect(invitedRoom().getMemberUserId(BOB_KEY)).toEqual(BOB);
+    });
+
+    it("does not fall back to a bare member key for an unnameable member", () => {
+        const room = new Room(ROOM_ID, createClient(), ALICE);
+        room.currentState.setStateEvents([memberEvent(CAROL_KEY, KnownMembership.Join)]);
+
+        expect(room.getMemberUserId(CAROL_KEY)).toBeUndefined();
+    });
+
+    it("still returns the user ID in a room without member keys", () => {
+        expect(legacyRoom().getMemberUserId(BOB)).toEqual(BOB);
+    });
+
+    it("prefers the member_info mapping over the claim", () => {
+        const room = invitedRoom();
+        room.applyMemberInfo({ [BOB_KEY]: { user_id: "@someone-else:localhost" } }, false);
+
+        expect(room.getMemberUserId(BOB_KEY)).toEqual("@someone-else:localhost");
+    });
+});
+
+describe("joining an invited member key room", () => {
+    const INVITED_ROOM = "!invited:localhost";
+
+    /** A client with just enough shape for `joinRoom` and a mocked crypto backend. */
+    function joinSetup(nameInviter = true): { client: MatrixClient; crypto: any; room: Room } {
+        const client = new MatrixClient({
+            baseUrl: "https://server",
+            userId: ALICE,
+            accessToken: "token",
+            deviceId: "DEV",
+        });
+        const room = new Room(INVITED_ROOM, client, ALICE);
+        room.currentState.setStateEvents([
+            new MatrixEvent({
+                type: EventType.RoomMember,
+                sender: BOB_KEY,
+                state_key: ALICE_KEY,
+                room_id: INVITED_ROOM,
+                event_id: "$invite",
+                content: { membership: KnownMembership.Invite, localpart: "alice", domain: "localhost" },
+            }),
+            new MatrixEvent({
+                type: EventType.RoomMember,
+                sender: BOB_KEY,
+                state_key: BOB_KEY,
+                room_id: INVITED_ROOM,
+                event_id: "$bob",
+                content: nameInviter
+                    ? { membership: KnownMembership.Join, localpart: "bob", domain: "localhost" }
+                    : { membership: KnownMembership.Join },
+            }),
+        ]);
+        room.recalculate();
+        vi.spyOn(client, "getRoom").mockReturnValue(room);
+        vi.spyOn(client.http, "authedRequest").mockResolvedValue({ room_id: INVITED_ROOM });
+
+        const crypto = {
+            markRoomAsPendingKeyBundle: vi.fn().mockResolvedValue(undefined),
+            maybeAcceptKeyBundle: vi.fn().mockResolvedValue(true),
+        };
+        (client as any).cryptoBackend = crypto;
+        return { client, crypto, room };
+    }
+
+    it("hands the crypto stack the inviter's user ID, never their member key", async () => {
+        // A member key is not a user ID; the rust crypto stack parses it as one and
+        // throws "required colon is missing", failing a join which actually succeeded.
+        const { client, crypto } = joinSetup();
+
+        await client.joinRoom(INVITED_ROOM);
+
+        expect(crypto.markRoomAsPendingKeyBundle).toHaveBeenCalledWith(INVITED_ROOM, BOB);
+        expect(crypto.maybeAcceptKeyBundle).toHaveBeenCalledWith(INVITED_ROOM, BOB);
+    });
+
+    it("skips the key bundle rather than passing on an unnameable inviter", async () => {
+        // Nothing names the inviter: no mapping and no claim in their member event.
+        const { client, crypto } = joinSetup(false);
+
+        await expect(client.joinRoom(INVITED_ROOM)).resolves.toBeDefined();
+
+        expect(crypto.markRoomAsPendingKeyBundle).not.toHaveBeenCalled();
+    });
+
+    it("still finds our own membership, so the join is not treated as a fresh one", async () => {
+        const { room } = joinSetup();
+
+        expect(room.getMyStableId()).toEqual(ALICE_KEY);
+        expect(room.getMember(ALICE)).not.toBeNull();
+        expect(room.getMyMembership()).toEqual(KnownMembership.Invite);
     });
 });
 

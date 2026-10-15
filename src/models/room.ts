@@ -35,7 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
-import { MEMBER_INFO_FIELD, MemberInfoMap, type MemberInfoMapContent } from "./member-info.ts";
+import { isMemberKey, MEMBER_INFO_FIELD, MemberInfoMap, type MemberInfoMapContent } from "./member-info.ts";
 import { type Hero, type IRoomSummary, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
@@ -1981,14 +1981,41 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
+     * The user ID behind a room member's stable ID (MSC4428).
+     *
+     * Unlike {@link getUserIdForStableId}, which reports only what the `member_info`
+     * mapping says, this also falls back to the server's signed `localpart`/`domain`
+     * claim in the member's own `m.room.member` event. That claim is the only way to
+     * name a member of an invited room, where the stripped `invite_state` carries no
+     * mapping at all.
+     *
+     * @param stableId - The member's stable ID.
+     * @returns the user ID, or `undefined` when the member cannot be named and should be
+     *     shown as an unknown user. Never returns a bare member key.
+     */
+    public getMemberUserId(stableId: string): string | undefined {
+        // `undefined` means no mapping, i.e. the stable ID is the user ID; `null` means
+        // the server has a mapping and cannot name a user. Claims from member events are
+        // already in the mapping, so there is nothing else to consult.
+        const mapped = this.memberInfo.getUserId(stableId);
+        if (mapped !== undefined) return mapped ?? undefined;
+
+        return isMemberKey(stableId) ? undefined : stableId;
+    }
+
+    /**
      * The stable ID identifying us as a member of this room (MSC4428).
      *
      * In a room without member keys this is our user ID. In a room with member keys it is
-     * our key in this room, which the server tells us in `member_info`; until the first
-     * `/sync` after we join carries that, this falls back to our user ID and will not
-     * match any member.
+     * our key in this room, which the server normally tells us in `member_info`.
      *
-     * @returns our stable ID in this room.
+     * An invited room is the awkward case: its stripped `invite_state` carries no
+     * `member_info`, so our own member event is under a key we have no mapping for. We
+     * find it through the server's signed `localpart`/`domain` claim instead — without
+     * this, our own membership is never found and the room does not render as an invite.
+     *
+     * @returns our stable ID in this room, falling back to our user ID when the room
+     *     holds nothing that names us.
      */
     public getMyStableId(): string {
         return this.memberInfo.getStableId(this.myUserId) ?? this.myUserId;

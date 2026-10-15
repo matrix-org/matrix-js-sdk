@@ -2455,8 +2455,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const preJoinMembership = roomMember?.membership;
 
         // If we were invited to the room, the ID of the user that sent the invite. Otherwise, `null`.
-        const inviter =
-            preJoinMembership == KnownMembership.Invite ? (roomMember?.events.member?.getSender() ?? null) : null;
+        // The invite event names its sender by stable ID (MSC4428), which in a room with
+        // member keys is not a user ID; the crypto stack below parses this as one and
+        // throws if it is a key. Resolve it, and pass `null` when we cannot name a user
+        // rather than handing a member key on: the key bundle is an E2EE nicety and must
+        // not be able to fail the join itself.
+        const inviterStableId =
+            preJoinMembership == KnownMembership.Invite ? (roomMember?.events.member?.getStableId() ?? null) : null;
+        const inviter = inviterStableId === null ? null : (room?.getMemberUserId(inviterStableId) ?? null);
 
         this.logger.debug(
             `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership}, inviter=${inviter}, opts=${JSON.stringify(opts)}`,

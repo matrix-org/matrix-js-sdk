@@ -514,6 +514,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
                         event.getContent().displayname || event.getPrevContent().displayname;
                 }
 
+                this.learnMemberInfoClaim(event);
+
                 const member = this.getOrCreateMember(stableId, event);
                 member.setMembershipEvent(event, this);
                 this.updateMember(member);
@@ -824,6 +826,8 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
             return;
         }
 
+        this.learnMemberInfoClaim(stateEvent);
+
         const member = this.getOrCreateMember(stableId, stateEvent);
         member.setMembershipEvent(stateEvent, this);
         // needed to know which members need to be stored seperately
@@ -836,6 +840,24 @@ export class RoomState extends TypedEventEmitter<EmittedEvents, EventHandlerMap>
         this.setStateEvent(stateEvent);
         this.updateMember(member);
         this.emit(RoomStateEvent.Members, stateEvent, this, member);
+    }
+
+    /**
+     * Learn the stable ID -> user ID mapping a member event carries, where the
+     * authoritative `member_info` says nothing about that member.
+     *
+     * In a room with member keys (MSC4430) the server co-signs a `localpart`/`domain`
+     * claim into `m.room.member` content. For an invited room that claim is all we get:
+     * the stripped `invite_state` has no `member_info`, so without this our own member
+     * event is under a key we cannot recognise, our membership is never found, and the
+     * room does not render as an invite.
+     */
+    private learnMemberInfoClaim(event: MatrixEvent): void {
+        const content = event.getContent();
+        if (typeof content.localpart !== "string" || typeof content.domain !== "string") return;
+        const stateKey = event.getStateKey();
+        if (stateKey === undefined) return;
+        this.memberInfo.applyClaim(stateKey, `@${content.localpart}:${content.domain}`);
     }
 
     /**
