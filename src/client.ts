@@ -1700,7 +1700,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getDomain(): string | null {
         if (this.credentials?.userId) {
-            return this.credentials.userId.replace(/^.*?:/, "");
+            return utils.getServerNameFromUserId(this.credentials.userId);
         }
         return null;
     }
