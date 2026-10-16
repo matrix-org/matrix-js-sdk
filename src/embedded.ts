@@ -468,7 +468,7 @@ export class RoomWidgetClient extends MatrixClient {
         // Delayed event special case.
         if (delayMs !== undefined) {
             // TODO: updatePendingEvent for delayed events?
-            return this.sendDelayedEventToHost(
+            return this.sendDelayedEventViaWidgetApi(
                 event.getType(),
                 undefined,
                 content,
@@ -536,7 +536,7 @@ export class RoomWidgetClient extends MatrixClient {
         }
         const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
-        return this.sendDelayedEventToHost(eventType, stateKey, content, roomId, delayMs);
+        return this.sendDelayedEventViaWidgetApi(eventType, stateKey, content, roomId, delayMs);
     }
 
     /**
@@ -599,7 +599,7 @@ export class RoomWidgetClient extends MatrixClient {
      * Uses the dedicated `send_delayed_event` action (MSC4157) if the host supports it,
      * and falls back to a `send_event` request with a delay otherwise.
      */
-    private async sendDelayedEventToHost(
+    private async sendDelayedEventViaWidgetApi(
         eventType: string,
         stateKey: string | undefined,
         content: unknown,
