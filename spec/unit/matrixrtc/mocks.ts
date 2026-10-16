@@ -17,7 +17,7 @@ limitations under the License.
 import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
+import { EventType, MatrixError, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
 import {
@@ -88,6 +88,8 @@ export type MockClient = MockedObject<
         MatrixClient,
         | "getUserId"
         | "getDeviceId"
+        | "fetchCapabilities"
+        | "getCachedCapabilities"
         | "sendEvent"
         | "sendStateEvent"
         | "_unstable_sendDelayedStateEvent"
@@ -108,6 +110,11 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
         getDeviceId: vi.fn(() => deviceId),
         getUserId: vi.fn(() => userId),
+        // By default the capabilities are not reachable, as in widget mode when the host does not support MSC4157.
+        fetchCapabilities: vi
+            .fn()
+            .mockRejectedValue(new MatrixError({ errcode: "M_MISSING_TOKEN", error: "Missing access token" }, 401)),
+        getCachedCapabilities: vi.fn(() => undefined),
         sendEvent: vi.fn(),
         sendStateEvent: vi.fn(),
         cancelPendingEvent: vi.fn(),

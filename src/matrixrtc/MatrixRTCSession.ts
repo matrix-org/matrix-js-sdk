@@ -498,6 +498,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
             MatrixClient,
             | "getUserId"
             | "getDeviceId"
+            | "fetchCapabilities"
+            | "getCachedCapabilities"
             | "sendEvent"
             | "sendStateEvent"
             | "_unstable_sendDelayedStateEvent"
