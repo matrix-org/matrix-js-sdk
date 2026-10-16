@@ -244,7 +244,12 @@ import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject, type XOR } from "./@types/common.ts";
-import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
+import {
+    ClientStoppedError,
+    TimeoutError,
+    UnsupportedDelayedEventsEndpointError,
+    UnsupportedStickyEventsEndpointError,
+} from "./errors.ts";
 import {
     type LivekitDelegateDelayedLeaveRequest,
     type LivekitGetTokenRequest,
@@ -2276,6 +2281,73 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
         }
         return Array.from(visibleRooms);
+    }
+
+    /**
+     * Determine whether the user has at least one encrypted room, waiting for the initial sync to
+     * complete first if it has not already done so.
+     *
+     * A room counts as encrypted if the crypto backend considers it encrypted (see
+     * {@link CryptoApi.isEncryptionEnabledInRoom}). This covers rooms whose encryption state event
+     * has been validated, and rooms the crypto store remembers as encrypted (room encryption
+     * cannot be disabled once enabled).
+     *
+     * Intended to let clients tailor warnings about identity resets, since a user with no encrypted
+     * rooms has no encrypted message history to lose.
+     *
+     * Note: when this client was configured to use sliding sync, only the rooms known locally are
+     * considered, which may be a subset of the user's true room list.
+     *
+     * @param timeoutMs - how long to wait for the initial sync, in milliseconds.
+     * @returns Whether the user has at least one encrypted room.
+     * @throws {@link TimeoutError} if the initial sync does not complete within `timeoutMs`. The
+     *     answer is then unknown: callers should treat this as "may have encrypted rooms", not as
+     *     `false`.
+     */
+    public async hasEncryptedRooms(timeoutMs: number): Promise<boolean> {
+        if (!this.isInitialSyncComplete()) {
+            await this.waitForInitialSync(timeoutMs);
+        }
+        for (const room of this.getRooms()) {
+            if (room.getMyMembership() !== KnownMembership.Join || room.isSpaceRoom()) {
+                continue;
+            }
+            if (await this.cryptoBackend?.isEncryptionEnabledInRoom(room.roomId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Wait for the initial sync to complete.
+     *
+     * @param timeoutMs - how long to wait, in milliseconds.
+     * @throws {@link TimeoutError} if the initial sync does not complete in time.
+     * @throws {@link ClientStoppedError} if the client is stopped before the initial sync completes.
+     */
+    private waitForInitialSync(timeoutMs: number): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const onSync = (state: SyncState): void => {
+                if (state === SyncState.Prepared || state === SyncState.Syncing) {
+                    cleanup();
+                    resolve();
+                } else if (state === SyncState.Stopped) {
+                    // The initial sync can no longer complete.
+                    cleanup();
+                    reject(new ClientStoppedError());
+                }
+            };
+            const timer = setTimeout(() => {
+                cleanup();
+                reject(new TimeoutError("Initial sync did not complete within the given timeout"));
+            }, timeoutMs);
+            const cleanup = (): void => {
+                clearTimeout(timer);
+                this.off(ClientEvent.Sync, onSync);
+            };
+            this.on(ClientEvent.Sync, onSync);
+        });
     }
 
     /**
