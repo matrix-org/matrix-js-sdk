@@ -1306,6 +1306,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected isGuestAccount = false;
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
+    /**
+     * The latest sticky event send per room, event type and sticky key, resolving to when it completed.
+     * See {@link sendStickyEventInOrder}.
+     */
+    protected readonly stickyEventSends = new Map<string, Promise<number>>();
 
     /**
      * Legacy crypto store used for migration from the legacy crypto to the rust crypto
@@ -3655,21 +3660,63 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
-            throw new UnsupportedStickyEventsEndpointError(
-                "Server does not support the sticky events",
-                "sendStickyEvent",
-            );
-        }
+        // Claim our place in the send order before anything asynchronous, so that concurrent calls go out in the
+        // order they were made. The server support check can take a different number of ticks per call.
+        return this.sendStickyEventInOrder(roomId, eventType, content.msc4354_sticky_key, async () => {
+            if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
+                throw new UnsupportedStickyEventsEndpointError(
+                    "Server does not support the sticky events",
+                    "sendStickyEvent",
+                );
+            }
 
-        this.addThreadRelationIfNeeded(content, threadId, roomId);
-        return this.sendCompleteEvent({
-            roomId,
-            threadId,
-            eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-            txnId,
+            this.addThreadRelationIfNeeded(content, threadId, roomId);
+            return this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                txnId,
+            });
         });
+    }
+
+    /**
+     * Ensures sticky events are sent at least 1 millisecond apart. Otherwise both events
+     * could get the same `origin_server_ts` which would make them tie break on event ID
+     * in the ephemeral sticky map.
+     */
+    protected async sendStickyEventInOrder<T>(
+        roomId: string,
+        eventType: string,
+        stickyKey: string | undefined,
+        send: () => Promise<T>,
+    ): Promise<T> {
+        if (stickyKey === undefined) {
+            return send();
+        }
+        const key = JSON.stringify([roomId, eventType, stickyKey]);
+        const previous = this.stickyEventSends.get(key);
+        const result = (async (): Promise<T> => {
+            if (previous) {
+                const waitMs = (await previous) + 1 - Date.now();
+                if (waitMs > 0) await sleep(waitMs);
+            }
+            return send();
+        })();
+        // Record when the send completed, whether or not it succeeded, for the next send to wait on.
+        const completedAt = result.then(
+            () => Date.now(),
+            () => Date.now(),
+        );
+        this.stickyEventSends.set(key, completedAt);
+        // Once the gap has passed there is nothing left to wait for, so forget the key.
+        void completedAt
+            .then(() => sleep(1))
+            .then(() => {
+                if (this.stickyEventSends.get(key) === completedAt) this.stickyEventSends.delete(key);
+            });
+        return result;
     }
 
     /**
