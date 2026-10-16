@@ -38,7 +38,7 @@ import {
     type LivekitGetTokenResponse,
     type Transport,
 } from "./matrixrtc/index.ts";
-import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
+import { MatrixEvent, type IEvent, EventStatus, isValidStickyDuration } from "./models/event.ts";
 import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
@@ -449,12 +449,12 @@ export class RoomWidgetClient extends MatrixClient {
         }
 
         const stickyDurationMs = queryDict?.["org.matrix.msc4354.sticky_duration_ms"];
-        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
-            throw new Error("Sticky duration must be a number when defined");
+        if (stickyDurationMs !== undefined && !isValidStickyDuration(stickyDurationMs)) {
+            throw new Error("Sticky duration must be a positive integer when defined");
         }
         // This is save since we just checked that above
         // We need the additional as assertion for the EW linter to be happy.
-        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
+        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && !isValidStickyDuration(stickyDurationMs)`
         // above
         const stickyDurationMsAsNumber: number | undefined = stickyDurationMs;
 
@@ -559,6 +559,9 @@ export class RoomWidgetClient extends MatrixClient {
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
         if (!this.widgetApi.hasCapability(MatrixCapabilities.MSC4407SendStickyEvent)) {
             throw new UnsupportedStickyEventsEndpointError(
                 "Widget was not granted the capability to send sticky events",
