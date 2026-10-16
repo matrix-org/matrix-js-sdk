@@ -8,7 +8,18 @@ export enum RoomStickyEventsEvent {
     Update = "RoomStickyEvents.Update",
 }
 
-export type StickyMatrixEvent = MatrixEvent & { unstableStickyExpiresAt: number };
+export type StickyMatrixEvent = MatrixEvent & {
+    /**
+     * When the event actually expires, preferring the server-provided TTL.
+     * This differs by homeserver and client and should be used for expiry only.
+     */
+    unstableStickyExpiresAt: number;
+    /**
+     * When the sender's homeserver intended the event to expire. This is stable across
+     * different homeservers and clients and should be used for ordering only.
+     */
+    unstableStickyIntendedExpiresAt: number;
+};
 
 export type RoomStickyEventsMap = {
     /**
@@ -40,8 +51,8 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * Sticky event map is a nested map of:
      *  eventType -> `content.sticky_key sender` -> StickyMatrixEvent[]
      *
-     * The events are ordered descendingly by expiry, tie breaking on the event ID, so that the first event
-     * in the array will always be the "current" one.
+     * The events are ordered descendingly by intended expiry, tie breaking on the event ID, so that the first
+     * event in the array will always be the "current" one.
      */
     private readonly stickyEventsMap = new Map<string, Map<string, StickyMatrixEvent[]>>();
     /**
@@ -54,14 +65,15 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
     private nextStickyEventExpiryTs: number = Number.MAX_SAFE_INTEGER;
 
     /**
-     * Sort two sticky events by expiry, tie breaking on the event ID. This assumes the sticky events have the same
-     * `type`, `sticky_key` and `sender`.
-     * @returns A positive value if event A will expire sooner, or a negative value if event B will expire sooner.
+     * Sort two sticky events by intended expiry, tie breaking on the event ID. This assumes the sticky events have
+     * the same `type`, `sticky_key` and `sender`.
+     *
+     * @returns A positive value if event A was intended to expire sooner, or a negative value if event B was.
      */
     private static sortStickyEvent(eventA: StickyMatrixEvent, eventB: StickyMatrixEvent): number {
-        // First, compare by expiry.
-        const expiryA = eventA.unstableStickyExpiresAt;
-        const expiryB = eventB.unstableStickyExpiresAt;
+        // First, compare by intended expiry.
+        const expiryA = eventA.unstableStickyIntendedExpiresAt;
+        const expiryB = eventB.unstableStickyIntendedExpiresAt;
         if (expiryB !== expiryA) {
             return expiryB - expiryA;
         }
