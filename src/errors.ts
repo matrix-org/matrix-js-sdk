@@ -54,6 +54,16 @@ export class ClientStoppedError extends Error {
 }
 
 /**
+ * This error is thrown when an operation did not complete within the time allotted to it.
+ */
+export class TimeoutError extends Error {
+    public constructor(message = "Operation timed out") {
+        super(message);
+        this.name = "TimeoutError";
+    }
+}
+
+/**
  * This error is thrown when the Homeserver does not support the delayed events endpoints.
  */
 export class UnsupportedDelayedEventsEndpointError extends Error {
