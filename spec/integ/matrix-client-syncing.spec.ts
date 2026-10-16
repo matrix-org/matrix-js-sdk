@@ -1548,6 +1548,42 @@ describe("MatrixClient syncing", () => {
         });
     });
 
+    describe("msc4354 sticky events", () => {
+        it("should assign the room to events from the sticky section", async () => {
+            // Servers serialise /sync events without a room_id
+            const stickyEvent = {
+                event_id: "$sticky",
+                type: "org.example.any_type",
+                content: { msc4354_sticky_key: "foobar" },
+                msc4354_sticky: { duration_ms: 15000 },
+                sender: otherUserId,
+                origin_server_ts: Date.now(),
+                unsigned: { msc4354_sticky_duration_ttl_ms: 15000 },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "batch_token",
+                rooms: {
+                    join: {
+                        [roomOne]: {
+                            timeline: {
+                                events: [utils.mkMessage({ room: roomOne, user: otherUserId, msg: "hello" })],
+                            },
+                            msc4354_sticky: { events: [stickyEvent] },
+                        },
+                    },
+                },
+            });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomOne)!;
+            const event = room._unstable_getKeyedStickyEvent(otherUserId, "org.example.any_type", "foobar");
+            expect(event?.getId()).toBe("$sticky");
+            expect(event?.getRoomId()).toBe(roomOne);
+        });
+    });
+
     describe("timeline", () => {
         beforeEach(() => {
             const syncData = {
