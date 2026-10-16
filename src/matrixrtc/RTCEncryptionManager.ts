@@ -228,9 +228,11 @@ export class RTCEncryptionManager implements IEncryptionManager {
         keyIndex: number,
         membership: CallMembershipIdentityParts,
     ): void {
-        const knownRtcMembership = this.getMemberships();
-        const fullMembership = knownRtcMembership.find(
-            (member) => member.userId === membership.userId && member.deviceId === membership.deviceId,
+        const fullMembership = this.getMemberships().find(
+            (member) =>
+                member.userId === membership.userId &&
+                member.deviceId === membership.deviceId &&
+                member.memberId === membership.memberId,
         );
         if (!fullMembership) {
             this.logger?.info(

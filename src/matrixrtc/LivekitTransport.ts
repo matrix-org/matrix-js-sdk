@@ -35,11 +35,20 @@ export const isLivekitTransport = (object: unknown): object is LivekitTransport 
     return transport.type === "livekit" && typeof transport.livekit_service_url === "string";
 };
 
+/**
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
 type WebsocketUrl = {
     /**
      * WebSocket URL of the LiveKit server.
      */
     url: string;
+    /**
+     * The server name of the homeserver that operates the SFU at `url`.
+     *
+     * When omitted, the SFU belongs to the homeserver of the member event's sender.
+     */
+    server_name?: string;
 };
 
 type ServiceUrl = {
@@ -53,6 +62,9 @@ type ServiceUrl = {
  * Any LiveKit transport that can be advertised by a homeserver or published by
  * a session member in unstable MSC4195 implementations: `url` only,
  * `livekit_service_url` only, or both during the migration.
+ *
+ * It uses the `Unstable` prefix as the MSC is not yet stable and it includes the
+ * `livekit_service_url` case which is only here for compatibility reasons.
  */
 export type UnstableLivekitTransport =
     // Latest MSC4195 variant, with `url`. Indicates that both publishers and
@@ -77,8 +89,26 @@ export const isUnstableLivekitTransport = (object: unknown): object is UnstableL
     if (!("url" in transport || "livekit_service_url" in transport)) return false;
     if ("url" in transport && typeof transport.url !== "string") return false;
     if ("livekit_service_url" in transport && typeof transport.livekit_service_url !== "string") return false;
+    // `server_name` only has meaning alongside `url`. It names the homeserver associated with the URL.
+    if ("server_name" in transport && (typeof transport.server_name !== "string" || !("url" in transport)))
+        return false;
     return true;
 };
+
+/**
+ * A LiveKit transport with an SFU WebSocket `url`.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export type UnstableLivekitTransportWithUrl = UnstableLivekitTransport & WebsocketUrl;
+
+/**
+ * Checks whether an object represents a LiveKit transport with an SFU WebSocket `url`.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export const isUnstableLivekitTransportWithUrl = (object: unknown): object is UnstableLivekitTransportWithUrl =>
+    isUnstableLivekitTransport(object) && "url" in object;
 
 /**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.

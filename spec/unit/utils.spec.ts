@@ -87,6 +87,16 @@ describe("utils", function () {
         });
     });
 
+    describe("getServerNameFromUserId", () => {
+        it.each([
+            ["@alice:example.org", "example.org"],
+            ["@alice:localhost:8448", "localhost:8448"],
+            ["@alice:[::1]:8448", "[::1]:8448"],
+        ])("extracts the server name from %s", (userId, serverName) => {
+            expect(utils.getServerNameFromUserId(userId)).toEqual(serverName);
+        });
+    });
+
     describe("removeElement", function () {
         it("should remove only 1 element if there is a match", function () {
             const matchFn = function () {
