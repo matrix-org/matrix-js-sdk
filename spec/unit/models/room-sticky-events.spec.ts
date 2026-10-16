@@ -125,7 +125,7 @@ describe("RoomStickyEvents", () => {
                 expect([...stickyEvents.getStickyEvents()]).toEqual([newerEv]);
             });
 
-            it("should prefer the event with the later server-provided TTL over the later intended expiry", () => {
+            it("should prefer the event with the later intended expiry over the later server-provided TTL", () => {
                 const now = Date.now();
                 // Intended to expire at now + 60000 but the server says there are only 5000 left
                 const longIntendedEv = new MatrixEvent({
@@ -135,7 +135,7 @@ describe("RoomStickyEvents", () => {
                     msc4354_sticky: { duration_ms: 60000 },
                     unsigned: { msc4354_sticky_duration_ttl_ms: 5000 },
                 });
-                // Intended to expire at now + 30000 and the server agrees there are 29000 left
+                // Intended to expire at now + 31000 and the server agrees there are 29000 left
                 const shortIntendedEv = new MatrixEvent({
                     ...stickyEvent,
                     event_id: "$short",
@@ -144,7 +144,27 @@ describe("RoomStickyEvents", () => {
                     unsigned: { msc4354_sticky_duration_ttl_ms: 29000 },
                 });
                 add(longIntendedEv, shortIntendedEv);
-                expect([...stickyEvents.getStickyEvents()]).toEqual([shortIntendedEv]);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([longIntendedEv]);
+            });
+
+            it("should order by the uncapped intended expiry", () => {
+                const now = Date.now();
+                // Intended to expire at now + 2h, even though stickiness is capped at 1h
+                const longIntendedEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$long",
+                    origin_server_ts: now,
+                    msc4354_sticky: { duration_ms: 7200000 },
+                });
+                // Intended to expire at now + 1h + 1000
+                const shortIntendedEv = new MatrixEvent({
+                    ...stickyEvent,
+                    event_id: "$short",
+                    origin_server_ts: now + 1000,
+                    msc4354_sticky: { duration_ms: 3600000 },
+                });
+                add(longIntendedEv, shortIntendedEv);
+                expect([...stickyEvents.getStickyEvents()]).toEqual([longIntendedEv]);
             });
 
             it("should tie break on the highest event ID when the intended expiry is equal", () => {
@@ -286,6 +306,32 @@ describe("RoomStickyEvents", () => {
             // Then expire the next event
             vi.advanceTimersByTime(1000);
             expect(emitSpy).toHaveBeenCalledWith([], [], [evLater]);
+        });
+        it("should not promote a losing event when the current event expires by its server-provided TTL", () => {
+            vi.setSystemTime(0);
+            // Wins on intended expiry (60000) but the server says there are only 5000 left
+            const currentEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$long",
+                origin_server_ts: 0,
+                msc4354_sticky: { duration_ms: 60000 },
+                unsigned: { msc4354_sticky_duration_ttl_ms: 5000 },
+            });
+            // Loses on intended expiry (31000) but outlives the current event
+            const losingEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$short",
+                origin_server_ts: 1000,
+                msc4354_sticky: { duration_ms: 30000 },
+                unsigned: { msc4354_sticky_duration_ttl_ms: 29000 },
+            });
+            stickyEvents.addStickyEvents([currentEv, losingEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([currentEv]);
+            const emitSpy = vi.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            vi.advanceTimersByTime(5000);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [currentEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
         });
         it("should emit two events when both expire at the same time", () => {
             const emitSpy = vi.fn();
