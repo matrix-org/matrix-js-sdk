@@ -41,6 +41,12 @@ describe("RoomRetentionPolicy", () => {
         await flushPromises();
     }
 
+    function setServerLifetime(maxLifetime: number | null): void {
+        getCachedMock.mockReturnValue(
+            maxLifetime === null ? undefined : { policies: { [ROOM_ID]: { max_lifetime: maxLifetime } } },
+        );
+    }
+
     function makeMessageEvent(ts: number, eventId = `$msg_${eventCounter++}`): MatrixEvent {
         return new MatrixEvent({
             type: "m.room.message",
@@ -195,6 +201,101 @@ describe("RoomRetentionPolicy", () => {
             await applyPolicy();
 
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(Date.now() - ONE_DAY_MS - 1000))).toBe(false);
+        });
+    });
+
+    describe("getRetentionMaxLifetime", () => {
+        it("returns null when retention is disabled", () => {
+            const client = {
+                ...room.client,
+                _unstable_shouldApplyMessageRetention: false,
+            } as unknown as MockedObject<MatrixClient>;
+            setServerLifetime(ONE_DAY_MS);
+            const roomWithoutRetention = new Room(ROOM_ID, client, USER_ID);
+
+            expect(roomWithoutRetention.getRetentionMaxLifetime()).toBeNull();
+        });
+    });
+
+    describe("immediate event admission", () => {
+        it.each([ONE_WEEK_MS, null])(
+            "retains now-allowed events immediately after changing the lifetime to %s",
+            async (maxLifetime) => {
+                setServerLifetime(ONE_DAY_MS);
+                await applyPolicy();
+                setServerLifetime(maxLifetime);
+                retentionPolicyUpdateHandler!();
+                const event = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS);
+                await room.addLiveEvents([event], { addToState: false });
+
+                expect(room.getLiveTimeline().getEvents()).toContain(event);
+                expect(event.isRedacted()).toBe(false);
+                expect(room.getRetentionMaxLifetime()).toBe(maxLifetime);
+            },
+        );
+
+        it("rejects expired events immediately after shortening the room state policy", async () => {
+            room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_WEEK_MS })]);
+            await flushPromises();
+            room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_DAY_MS })]);
+            const event = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS);
+            await room.addLiveEvents([event], { addToState: false });
+
+            expect(room.getLiveTimeline().getEvents()).not.toContain(event);
+            expect(room.getRetentionMaxLifetime()).toBe(ONE_DAY_MS);
+        });
+    });
+
+    describe("RetentionChanged", () => {
+        it("emits activation once when it overlaps constructor initialization", async () => {
+            room = new Room(ROOM_ID, room.client, USER_ID);
+            const timelineListenerCount = room.listenerCount(RoomEvent.Timeline);
+            const onRetentionChanged = vi.fn();
+            room.on(RoomEvent.RetentionChanged, onRetentionChanged);
+            setServerLifetime(ONE_DAY_MS);
+            retentionPolicyUpdateHandler!();
+            await flushPromises();
+
+            expect(onRetentionChanged).toHaveBeenCalledExactlyOnceWith(room, ONE_DAY_MS);
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListenerCount + 1);
+        });
+
+        it("emits each room state policy change in order", async () => {
+            const onRetentionChanged = vi.fn();
+            room.on(RoomEvent.RetentionChanged, onRetentionChanged);
+            room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_WEEK_MS })]);
+            room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_DAY_MS })]);
+            room.currentState.setStateEvents([makeRetentionStateEvent({})]);
+            await flushPromises();
+
+            expect(onRetentionChanged.mock.calls).toEqual([
+                [room, ONE_WEEK_MS],
+                [room, ONE_DAY_MS],
+                [room, null],
+            ]);
+            expect(room.getRetentionMaxLifetime()).toBeNull();
+        });
+
+        it("ignores an invalid policy", async () => {
+            const onRetentionChanged = vi.fn();
+            room.on(RoomEvent.RetentionChanged, onRetentionChanged);
+            setServerLifetime(-1);
+            retentionPolicyUpdateHandler!();
+            setServerLifetime(ONE_DAY_MS);
+            retentionPolicyUpdateHandler!();
+            await flushPromises();
+
+            expect(onRetentionChanged).toHaveBeenCalledExactlyOnceWith(room, ONE_DAY_MS);
+        });
+
+        it.each([null, ONE_DAY_MS])("does not emit when the lifetime remains %s", async (maxLifetime) => {
+            setServerLifetime(maxLifetime);
+            await applyPolicy();
+            const onRetentionChanged = vi.fn();
+            room.on(RoomEvent.RetentionChanged, onRetentionChanged);
+            await applyPolicy();
+
+            expect(onRetentionChanged).not.toHaveBeenCalled();
         });
     });
 
