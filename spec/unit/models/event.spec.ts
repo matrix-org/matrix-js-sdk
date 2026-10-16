@@ -655,10 +655,33 @@ describe("MatrixEvent", () => {
                 new MatrixEvent({ ...evData, unsigned: undefined, origin_server_ts: 5000 } satisfies IStickyEvent)
                     .unstableStickyExpiresAt,
             ).toEqual(1050);
+            // Fall back to `duration_ms` if the TTL is malformed
+            for (const ttl of [-1, 1.5, "5000", null]) {
+                expect(
+                    new MatrixEvent({ ...evData, unsigned: { msc4354_sticky_duration_ttl_ms: ttl as any } })
+                        .unstableStickyExpiresAt,
+                ).toEqual(1050);
+            }
         } finally {
             vi.useRealTimers();
         }
     });
+
+    it.each([0, -1000, 1.5, NaN, Infinity, "600000", true, null])(
+        "should not treat an event with sticky duration %s as sticky",
+        (duration) => {
+            const event = new MatrixEvent({
+                event_id: "$event_id",
+                type: "org.example.any_type",
+                content: {},
+                sender: "@alice:example.org",
+                origin_server_ts: 50,
+                msc4354_sticky: { duration_ms: duration as any },
+            });
+            expect(event.unstableStickyInfo).toBeUndefined();
+            expect(event.unstableStickyExpiresAt).toBeUndefined();
+        },
+    );
 });
 
 function mainTimelineLiveEventIds(room: Room): Array<string> {
