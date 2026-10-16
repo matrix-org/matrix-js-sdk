@@ -332,9 +332,9 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      * @param redactedEvent The MatrixEvent OR event ID of the event being redacted. MAY not be a sticky event.
      */
     public handleRedaction(redactedEvent: MatrixEvent | string): void {
-        // Note, we do not adjust`nextStickyEventExpiryTs` here.
-        // If this event happens to be the most recent expiring event
-        // then we may do one extra iteration of cleanExpiredStickyEvents
+        // Note, we only adjust `nextStickyEventExpiryTs` here when a predecessor
+        // gets promoted. Otherwise, if this event happens to be the most recent
+        // expiring event then we may do one extra iteration of cleanExpiredStickyEvents
         // but this saves us having to iterate over all events here to calculate
         // the next expiry time.
 
@@ -408,8 +408,14 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         const currentEvent = events[0];
         const currentEventRedacted = index === 0;
 
-        // Drop the redacted event and any other events that may have already been redacted before.
-        const newEvents = events.filter((e) => e.getId() !== redactEventId && !e.isRedacted());
+        // Drop the redacted event and any other events that may have already been redacted before. Expiry
+        // cleanup only tracks the current event, so also drop predecessors that have expired unnoticed. The
+        // current event is left to the expiry timer so that its removal is still emitted.
+        const now = Date.now();
+        const newEvents = events.filter(
+            (e, i) =>
+                e.getId() !== redactEventId && !e.isRedacted() && (i === 0 || !RoomStickyEventsStore.isExpired(e, now)),
+        );
         if (newEvents.length) {
             innerMap.set(mapKey, newEvents);
         } else {
@@ -422,7 +428,13 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
         // Emit an update if the current event was redacted.
         if (currentEventRedacted) {
             if (newEvents.length) {
-                // The current event was redacted and most recent superseded event takes its place.
+                // The current event was redacted and the most recent superseded event takes its place.
+                // It may expire sooner than any other current event, so make sure the timer covers it.
+                this.nextStickyEventExpiryTs = Math.min(
+                    this.nextStickyEventExpiryTs,
+                    newEvents[0].unstableStickyExpiresAt,
+                );
+                this.scheduleStickyTimer();
                 this.emit(RoomStickyEventsEvent.Update, [], [{ previous: currentEvent, current: newEvents[0] }], []);
             } else {
                 // The current event was redacted and no superseded events remain to replace it.
@@ -436,6 +448,7 @@ export class RoomStickyEventsStore extends TypedEventEmitter<RoomStickyEventsEve
      */
     public clear(): void {
         this.stickyEventsMap.clear();
+        this.unkeyedStickyEvents.clear();
         // Unschedule timer.
         this.nextStickyEventExpiryTs = Number.MAX_SAFE_INTEGER;
         this.scheduleStickyTimer();

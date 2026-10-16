@@ -1118,6 +1118,43 @@ describe("SyncAccumulator", function () {
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
         });
 
+        it("should keep sticky events from the timeline after the timeline is reset", () => {
+            vi.setSystemTime(0);
+            const ev = stickyEvent();
+            sa.accumulate(syncSkeleton({ timeline: { events: [ev], prev_batch: "a" } }));
+            // While the event is in the timeline, it isn't repeated in the sticky section.
+            let room = sa.getJSON().roomsData[Category.Join]["!foo:bar"];
+            expect(room.timeline.events).toEqual([ev]);
+            expect(room.msc4354_sticky).toBeUndefined();
+
+            const otherMsg = msg("test", "after the gap");
+            sa.accumulate(syncSkeleton({ timeline: { events: [otherMsg], prev_batch: "b", limited: true } }));
+            room = sa.getJSON().roomsData[Category.Join]["!foo:bar"];
+            expect(room.timeline.events).toEqual([otherMsg]);
+            expect(room.msc4354_sticky?.events).toEqual([ev]);
+        });
+
+        it("should not duplicate sticky events that arrive in both the timeline and the sticky section", () => {
+            vi.setSystemTime(0);
+            const ev = stickyEvent();
+            sa.accumulate(syncSkeleton({ timeline: { events: [ev], prev_batch: "a" } }));
+            sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+            sa.accumulate(syncSkeleton({ timeline: { events: [msg("test", "gap")], prev_batch: "b", limited: true } }));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
+        });
+
+        it.each([
+            ["in the content", (redacts: string) => ({ content: { redacts } })],
+            ["at the top level", (redacts: string) => ({ content: {}, redacts })],
+        ])("should drop sticky events that are redacted %s", (_, redaction) => {
+            vi.setSystemTime(0);
+            const ev = stickyEvent();
+            sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+            const redactionEv = { ...msg("test", ""), type: "m.room.redaction", ...redaction(ev.event_id) };
+            sa.accumulate(syncSkeleton({ timeline: { events: [redactionEv], prev_batch: "a" } }));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky).toBeUndefined();
+        });
+
         it("clears stale sticky events that pretend to be from the distant future", () => {
             vi.setSystemTime(0);
             const eventFarInTheFuture = stickyEvent(999999999999);
