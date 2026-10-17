@@ -63,6 +63,7 @@ describe("NotificationService", function () {
         matrixClient = {
             getRoom: function () {
                 return {
+                    getMyStableId: () => testUserId,
                     currentState: {
                         getMember: function () {
                             return {

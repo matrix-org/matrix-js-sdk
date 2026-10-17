@@ -35,6 +35,7 @@ import {
 } from "./event.ts";
 import { EventStatus } from "./event-status.ts";
 import { RoomMember } from "./room-member.ts";
+import { isMemberKey, MEMBER_INFO_FIELD, MemberInfoMap, type MemberInfoMapContent } from "./member-info.ts";
 import { type Hero, type IRoomSummary, RoomSummary } from "./room-summary.ts";
 import { logger } from "../logger.ts";
 import { TypedReEmitter } from "../ReEmitter.ts";
@@ -417,6 +418,18 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      *             Use getLiveTimeline().getState(EventTimeline.FORWARDS) instead.
      */
     public currentState!: RoomState;
+
+    /**
+     * The room's mapping between the stable IDs that identify its members on the wire
+     * (MSC4428) and the user IDs behind them, as last reported by the server.
+     *
+     * This object is shared by reference with every {@link RoomState} of this room, so
+     * that a member's resolved {@link RoomMember.userId} follows the mapping. Prefer
+     * {@link getUserIdForStableId} and {@link getStableIdForUserId} over reaching into it.
+     *
+     * In a room without member keys this is empty: every stable ID is its own user ID.
+     */
+    public readonly memberInfo = new MemberInfoMap();
 
     public readonly relations;
 
@@ -896,7 +909,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             // fall back to summary information
             const memberCount = this.getInvitedAndJoinedMemberCount();
             if (memberCount === 2) {
-                return this.heroes?.[0]?.userId;
+                // Heroes are identified by stable ID, and this returns a user ID.
+                const hero = this.heroes?.[0]?.userId;
+                if (hero !== undefined) return this.getUserIdForStableId(hero) ?? hero;
             }
         }
     }
@@ -915,7 +930,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
         // Remember, we're assuming this room is a DM, so returning the first member we find should be fine
         if (Array.isArray(this.heroes) && this.heroes.length) {
-            return this.heroes[0].userId;
+            // Heroes are identified by stable ID, and this returns a user ID.
+            const hero = this.heroes[0].userId;
+            return this.getUserIdForStableId(hero) ?? hero;
         }
         const members = this.currentState.getMembers();
         const anyMember = members.find((m) => m.userId !== this.myUserId);
@@ -1055,6 +1072,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             KnownMembership.Leave,
             lastSyncToken ?? undefined,
         );
+        // /members serves the room's complete mapping alongside the chunk. Apply it
+        // before the member events are turned into RoomMembers below.
+        if (response[MEMBER_INFO_FIELD] !== undefined) {
+            this.applyMemberInfo(response[MEMBER_INFO_FIELD], true);
+        }
         return response.chunk;
     }
 
@@ -1700,9 +1722,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             this.currentState.setInvitedMemberCount(invitedCount!);
         }
         if (Array.isArray(heroes)) {
-            // filter out ourselves just in case
+            // filter out ourselves just in case. Heroes are identified by stable ID in a
+            // room with member keys, so compare against ours rather than our user ID.
+            const myStableId = this.getMyStableId();
             this.heroes = heroes.filter((h) => {
-                return h.userId != this.myUserId;
+                return h.userId != myStableId;
             });
         }
 
@@ -1722,8 +1746,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         invitedCount: number | undefined,
     ): void {
         if (heroes) {
+            // `user_id` here carries the hero's stable ID, which in a room with member
+            // keys is their member key rather than their user ID.
+            const myStableId = this.getMyStableId();
             this.heroes = heroes
-                .filter((h) => h.user_id !== this.myUserId)
+                .filter((h) => h.user_id !== myStableId)
                 .map((h) => ({
                     userId: h.user_id,
                     displayName: h.displayname,
@@ -1892,12 +1919,146 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     }
 
     /**
-     * Get a member from the current room state.
-     * @param userId - The user ID of the member.
+     * Get a member from the current room state, by their stable ID or their user ID.
+     * @param id - The stable ID of the member (MSC4428), or their user ID.
      * @returns The member or `null`.
      */
-    public getMember(userId: string): RoomMember | null {
-        return this.currentState.getMember(userId);
+    public getMember(id: string): RoomMember | null {
+        return this.currentState.getMember(id);
+    }
+
+    /**
+     * Apply a `member_info` map from the server (MSC4428), updating the room's mapping
+     * from stable IDs to user IDs.
+     *
+     * @param content - The `member_info` map as served.
+     * @param full - True if `content` is the complete mapping for the room and should
+     *     replace what we have (an initial sync, or `/members`); false if it holds only
+     *     the entries which changed and should be merged in (an incremental sync).
+     */
+    public applyMemberInfo(content: MemberInfoMapContent | undefined, full: boolean): void {
+        // An incremental sync with no member_info for this room says nothing changed;
+        // don't mistake that for "the room has no members".
+        if (!full && content === undefined) return;
+
+        const changed = full ? this.memberInfo.applyFull(content) : this.memberInfo.applyDelta(content);
+        if (changed.length === 0) return;
+
+        // The mapping is shared by reference, so every RoomState already resolves members
+        // the new way; what each has to do is recalculate the state derived from it
+        // (names, the display name cache) and tell its listeners.
+        for (const state of this.getAllRoomStates()) {
+            state.onMemberInfoChanged(changed);
+        }
+    }
+
+    /**
+     * Resolve the stable ID of a room member (MSC4428) to the user ID behind it.
+     *
+     * @param stableId - The stable ID, as found in {@link MatrixEvent.getStableId},
+     *     {@link RoomMember.stableId} or the keys of a `member_info` map.
+     * @returns The user ID; `null` if the server has a mapping but cannot name a user
+     *     (the member has been erased, or the claim is unverified); `undefined` if there
+     *     is no mapping, which per MSC4428 means the stable ID is itself the user ID.
+     */
+    public getUserIdForStableId(stableId: string): string | null | undefined {
+        return this.memberInfo.getUserId(stableId);
+    }
+
+    /**
+     * Find the stable ID of the member of this room who is the given user.
+     *
+     * Use this to attach things which the server keys by user ID — read receipts, typing
+     * notifications, presence — to a room member.
+     *
+     * @param userId - The user ID to look up.
+     * @returns The stable ID, or `undefined` if no member of this room resolves to that
+     *     user. In a room without member keys there is no mapping at all, so this returns
+     *     `undefined` and the user ID should be used as the stable ID.
+     */
+    public getStableIdForUserId(userId: string): string | undefined {
+        return this.memberInfo.getStableId(userId);
+    }
+
+    /**
+     * The user ID behind a room member's stable ID (MSC4428).
+     *
+     * Unlike {@link getUserIdForStableId}, which reports only what the `member_info`
+     * mapping says, this also falls back to the server's signed `localpart`/`domain`
+     * claim in the member's own `m.room.member` event. That claim is the only way to
+     * name a member of an invited room, where the stripped `invite_state` carries no
+     * mapping at all.
+     *
+     * @param stableId - The member's stable ID.
+     * @returns the user ID, or `undefined` when the member cannot be named and should be
+     *     shown as an unknown user. Never returns a bare member key.
+     */
+    public getMemberUserId(stableId: string): string | undefined {
+        // `undefined` means no mapping, i.e. the stable ID is the user ID; `null` means
+        // the server has a mapping and cannot name a user. Claims from member events are
+        // already in the mapping, so there is nothing else to consult.
+        const mapped = this.memberInfo.getUserId(stableId);
+        if (mapped !== undefined) return mapped ?? undefined;
+
+        return isMemberKey(stableId) ? undefined : stableId;
+    }
+
+    /**
+     * The stable ID identifying us as a member of this room (MSC4428).
+     *
+     * In a room without member keys this is our user ID. In a room with member keys it is
+     * our key in this room, which the server normally tells us in `member_info`.
+     *
+     * An invited room is the awkward case: its stripped `invite_state` carries no
+     * `member_info`, so our own member event is under a key we have no mapping for. We
+     * find it through the server's signed `localpart`/`domain` claim instead — without
+     * this, our own membership is never found and the room does not render as an invite.
+     *
+     * @returns our stable ID in this room, falling back to our user ID when the room
+     *     holds nothing that names us.
+     */
+    public getMyStableId(): string {
+        return this.memberInfo.getStableId(this.myUserId) ?? this.myUserId;
+    }
+
+    /**
+     * The identifiers under which a room member may be named in room state.
+     *
+     * @param id - The member's stable ID or their user ID; either is accepted.
+     * @returns `stableId`, the key this member is identified by in `power_levels.users`
+     *     and as an `m.room.member` state key, and `userId`, the user they are, which is
+     *     `undefined` if we have no mapping (so the stable ID is the user ID) and `null`
+     *     if the server cannot name one.
+     */
+    public resolveMemberIdentity(id: string): { stableId: string; userId: string | null | undefined } {
+        const asStableId = this.memberInfo.getUserId(id);
+        if (asStableId !== undefined) return { stableId: id, userId: asStableId };
+
+        const fromUserId = this.memberInfo.getStableId(id);
+        if (fromUserId !== undefined) return { stableId: fromUserId, userId: id };
+
+        // No mapping either way: in a room without member keys the two are the same thing.
+        return { stableId: id, userId: undefined };
+    }
+
+    /**
+     * Every RoomState belonging to this room: the current and historical state of each
+     * timeline of each timeline set.
+     */
+    private getAllRoomStates(): Set<RoomState> {
+        const states = new Set<RoomState>();
+        for (const timelineSet of this.timelineSets) {
+            for (const timeline of timelineSet.getTimelines()) {
+                const start = timeline.getState(EventTimeline.BACKWARDS);
+                if (start) states.add(start);
+                const end = timeline.getState(EventTimeline.FORWARDS);
+                if (end) states.add(end);
+            }
+        }
+        // These are normally the live timeline's states, but be safe.
+        if (this.currentState) states.add(this.currentState);
+        if (this.oldState) states.add(this.oldState);
+        return states;
     }
 
     /**
@@ -1986,7 +2147,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * @returns The default room name
      */
     public getDefaultRoomName(userId: string): string {
-        return this.calculateRoomName(userId, true);
+        return this.calculateRoomName(this.getStableIdForUserId(userId) ?? userId, true);
     }
 
     /**
@@ -2118,8 +2279,9 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             Array.from(this.threads).forEach(([, thread]) => {
                 if (thread.length === 0) return;
+                const myStableId = this.getMyStableId();
                 const currentUserParticipated = thread.timeline.some((event) => {
-                    return event.getSender() === this.client.getUserId();
+                    return event.getStableId() === myStableId;
                 });
                 if (filterType !== ThreadFilterType.My || currentUserParticipated) {
                     timelineSet.getLiveTimeline().addEvent(thread.rootEvent!, {
@@ -2716,7 +2878,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // field. Only do this for events sent by us though as it's potentially expensive to loop
         // the pending events map.
         const txnId = event.getUnsigned().transaction_id;
-        if (!txnId && event.getSender() === this.myUserId) {
+        if (!txnId && event.getStableId() === this.getMyStableId()) {
             // check the txn map for a matching event ID
             for (const [tid, localEvent] of this.txnToEvent) {
                 if (localEvent.getId() === event.getId()) {
@@ -3276,7 +3438,13 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                         // https://github.com/matrix-org/matrix-js-sdk/issues/3684
                         if (!synthetic && this.client.isInitialSyncComplete() && userId === this.client.getUserId()) {
                             const lastEvent = receiptDestination.timeline[receiptDestination.timeline.length - 1];
-                            if (lastEvent && eventId === lastEvent.getId() && userId === lastEvent.getSender()) {
+                            // The receipt names a user; the event names its sender by
+                            // stable ID (MSC4428). Compare like with like.
+                            if (
+                                lastEvent &&
+                                eventId === lastEvent.getId() &&
+                                this.getMyStableId() === lastEvent.getStableId()
+                            ) {
                                 receiptDestination.setUnread(NotificationCountType.Total, 0);
                                 receiptDestination.setUnread(NotificationCountType.Highlight, 0);
                             }
@@ -3367,7 +3535,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public recalculate(): void {
         // set fake stripped state events if this is an invite room so logic remains
         // consistent elsewhere.
-        const membershipEvent = this.currentState.getStateEvents(EventType.RoomMember, this.myUserId);
+        const membershipEvent = this.currentState.getStateEvents(EventType.RoomMember, this.getMyStableId());
         if (membershipEvent) {
             const membership = membershipEvent.getContent().membership;
             this.updateMyMembership(membership!);
@@ -3385,7 +3553,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                                 content: strippedEvent.content,
                                 event_id: "$fake" + Date.now(),
                                 room_id: this.roomId,
-                                sender: this.myUserId, // technically a lie
+                                sender: this.getMyStableId(), // technically a lie
                             }),
                         ]);
                     }
@@ -3394,7 +3562,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
 
         const oldName = this.name;
-        this.name = this.calculateRoomName(this.myUserId);
+        this.name = this.calculateRoomName(this.getMyStableId());
         this.normalizedName = normalize(this.name);
         this.summary = new RoomSummary(this.roomId, {
             title: this.name,
@@ -3657,7 +3825,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      * was no m.room.name event.
      * @returns The calculated room name.
      */
-    private calculateRoomName(userId: string, ignoreRoomNameEvent = false): string {
+    private calculateRoomName(myStableId: string, ignoreRoomNameEvent = false): string {
         if (!ignoreRoomNameEvent) {
             const name = this.currentState.getStateEvents(EventType.RoomName, "")?.getContent().name;
             if (name && typeof name === "string") {
@@ -3689,25 +3857,28 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (this.heroes) {
             // if we have heroes, use those as the names
             this.heroes.forEach((hero) => {
+                // Heroes are identified by stable ID; functional members are configured
+                // by user ID, so resolve before comparing.
+                const heroUserId = this.getUserIdForStableId(hero.userId) ?? hero.userId;
                 // filter service members
-                if (excludedUserIds.includes(hero.userId)) {
+                if (excludedUserIds.includes(heroUserId)) {
                     inviteJoinCount--;
                     return;
                 }
                 // If the hero has a display name, use that.
-                // Otherwise, look their user ID up in the membership and use
-                // the name from there, or the user ID as a last resort.
+                // Otherwise, look them up in the membership and use the name from there,
+                // or their user ID as a last resort.
                 if (hero.displayName) {
                     otherNames.push(hero.displayName);
                 } else {
                     const member = this.getMember(hero.userId);
-                    otherNames.push(member ? member.name : hero.userId);
+                    otherNames.push(member ? member.name : heroUserId);
                 }
             });
         } else {
             let otherMembers = this.currentState.getMembers().filter((m) => {
                 return (
-                    m.userId !== userId &&
+                    m.stableId !== myStableId &&
                     (m.membership === KnownMembership.Invite || m.membership === KnownMembership.Join)
                 );
             });
@@ -3763,7 +3934,7 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
                 .getMembers()
                 .filter((m) => {
                     return (
-                        m.userId !== userId &&
+                        m.stableId !== myStableId &&
                         m.membership !== KnownMembership.Invite &&
                         m.membership !== KnownMembership.Join
                     );
