@@ -569,13 +569,15 @@ export class RoomWidgetClient extends MatrixClient {
         this.addThreadRelationIfNeeded(content, threadId, roomId);
         txnId ??= this.makeTxnId();
         try {
-            return await this.sendCompleteEvent({
-                roomId,
-                threadId,
-                eventObject: { type: eventType, content },
-                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-                txnId,
-            });
+            return await this.sendStickyEventInOrder(roomId, eventType, content.msc4354_sticky_key, () =>
+                this.sendCompleteEvent({
+                    roomId,
+                    threadId,
+                    eventObject: { type: eventType, content },
+                    queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                    txnId,
+                }),
+            );
         } catch (error) {
             if (!(error instanceof WidgetApiResponseError) || error.data.matrix_api_error !== undefined) throw error;
 
