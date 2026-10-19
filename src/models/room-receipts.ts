@@ -192,7 +192,7 @@ export class RoomReceipts {
                 ? this.room.getLiveTimeline().getEvents()
                 : this.room.getThread(threadId)?.timeline;
 
-        const latestEventId = latestEventIdSentByUser(timeline, userId);
+        const latestEventId = latestEventIdSentByUser(timeline, this.room.getStableIdForUserId(userId) ?? userId);
         return !!latestEventId && isAfterOrSame(latestEventId, eventId, this.room);
     }
 
@@ -204,12 +204,14 @@ export class RoomReceipts {
         // The root is part of the thread's timeline, but it is not a reply to
         // the thread, so leave it out.
         const replies = this.room.getThread(rootEventId)?.timeline.filter((event) => event.getId() !== rootEventId);
-        return !!latestEventIdSentByUser(replies, userId);
+        return !!latestEventIdSentByUser(replies, this.room.getStableIdForUserId(userId) ?? userId);
     }
 }
 
 /**
- * Find the last event in the supplied timeline that was sent by this user.
+ * Find the last event in the supplied timeline that was sent by this room member,
+ * identified by their stable ID (MSC4428). Receipts name users, so callers starting
+ * from a user ID must resolve it first.
  *
  * Events that are still on their way to the server (or failed to get there) are
  * ignored: they have no place in the timeline yet, and a failed send tells us
@@ -217,12 +219,12 @@ export class RoomReceipts {
  *
  * @returns the ID of the found event, or undefined if there is no such event.
  */
-function latestEventIdSentByUser(timeline: Array<MatrixEvent> | undefined, userId: string): string | undefined {
+function latestEventIdSentByUser(timeline: Array<MatrixEvent> | undefined, stableId: string): string | undefined {
     if (!timeline) return undefined;
 
     for (let index = timeline.length - 1; index >= 0; index--) {
         const event = timeline[index];
-        if (event.getSender() === userId && !event.status) {
+        if (event.getStableId() === stableId && !event.status) {
             return event.getId();
         }
     }

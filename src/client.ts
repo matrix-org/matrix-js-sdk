@@ -100,6 +100,7 @@ import {
     type RoomEventHandlerMap,
     type RoomNameState,
 } from "./models/room.ts";
+import { type MEMBER_INFO_FIELD, type MemberInfoMapContent } from "./models/member-info.ts";
 import { RoomMemberEvent, type RoomMemberEventHandlerMap } from "./models/room-member.ts";
 import { RoomStateEvent, type IPowerLevelsContent, type RoomStateEventHandlerMap } from "./models/room-state.ts";
 import {
@@ -761,11 +762,28 @@ interface IJoinedRoomsResponse {
     joined_rooms: string[];
 }
 
+/**
+ * The response to `GET /rooms/{roomId}/members`.
+ */
+export interface IMembersResponse {
+    chunk: IStateEventWithRoomId[];
+    /**
+     * The room's stable ID -> user ID mapping (MSC4428), complete as of this response.
+     */
+    [MEMBER_INFO_FIELD]?: MemberInfoMapContent;
+}
+
 interface IJoinedMembersResponse {
+    /**
+     * Keyed by the member's stable ID (MSC4428), which in a room without member keys is
+     * their user ID. `user_id` resolves the key, and is `null` where the server cannot
+     * name a user.
+     */
     joined: {
-        [userId: string]: {
+        [stableId: string]: {
             display_name: string;
             avatar_url: string;
+            user_id?: string | null;
         };
     };
 }
@@ -2467,8 +2485,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const preJoinMembership = roomMember?.membership;
 
         // If we were invited to the room, the ID of the user that sent the invite. Otherwise, `null`.
-        const inviter =
-            preJoinMembership == KnownMembership.Invite ? (roomMember?.events.member?.getSender() ?? null) : null;
+        // The invite event names its sender by stable ID (MSC4428), which in a room with
+        // member keys is not a user ID; the crypto stack below parses this as one and
+        // throws if it is a key. Resolve it, and pass `null` when we cannot name a user
+        // rather than handing a member key on: the key bundle is an E2EE nicety and must
+        // not be able to fail the join itself.
+        const inviterStableId =
+            preJoinMembership == KnownMembership.Invite ? (roomMember?.events.member?.getStableId() ?? null) : null;
+        const inviter = inviterStableId === null ? null : (room?.getMemberUserId(inviterStableId) ?? null);
 
         this.logger.debug(
             `joinRoom[${roomIdOrAlias}]: preJoinMembership=${preJoinMembership}, inviter=${inviter}, opts=${JSON.stringify(opts)}`,
@@ -2681,7 +2705,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Will apply changes atop of current power level event from local state if running & synced, falling back
      * to fetching latest from the `/state/` API.
      * @param roomId - the room to update power levels in
-     * @param userId - the ID of the user or users to update power levels of
+     * @param userId - the ID of the user or users to update power levels of. A member's
+     *     stable ID (MSC4428) is accepted here too, and is what ends up in the event:
+     *     `power_levels.users` is keyed by stable ID, which in a room with member keys is
+     *     the member's key rather than their user ID.
      * @param powerLevel - the numeric power level to update given users to
      * @returns Promise which resolves: to an ISendEventResponse object
      * @returns Rejects: with an error response.
@@ -2717,12 +2744,22 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (!content?.users) {
             content.users = {};
         }
+        const room = this.getRoom(roomId);
         const users = Array.isArray(userId) ? userId : [userId];
         for (const user of users) {
-            if (powerLevel == null) {
-                delete content.users[user];
-            } else {
-                content.users[user] = powerLevel;
+            // `users` is keyed by stable ID. The caller may have named the member by
+            // either identifier, and the server rejects an event which names one member
+            // twice, so clear both spellings before writing the one that counts. In a
+            // room without member keys the two are the same string and this is a no-op.
+            const identity = room?.resolveMemberIdentity(user);
+            delete content.users[user];
+            if (identity) {
+                delete content.users[identity.stableId];
+                if (identity.userId) delete content.users[identity.userId];
+            }
+
+            if (powerLevel != null) {
+                content.users[identity?.stableId ?? user] = powerLevel;
             }
         }
 
@@ -5263,7 +5300,10 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     // Process latest events first
                     for (const event of matrixEvents.slice().reverse()) {
                         await thread?.processEvent(event);
-                        const sender = event.getSender()!;
+                        // Receipts are keyed by user ID, but the event names its sender
+                        // by stable ID (MSC4428); resolve before recording one.
+                        const stableId = event.getStableId()!;
+                        const sender = room.getUserIdForStableId(stableId) ?? stableId;
                         if (!backwards || thread?.getEventReadUpTo(sender) === null) {
                             room.addLocalEchoReceipt(sender, event, ReceiptType.Read);
                         }
@@ -7171,7 +7211,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         includeMembership?: string,
         excludeMembership?: string,
         atSyncToken?: string,
-    ): Promise<{ [userId: string]: IStateEventWithRoomId[] }> {
+    ): Promise<IMembersResponse> {
         const queryParams: Record<string, string> = {};
         if (includeMembership) {
             queryParams.membership = includeMembership;
@@ -7381,11 +7421,25 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *                                 and their profile data.
      * @returns Rejects: with an error response.
      */
-    public getJoinedRoomMembers(roomId: string): Promise<IJoinedMembersResponse> {
+    public async getJoinedRoomMembers(roomId: string): Promise<IJoinedMembersResponse> {
         const path = utils.encodeUri("/rooms/$roomId/joined_members", {
             $roomId: roomId,
         });
-        return this.http.authedRequest(Method.Get, path);
+        const response = await this.http.authedRequest<IJoinedMembersResponse>(Method.Get, path);
+
+        // The response is keyed by stable ID and names the user behind each (MSC4428):
+        // that is the room's mapping, so learn it rather than make the caller do so.
+        const room = this.getRoom(roomId);
+        if (room) {
+            const memberInfo: MemberInfoMapContent = {};
+            for (const [stableId, member] of Object.entries(response.joined ?? {})) {
+                if (member.user_id !== undefined) memberInfo[stableId] = { user_id: member.user_id };
+            }
+            // Joined members alone are not the whole room, so merge rather than replace.
+            room.applyMemberInfo(memberInfo, false);
+        }
+
+        return response;
     }
 
     /**
