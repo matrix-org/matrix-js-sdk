@@ -1280,7 +1280,7 @@ export class SyncApi {
                 const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
                 const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
                 const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
-                const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky);
+                const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky, room);
 
                 // If state_after is present, this is the events that form the state at the end of the timeline block and
                 // regular timeline events do *not* count towards state. If it's not present, then the state is formed by
