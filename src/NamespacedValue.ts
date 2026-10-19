@@ -90,6 +90,10 @@ export class ServerControlledNamespacedValue<S extends string, U extends string>
         this.preferUnstable = preferUnstable;
     }
 
+    public get altName(): U | S | null {
+        return this.name === this.stable ? this.unstable : this.stable;
+    }
+
     public get name(): U | S {
         if (this.stable && !this.preferUnstable) {
             return this.stable;
