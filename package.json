@@ -92,7 +92,7 @@
         "debug": "^4.3.4",
         "fake-indexeddb": "^6.0.0",
         "fetch-mock": "^12.6.0",
-        "happy-dom": "^20.1.0",
+        "happy-dom": "^21.0.0",
         "husky": "^9.0.0",
         "knip": "^6.0.0",
         "lint-staged": "^17.0.0",
