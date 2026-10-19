@@ -1325,7 +1325,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected canResetTimelineCallback?: ResetTimelineCallback;
 
     // Set once the server has answered M_UNRECOGNIZED to the MSC4140 delayed event endpoint
-    private delayedEventEndpointUnrecognised = false;
+    private useDelayedEventEndpointFallback = false;
 
     public canSupport = new Map<Feature, ServerSupport>();
 
@@ -3172,7 +3172,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
         requestOpts: IRequestOpts = {},
     ): Promise<SendDelayedEventResponse> {
-        if (!this.delayedEventEndpointUnrecognised) {
+        if (!this.useDelayedEventEndpointFallback) {
             const path = utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
                 $roomId: event.roomId,
                 $eventType: event.eventType,
@@ -3198,7 +3198,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     throw e;
                 }
                 this.logger.debug("Server does not recognise the delayed event endpoint, using query parameters");
-                this.delayedEventEndpointUnrecognised = true;
+                this.useDelayedEventEndpointFallback = true;
             }
         }
 
