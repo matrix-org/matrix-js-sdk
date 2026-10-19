@@ -18,6 +18,7 @@ import {
     isLivekitFocusSelection,
     isLivekitTransport,
     isUnstableLivekitTransport,
+    isUnstableLivekitTransportWithUrl,
 } from "../../../src/matrixrtc/LivekitTransport";
 
 describe("LivekitTransport", () => {
@@ -72,5 +73,47 @@ describe("LivekitTransport", () => {
         expect(isUnstableLivekitTransport({ type: "livekit", other_service_url: "multi_sfu" })).toBeFalsy();
         expect(isUnstableLivekitTransport({ type: "livekit", livekit_service_url: 3 })).toBeFalsy();
         expect(isUnstableLivekitTransport({ type: "livekit", url: 4 })).toBeFalsy();
+    });
+    it("isUnstableLivekitTransport with server_name", () => {
+        expect(
+            isUnstableLivekitTransport({
+                type: "livekit",
+                url: "ws://test.com",
+                server_name: "test.com",
+            }),
+        ).toBeTruthy();
+        expect(
+            isUnstableLivekitTransport({
+                type: "livekit",
+                url: "ws://test.com",
+                livekit_service_url: "http://test.com",
+                server_name: "test.com",
+            }),
+        ).toBeTruthy();
+        // server_name must be a string
+        expect(isUnstableLivekitTransport({ type: "livekit", url: "ws://test.com", server_name: 5 })).toBeFalsy();
+        // server_name is meaningless without a url
+        expect(
+            isUnstableLivekitTransport({
+                type: "livekit",
+                livekit_service_url: "http://test.com",
+                server_name: "test.com",
+            }),
+        ).toBeFalsy();
+    });
+    it("isUnstableLivekitTransportWithUrl", () => {
+        expect(isUnstableLivekitTransportWithUrl(null)).toBeFalsy();
+        expect(isUnstableLivekitTransportWithUrl({ type: "livekit", url: "ws://test.com" })).toBeTruthy();
+        expect(
+            isUnstableLivekitTransportWithUrl({
+                type: "livekit",
+                url: "ws://test.com",
+                livekit_service_url: "http://test.com",
+            }),
+        ).toBeTruthy();
+        expect(
+            isUnstableLivekitTransportWithUrl({ type: "livekit", livekit_service_url: "http://test.com" }),
+        ).toBeFalsy();
+        expect(isUnstableLivekitTransportWithUrl({ type: "livekit", url: 4 })).toBeFalsy();
     });
 });

@@ -17,10 +17,10 @@ limitations under the License.
 import { type Mock, type Mocked } from "vitest";
 
 import { RTCEncryptionManager } from "../../../src/matrixrtc/RTCEncryptionManager.ts";
-import { type UnstableLivekitTransport, type CallMembership } from "../../../src/matrixrtc";
+import { type UnstableLivekitTransport, CallMembership } from "../../../src/matrixrtc";
 import { type ToDeviceKeyTransport } from "../../../src/matrixrtc/ToDeviceKeyTransport.ts";
 import { KeyTransportEvents, type KeyTransportEventsHandlerMap } from "../../../src/matrixrtc/IKeyTransport.ts";
-import { sessionMembershipTemplate, mockCallMembership } from "./mocks.ts";
+import { sessionMembershipTemplate, rtcMembershipTemplate, mockCallMembership, mockRTCEvent } from "./mocks.ts";
 import { decodeBase64, TypedEventEmitter } from "../../../src";
 import { logger } from "../../../src/logger.ts";
 import { getEncryptionKeyMapKey } from "../../../src/matrixrtc/EncryptionManager.ts";
@@ -913,6 +913,36 @@ describe("RTCEncryptionManager", () => {
                 expect(bob1Ring).not.toBeDefined();
             });
         });
+
+        it("should attach the key to the membership it was sent for if a device has two memberships", async () => {
+            vi.useFakeTimers();
+
+            // Bob rejoined after a reload without leaving, so his stale membership is still around
+            const staleMembership = anRtcMembership("@bob:example.org", "BOBDEVICE", "STALE", 1000, "rtcIDBOBSTALE");
+            const freshMembership = anRtcMembership("@bob:example.org", "BOBDEVICE", "FRESH", 2000, "rtcIDBOBFRESH");
+            getMembershipMock.mockReturnValue([staleMembership, freshMembership]);
+
+            encryptionManager.join(undefined, [transport]);
+            encryptionManager.onMembershipsUpdate();
+            await vi.advanceTimersByTimeAsync(10);
+            onEncryptionKeysChanged.mockClear();
+
+            mockTransport.emit(
+                KeyTransportEvents.ReceivedKeys,
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE", memberId: "FRESH" },
+                "AAAAAAAAAAA",
+                0 /* KeyId */,
+                0 /* Timestamp */,
+            );
+
+            await vi.waitFor(() => expect(onEncryptionKeysChanged).toHaveBeenCalledTimes(1));
+            expect(onEncryptionKeysChanged).toHaveBeenCalledWith(
+                decodeBase64("AAAAAAAAAAA"),
+                0,
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE", memberId: "FRESH" },
+                "rtcIDBOBFRESH",
+            );
+        });
     });
 
     it("Should only rotate once again if several membership changes during a rollout", async () => {
@@ -1161,6 +1191,34 @@ describe("RTCEncryptionManager", () => {
             { ...sessionMembershipTemplate, user_id: userId, device_id: deviceId, created_ts: ts },
             "!room:id",
             [backendIdentity],
+        );
+    }
+
+    /**
+     * Creates an MSC4143 (sticky) membership for the given user and device, carrying the given member ID.
+     */
+    function anRtcMembership(
+        userId: string,
+        deviceId: string,
+        memberId: string,
+        ts: number,
+        backendIdentity: string,
+    ): CallMembership {
+        const ev = mockRTCEvent(
+            {
+                ...rtcMembershipTemplate,
+                user_id: userId,
+                member: { ...rtcMembershipTemplate.member, user_id: userId, device_id: deviceId, id: memberId },
+            },
+            "!room:id",
+            60_000,
+            ts,
+        );
+        return new CallMembership(
+            ev,
+            CallMembership.membershipDataFromMatrixEvent(ev),
+            [backendIdentity],
+            "(deprecated)",
         );
     }
 
