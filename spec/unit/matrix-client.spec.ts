@@ -1161,6 +1161,25 @@ describe("MatrixClient", function () {
             expect(httpLookups).toHaveLength(0);
         });
 
+        it("prevents subclasses from sending a delayed state event with a sticky duration", async () => {
+            class Subclass extends MatrixClient {
+                async sendStickyDelayedStateEvent() {
+                    return this.sendCompleteEvent({
+                        roomId,
+                        threadId: null,
+                        eventObject: { type: EventType.RoomTopic, state_key: "", content: { topic: "The year 2000" } },
+                        queryDict: { "org.matrix.msc4354.sticky_duration_ms": 5000 },
+                        delayMs: 2000,
+                    });
+                }
+            }
+            Object.setPrototypeOf(client, Subclass.prototype);
+            httpLookups = [];
+            await expect((client as Subclass).sendStickyDelayedStateEvent()).rejects.toThrow(
+                new Error("A delayed state event cannot have a sticky duration"),
+            );
+        });
+
         describe.each([delayMs, delayOpts])("without dedicated endpoint support", (delayMsOrOpts) => {
             const unrecognised = { httpStatus: 404, errcode: "M_UNRECOGNIZED" };
 

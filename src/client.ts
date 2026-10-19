@@ -3164,6 +3164,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @param legacyPath - the regular send endpoint for this event, used for the fallback.
      * @param queryDict - query parameters to send on either endpoint. On the dedicated endpoint, the MSC4354
      *     sticky duration is moved to the request body instead.
+     * @throws `Error` if the event is a state event and `queryDict` has an MSC4354 sticky duration, as
+     *     MSC4354 does not allow sticky state events.
      */
     private async scheduleDelayedEvent(
         event: { roomId: string; eventType: string; txnId: string; stateKey?: string; content: IContent },
@@ -3172,6 +3174,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
         requestOpts: IRequestOpts = {},
     ): Promise<SendDelayedEventResponse> {
+        if (event.stateKey !== undefined && queryDict?.[UNSTABLE_MSC4354_STICKY_DURATION] !== undefined) {
+            throw new Error("A delayed state event cannot have a sticky duration");
+        }
         if (!this.useDelayedEventEndpointFallback) {
             const path = utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
                 $roomId: event.roomId,
@@ -3185,7 +3190,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             };
             if (event.stateKey !== undefined) {
                 body.state_key = event.stateKey;
-            } else if (stickyDuration !== undefined) {
+            }
+            if (stickyDuration !== undefined) {
                 body[UNSTABLE_MSC4354_STICKY_DURATION] = stickyDuration;
             }
             try {
