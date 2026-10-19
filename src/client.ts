@@ -3179,12 +3179,15 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 $txnId: event.txnId,
             });
             const { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration, ...otherQuery } = queryDict ?? {};
-            const body = {
+            const body: Body = {
                 delay_ms: delayMs,
-                ...(event.stateKey !== undefined && { state_key: event.stateKey }),
-                ...(stickyDuration !== undefined && { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration }),
                 content: event.content,
             };
+            if (event.stateKey !== undefined) {
+                body.state_key = event.stateKey;
+            } else if (stickyDuration !== undefined) {
+                body[UNSTABLE_MSC4354_STICKY_DURATION] = stickyDuration;
+            }
             try {
                 return await this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, otherQuery, body, {
                     ...requestOpts,
