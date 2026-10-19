@@ -739,6 +739,31 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("sticky events", () => {
+        const roomId = "!room:example.org";
+
+        beforeEach(() => {
+            unstableFeatures["org.matrix.msc4140"] = true;
+            unstableFeatures["org.matrix.msc4354"] = true;
+        });
+
+        it.each([0, -1000, 1.5, NaN, Infinity])("rejects a sticky duration of %s", async (duration) => {
+            httpLookups = [];
+            await expect(
+                client._unstable_sendStickyEvent(roomId, duration, null, EventType.RoomMessage, {
+                    body: "hi",
+                    msgtype: MsgType.Text,
+                }),
+            ).rejects.toThrow("Sticky duration must be a positive integer");
+            await expect(
+                client._unstable_sendStickyDelayedEvent(roomId, duration, 1000, null, EventType.RoomMessage, {
+                    body: "hi",
+                    msgtype: MsgType.Text,
+                }),
+            ).rejects.toThrow("Sticky duration must be a positive integer");
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";

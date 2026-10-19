@@ -1118,6 +1118,24 @@ describe("SyncAccumulator", function () {
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toBeUndefined();
         });
 
+        it("should ignore sticky section events with an invalid duration", () => {
+            vi.setSystemTime(0);
+            const ev = { ...stickyEvent(), msc4354_sticky: { duration_ms: "1000" as any } };
+            sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky).toBeUndefined();
+        });
+
+        it("should ignore a malformed server-provided TTL and fall back to duration_ms", () => {
+            vi.setSystemTime(0);
+            // `Math.min(null, …)` would be 0, i.e. expired on arrival.
+            const ev = { ...stickyEvent(), unsigned: { msc4354_sticky_duration_ttl_ms: null as any } };
+            sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
+            vi.setSystemTime(1000); // `duration_ms` has now elapsed
+            sa.accumulate(syncSkeleton({}));
+            expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky).toBeUndefined();
+        });
+
         it("clears stale sticky events that pretend to be from the distant future", () => {
             vi.setSystemTime(0);
             const eventFarInTheFuture = stickyEvent(999999999999);

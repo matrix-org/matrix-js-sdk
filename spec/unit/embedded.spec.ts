@@ -916,6 +916,17 @@ describe("RoomWidgetClient", () => {
                 expect(doesServerSupportUnstableFeatureMock).not.toHaveBeenCalled();
             });
 
+            it.each([0, -1000, 1.5])("rejects a sticky duration of %s", async (duration) => {
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await expect(
+                    client._unstable_sendStickyEvent("!1:example.org", duration, null, EventType.RTCMembership, {
+                        slot_id: "m.call#ROOM",
+                        msc4354_sticky_key: "test",
+                    }),
+                ).rejects.toThrow("Sticky duration must be a positive integer");
+                expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
+            });
+
             it("receives (adds, updates, then removes when redacted)", async () => {
                 await makeClient({ receiveEvent: [EventType.RTCMembership, EventType.RoomRedaction] });
                 const room = client.getRoom("!1:example.org")!;
