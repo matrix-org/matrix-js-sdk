@@ -1060,8 +1060,7 @@ describe("MatrixClient", function () {
             ["with a state key (delay opts)", "@alice:bar", "@alice:bar", delayOpts],
         ])("can send a delayed state event %s", async (_name, stateKey, expectedStateKey, delayMsOrOpts) => {
             const content = { topic: "The year 2000" };
-            const txnId = "txn1";
-            vi.spyOn(client, "makeTxnId").mockReturnValue(txnId);
+            const txnId = client.makeTxnId();
 
             httpLookups = [
                 {
@@ -1079,6 +1078,8 @@ describe("MatrixClient", function () {
                 EventType.RoomTopic,
                 { ...content },
                 stateKey,
+                {},
+                txnId,
             );
         });
 

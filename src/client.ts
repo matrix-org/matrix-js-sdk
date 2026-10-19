@@ -3677,6 +3677,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: StateEvents[K],
         stateKey = "",
         opts: IRequestOpts = {},
+        txnId?: string,
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -3696,7 +3697,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
         return this.scheduleDelayedEvent(
-            { roomId, eventType, txnId: this.makeTxnId(), stateKey, content },
+            { roomId, eventType, txnId: txnId || this.makeTxnId(), stateKey, content },
             delayMs,
             path,
             undefined,
