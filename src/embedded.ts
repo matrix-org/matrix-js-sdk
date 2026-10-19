@@ -468,10 +468,14 @@ export class RoomWidgetClient extends MatrixClient {
         // Delayed event special case.
         if (delayMs !== undefined) {
             // TODO: updatePendingEvent for delayed events?
-            const response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId, delayMs, stickyDurationMsAsNumber)
-                .catch(timeoutToConnectionError);
-            return this.validateSendDelayedEventResponse(response);
+            return this.sendDelayedEventViaWidgetApi(
+                event.getType(),
+                undefined,
+                content,
+                room.roomId,
+                delayMs,
+                stickyDurationMsAsNumber,
+            );
         }
 
         const txId = event.getTxnId();
@@ -532,10 +536,7 @@ export class RoomWidgetClient extends MatrixClient {
         }
         const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
-        const response = await this.widgetApi
-            .sendStateEvent(eventType, stateKey, content, roomId, delayMs)
-            .catch(timeoutToConnectionError);
-        return this.validateSendDelayedEventResponse(response);
+        return this.sendDelayedEventViaWidgetApi(eventType, stateKey, content, roomId, delayMs);
     }
 
     /**
@@ -590,6 +591,41 @@ export class RoomWidgetClient extends MatrixClient {
                 { cause: error },
             );
         }
+    }
+
+    /**
+     * Schedules a delayed event through the widget host.
+     *
+     * Uses the dedicated `send_delayed_event` action (MSC4157) if the host supports it,
+     * and falls back to a `send_event` request with a delay otherwise.
+     */
+    private async sendDelayedEventViaWidgetApi(
+        eventType: string,
+        stateKey: string | undefined,
+        content: unknown,
+        roomId: string,
+        delayMs: number,
+        stickyDurationMs?: number,
+    ): Promise<SendDelayedEventResponse> {
+        let response: ISendEventFromWidgetResponseData;
+        if (await this.supportsSendDelayedEventAction()) {
+            response = await this.widgetApi
+                .sendDelayedEvent(eventType, stateKey, content, delayMs, roomId, stickyDurationMs)
+                .catch(timeoutToConnectionError);
+        } else if (stateKey === undefined) {
+            response = await this.widgetApi
+                .sendRoomEvent(eventType, content, roomId, delayMs, stickyDurationMs)
+                .catch(timeoutToConnectionError);
+        } else {
+            response = await this.widgetApi
+                .sendStateEvent(eventType, stateKey, content, roomId, delayMs)
+                .catch(timeoutToConnectionError);
+        }
+        return this.validateSendDelayedEventResponse(response);
+    }
+
+    private async supportsSendDelayedEventAction(): Promise<boolean> {
+        return (await this.widgetApi.getClientVersions()).includes(UnstableApiVersion.MSC4157_SEND_DELAYED_EVENT);
     }
 
     private validateSendDelayedEventResponse(response: ISendEventFromWidgetResponseData): SendDelayedEventResponse {
