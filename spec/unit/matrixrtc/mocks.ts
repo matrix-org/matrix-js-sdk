@@ -17,16 +17,22 @@ limitations under the License.
 import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, type MatrixEvent } from "../../../src";
+import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
-import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
+import {
+    type RtcLeftMembershipData,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "../../../src/matrixrtc/membershipData";
 import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
 import { type EmptyObject } from "../../../src/@types/common";
 import { type RtcSlotEventContent, type SlotDescription } from "../../../src/matrixrtc/types";
 import { computeSlotId } from "../../../src/matrixrtc/utils";
 
-export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | RtcLeftMembershipData | {}) & {
+    user_id: string;
+};
 
 export const owmMemberIdentity: CallMembershipIdentityParts = {
     deviceId: "AAAAAAA",
@@ -40,15 +46,13 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     user_id: "@mock:user.example",
     device_id: "AAAAAAA",
     scope: "m.room",
-    focus_active: { type: "livekit", focus_selection: "oldest_membership" },
+    focus_active: { type: "livekit", focus_selection: "multi_sfu" },
     foci_preferred: [
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
             type: "livekit",
         },
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.dev",
             type: "livekit",
         },
@@ -64,26 +68,14 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         id: "IDIDID",
         user_id: "@mock:user.example",
         device_id: "AAAAAAA",
+        membership: "join",
     },
     slot_id: "m.call#ROOM",
-    versions: [],
     transports: {
         published: [
             {
                 type: "livekit",
-                focus_active: { type: "livekit", focus_selection: "oldest_membership" },
-                foci_preferred: [
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.io",
-                        type: "livekit",
-                    },
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.dev",
-                        type: "livekit",
-                    },
-                ],
+                url: "wss://livekit.something.io",
             },
         ],
         can_subscribe: ["livekit"],
@@ -108,6 +100,7 @@ export type MockClient = MockedObject<
         | "cancelPendingEvent"
     >
 >;
+
 /**
  * Mocks a object that has all required methods for a MatrixRTC session client.
  */
@@ -232,6 +225,24 @@ export function makeMockEvent(
     } as unknown as MatrixEvent;
 }
 
+export function makeMatrixEvent(
+    type: string,
+    sender: string,
+    roomId: string | undefined,
+    content: any,
+    timestamp?: number,
+    stateKey?: string,
+): MatrixEvent {
+    return new MatrixEvent({
+        type,
+        sender,
+        room_id: roomId,
+        content,
+        state_key: stateKey,
+        origin_server_ts: timestamp,
+    });
+}
+
 export function mockRTCEvent(
     { user_id: sender, ...membershipData }: MembershipData,
     roomId: string,
@@ -254,12 +265,12 @@ export function mockRTCEvent(
 export function mockCallMembership(
     membershipData: MembershipData,
     roomId: string,
-    rtcBackendIdentity?: string,
+    backendIdentities = ["xx"],
 ): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx");
+    return new CallMembership(ev, data, backendIdentities, "(deprecated)");
 }
 
 export function makeKey(id: number, key: string): { key: string; index: number } {

@@ -246,6 +246,82 @@ describe("initRustCrypto", () => {
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
     });
 
+    it("should initialize without waiting for pending room key bundles", async () => {
+        // Given a pending key bundle whose lookup never completes.
+        const mockStore = { free: vi.fn() } as unknown as StoreHandle;
+        vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
+        const olmMachine = makeTestOlmMachine();
+        olmMachine.getAllRoomsPendingKeyBundles.mockResolvedValue([
+            {
+                roomId: new RustSdkCryptoJs.RoomId("!joined:example.com"),
+                inviterId: new RustSdkCryptoJs.UserId("@inviter:example.com"),
+                inviteAcceptedAtMillis: Date.now(),
+            } as RustSdkCryptoJs.RoomPendingKeyBundleDetails,
+        ]);
+        vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(olmMachine);
+        // No real store or HTTP request is opened, so there is nothing to clean up if startup blocks.
+        const acceptKeyBundle = vi
+            .spyOn(RustCrypto.prototype, "maybeAcceptKeyBundle")
+            .mockReturnValue(new Promise(() => {}));
+
+        // When crypto initialisation starts.
+        const crypto = await makeTestRustCrypto();
+
+        // Then it completes without waiting for the lookup.
+        expect(crypto).toBeInstanceOf(RustCrypto);
+        expect(acceptKeyBundle).toHaveBeenCalledWith("!joined:example.com", "@inviter:example.com");
+    });
+
+    it("should keep local crypto usable and the bundle pending after a startup key query fails", async () => {
+        // Given a real crypto store with a pending key bundle from a recently accepted invitation.
+        const roomId = "!joined:example.com";
+        const inviterId = "@inviter:example.com";
+        let olmMachine: OlmMachine | undefined;
+        let crypto: RustCrypto | undefined;
+        const initFromStore = OlmMachine.initFromStore;
+        vi.spyOn(OlmMachine, "initFromStore").mockImplementationOnce(async (...args) => {
+            olmMachine = await initFromStore(...args);
+            await olmMachine.storeRoomPendingKeyBundle(
+                new RustSdkCryptoJs.RoomId(roomId),
+                new RustSdkCryptoJs.UserId(inviterId),
+            );
+            return olmMachine;
+        });
+
+        // Given the inviter's key query fails.
+        fetchMock.post("http://server/_matrix/client/v3/keys/query", {
+            status: 403,
+            body: { errcode: "M_FORBIDDEN", error: "Key query failed" },
+        });
+        const logError = vi.spyOn(DebugLogger.prototype, "error");
+
+        try {
+            // When crypto initialisation starts.
+            crypto = await makeTestRustCrypto(makeMatrixHttpApi());
+
+            // Then the failure is logged, local keys stay usable, and the bundle remains pending for retry.
+            await waitFor(() =>
+                expect(logError).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.objectContaining({ errcode: "M_FORBIDDEN" }),
+                ),
+            );
+            expect(fetchMock).toHaveFetched("http://server/_matrix/client/v3/keys/query", {
+                body: { device_keys: { [inviterId]: [] } },
+            });
+            expect((await crypto.getOwnDeviceKeys()).ed25519).toEqual(expect.any(String));
+            const pending = await olmMachine!.getAllRoomsPendingKeyBundles();
+            expect(pending.map((details) => details.roomId.toString())).toEqual([roomId]);
+        } finally {
+            if (crypto) {
+                crypto.stop();
+            } else {
+                // Initialisation may have thrown before returning a RustCrypto instance.
+                olmMachine?.close();
+            }
+        }
+    });
+
     describe("libolm migration", () => {
         let mockStore: RustSdkCryptoJs.StoreHandle;
 
@@ -1393,38 +1469,44 @@ describe("RustCrypto", () => {
         });
     });
 
+    /** Returns the test device as `rustCrypto` sees it. */
+    async function getTestDevice(rustCrypto: RustCrypto): Promise<Device> {
+        const devices = await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
+        return devices.get(testData.TEST_USER_ID)!.get(testData.TEST_DEVICE_ID)!;
+    }
+
+    /** Makes a RustCrypto that has downloaded the keys of the test device, still unverified. */
+    async function makeTestRustCryptoWithTestDevice(): Promise<RustCrypto> {
+        const rustCrypto = await makeTestRustCrypto(
+            new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
+                baseUrl: "http://server/",
+                prefix: "",
+                onlyData: true,
+            }),
+            testData.TEST_USER_ID,
+        );
+
+        fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
+        fetchMock.post("path:/_matrix/client/v3/keys/query", {
+            device_keys: {
+                [testData.TEST_USER_ID]: {
+                    [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
+                },
+            },
+        });
+        // call onSyncCompleted to kick off the outgoingRequestLoop and download the device list.
+        rustCrypto.onSyncCompleted({});
+
+        // before the call, the device should be unverified.
+        expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Unverified);
+        return rustCrypto;
+    }
+
     describe("setDeviceVerified", () => {
         let rustCrypto: RustCrypto;
 
-        async function getTestDevice(): Promise<Device> {
-            const devices = await rustCrypto.getUserDeviceInfo([testData.TEST_USER_ID]);
-            return devices.get(testData.TEST_USER_ID)!.get(testData.TEST_DEVICE_ID)!;
-        }
-
         beforeEach(async () => {
-            rustCrypto = await makeTestRustCrypto(
-                new MatrixHttpApi(new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>(), {
-                    baseUrl: "http://server/",
-                    prefix: "",
-                    onlyData: true,
-                }),
-                testData.TEST_USER_ID,
-            );
-
-            fetchMock.post("path:/_matrix/client/v3/keys/upload", { one_time_key_counts: {} });
-            fetchMock.post("path:/_matrix/client/v3/keys/query", {
-                device_keys: {
-                    [testData.TEST_USER_ID]: {
-                        [testData.TEST_DEVICE_ID]: testData.SIGNED_TEST_DEVICE_DATA,
-                    },
-                },
-            });
-            // call onSyncCompleted to kick off the outgoingRequestLoop and download the device list.
-            rustCrypto.onSyncCompleted({});
-
-            // before the call, the device should be unverified.
-            const device = await getTestDevice();
-            expect(device.verified).toEqual(DeviceVerification.Unverified);
+            rustCrypto = await makeTestRustCryptoWithTestDevice();
         });
 
         it("should throw an error for an unknown device", async () => {
@@ -1435,15 +1517,54 @@ describe("RustCrypto", () => {
             await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
 
             // and confirm that the device is now verified
-            expect((await getTestDevice()).verified).toEqual(DeviceVerification.Verified);
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Verified);
         });
 
         it("should mark a verified device as unverified", async () => {
             await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
-            expect((await getTestDevice()).verified).toEqual(DeviceVerification.Verified);
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Verified);
 
             await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID, false);
-            expect((await getTestDevice()).verified).toEqual(DeviceVerification.Unverified);
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Unverified);
+        });
+    });
+
+    describe("setDeviceBlocked", () => {
+        let rustCrypto: RustCrypto;
+
+        beforeEach(async () => {
+            rustCrypto = await makeTestRustCryptoWithTestDevice();
+        });
+
+        it("should throw an error for an unknown device", async () => {
+            await expect(rustCrypto.setDeviceBlocked(testData.TEST_USER_ID, "xxy")).rejects.toThrow("Unknown device");
+        });
+
+        it("should block a device, and report it in the verification status", async () => {
+            await rustCrypto.setDeviceBlocked(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Blocked);
+            const status = await rustCrypto.getDeviceVerificationStatus(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            expect(status?.blocked).toBe(true);
+            expect(status?.isVerified()).toBe(false);
+        });
+
+        it("should unblock a blocked device", async () => {
+            await rustCrypto.setDeviceBlocked(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            await rustCrypto.setDeviceBlocked(testData.TEST_USER_ID, testData.TEST_DEVICE_ID, false);
+
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Unverified);
+            const status = await rustCrypto.getDeviceVerificationStatus(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            expect(status?.blocked).toBe(false);
+        });
+
+        it("should be replaced by setDeviceVerified, and replace it", async () => {
+            await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            await rustCrypto.setDeviceBlocked(testData.TEST_USER_ID, testData.TEST_DEVICE_ID);
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Blocked);
+
+            await rustCrypto.setDeviceVerified(testData.TEST_USER_ID, testData.TEST_DEVICE_ID, false);
+            expect((await getTestDevice(rustCrypto)).verified).toEqual(DeviceVerification.Unverified);
         });
     });
 
@@ -1471,6 +1592,7 @@ describe("RustCrypto", () => {
                 free: vi.fn(),
                 isCrossSigningTrusted: vi.fn().mockReturnValue(false),
                 isLocallyTrusted: vi.fn().mockReturnValue(false),
+                isBlacklisted: vi.fn().mockReturnValue(false),
                 isCrossSignedByOwner: vi.fn().mockReturnValue(false),
             } as unknown as RustSdkCryptoJs.Device);
             const res = await rustCrypto.getDeviceVerificationStatus("@user:domain", "device");

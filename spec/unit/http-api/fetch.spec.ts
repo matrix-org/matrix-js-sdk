@@ -53,6 +53,40 @@ describe("FetchHttpApi", () => {
     const prefix = ClientPrefix.V3;
     const tokenInactiveError = new MatrixError({ errcode: "M_UNKNOWN_TOKEN", error: "Token is not active" }, 401);
 
+    /** The URL a `fetch` was called with, as a string. The SDK only ever passes a `URL` or a string. */
+    const requestUrl = (resource: RequestInfo | URL): string => (resource as URL | string).toString();
+
+    /**
+     * Wraps a mocked `fetchFn` so that it only sees requests to the homeserver: requests to any other origin,
+     * i.e. the authorization server, are handed to `fetchMock` instead. The SDK makes its authorization server
+     * requests via `fetchFn` too, so this lets a test stub the homeserver with a simple mock whilst stubbing the
+     * authorization server with `fetchMock` routes.
+     */
+    function homeserverOnly(fetchFn: MockedFunction<Window["fetch"]>): typeof globalThis.fetch {
+        const homeserverOrigin = new URL(baseUrl).origin;
+        return (resource, init) =>
+            new URL(requestUrl(resource)).origin === homeserverOrigin
+                ? fetchFn(resource, init)
+                : fetchMock.fetchHandler(resource, init);
+    }
+
+    /**
+     * Makes a `fetchFn` whose response to a request never resolves, but rejects with an `AbortError` if the
+     * request's signal is aborted, in the same way as a real `fetch` would. Requests to any other origin get
+     * `homeserverResponse`.
+     */
+    function makeHangingAuthServerFetchFn(homeserverResponse: unknown): MockedFunction<Window["fetch"]> {
+        const homeserverOrigin = new URL(baseUrl).origin;
+        return vi.fn((resource: URL | RequestInfo, init?: RequestInit): Promise<Response> => {
+            if (new URL(requestUrl(resource)).origin === homeserverOrigin) {
+                return Promise.resolve(homeserverResponse as Response);
+            }
+            return new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+            });
+        });
+    }
+
     beforeEach(() => {
         vi.useRealTimers();
     });
@@ -390,7 +424,8 @@ describe("FetchHttpApi", () => {
 
                 describe("with an oauth2ClientConfig", () => {
                     const makeOAuthApi = (
-                        fetchFn: MockedFunction<Window["fetch"]>,
+                        fetchFn: typeof globalThis.fetch,
+                        extraOpts: Partial<IHttpOpts> = {},
                     ): { api: FetchHttpApi<any>; emitter: TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap> } => {
                         const emitter = new TypedEventEmitter<HttpApiEvent, HttpApiEventHandlerMap>();
                         vi.spyOn(emitter, "emit");
@@ -403,6 +438,7 @@ describe("FetchHttpApi", () => {
                             accessToken,
                             refreshToken,
                             onlyData: true,
+                            ...extraOpts,
                         });
                         return { api, emitter };
                     };
@@ -413,7 +449,7 @@ describe("FetchHttpApi", () => {
                             body: { errcode: "M_UNKNOWN", error: "failed" },
                         });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             unknownTokenErr,
                         );
@@ -424,7 +460,7 @@ describe("FetchHttpApi", () => {
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
                         fetchMock.post(authMetadata.token_endpoint, { throws: new Error("transitive fault") });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             new TokenRefreshError(unknownTokenErr),
                         );
@@ -444,7 +480,7 @@ describe("FetchHttpApi", () => {
                             .fn()
                             .mockResolvedValueOnce(unknownTokenResponse)
                             .mockResolvedValueOnce(okayResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         const result = await api.authedRequest(Method.Post, "/account/password", undefined, undefined, {
                             headers: {},
                         });
@@ -455,6 +491,28 @@ describe("FetchHttpApi", () => {
                         // uses new access token
                         expect(fetchFn.mock.calls[1][1].headers.Authorization).toEqual("Bearer new-access-token");
                         expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should use the configured logger for requests to the authorization server", async () => {
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 200,
+                            headers: { "Content-Type": "application/json" },
+                            body: makeTokenResponse("new-access-token", "new-refresh-token"),
+                        });
+                        const fetchFn = vi
+                            .fn()
+                            .mockResolvedValueOnce(unknownTokenResponse)
+                            .mockResolvedValueOnce(okayResponse);
+                        const logger = {
+                            debug: vi.fn(),
+                            warn: vi.fn(),
+                            error: vi.fn(),
+                        } as unknown as Mocked<Logger>;
+                        const { api } = makeOAuthApi(homeserverOnly(fetchFn), { logger });
+
+                        await api.authedRequest(Method.Post, "/account/password");
+
+                        expect(logger.debug).toHaveBeenCalledWith(`OAuth2: --> POST ${authMetadata.token_endpoint}`);
                     });
 
                     it("should not try to refresh the token if it has plenty of time left before expiry", async () => {
@@ -478,7 +536,7 @@ describe("FetchHttpApi", () => {
                         // fetch doesn't like our new or old tokens
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
@@ -519,13 +577,59 @@ describe("FetchHttpApi", () => {
 
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
 
-                        const { api } = makeOAuthApi(fetchFn);
+                        const { api } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrowError(
                             unknownTokenErr,
                         );
 
                         // We should have seen the 3 token refreshes, as above.
                         expect(fetchMock).toHaveFetchedTimes(3, authMetadata.token_endpoint);
+                    });
+
+                    it("should make token refresh requests via fetchFn", async () => {
+                        const homeserverResponses = [unknownTokenResponse, okayResponse];
+                        const fetchFn = vi.fn((resource: URL | RequestInfo): Promise<Response> => {
+                            if (requestUrl(resource) === authMetadata.token_endpoint) {
+                                return Promise.resolve(
+                                    new Response(JSON.stringify(makeTokenResponse("new-access-token", "new-refresh")), {
+                                        status: 200,
+                                        headers: { "Content-Type": "application/json" },
+                                    }),
+                                );
+                            }
+                            return Promise.resolve(homeserverResponses.shift() as unknown as Response);
+                        });
+                        const { api } = makeOAuthApi(fetchFn);
+
+                        await expect(api.authedRequest(Method.Get, "/path")).resolves.toEqual({ x: 1 });
+
+                        expect(fetchFn).toHaveBeenCalledWith(
+                            authMetadata.token_endpoint,
+                            expect.objectContaining({ method: "POST", signal: expect.any(AbortSignal) }),
+                        );
+                        expect(fetchMock).not.toHaveFetched(authMetadata.token_endpoint);
+                        expect(api.opts.accessToken).toBe("new-access-token");
+                        expect(api.opts.refreshToken).toBe("new-refresh");
+                    });
+
+                    it("should abort an in-flight token refresh request when abort() is called", async () => {
+                        const fetchFn = makeHangingAuthServerFetchFn(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(fetchFn);
+
+                        const prom = api.authedRequest(Method.Get, "/path");
+                        // wait for the homeserver request to fail and the token request to be made
+                        await vi.waitFor(() =>
+                            expect(fetchFn).toHaveBeenCalledWith(authMetadata.token_endpoint, expect.anything()),
+                        );
+                        const tokenRequestSignal = fetchFn.mock.calls.at(-1)![1]!.signal!;
+                        expect(tokenRequestSignal.aborted).toBe(false);
+
+                        api.abort();
+
+                        await expect(prom).rejects.toThrow(TokenRefreshError);
+                        expect(tokenRequestSignal.aborted).toBe(true);
+                        // an aborted refresh is not evidence that the session is invalid
+                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, expect.anything());
                     });
                 });
             });
@@ -731,7 +835,7 @@ describe("FetchHttpApi", () => {
         const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), {
             baseUrl,
             prefix,
-            fetchFn,
+            fetchFn: homeserverOnly(fetchFn),
             oauth2ClientConfig,
             authMetadataCallback: () => Promise.resolve(authMetadata),
             accessToken: "ACCESS_TOKEN",

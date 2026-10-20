@@ -243,7 +243,7 @@ import { type ImageInfo } from "./@types/media.ts";
 import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
-import { type EmptyObject } from "./@types/common.ts";
+import { type EmptyObject, type XOR } from "./@types/common.ts";
 import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
 import {
     type LivekitDelegateDelayedLeaveRequest,
@@ -584,6 +584,7 @@ export const GET_LOGIN_TOKEN_CAPABILITY = new NamespacedValue(
 export const UNSTABLE_MSC2666_SHARED_ROOMS = "uk.half-shot.msc2666";
 export const UNSTABLE_MSC2666_MUTUAL_ROOMS = "uk.half-shot.msc2666.mutual_rooms";
 export const UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms";
+export const STABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mutual_rooms.stable";
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
@@ -1201,6 +1202,36 @@ export type ClientEventHandlerMap = {
 
 type ContentTransformCallback = (roomId: string, content: IContent) => IContent;
 
+/** Options for sending an event. */
+type SendEventParams = {
+    /** The room to send the event to. */
+    roomId: string;
+    /** The thread to send the event in, or `null` for the main timeline. */
+    threadId: string | null;
+    /** An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added. */
+    eventObject: Partial<IEvent>;
+    /** Optional query parameters for the send request. */
+    queryDict?: QueryDict;
+    /** Optional transaction ID. Generated if omitted. */
+    txnId?: string;
+};
+
+/** Options for scheduling a delayed event. */
+type SendDelayedEventParams = SendEventParams &
+    XOR<
+        {
+            /**
+             * Properties of the delay for this event.
+             * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
+             */
+            delayOpts: SendDelayedEventRequestOpts;
+        },
+        {
+            /** A positive non-zero integer of milliseconds the homeserver should wait before sending the event. */
+            delayMs: number;
+        }
+    >;
+
 const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action");
 
 /**
@@ -1612,6 +1643,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.matrixRTC.stop();
 
         this.serverCapabilitiesService.stop();
+        this.retentionPolicyService?.stop();
 
         this.cachedRtcTransports.stop();
         this.cachedWellKnown.stop();
@@ -1710,7 +1742,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public getDomain(): string | null {
         if (this.credentials?.userId) {
-            return this.credentials.userId.replace(/^.*?:/, "");
+            return utils.getServerNameFromUserId(this.credentials.userId);
         }
         return null;
     }
@@ -2849,60 +2881,29 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * Sends an event, adding it to the local echo and encrypting it if the room requires it.
      *
      * @param params - What to send and where.
-     * @param params.roomId - The room to send the event to.
-     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
-     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param params.queryDict - Optional query parameters for the send request.
-     * @param params.txnId - Optional transaction ID. Generated if omitted.
      * @returns Promise which resolves: to an object with the ID of the sent event.
      * @returns Rejects: with an error response.
      */
-    protected sendCompleteEvent(params: {
-        roomId: string;
-        threadId: string | null;
-        eventObject: Partial<IEvent>;
-        queryDict?: QueryDict;
-        txnId?: string;
-    }): Promise<ISendEventResponse>;
+    protected sendCompleteEvent(params: SendEventParams): Promise<ISendEventResponse>;
     /**
      * Sends a delayed event (MSC4140).
      *
      * @param params - What to send and where.
-     * @param params.roomId - The room to send the event to.
-     * @param params.threadId - The thread to send the event in, or `null` for the main timeline.
-     * @param params.eventObject - An object with the partial structure of an event, to which event_id, user_id, room_id and origin_server_ts will be added.
-     * @param params.delayOpts - Properties of the delay for this event.
-     * @param params.queryDict - Optional query parameters for the send request.
-     * @param params.txnId - Optional transaction ID. Generated if omitted.
      * @returns Promise which resolves: to an object with the ID of the scheduled delayed event.
      * @returns Rejects: with an error response.
      */
-    protected sendCompleteEvent(params: {
-        roomId: string;
-        threadId: string | null;
-        eventObject: Partial<IEvent>;
-        delayOpts: SendDelayedEventRequestOpts;
-        queryDict?: QueryDict;
-        txnId?: string;
-    }): Promise<SendDelayedEventResponse>;
-    protected sendCompleteEvent({
-        roomId,
-        threadId,
-        eventObject,
-        delayOpts,
-        queryDict,
-        txnId,
-    }: {
-        roomId: string;
-        threadId: string | null;
-        eventObject: Partial<IEvent>;
-        delayOpts?: SendDelayedEventRequestOpts;
-        queryDict?: QueryDict;
-        txnId?: string;
-    }): Promise<SendDelayedEventResponse | ISendEventResponse> {
-        if (!txnId) {
-            txnId = this.makeTxnId();
-        }
+    protected sendCompleteEvent(params: SendDelayedEventParams): Promise<SendDelayedEventResponse>;
+    protected sendCompleteEvent(
+        params: SendEventParams | SendDelayedEventParams,
+    ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        const { roomId, threadId, eventObject, queryDict } = params;
+        const delayMs =
+            "delayMs" in params
+                ? params.delayMs
+                : "delayOpts" in params
+                  ? this.getDelayMsFromOpts(params.delayOpts)
+                  : undefined;
+        const txnId = params.txnId || this.makeTxnId();
 
         // We always construct a MatrixEvent when sending because the store and scheduler use them.
         // We'll extract the params back out if it turns out the client has no scheduler or store.
@@ -2922,7 +2923,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             localEvent.setThread(thread);
         }
 
-        if (!delayOpts) {
+        if (delayMs === undefined) {
             // set up re-emitter for this new event - this is normally the job of EventMapper but we don't use it here
             this.reEmitter.reEmit(localEvent, [MatrixEventEvent.Replaced, MatrixEventEvent.VisibilityChange]);
             room?.reEmitter.reEmit(localEvent, [MatrixEventEvent.BeforeRedaction]);
@@ -2942,14 +2943,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         const type = localEvent.getType();
         this.logger.debug(
-            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${delayOpts ? " (delayed event)" : ""}${queryDict ? " query params: " + JSON.stringify(queryDict) : ""}`,
+            `sendEvent of type ${type} in ${roomId} with txnId ${txnId}${delayMs !== undefined ? " (delayed event)" : ""}${queryDict ? " query params: " + JSON.stringify(queryDict) : ""}`,
         );
 
         localEvent.setTxnId(txnId);
         localEvent.setStatus(EventStatus.SENDING);
 
         // TODO: separate store for delayed events?
-        if (!delayOpts) {
+        if (delayMs === undefined) {
             // add this event immediately to the local store as 'sending'.
             room?.addPendingEvent(localEvent, txnId);
 
@@ -2962,7 +2963,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
             return this.encryptAndSendEvent(room, localEvent, queryDict);
         } else {
-            return this.encryptAndSendEvent(room, localEvent, delayOpts, queryDict);
+            return this.encryptAndSendEvent(room, localEvent, delayMs, queryDict);
         }
     }
 
@@ -2978,6 +2979,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     /**
      * Simply sends a delayed event without encrypting it.
      * TODO: Allow encrypted delayed events, and encrypt them properly
+     * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
      * @param delayOpts - Properties of the delay for this event.
      * @returns returns a promise which resolves with the result of the delayed send request
      */
@@ -2986,19 +2988,30 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
-    ): Promise<ISendEventResponse>;
+    ): Promise<SendDelayedEventResponse>;
+    /**
+     * Simply sends a delayed event without encrypting it.
+     * TODO: Allow encrypted delayed events, and encrypt them properly
+     * @experimental based on MSC4140
+     * @param delayMs - A positive non-zero integer of milliseconds the homeserver should wait before sending the event.
+     * @returns returns a promise which resolves with the result of the delayed send request
+     */
     protected async encryptAndSendEvent(
         room: Room | null,
         event: MatrixEvent,
-        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
+        delayMs: number,
+        queryDict?: QueryDict,
+    ): Promise<SendDelayedEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room | null,
+        event: MatrixEvent,
+        delayOrQueryDict?: number | SendDelayedEventRequestOpts | QueryDict,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        let queryOpts = queryDict;
-        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            return this.sendEventHttpRequest(event, delayOptsOrQuery, queryOpts);
-        } else if (!queryOpts) {
-            queryOpts = delayOptsOrQuery;
+        if (this.isDelayMsOrOpts(delayOrQueryDict)) {
+            return this.sendEventHttpRequest(event, this.getDelayMsFromArg(delayOrQueryDict), queryDict);
         }
+        queryDict = delayOrQueryDict;
         try {
             let cancelled: boolean;
             this.eventsBeingEncrypted.add(event.getId()!);
@@ -3034,7 +3047,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
 
             if (!promise) {
-                promise = this.sendEventHttpRequest(event, queryOpts);
+                promise = this.sendEventHttpRequest(event, queryDict);
                 if (room) {
                     promise = promise.then((res) => {
                         room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
@@ -3158,12 +3171,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse>;
     private sendEventHttpRequest(
         event: MatrixEvent,
-        delayOpts: SendDelayedEventRequestOpts,
+        delayMs: number,
         queryDict?: QueryDict,
     ): Promise<SendDelayedEventResponse>;
     private sendEventHttpRequest(
         event: MatrixEvent,
-        queryOrDelayOpts?: SendDelayedEventRequestOpts | QueryDict,
+        delayMsOrQueryDict?: number | QueryDict,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         let txnId = event.getTxnId();
@@ -3197,22 +3210,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
 
-        const delayOpts =
-            queryOrDelayOpts && isSendDelayedEventRequestOpts(queryOrDelayOpts) ? queryOrDelayOpts : undefined;
-        const queryOpts = !delayOpts ? queryOrDelayOpts : queryDict;
         const content = event.getWireContent();
-        if (delayOpts) {
+        if (typeof delayMsOrQueryDict === "number") {
             return this.http.authedRequest<SendDelayedEventResponse>(
                 Method.Put,
                 path,
-                { ...getUnstableDelayQueryOpts(delayOpts), ...queryOpts },
+                { [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMsOrQueryDict, ...queryDict },
                 content,
             );
         } else {
-            return this.http.authedRequest<ISendEventResponse>(Method.Put, path, queryOpts, content).then((res) => {
-                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
-                return res;
-            });
+            return this.http
+                .authedRequest<ISendEventResponse>(Method.Put, path, delayMsOrQueryDict, content)
+                .then((res) => {
+                    this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+                    return res;
+                });
         }
     }
 
@@ -3567,7 +3579,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async _unstable_sendDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         threadId: string | null,
         eventType: K,
         content: TimelineEvents[K],
@@ -3579,13 +3591,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "sendDelayedEvent",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
         this.addThreadRelationIfNeeded(content, threadId, roomId);
         return this.sendCompleteEvent({
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            delayOpts,
+            delayMs,
             txnId,
         });
     }
@@ -3602,7 +3615,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     public async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
         roomId: string,
         stickDuration: number,
-        delayOpts: SendDelayedEventRequestOpts,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         threadId: string | null,
         eventType: K,
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
@@ -3614,6 +3627,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "getDelayedEvents",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
             throw new UnsupportedStickyEventsEndpointError(
                 "Server does not support the sticky events",
@@ -3627,7 +3641,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             threadId,
             eventObject: { type: eventType, content },
             queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-            delayOpts,
+            delayMs,
             txnId,
         });
     }
@@ -3642,7 +3656,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
@@ -3654,6 +3668,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 "sendDelayedStateEvent",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
         const pathParams = {
             $roomId: roomId,
@@ -3664,7 +3679,13 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(Method.Put, path, getUnstableDelayQueryOpts(delayOpts), content as Body, opts);
+        return this.http.authedRequest(
+            Method.Put,
+            path,
+            { [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMs },
+            content as Body,
+            opts,
+        );
     }
 
     /**
@@ -6248,36 +6269,42 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Gets a set of room IDs in common with another user.
+     * Determine if the server supports finding mutual rooms, as described by MSC2666.
      *
-     * Note: This endpoint is unstable, and can throw an `Error`.
-     *   Check progress on [MSC2666](https://github.com/matrix-org/matrix-spec-proposals/pull/2666) for more details.
-     *
+     * @returns `true` if supported, otherwise `false`
+     */
+    public async doesServerSupportMutualRooms(): Promise<boolean> {
+        return (
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS)) ||
+            (await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS))
+        );
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user, using the unstable
+     * Mutual Rooms API. Doesn't check for server support.
      * @param userId - The userId to check.
-     * @returns Promise which resolves to an array of rooms
+     * @returns Promise which resolves to an array of room IDs
      * @returns Rejects: with an error response.
      */
-    // TODO: on spec release, rename this to getMutualRooms
-    public async _unstable_getSharedRooms(userId: string): Promise<string[]> {
-        // Initial variant of the MSC
-        const sharedRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_SHARED_ROOMS);
+    private async getMutualRoomsUnstable(userId: string): Promise<string[]> {
+        // Accumulated rooms
+        const rooms: string[] = [];
 
         // Newer variant that renamed shared rooms to mutual rooms
         const mutualRoomsSupport = await this.doesServerSupportUnstableFeature(UNSTABLE_MSC2666_MUTUAL_ROOMS);
 
-        // Latest variant that changed from path elements to query elements
+        // Latest unstable variant that changed from path elements to query elements
         const queryMutualRoomsSupport = await this.doesServerSupportUnstableFeature(
             UNSTABLE_MSC2666_QUERY_MUTUAL_ROOMS,
         );
 
-        if (!sharedRoomsSupport && !mutualRoomsSupport && !queryMutualRoomsSupport) {
-            throw Error("Server does not support the Mutual Rooms API");
-        }
-
         let path;
         let query;
 
-        // Cascading unstable support switching.
         if (queryMutualRoomsSupport) {
             path = "/uk.half-shot.msc2666/user/mutual_rooms";
             query = { user_id: userId };
@@ -6289,10 +6316,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             query = {};
         }
 
-        // Accumulated rooms
-        const rooms: string[] = [];
         let token = null;
-
         do {
             const tokenQuery: Record<string, string> = {};
             if (token != null && queryMutualRoomsSupport) {
@@ -6319,12 +6343,76 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Gets a set of room IDs in common with another user, using the stable
+     * Mutual Rooms API. Doesn't check for server support.
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    private async getMutualRoomsStable(userId: string): Promise<string[]> {
+        const rooms: string[] = [];
+
+        let token = null;
+        do {
+            const query: Record<string, string> = { user_id: userId };
+            if (token != null) {
+                query["from"] = token;
+            }
+
+            const res = await this.http.authedRequest<{
+                joined: string[];
+                next_batch?: string;
+            }>(Method.Get, "/mutual_rooms", query, undefined, {
+                prefix: ClientPrefix.V1,
+            });
+
+            rooms.push(...res.joined);
+
+            if (res.next_batch !== undefined) {
+                token = res.next_batch;
+            } else {
+                token = null;
+            }
+        } while (token != null);
+
+        return rooms;
+    }
+
+    /**
+     * Gets a set of room IDs in common with another user.
+     *
+     * @param userId - The userId to check.
+     * @returns Promise which resolves to an array of room IDs
+     * @returns Rejects: with an error response.
+     */
+    public async getMutualRooms(userId: string): Promise<string[]> {
+        if (!(await this.doesServerSupportMutualRooms())) {
+            throw Error("Server does not support the Mutual Rooms API");
+        }
+
+        // Stable version found in the spec
+        const stableMutualRoomsSupport =
+            (await this.isVersionSupported("v1.19")) ||
+            (await this.doesServerSupportUnstableFeature(STABLE_MSC2666_QUERY_MUTUAL_ROOMS));
+
+        // Handle unstable and stable support in separate functions since
+        // since they are different in enough ways to be annoying to do in one
+        // (token names are different, different prefix, no pagination in some
+        // versions, etc)
+        if (stableMutualRoomsSupport) return this.getMutualRoomsStable(userId);
+        else return this.getMutualRoomsUnstable(userId);
+    }
+
+    /**
      * Returns a set of configured RTC transports supported by the homeserver.
-     * Requires homeserver support for MSC4143.
-     * @throws A M_NOT_FOUND error if not supported by the homeserver.
+     * Requires the homeserver to advertise `org.matrix.msc4143` in `/versions`.
+     * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
      */
     public async _unstable_getRTCTransports(): Promise<Transport[]> {
-        // There is no /versions endpoint to check for support, so we just have to attempt a request.
+        if (!(await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))) {
+            throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
+        }
+
         return (
             await this.http.authedRequest<{
                 rtc_transports: Transport[];
@@ -9106,12 +9194,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         logger.error("Issuer configuration not valid");
         throw new Error(OAuth2Error.OpSupport);
     }
-}
 
-function getUnstableDelayQueryOpts(delayOpts: SendDelayedEventRequestOpts): QueryDict {
-    return Object.fromEntries(
-        Object.entries(delayOpts).map(([k, v]) => [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.${k}`, v]),
-    );
+    /** @deprecated Present only to assist fully dropping support for {@link SendDelayedEventRequestOpts} */
+    protected readonly isDelayMsOrOpts = (
+        opt: number | SendDelayedEventRequestOpts | QueryDict | undefined,
+    ): opt is number | SendDelayedEventRequestOpts => {
+        return typeof opt === "number" || (!!opt && isSendDelayedEventRequestOpts(opt));
+    };
+
+    /** @deprecated Present only to assist fully dropping support for {@link SendDelayedEventRequestOpts} */
+    protected readonly getDelayMsFromArg = (delayMsOrOpts: number | SendDelayedEventRequestOpts): number => {
+        return typeof delayMsOrOpts === "number" ? delayMsOrOpts : this.getDelayMsFromOpts(delayMsOrOpts);
+    };
+
+    private getDelayMsFromOpts(opts: SendDelayedEventRequestOpts): number {
+        if (opts.parent_delay_id !== undefined) {
+            throw new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+        }
+        // Cast is known to be correct by process of elimination on the union
+        return (opts as any).delay;
+    }
 }
 
 /**

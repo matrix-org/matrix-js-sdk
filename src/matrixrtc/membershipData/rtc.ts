@@ -16,7 +16,6 @@ limitations under the License.
 
 import { MXID_PATTERN } from "../../models/room-member.ts";
 import type { IContent } from "../../models/event.ts";
-import type { RelationType } from "../../types.ts";
 import { type RtcSlotApplicationContent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 import { sha256 } from "../../digest.ts";
@@ -24,35 +23,70 @@ import { encodeUnpaddedBase64 } from "../../base64.ts";
 import { slotIdToDescription } from "../utils.ts";
 
 /**
- * Represents the current form of MSC4143, which uses sticky events to store membership.
+ * The membership status of an RTC member event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export type RtcMembershipStatus = "join" | "leave";
+
+/**
+ * The membership data of a joined RTC member event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export interface RtcMembershipData {
-    "slot_id": string;
-    "member": {
+    slot_id: string;
+    member: {
         user_id: string;
         device_id: string;
         id: string;
+        /**
+         * The intended membership status.
+         *
+         * Optional and defaulting to "join" for backwards compatibility.
+         */
+        membership?: "join";
     };
-    "m.relates_to"?: {
-        event_id: string;
-        rel_type: RelationType.Reference;
-    };
-    "application": RtcSlotApplicationContent;
-    "transports": {
+    application: RtcSlotApplicationContent;
+    transports: {
         published: Transport[];
         can_subscribe: string[];
     };
-    "versions": string[];
-    "msc4354_sticky_key"?: string;
-    "sticky_key"?: string;
+    msc4354_sticky_key?: string;
+    sticky_key?: string;
 }
 
 /**
- * Validates that `data` matches the format expected by MSC4143.
+ * The membership data of a left RTC member event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export interface RtcLeftMembershipData {
+    slot_id: string;
+    member: {
+        id: string;
+        membership: "leave";
+    };
+    /**
+     * Optional context on why the member left.
+     */
+    leave_reason?: {
+        code: string;
+        reason?: string;
+    };
+    msc4354_sticky_key?: string;
+    sticky_key?: string;
+}
+
+/**
+ * Validates that `data` matches the format expected by MSC4143 for a joined membership.
+ *
  * @param data The event content.
  * @param sender The sender of the event.
  * @returns true if `data` is valid RtcMembershipData
  * @throws {MatrixRTCMembershipParseError} if the content is not valid
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export const checkRtcMembershipData = (data: IContent, sender: string): data is RtcMembershipData => {
     const errors: string[] = [];
@@ -90,6 +124,11 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
             errors.push(prefix + "member.device_id must be string");
         }
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
+        // Events predating `member.membership` omit it and are treated as joined. Anything other than `join`
+        // (including `leave`) does not describe a joined membership and is rejected.
+        if (data.member.membership !== undefined && data.member.membership !== "join") {
+            errors.push(prefix + "member.membership must be join");
+        }
     }
     if (typeof data.application !== "object" || data.application === null) {
         errors.push(prefix + "application must be an object");
@@ -119,12 +158,6 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     ) {
         errors.push(prefix + "transports.can_subscribe must be an array of strings");
     }
-    if (data.versions === undefined || !Array.isArray(data.versions)) {
-        errors.push(prefix + "versions must be an array");
-    } else if (!data.versions.every((v) => typeof v === "string")) {
-        errors.push(prefix + "versions must be an array of strings");
-    }
-
     // optional fields
     if ((data.sticky_key ?? data.msc4354_sticky_key) === undefined) {
         errors.push(prefix + "sticky_key or msc4354_sticky_key must be a defined");
@@ -142,15 +175,6 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     ) {
         errors.push(prefix + "sticky_key and msc4354_sticky_key must be equal if both are defined");
     }
-    if (data["m.relates_to"] !== undefined) {
-        const rel = data["m.relates_to"] as RtcMembershipData["m.relates_to"];
-        if (typeof rel !== "object" || rel === null) {
-            errors.push(prefix + "m.relates_to must be an object if provided");
-        } else {
-            if (typeof rel.event_id !== "string") errors.push(prefix + "m.relates_to.event_id must be a string");
-            if (rel.rel_type !== "m.reference") errors.push(prefix + "m.relates_to.rel_type must be m.reference");
-        }
-    }
 
     if (errors.length) {
         throw new MatrixRTCMembershipParseError("RtcMembership", errors);
@@ -159,9 +183,9 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
     return true;
 };
 
-export async function computeRtcIdentityRaw(userId: string, deviceId: string, memberId: string): Promise<string> {
+export async function computeRtcIdentityRaw(userId: string, memberId: string): Promise<string> {
     // canonical JSON serialization (Matrix canonical JSON for arrays)
-    const jsonStr = JSON.stringify([userId, deviceId, memberId]);
+    const jsonStr = JSON.stringify([userId, memberId]);
     const hashBuffer = await sha256(jsonStr);
     const hashedString = encodeUnpaddedBase64(hashBuffer);
     return hashedString;

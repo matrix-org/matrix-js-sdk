@@ -15,7 +15,7 @@ limitations under the License.
 */
 import { AbortError } from "p-retry";
 
-import { EventType, RelationType } from "../@types/event.ts";
+import { EventType } from "../@types/event.ts";
 import { type ISendEventResponse, type SendDelayedEventResponse } from "../@types/requests.ts";
 import { type EmptyObject } from "../@types/common.ts";
 import type { MatrixClient } from "../client.ts";
@@ -23,7 +23,14 @@ import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
-import { type Transport, isMyMembership, type RTCCallIntent, Status, type SlotDescription } from "./types.ts";
+import {
+    type Transport,
+    isMyMembership,
+    type RTCCallCapability,
+    type RTCCallIntent,
+    Status,
+    type SlotDescription,
+} from "./types.ts";
 import { type MembershipConfig, type SessionConfig } from "./MatrixRTCSession.ts";
 import { type Action, ActionScheduler, type ActionUpdate } from "./MembershipManagerActionScheduler.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
@@ -33,10 +40,13 @@ import {
     type IMembershipManager,
     type MembershipManagerEventHandlerMap,
 } from "./IMembershipManager.ts";
-import { type RtcMembershipData, type SessionMembershipData } from "./membershipData/index.ts";
+import {
+    type RtcLeftMembershipData,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
 import { deepCompare } from "../utils.ts";
-import { isLivekitTransportConfig } from "./LivekitTransport.ts";
 
 /* MembershipActionTypes:
 On Join:  ───────────────────┐   ┌───────────────(1)───────────┐
@@ -159,7 +169,8 @@ export interface MembershipManagerState {
  * The outcome of a delayed leave event restart attempt.
  *
  *  - `"ok"`: the server restarted it, it will fire `delayedLeaveEventDelayMs` from now.
- *  - `"gone"`: the server does not know the delay id anymore. It either sent the event or lost/cancelled it.
+ *  - `"gone"`: the delayed event cannot be restarted anymore (see `isDelayedEventGoneError`). The server either sent
+ *    it or lost/cancelled it.
  *  - `"unsupported"`: the server does not support the delayed events endpoint.
  *  - `{ error }`: any other failure, for the caller to turn into a retry or to rethrow.
  */
@@ -209,6 +220,7 @@ export class MembershipManager
     private activated = false;
     private readonly logger: Logger;
     protected callIntent: RTCCallIntent | undefined;
+    protected callCapabilities: RTCCallCapability[] | undefined;
     protected applicationData: Record<string, unknown> | undefined;
 
     public isActivated(): boolean {
@@ -222,23 +234,18 @@ export class MembershipManager
     /**
      * Puts the MembershipManager in a state where it tries to be joined.
      * It will send delayed events and membership events
-     * @param fociPreferred the list of preferred foci to use in the joined RTC membership event.
-     * If multiSfuFocus is set, this is only needed if this client wants to publish to multiple transports simultaneously.
-     * @param multiSfuFocus the active focus to use in the joined RTC membership event. Setting this implies the
-     * membership manager will operate in a multi-SFU connection mode. If `undefined`, an `oldest_membership`
-     * transport selection will be used instead.
+     * @param publishedTransports the list of transports on which the member is publishing.
      * @param onError This will be called once the membership manager encounters an unrecoverable error.
      * This should bubble up the the frontend to communicate that the call does not work in the current environment.
      * The original underlying error is preserved as `error.cause`, so consumers can `instanceof`-check the typed
      * cause.
      */
-    public join(fociPreferred: Transport[], multiSfuFocus?: Transport, onError?: (error: unknown) => void): void {
+    public join(publishedTransports: Transport[], onError?: (error: unknown) => void): void {
         if (this.scheduler.running) {
             this.logger.error("MembershipManager is already running. Ignoring join request.");
             return;
         }
-        this.fociPreferred = fociPreferred;
-        this.rtcTransport = multiSfuFocus;
+        this.publishedTransports = publishedTransports;
         this.leavePromiseResolvers = undefined;
         this.activated = true;
         this.oldStatus = this.status;
@@ -367,6 +374,7 @@ export class MembershipManager
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
         this.callIntent = joinConfig?.callIntent;
+        this.callCapabilities = joinConfig?.callCapabilities;
         this.applicationData = joinConfig?.applicationData;
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
@@ -414,9 +422,7 @@ export class MembershipManager
     protected deviceId: string;
     protected userId: string;
     protected stateKey: string;
-    protected rtcTransport?: Transport;
-    /** @deprecated This will be removed in favor or rtcTransport becoming a list of actively used transports */
-    private fociPreferred?: Transport[];
+    protected publishedTransports: Transport[] = [];
 
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
@@ -511,7 +517,7 @@ export class MembershipManager
     protected clientSendDelayedDisconnectMembership: () => Promise<SendDelayedEventResponse> = () =>
         this.client._unstable_sendDelayedStateEvent(
             this.room.roomId,
-            { delay: this.delayedLeaveEventDelayMs },
+            this.delayedLeaveEventDelayMs,
             EventType.GroupCallMemberPrefix,
             {},
             this.stateKey,
@@ -585,9 +591,9 @@ export class MembershipManager
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "cancelScheduledDelayedEvent");
                 if (update) return update;
 
-                if (this.isNotFoundError(e)) {
-                    // If we get a M_NOT_FOUND we know that the delayed event got already removed.
+                if (this.isDelayedEventGoneError(e)) {
                     // This means we are good and can set it to undefined and run this again.
+                    this.logger.info("Delayed event to cancel is already gone, scheduling a new one:", e);
                     this.setAndEmitDelayId(undefined);
                     return createReplaceActionUpdate(repeatActionType);
                 }
@@ -657,7 +663,9 @@ export class MembershipManager
                 // It will emit `probablyLeft = false` once we notice about our leave through sync and successfully setup a new state event.
                 this.setAndEmitProbablyLeft(true);
             }
-            if (this.isNotFoundError(e)) {
+            if (this.isDelayedEventGoneError(e)) {
+                // There is nothing left to restart, so we forget the delay id and let the caller decide what to do next.
+                this.logger.info("Delayed event to restart is already gone:", e);
                 this.setAndEmitDelayId(undefined);
                 return "gone";
             }
@@ -715,7 +723,9 @@ export class MembershipManager
             .catch((e) => {
                 const repeatActionType = MembershipActionType.SendLeaveEvent;
                 if (this.isUnsupportedDelayedEndpoint(e)) return {};
-                if (this.isNotFoundError(e)) {
+                if (this.isDelayedEventGoneError(e)) {
+                    // It will never send our leave event, so we send it ourselves.
+                    this.logger.info("Delayed leave event is already gone, falling back to SendLeaveEvent:", e);
                     this.setAndEmitDelayId(undefined);
                     return createInsertActionUpdate(repeatActionType);
                 }
@@ -741,6 +751,9 @@ export class MembershipManager
             this.stateKey,
         );
     };
+
+    /** Sends the event that marks our membership as left. */
+    protected clientSendLeaveMembership: () => Promise<ISendEventResponse> = () => this.clientSendMembership({});
 
     private async sendJoinEvent(): Promise<ActionUpdate> {
         const myMembership = this.makeMyMembership(this.membershipEventExpiryMs);
@@ -856,7 +869,7 @@ export class MembershipManager
      * already sent it (e.g. because the device was asleep and no restarts reached the server), the membership we
      * would send would come back to life without any delayed leave event to clean it up, and stay until `expires`
      * runs out. So we restart the delayed event first. A success guarantees it will outlive the membership update;
-     * a 404 tells us it is gone, and we have to work out why.
+     * if it is gone instead, we have to work out why.
      * @returns `undefined` if the membership can be sent, otherwise the action to take instead.
      */
     private async ensureDelayedLeaveEventProtectsMembership(): Promise<ActionUpdate | undefined> {
@@ -906,7 +919,7 @@ export class MembershipManager
     }
 
     /**
-     * Restarting our delayed leave event failed with something other than a 404.
+     * Restarting our delayed leave event failed with something other than the delayed event being gone.
      * @param error what the restart failed with
      * @returns `undefined` if the membership can be sent regardless, otherwise the action to take instead.
      * @throws the error if it is not one we retry on.
@@ -965,7 +978,7 @@ export class MembershipManager
             });
     }
     private async sendFallbackLeaveEvent(): Promise<ActionUpdate> {
-        return await this.clientSendMembership({})
+        return await this.clientSendLeaveMembership()
             .then(() => {
                 this.resetRateLimitCounter(MembershipActionType.SendLeaveEvent);
                 this.state.hasMemberStateEvent = false;
@@ -1006,16 +1019,6 @@ export class MembershipManager
         const needsEmptyStringRoomFix =
             this.slotDescription.application === "m.call" && this.slotDescription.id === "ROOM";
 
-        const focusObjects: Pick<SessionMembershipData, "foci_preferred" | "focus_active"> =
-            this.rtcTransport === undefined
-                ? {
-                      focus_active: { type: "livekit", focus_selection: "oldest_membership" } as const,
-                      foci_preferred: this.fociPreferred ?? [],
-                  }
-                : {
-                      focus_active: { type: "livekit", focus_selection: "multi_sfu" } as const,
-                      foci_preferred: [this.rtcTransport, ...(this.fociPreferred ?? [])],
-                  };
         return {
             // Legacy memberships have no application object, so the
             // application's data sits at the top level, under the fields
@@ -1033,7 +1036,9 @@ export class MembershipManager
             "membershipID": `${this.userId}:${this.deviceId}`,
             expires,
             "m.call.intent": this.callIntent,
-            ...focusObjects,
+            ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
+            "focus_active": { type: "livekit", focus_selection: "multi_sfu" } as const,
+            "foci_preferred": this.publishedTransports,
             ...(ownMembership !== undefined ? { created_ts: ownMembership.createdTs() } : undefined),
         };
     }
@@ -1047,6 +1052,30 @@ export class MembershipManager
      */
     private isNotFoundError(error: unknown): boolean {
         return error instanceof MatrixError && error.errcode === "M_NOT_FOUND";
+    }
+
+    /**
+     * Check if its a 409 (conflict) error.
+     * A homeserver answers a delayed event management action (restart, cancel, send) with a 409 if the delayed event
+     * is already finalised with an outcome that conflicts with the action
+     * (MSC4140 — https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md).
+     * The MSC does not mandate an errcode for this case, so we only check the http status.
+     * @param error the error causing this handler check/execution
+     * @returns true if its a conflict error
+     */
+    private isConflictError(error: unknown): boolean {
+        return error instanceof HTTPError && error.httpStatus === 409;
+    }
+
+    /**
+     * Check if the error tells us that the delayed event we tried to manage is gone: either the homeserver does not
+     * know about it anymore (404) or it is already finalised with an outcome that conflicts with our action (409).
+     * In both cases the delayed event will not do what we asked, so the `delayId` is stale and needs to be replaced.
+     * @param error the error causing this handler check/execution
+     * @returns true if the delayed event is gone
+     */
+    private isDelayedEventGoneError(error: unknown): boolean {
+        return this.isNotFoundError(error) || this.isConflictError(error);
     }
 
     /**
@@ -1288,10 +1317,10 @@ export class StickyEventMembershipManager extends MembershipManager {
         this.clientWithSticky._unstable_sendStickyDelayedEvent(
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
-            { delay: this.delayedLeaveEventDelayMs },
+            this.delayedLeaveEventDelayMs,
             null,
             EventType.RTCMembership,
-            { slot_id: computeSlotId(this.slotDescription), msc4354_sticky_key: this.memberId },
+            this.makeMyLeftMembership(),
         );
 
     protected clientSendMembership: (
@@ -1305,6 +1334,15 @@ export class StickyEventMembershipManager extends MembershipManager {
             { slot_id: computeSlotId(this.slotDescription), ...myMembership, msc4354_sticky_key: this.memberId },
         );
     };
+
+    protected clientSendLeaveMembership: () => Promise<ISendEventResponse> = () =>
+        this.clientWithSticky._unstable_sendStickyEvent(
+            this.room.roomId,
+            MEMBERSHIP_STICKY_DURATION_MS,
+            null,
+            EventType.RTCMembership,
+            this.makeMyLeftMembership(),
+        );
 
     private static nameMap = new Map([
         ["sendStateEvent", "_unstable_sendStickyEvent"],
@@ -1324,30 +1362,27 @@ export class StickyEventMembershipManager extends MembershipManager {
      * @returns Only returns `RtcMembershipData`
      */
     protected makeMyMembership(): RtcMembershipData {
-        const ownMembership = this.ownMembership;
-
-        const livekitTransport = isLivekitTransportConfig(this.rtcTransport) ? this.rtcTransport : undefined;
-        const relationObject = ownMembership?.eventId
-            ? { "m.relation": { rel_type: RelationType.Reference, event_id: ownMembership?.eventId } }
-            : {};
         return {
             application: {
                 ...this.applicationData,
                 type: this.slotDescription.application,
                 ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
+                ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
-            transports: {
-                // Make sure we do not add the alias to the transport.
-                // It is not needed in matrix2.0. The additional session information will be used to find the right alias on the sfu.
-                published: livekitTransport
-                    ? [{ type: livekitTransport.type, livekit_service_url: livekitTransport.livekit_service_url }]
-                    : [],
-                can_subscribe: ["livekit"],
-            },
-            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId },
-            versions: [],
-            ...relationObject,
+            transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
+            member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId, membership: "join" },
+        };
+    }
+
+    /**
+     * The content of the `m.rtc.member` event that marks our membership as left.
+     */
+    protected makeMyLeftMembership(): RtcLeftMembershipData {
+        return {
+            slot_id: computeSlotId(this.slotDescription),
+            member: { id: this.memberId, membership: "leave" },
+            msc4354_sticky_key: this.memberId,
         };
     }
 }

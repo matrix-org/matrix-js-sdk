@@ -15,5 +15,11 @@ limitations under the License.
 */
 
 export { type SessionMembershipData, checkSessionsMembershipData } from "./session.ts";
-export { type RtcMembershipData, computeRtcIdentityRaw, checkRtcMembershipData } from "./rtc.ts";
+export {
+    type RtcMembershipData,
+    type RtcLeftMembershipData,
+    type RtcMembershipStatus,
+    computeRtcIdentityRaw,
+    checkRtcMembershipData,
+} from "./rtc.ts";
 export { MatrixRTCMembershipParseError, isLeftMembershipContent } from "./common.ts";

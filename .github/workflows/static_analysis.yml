@@ -19,7 +19,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true
@@ -37,7 +37,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true
@@ -55,7 +55,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true
@@ -87,7 +87,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true
@@ -97,7 +97,7 @@ jobs:
               run: "pnpm lint:workflows"
 
             - name: Run zizmor
-              uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+              uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
 
     docs:
         name: "JSDoc Checker"
@@ -108,7 +108,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true
@@ -118,7 +118,7 @@ jobs:
               run: "pnpm run gendoc --treatWarningsAsErrors --suppressCommentWarningsInDeclarationFiles"
 
             - name: Upload Artifact
-              uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
               with:
                   name: docs
                   path: _docs
@@ -134,7 +134,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true
@@ -154,7 +154,7 @@ jobs:
                   persist-credentials: false
 
             - name: 🔨 Setup pnpm & node
-              uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024 # v3.0.0
+              uses: pnpm/setup@a0881977cd8ea73b1ed212236c99ca10dcc80cf4 # v3.1.1
               with:
                   runtime: node
                   cache: true

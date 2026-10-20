@@ -26,7 +26,13 @@ import {
     type Room,
     MAX_STICKY_DURATION_MS,
 } from "../../../src";
-import { MembershipManagerEvent, Status, type Transport, type LivekitFocusSelection } from "../../../src/matrixrtc";
+import {
+    MembershipManagerEvent,
+    Status,
+    type Transport,
+    type LivekitFocusSelection,
+    type SlotDescription,
+} from "../../../src/matrixrtc";
 import {
     makeMockClient,
     makeMockRoom,
@@ -95,13 +101,12 @@ describe("MembershipManager", () => {
     let client: MockClient;
     let room: Room;
     const focusActive: LivekitFocusSelection = {
-        focus_selection: "oldest_membership",
+        focus_selection: "multi_sfu",
         type: "livekit",
     };
     const focus: Transport = {
         type: "livekit",
         livekit_service_url: "https://active.url",
-        livekit_alias: "!active:active.url",
     };
 
     beforeEach(() => {
@@ -140,7 +145,10 @@ describe("MembershipManager", () => {
 
     describe("join()", () => {
         describe("sends a membership event", () => {
-            it("sends a membership event and schedules delayed leave when joining a call", async () => {
+            async function testSendMembershipEvent(
+                slotDescription: SlotDescription,
+                expectedCallId: string,
+            ): Promise<void> {
                 // Spys/Mocks
 
                 const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
@@ -148,7 +156,7 @@ describe("MembershipManager", () => {
                 );
 
                 // Test
-                const memberManager = new MembershipManager(undefined, room, client, callSession);
+                const memberManager = new MembershipManager(undefined, room, client, slotDescription);
                 memberManager.join([focus], undefined);
                 // expects
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
@@ -157,8 +165,7 @@ describe("MembershipManager", () => {
                     "org.matrix.msc3401.call.member",
                     {
                         application: "m.call",
-                        // This tests INFO_SLOT_ID_LEGACY_CASE because it is using callSession = { id: "ROOM", application: "m.call" }
-                        call_id: "",
+                        call_id: expectedCallId,
                         device_id: "AAAAAAA",
                         expires: 14400000,
                         foci_preferred: [focus],
@@ -166,57 +173,71 @@ describe("MembershipManager", () => {
                         focus_active: focusActive,
                         scope: "m.room",
                     },
-                    // This tests INFO_SLOT_ID_LEGACY_CASE because it is using callSession = { id: "ROOM", application: "m.call" }
-                    "_@alice:example.org_AAAAAAA_m.call",
+                    `_@alice:example.org_AAAAAAA_m.call${expectedCallId}`,
                 );
                 restartScheduledDelayedEventHandle.resolve?.();
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    { delay: 8000 },
+                    8000,
                     "org.matrix.msc3401.call.member",
                     {},
-                    "_@alice:example.org_AAAAAAA_m.call",
+                    `_@alice:example.org_AAAAAAA_m.call${expectedCallId}`,
                 );
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            }
+
+            // eslint-disable-next-line @vitest/expect-expect
+            it("sends a membership event and schedules delayed leave when joining a call", async () => {
+                // This tests INFO_SLOT_ID_LEGACY_CASE because it is using callSession = { id: "ROOM", application: "m.call" }
+                await testSendMembershipEvent(callSession, "");
             });
 
+            // eslint-disable-next-line @vitest/expect-expect
             it("sends correct call_id and state key when using non empty string. Not using empty string -> ROOM hack. See: INFO_SLOT_ID_LEGACY_CASE", async () => {
-                // Spys/Mocks
-
                 const customCallSession = { id: "custom", application: "m.call" };
-                const restartScheduledDelayedEventHandle = createAsyncHandle<void>(
-                    client._unstable_restartScheduledDelayedEvent,
-                );
+                await testSendMembershipEvent(customCallSession, customCallSession.id);
+            });
 
-                // Test
-                const memberManager = new MembershipManager(undefined, room, client, customCallSession);
+            it("does not send capabilities if none are configured", async () => {
+                const memberManager = new MembershipManager({}, room, client, callSession);
                 memberManager.join([focus], undefined);
-                // expects
                 await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
-                expect(client.sendStateEvent).toHaveBeenCalledWith(
-                    room.roomId,
-                    "org.matrix.msc3401.call.member",
-                    {
-                        application: "m.call",
-                        call_id: "custom",
-                        device_id: "AAAAAAA",
-                        expires: 14400000,
-                        foci_preferred: [focus],
-                        membershipID: "@alice:example.org:AAAAAAA",
-                        focus_active: focusActive,
-                        scope: "m.room",
-                    },
-                    "_@alice:example.org_AAAAAAA_m.callcustom",
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect("capabilities" in eventContent).toBe(false);
+            });
+
+            it("sends the configured capabilities at the top level of a legacy membership", async () => {
+                const memberManager = new MembershipManager(
+                    { callCapabilities: ["m.render_audio", "m.render_video"] },
+                    room,
+                    client,
+                    callSession,
                 );
-                restartScheduledDelayedEventHandle.resolve?.();
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
-                    room.roomId,
-                    { delay: 8000 },
-                    "org.matrix.msc3401.call.member",
-                    {},
-                    "_@alice:example.org_AAAAAAA_m.callcustom",
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.capabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
+            });
+
+            it("sends empty capabilities if configured as such", async () => {
+                const memberManager = new MembershipManager({ callCapabilities: [] }, room, client, callSession);
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.capabilities).toStrictEqual([]);
+            });
+
+            it("prefers the configured capabilities over ones in applicationData", async () => {
+                const memberManager = new MembershipManager(
+                    { callCapabilities: ["m.render_video"], applicationData: { capabilities: ["m.render_audio"] } },
+                    room,
+                    client,
+                    callSession,
                 );
-                expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+                memberManager.join([focus], undefined);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.capabilities).toStrictEqual(["m.render_video"]);
             });
 
             it("reschedules delayed leave event if sending state cancels it", async () => {
@@ -226,7 +247,7 @@ describe("MembershipManager", () => {
                     client._unstable_restartScheduledDelayedEvent,
                     Promise.reject(new MatrixError({ errcode: "M_NOT_FOUND" })),
                 );
-                memberManager.join([focus], focusActive);
+                memberManager.join([focus]);
                 await waitForSendState;
                 await waitForRestartScheduledDelayedEvent;
                 await vi.advanceTimersByTimeAsync(1);
@@ -302,7 +323,7 @@ describe("MembershipManager", () => {
                     await sendDelayedStateExceedAttempt.then(); // needed to resolve after the send attempt catches
                     await sendDelayedStateAttempt;
                     const callProps = (d: number) => {
-                        return [room!.roomId, { delay: d }, "org.matrix.msc3401.call.member", {}, userStateKey];
+                        return [room!.roomId, d, "org.matrix.msc3401.call.member", {}, userStateKey];
                     };
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(1, ...callProps(9000));
                     expect(client._unstable_sendDelayedStateEvent).toHaveBeenNthCalledWith(2, ...callProps(7500));
@@ -378,7 +399,7 @@ describe("MembershipManager", () => {
                 manager.join([focus]);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledWith(
                     room.roomId,
-                    { delay: 123456 },
+                    123456,
                     "org.matrix.msc3401.call.member",
                     {},
                     "_@alice:example.org_AAAAAAA_m.call",
@@ -425,6 +446,40 @@ describe("MembershipManager", () => {
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
         });
 
+        it("rejoins if restarting the delayed event conflicts with its finalised outcome (409)", async () => {
+            const RESTART_DELAY = 15000;
+            const onError = vi.fn();
+            const manager = new MembershipManager(
+                { delayedLeaveEventRestartMs: RESTART_DELAY },
+                room,
+                client,
+                callSession,
+            );
+            manager.join([focus], onError);
+            await vi.runOnlyPendingTimersAsync();
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(manager.status).toBe(Status.Connected);
+            // Same scenario as in the "not found" test above, but with a homeserver that keeps finalised delayed events
+            // around and answers with a 409 (without a dedicated errcode) because the delayed leave event was already sent.
+            (client._unstable_restartScheduledDelayedEvent as Mock<any>).mockRejectedValueOnce(
+                new MatrixError({ errcode: "M_UNKNOWN" }, 409),
+            );
+
+            const { resolve } = createAsyncHandle(client._unstable_sendDelayedStateEvent);
+            await vi.advanceTimersByTimeAsync(RESTART_DELAY);
+            expect(manager.delayId).toBeUndefined();
+            // first simulate the sync, then resolve sending the delayed event.
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
+            resolve({ delay_id: "id2" });
+            // Let the scheduler run one iteration so that the new join gets sent
+            await vi.runOnlyPendingTimersAsync();
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(2);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
+            expect(manager.delayId).toBe("id2");
+            expect(manager.status).toBe(Status.Connected);
+            expect(onError).not.toHaveBeenCalled();
+        });
+
         it("uses membershipEventExpiryMs from config", async () => {
             const manager = new MembershipManager(
                 { membershipEventExpiryMs: 1234567 },
@@ -448,7 +503,7 @@ describe("MembershipManager", () => {
                     foci_preferred: [focus],
                     membershipID: "@alice:example.org:AAAAAAA",
                     focus_active: {
-                        focus_selection: "oldest_membership",
+                        focus_selection: "multi_sfu",
                         type: "livekit",
                     },
                 },
@@ -513,6 +568,28 @@ describe("MembershipManager", () => {
             );
             expect(manager.delayId).toBe(undefined);
         });
+        it("send leave event when leave is called and the delayed leave was already cancelled (409)", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager({}, room, client, callSession);
+            manager.join([focus], onError);
+            await vi.advanceTimersByTimeAsync(1);
+            (client._unstable_sendScheduledDelayedEvent as Mock<any>).mockRejectedValue(
+                new MatrixError({ errcode: "M_UNKNOWN" }, 409),
+            );
+            await expect(manager.leave()).resolves.toBe(true);
+
+            // We send a normal leave event since the cancelled delayed event will never send it for us.
+            expect(client._unstable_sendScheduledDelayedEvent).toHaveBeenCalledTimes(1);
+            expect(client.sendStateEvent).toHaveBeenLastCalledWith(
+                room.roomId,
+                "org.matrix.msc3401.call.member",
+                {},
+                "_@alice:example.org_AAAAAAA_m.call",
+            );
+            // The delayed event is finalised, so we stop tracking it.
+            expect(manager.delayId).toBeUndefined();
+            expect(onError).not.toHaveBeenCalled();
+        });
         it("does nothing if not joined", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
             await expect(manager.leave()).resolves.toBeTruthy();
@@ -535,7 +612,7 @@ describe("MembershipManager", () => {
         });
         it("does nothing if own membership still present", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await vi.advanceTimersByTimeAsync(1);
             const myMembership = vi.mocked(client.sendStateEvent).mock.calls[0][2];
             // reset all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
@@ -565,7 +642,7 @@ describe("MembershipManager", () => {
         });
         it("recreates membership if it is missing", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await vi.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
             vi.mocked(client.sendStateEvent).mockClear();
@@ -581,9 +658,35 @@ describe("MembershipManager", () => {
             expect(client._unstable_restartScheduledDelayedEvent).toHaveBeenCalled();
         });
 
+        it("recreates membership if it is missing and the delayed event to cancel was already sent (409)", async () => {
+            const onError = vi.fn();
+            const manager = new MembershipManager({}, room, client, callSession);
+            manager.join([focus], onError);
+            await vi.advanceTimersByTimeAsync(1);
+            // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
+            vi.mocked(client.sendStateEvent).mockClear();
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockClear();
+            vi.mocked(client._unstable_sendDelayedStateEvent).mockResolvedValue({ delay_id: "id2" });
+            // The delayed leave event is what removed our membership, so cancelling it conflicts with its outcome.
+            vi.mocked(client._unstable_cancelScheduledDelayedEvent).mockRejectedValueOnce(
+                new MatrixError({ errcode: "M_UNKNOWN" }, 409),
+            );
+
+            // Our own membership is removed:
+            await manager.onRTCSessionMemberUpdate([mockCallMembership(sessionMembershipTemplate, room.roomId)]);
+            await vi.advanceTimersByTimeAsync(1);
+            expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenCalledTimes(1);
+            expect(client._unstable_cancelScheduledDelayedEvent).toHaveBeenCalledWith("id");
+            expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
+            expect(manager.delayId).toBe("id2");
+            expect(manager.status).toBe(Status.Connected);
+            expect(onError).not.toHaveBeenCalled();
+        });
+
         it("updates the UpdateExpiry entry in the action scheduler", async () => {
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await vi.advanceTimersByTimeAsync(1);
             // clearing all mocks before checking what happens when calling: `onRTCSessionMemberUpdate`
             vi.mocked(client.sendStateEvent).mockClear();
@@ -617,7 +720,7 @@ describe("MembershipManager", () => {
                 client,
                 { id: "", application: "m.call" },
             );
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await vi.advanceTimersByTimeAsync(1);
             expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
 
@@ -649,7 +752,7 @@ describe("MembershipManager", () => {
 
                 { id: "", application: "m.call" },
             );
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await waitForMockCall(client.sendStateEvent);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
             const sentMembership = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
@@ -672,7 +775,7 @@ describe("MembershipManager", () => {
             settleMs = 1,
         ): Promise<MembershipManager> {
             const manager = new MembershipManager(config, room, client, { id: "", application: "m.call" });
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await waitForMockCall(client.sendStateEvent);
             await vi.advanceTimersByTimeAsync(settleMs);
             vi.mocked(client.sendStateEvent).mockClear();
@@ -696,7 +799,7 @@ describe("MembershipManager", () => {
                 client,
                 { id: "", application: "m.call" },
             );
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await waitForMockCall(client.sendStateEvent);
             await vi.advanceTimersByTimeAsync(1);
             // The restart after joining checks that the delayed event survived the join.
@@ -722,7 +825,7 @@ describe("MembershipManager", () => {
             );
             const probablyLeft: boolean[] = [];
             manager.on(MembershipManagerEvent.ProbablyLeft, (value) => probablyLeft.push(value));
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await waitForMockCall(client.sendStateEvent);
             await vi.advanceTimersByTimeAsync(1);
             // Sync tells us about the membership we just sent, so from here on we know its `created_ts`.
@@ -772,7 +875,7 @@ describe("MembershipManager", () => {
             manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeft);
             const statusChanged = vi.fn();
             manager.on(MembershipManagerEvent.StatusChanged, statusChanged);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await waitForMockCall(client.sendStateEvent);
             await vi.advanceTimersByTimeAsync(1);
             vi.mocked(client.sendStateEvent).mockClear();
@@ -943,7 +1046,7 @@ describe("MembershipManager", () => {
                 client,
                 { id: "", application: "m.call" },
             );
-            manager.join([focus], focusActive, unrecoverableError);
+            manager.join([focus], unrecoverableError);
             await waitForMockCall(client.sendStateEvent);
             await vi.advanceTimersByTimeAsync(1);
             vi.mocked(client.sendStateEvent).mockClear();
@@ -985,7 +1088,7 @@ describe("MembershipManager", () => {
             expect(manager.status).toBe(Status.Disconnected);
             const connectEmit = vi.fn();
             manager.on(MembershipManagerEvent.StatusChanged, connectEmit);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             expect(manager.status).toBe(Status.Connecting);
             handleDelayedEvent.resolve();
             await vi.advanceTimersByTimeAsync(1);
@@ -998,7 +1101,7 @@ describe("MembershipManager", () => {
             const manager = new MembershipManager({}, room, client, callSession);
             const connectEmit = vi.fn();
             manager.on(MembershipManagerEvent.StatusChanged, connectEmit);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             await vi.advanceTimersByTimeAsync(1);
             await manager.leave();
             expect(connectEmit).toHaveBeenCalledWith(Status.Connected, Status.Disconnecting);
@@ -1012,7 +1115,7 @@ describe("MembershipManager", () => {
                 const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
                 const manager = new MembershipManager({}, room, client, callSession);
-                manager.join([focus], focusActive);
+                manager.join([focus]);
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
 
                 handle.reject?.(
@@ -1041,7 +1144,7 @@ describe("MembershipManager", () => {
                 const manager = new MembershipManager({}, room, client, callSession);
                 // Should call _unstable_sendDelayedStateEvent but not sendStateEvent because of the
                 // RateLimit error.
-                manager.join([focus], focusActive);
+                manager.join([focus]);
                 await vi.advanceTimersByTimeAsync(1);
 
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(1);
@@ -1059,7 +1162,7 @@ describe("MembershipManager", () => {
                 const handle = createAsyncHandle(client._unstable_sendDelayedStateEvent);
 
                 const manager = new MembershipManager({}, room, client, callSession);
-                manager.join([focus], focusActive);
+                manager.join([focus]);
                 handle.reject?.(
                     new MatrixError(
                         { errcode: "M_LIMIT_EXCEEDED" },
@@ -1094,7 +1197,7 @@ describe("MembershipManager", () => {
                     ),
                 );
                 const manager = new MembershipManager({}, room, client, callSession);
-                manager.join([focus], focusActive);
+                manager.join([focus]);
 
                 // Hit rate limit
                 await vi.advanceTimersByTimeAsync(1);
@@ -1127,7 +1230,7 @@ describe("MembershipManager", () => {
                 ),
             );
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive, delayEventSendError);
+            manager.join([focus], delayEventSendError);
 
             for (let i = 0; i < 10; i++) {
                 await vi.advanceTimersByTimeAsync(2000);
@@ -1147,7 +1250,7 @@ describe("MembershipManager", () => {
                 ),
             );
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive, delayEventRestartError);
+            manager.join([focus], delayEventRestartError);
 
             for (let i = 0; i < 10; i++) {
                 await vi.advanceTimersByTimeAsync(1000);
@@ -1158,7 +1261,7 @@ describe("MembershipManager", () => {
             const unrecoverableError = vi.fn();
             (client._unstable_sendDelayedStateEvent as Mock<any>).mockRejectedValue(new HTTPError("unknown", 601));
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive, unrecoverableError);
+            manager.join([focus], unrecoverableError);
             await waitForMockCall(client.sendStateEvent);
             expect(unrecoverableError).not.toHaveBeenCalledWith();
             expect(client.sendStateEvent).toHaveBeenCalled();
@@ -1172,7 +1275,7 @@ describe("MembershipManager", () => {
                 client,
                 callSession,
             );
-            manager.join([focus], focusActive, unrecoverableError);
+            manager.join([focus], unrecoverableError);
             for (let retries = 0; retries < 7; retries++) {
                 expect(client._unstable_sendDelayedStateEvent).toHaveBeenCalledTimes(retries + 1);
                 await vi.advanceTimersByTimeAsync(1000);
@@ -1191,7 +1294,7 @@ describe("MembershipManager", () => {
                 client,
                 callSession,
             );
-            manager.join([focus], focusActive, onError);
+            manager.join([focus], onError);
             await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
             client._unstable_restartScheduledDelayedEvent = vi.fn((_) => Promise.reject(new HTTPError("unknown", 501)));
             await vi.advanceTimersByTimeAsync(3000);
@@ -1213,7 +1316,7 @@ describe("MembershipManager", () => {
             const { promise: stuckPromise, reject: rejectStuckPromise } = Promise.withResolvers<EmptyObject>();
             const probablyLeftEmit = vi.fn();
             manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
-            manager.join([focus], focusActive, onError);
+            manager.join([focus], onError);
             try {
                 await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
                 // The server never answers restarts: each hits the 2s local timeout and is retried immediately.
@@ -1235,7 +1338,7 @@ describe("MembershipManager", () => {
                 new UnsupportedDelayedEventsEndpointError("not supported", "sendDelayedStateEvent"),
             );
             const manager = new MembershipManager({}, room, client, callSession);
-            manager.join([focus], focusActive, unrecoverableError);
+            manager.join([focus], unrecoverableError);
             await vi.advanceTimersByTimeAsync(1);
 
             expect(unrecoverableError).not.toHaveBeenCalled();
@@ -1254,7 +1357,7 @@ describe("MembershipManager", () => {
             const { promise: stuckPromise, reject: rejectStuckPromise } = Promise.withResolvers<EmptyObject>();
             const probablyLeftEmit = vi.fn();
             manager.on(MembershipManagerEvent.ProbablyLeft, probablyLeftEmit);
-            manager.join([focus], focusActive);
+            manager.join([focus]);
             try {
                 // Let the scheduler run one iteration so that we can send the join state event
                 await waitForMockCall(client._unstable_restartScheduledDelayedEvent);
@@ -1400,14 +1503,17 @@ describe("MembershipManager", () => {
                         client._unstable_restartScheduledDelayedEvent,
                     );
                     const memberManager = new StickyEventMembershipManager(
-                        { applicationData: { "org.example.key": "value" } },
+                        {
+                            applicationData: { "org.example.key": "value" },
+                            callCapabilities: ["m.render_audio", "m.render_video"],
+                        },
                         room,
                         client,
                         callSession,
                         "@alice:example.org:AAAAAAA_m.call",
                     );
 
-                    memberManager.join([], focus);
+                    memberManager.join([focus]);
 
                     await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
                     // Test we sent the initial join
@@ -1417,18 +1523,22 @@ describe("MembershipManager", () => {
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
-                            application: { "type": "m.call", "org.example.key": "value" },
+                            application: {
+                                "type": "m.call",
+                                "org.example.key": "value",
+                                "capabilities": ["m.render_audio", "m.render_video"],
+                            },
                             member: {
                                 user_id: "@alice:example.org",
                                 id: "@alice:example.org:AAAAAAA_m.call",
                                 device_id: "AAAAAAA",
+                                membership: "join",
                             },
                             slot_id: "m.call#ROOM",
                             transports: {
                                 published: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
                                 can_subscribe: ["livekit"],
                             },
-                            versions: [],
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
@@ -1438,17 +1548,48 @@ describe("MembershipManager", () => {
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledWith(
                         room.roomId,
                         MAX_STICKY_DURATION_MS,
-                        { delay: 8000 },
+                        8000,
                         null,
                         "org.matrix.msc4143.rtc.member",
                         {
                             slot_id: "m.call#ROOM",
+                            member: { id: "@alice:example.org:AAAAAAA_m.call", membership: "leave" },
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
                     );
                     // ..once
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
                 });
+            });
+            it("sends a leave event with member.membership leave when the scheduled delayed leave is gone", async () => {
+                const memberManager = new StickyEventMembershipManager(
+                    undefined,
+                    room,
+                    client,
+                    callSession,
+                    "@alice:example.org:AAAAAAA_m.call",
+                );
+                memberManager.join([focus]);
+                await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                await vi.advanceTimersByTimeAsync(1);
+                (client._unstable_sendScheduledDelayedEvent as Mock<any>).mockRejectedValue(
+                    new MatrixError({ errcode: "M_NOT_FOUND" }, 404),
+                );
+
+                await memberManager.leave();
+
+                // We send a normal leave event since we failed using sendScheduledDelayedEvent.
+                expect(client._unstable_sendStickyEvent).toHaveBeenLastCalledWith(
+                    room.roomId,
+                    MAX_STICKY_DURATION_MS,
+                    null,
+                    "org.matrix.msc4143.rtc.member",
+                    {
+                        slot_id: "m.call#ROOM",
+                        member: { id: "@alice:example.org:AAAAAAA_m.call", membership: "leave" },
+                        msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
+                    },
+                );
             });
             it("preserves UnsupportedStickyEventsEndpointError on `cause` when wrapping", async () => {
                 const stickyError = new UnsupportedStickyEventsEndpointError(
@@ -1465,7 +1606,7 @@ describe("MembershipManager", () => {
                     callSession,
                     "@alice:example.org:AAAAAAA_m.call",
                 );
-                memberManager.join([], focus, unrecoverableError);
+                memberManager.join([focus], unrecoverableError);
                 await vi.advanceTimersByTimeAsync(1);
 
                 expect(unrecoverableError).toHaveBeenCalled();
@@ -1486,7 +1627,7 @@ describe("MembershipManager", () => {
                     callSession,
                     "@alice:example.org:AAAAAAA_m.call",
                 );
-                manager.join([], focus, unrecoverableError);
+                manager.join([focus], unrecoverableError);
                 await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
                 await vi.advanceTimersByTimeAsync(1);
                 vi.mocked(client._unstable_sendStickyEvent).mockClear();

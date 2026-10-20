@@ -209,7 +209,8 @@ describe("MatrixClient", function () {
 
     const RTC_TRANSPORT_RESPONSE: HttpLookup = {
         method: "GET",
-        path: "/rtc/transports/",
+        path: "/rtc/transports",
+        prefix: "/_matrix/client/unstable/org.matrix.msc4143",
         data: { rtc_transports: [] },
     };
 
@@ -402,6 +403,7 @@ describe("MatrixClient", function () {
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
             "org.matrix.msc3440.stable": true,
+            "org.matrix.msc4143": true,
         };
 
         makeClient();
@@ -424,6 +426,19 @@ describe("MatrixClient", function () {
         // promises to stop the client from continuing to run.
         vi.mocked(client.http.authedRequest).mockImplementation(function () {
             return new Promise(() => {});
+        });
+    });
+
+    describe("stopClient", () => {
+        it("should stop serverCapabilitiesService and retentionPolicyService", () => {
+            const serverCapsSpy = vi.spyOn((client as any).serverCapabilitiesService, "stop");
+            const retentionSpy = vi.spyOn(client.retentionPolicyService, "stop");
+            (client as any).clientRunning = true;
+
+            client.stopClient();
+
+            expect(serverCapsSpy).toHaveBeenCalled();
+            expect(retentionSpy).toHaveBeenCalled();
         });
     });
 
@@ -870,8 +885,10 @@ describe("MatrixClient", function () {
         const roomId = "!room:example.org";
         const body = "This is the body";
         const content = { body, msgtype: MsgType.Text } satisfies RoomMessageEventContent;
-        const timeoutDelayOpts = { delay: 2000 };
-        const realTimeoutDelayOpts = { "org.matrix.msc4140.delay": 2000 };
+        const delayMs = 2000;
+        const delayOpts = { delay: delayMs };
+        const realDelayOpts = { "org.matrix.msc4140.delay": 2000 };
+        const delayData = { delay_id: "did" };
 
         beforeEach(() => {
             unstableFeatures["org.matrix.msc4140"] = true;
@@ -884,7 +901,7 @@ describe("MatrixClient", function () {
             await expect(
                 client._unstable_sendDelayedEvent(
                     roomId,
-                    timeoutDelayOpts,
+                    delayMs,
                     null,
                     EventType.RoomMessage,
                     { ...content },
@@ -893,7 +910,7 @@ describe("MatrixClient", function () {
             ).rejects.toThrow(errorMessage);
 
             await expect(
-                client._unstable_sendDelayedStateEvent(roomId, timeoutDelayOpts, EventType.RoomTopic, {
+                client._unstable_sendDelayedStateEvent(roomId, delayMs, EventType.RoomTopic, {
                     topic: "topic",
                 }),
             ).rejects.toThrow(errorMessage);
@@ -911,49 +928,30 @@ describe("MatrixClient", function () {
         });
 
         // eslint-disable-next-line @vitest/expect-expect
-        it("works with null threadId", async () => {
-            httpLookups = [];
-
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody: content,
-            });
-
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                null,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
-
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody: content,
-            });
+        it.each([delayMs, delayOpts])("can send a delayed message event", async (delayMsOrOpts) => {
+            const txnId = client.makeTxnId();
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: delayData,
+                    expectQueryParams: realDelayOpts,
+                    expectBody: content,
+                },
+            ];
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                { parent_delay_id: timeoutDelayId },
+                delayMsOrOpts,
                 null,
                 EventType.RoomMessage,
                 { ...content },
-                actionDelayTxnId,
+                txnId,
             );
         });
 
         // eslint-disable-next-line @vitest/expect-expect
         it("works with non-null threadId", async () => {
-            httpLookups = [];
             const threadId = "$threadId:server";
             const expectBody = {
                 ...content,
@@ -964,55 +962,41 @@ describe("MatrixClient", function () {
                 },
             };
 
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody,
-            });
-
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
-
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody,
-            });
+            const txnId = client.makeTxnId();
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    data: delayData,
+                    expectQueryParams: realDelayOpts,
+                    expectBody,
+                },
+            ];
 
             await client._unstable_sendDelayedEvent(
                 roomId,
-                { parent_delay_id: timeoutDelayId },
+                delayMs,
                 threadId,
                 EventType.RoomMessage,
                 { ...content },
-                actionDelayTxnId,
+                txnId,
             );
         });
 
-        // eslint-disable-next-line @vitest/expect-expect
-        it("should add thread relation if threadId is passed and the relation is missing", async () => {
-            httpLookups = [];
-            const threadId = "$threadId:server";
+        async function testThreadRelation(
+            content: RoomMessageEventContent,
+            inReplyTo: string,
+            threadId: string,
+            isFallingBack: boolean,
+        ): Promise<void> {
             const expectBody = {
                 ...content,
                 "m.relates_to": {
                     "m.in_reply_to": {
-                        event_id: threadId,
+                        event_id: inReplyTo,
                     },
                     "event_id": threadId,
-                    "is_falling_back": true,
+                    "is_falling_back": isFallingBack,
                     "rel_type": "m.thread",
                 },
             };
@@ -1024,145 +1008,115 @@ describe("MatrixClient", function () {
             room.createThread(threadId, rootEvent, [rootEvent], false);
 
             const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody,
-            });
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                    data: delayData,
+                    expectQueryParams: realDelayOpts,
+                    expectBody,
+                },
+            ];
 
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
+            await client._unstable_sendDelayedEvent(
                 roomId,
-                timeoutDelayOpts,
+                delayMs,
                 threadId,
                 EventType.RoomMessage,
                 { ...content },
                 timeoutDelayTxnId,
             );
+        }
 
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody,
-            });
-
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                actionDelayTxnId,
-            );
+        // eslint-disable-next-line @vitest/expect-expect
+        it("should add thread relation if threadId is passed and the relation is missing", async () => {
+            const threadId = "$threadId:server";
+            await testThreadRelation(content, threadId, threadId, true);
         });
 
         // eslint-disable-next-line @vitest/expect-expect
         it("should add thread relation if threadId is passed and the relation is missing with reply", async () => {
-            httpLookups = [];
-            const threadId = "$threadId:server";
-
-            const content = {
-                body,
-                "msgtype": MsgType.Text,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
+            await testThreadRelation(
+                {
+                    body,
+                    "msgtype": MsgType.Text,
+                    "m.relates_to": {
+                        "m.in_reply_to": {
+                            event_id: "$other:event",
+                        },
                     },
                 },
-            } satisfies RoomMessageEventContent;
-            const expectBody = {
-                ...content,
-                "m.relates_to": {
-                    "m.in_reply_to": {
-                        event_id: "$other:event",
-                    },
-                    "event_id": threadId,
-                    "is_falling_back": false,
-                    "rel_type": "m.thread",
-                },
-            };
-
-            const room = new Room(roomId, client, userId);
-            vi.mocked(store.getRoom).mockReturnValue(room);
-
-            const rootEvent = new MatrixEvent({ event_id: threadId });
-            room.createThread(threadId, rootEvent, [rootEvent], false);
-
-            const timeoutDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody,
-            });
-
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedEvent(
-                roomId,
-                timeoutDelayOpts,
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                timeoutDelayTxnId,
-            );
-
-            const actionDelayTxnId = client.makeTxnId();
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${actionDelayTxnId}`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody,
-            });
-
-            await client._unstable_sendDelayedEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                threadId,
-                EventType.RoomMessage,
-                { ...content },
-                actionDelayTxnId,
+                "$other:event",
+                "@threadId:server",
+                false,
             );
         });
 
         // eslint-disable-next-line @vitest/expect-expect
-        it("can send a delayed state event", async () => {
-            httpLookups = [];
+        it.each([delayMs, delayOpts])("can send a delayed state event", async (delayMsOrOpts) => {
             const content = { topic: "The year 2000" };
 
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
-                expectQueryParams: realTimeoutDelayOpts,
-                data: { delay_id: "id1" },
-                expectBody: content,
-            });
+            httpLookups = [
+                {
+                    method: "PUT",
+                    path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                    data: delayData,
+                    expectQueryParams: realDelayOpts,
+                    expectBody: content,
+                },
+            ];
 
-            const { delay_id: timeoutDelayId } = await client._unstable_sendDelayedStateEvent(
-                roomId,
-                timeoutDelayOpts,
-                EventType.RoomTopic,
-                { ...content },
+            await client._unstable_sendDelayedStateEvent(roomId, delayMsOrOpts, EventType.RoomTopic, { ...content });
+        });
+
+        describe("parent_delay_id", () => {
+            const error = new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+
+            it.each([{}, delayOpts])(
+                "rejects sending a delayed message event with a parent_delay_id",
+                async (delayOpts) => {
+                    await expect(
+                        client._unstable_sendDelayedEvent(
+                            roomId,
+                            { parent_delay_id: "d0", ...delayOpts },
+                            null,
+                            EventType.RoomMessage,
+                            { ...content },
+                        ),
+                    ).rejects.toThrow(error);
+                },
             );
 
-            httpLookups.push({
-                method: "PUT",
-                path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
-                expectQueryParams: { "org.matrix.msc4140.parent_delay_id": timeoutDelayId },
-                data: { delay_id: "id2" },
-                expectBody: content,
-            });
-
-            await client._unstable_sendDelayedStateEvent(
-                roomId,
-                { parent_delay_id: timeoutDelayId },
-                EventType.RoomTopic,
-                { ...content },
+            it.each([{}, delayOpts])(
+                "rejects sending a delayed state event with a parent_delay_id",
+                async (delayOpts) => {
+                    const error = new Error("Scheduling a delayed event with a parent_delay_id is no longer supported");
+                    const content = { topic: "The year 2000" };
+                    await expect(
+                        client._unstable_sendDelayedStateEvent(
+                            roomId,
+                            { parent_delay_id: "d0", ...delayOpts },
+                            EventType.RoomTopic,
+                            { ...content },
+                        ),
+                    ).rejects.toThrow(error);
+                },
             );
+
+            it.each([{}, delayOpts])("prevents subclasses from using a parent_delay_id", async (delayOpts) => {
+                class Subclass extends MatrixClient {
+                    async sendCompleteEventWithParentDelayId() {
+                        return this.sendCompleteEvent({
+                            roomId,
+                            threadId: null,
+                            eventObject: {},
+                            delayOpts: { parent_delay_id: "d0", ...delayOpts },
+                        });
+                    }
+                }
+                Object.setPrototypeOf(client, Subclass.prototype);
+                await expect((client as Subclass).sendCompleteEventWithParentDelayId()).rejects.toThrow(error);
+            });
         });
 
         describe("lookups", () => {
@@ -1894,7 +1848,8 @@ describe("MatrixClient", function () {
             const wasPreparedPromise = new Promise((resolve) => {
                 client.on(ClientEvent.Sync, function syncListener(state) {
                     if (state === "ERROR" && httpLookups.length > 0) {
-                        expect(httpLookups.length).toEqual(3);
+                        // RTC discovery may still be waiting for the /versions support check.
+                        expect(httpLookups.filter((lookup) => lookup !== RTC_TRANSPORT_RESPONSE)).toHaveLength(3);
                         expect(client.retryImmediately()).toBe(true);
                         vi.advanceTimersByTime(1);
                     } else if (state === "PREPARED" && httpLookups.length === 0) {
@@ -2288,7 +2243,7 @@ describe("MatrixClient", function () {
                             `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
                             `/${encodeURIComponent(txnId)}`,
                         expectBody: {
-                            "reason": "redaction test",
+                            reason: "redaction test",
                             ["org.matrix.msc3912.with_relations"]: ["m.reference"],
                         },
                         data: { event_id: eventId },
@@ -4028,6 +3983,7 @@ describe("MatrixClient", function () {
 
     describe("_unstable_getRTCTransports", () => {
         it("makes a well-formed request", async () => {
+            unstableFeatures["org.matrix.msc4143"] = true;
             httpLookups = [
                 {
                     method: "GET",
@@ -4042,19 +3998,62 @@ describe("MatrixClient", function () {
                     extra_field: "foobar",
                 },
             ]);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(
+                Method.Get,
+                "/_matrix/client/versions",
+                undefined,
+                undefined,
+                { prefix: "" },
+            );
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it.each([{ unstable_features: { "org.matrix.msc4143": false } }, { unstable_features: {} }, {}])(
+            "does not request transports when support is not advertised: %j",
+            async (versionsResponse) => {
+                vi.mocked(client.http.authedRequest)
+                    .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
+                    .mockResolvedValue({ rtc_transports: [] });
+
+                await expect(client._unstable_getRTCTransports()).rejects.toMatchObject({
+                    errcode: "M_UNRECOGNIZED",
+                    httpStatus: 404,
+                });
+                expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
+                expect(client.http.authedRequest).toHaveBeenCalledWith(
+                    Method.Get,
+                    "/_matrix/client/versions",
+                    undefined,
+                    undefined,
+                    { prefix: "" },
+                );
+            },
+        );
+
+        it("caches unsupported discovery without requesting transports", async () => {
+            vi.mocked(client.http.authedRequest)
+                .mockResolvedValueOnce({ versions: ["v1.1"], unstable_features: {} })
+                .mockResolvedValue({ rtc_transports: [] });
+
+            for (let i = 0; i < 3; i++) {
+                await expect(client.cachedRtcTransports.wait()).rejects.toMatchObject({
+                    errcode: "M_UNRECOGNIZED",
+                    httpStatus: 404,
+                });
+            }
+
+            expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
         });
     });
 
     describe("MSC4195 LiveKit endpoints", () => {
-        const member = { id: "xyzABCDEF10123", claimed_device_id: "DEVICEID" };
-
         describe("_unstable_getLivekitToken", () => {
             it("makes a well-formed request", async () => {
                 const body = {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                 } satisfies LivekitGetTokenRequest;
                 httpLookups = [
                     {
@@ -4074,7 +4073,7 @@ describe("MatrixClient", function () {
                     url: "wss://livekit.remote.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                     server_name: "remote.example.com",
                 } satisfies LivekitGetTokenRequest;
                 httpLookups = [
@@ -4104,7 +4103,7 @@ describe("MatrixClient", function () {
                         url: "wss://not-an-sfu.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
-                        member,
+                        member_id: "xyzABCDEF10123",
                     }),
                 ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
                 expect(httpLookups.length).toEqual(0);
@@ -4117,7 +4116,7 @@ describe("MatrixClient", function () {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
                     slot_id: "m.call#ROOM",
-                    member,
+                    member_id: "xyzABCDEF10123",
                     delay_id: "1234567890",
                 } satisfies LivekitDelegateDelayedLeaveRequest;
                 httpLookups = [
@@ -4147,7 +4146,7 @@ describe("MatrixClient", function () {
                         url: "wss://livekit.example.com",
                         room_id: "!room:example.com",
                         slot_id: "m.call#ROOM",
-                        member,
+                        member_id: "xyzABCDEF10123",
                         delay_id: "1234567890",
                     }),
                 ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
