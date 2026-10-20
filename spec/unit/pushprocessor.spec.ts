@@ -24,6 +24,7 @@ import {
     type MatrixClient,
     type MatrixEvent,
     PushRuleActionName,
+    type PushRuleCondition,
     RuleId,
     TweakName,
 } from "../../src";
@@ -700,6 +701,55 @@ describe("NotificationService", function () {
                 expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(false);
             },
         );
+    });
+
+    describe("MSC4306 thread_subscription condition", () => {
+        const threadRootId = "$root";
+        const mkThreadReply = (): MatrixEvent =>
+            utils.mkEvent({
+                type: "m.room.message",
+                room: testRoomId,
+                user: "@alfred:localhost",
+                event: true,
+                content: {
+                    "body": "reply",
+                    "msgtype": "m.text",
+                    "m.relates_to": { rel_type: "m.thread", event_id: threadRootId },
+                },
+            });
+        const mkRule = (kind: ConditionKind, subscribed: boolean) => ({
+            rule_id: "rule",
+            conditions: [{ kind, subscribed } as PushRuleCondition],
+            actions: [],
+        });
+
+        it.each([ConditionKind.ThreadSubscription, ConditionKind.ThreadSubscriptionUnstable])(
+            "matches %s against the cached subscription state",
+            (kind) => {
+                matrixClient.getCachedThreadSubscription = vi.fn().mockReturnValue(true);
+                const ev = mkThreadReply();
+
+                expect(pushProcessor.ruleMatchesEvent(mkRule(kind, true), ev)).toBe(true);
+                expect(pushProcessor.ruleMatchesEvent(mkRule(kind, false), ev)).toBe(false);
+                expect(matrixClient.getCachedThreadSubscription).toHaveBeenCalledWith(testRoomId, threadRootId);
+            },
+        );
+
+        it("does not match when the subscription state is unknown", () => {
+            matrixClient.getCachedThreadSubscription = vi.fn().mockReturnValue(undefined);
+            const ev = mkThreadReply();
+
+            expect(pushProcessor.ruleMatchesEvent(mkRule(ConditionKind.ThreadSubscription, true), ev)).toBe(false);
+            expect(pushProcessor.ruleMatchesEvent(mkRule(ConditionKind.ThreadSubscription, false), ev)).toBe(false);
+        });
+
+        it("does not match events outside a thread", () => {
+            matrixClient.getCachedThreadSubscription = vi.fn().mockReturnValue(false);
+
+            expect(pushProcessor.ruleMatchesEvent(mkRule(ConditionKind.ThreadSubscription, false), testEvent)).toBe(
+                false,
+            );
+        });
     });
 });
 
