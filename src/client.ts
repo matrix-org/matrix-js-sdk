@@ -2309,6 +2309,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             await this.waitForInitialSync(timeoutMs);
         }
         for (const room of this.getRooms()) {
+            // Only consider rooms the user has joined, and ignore spaces since they are not
+            // intended for conversations (and most clients don't allow messages in them anyway).
             if (room.getMyMembership() !== KnownMembership.Join || room.isSpaceRoom()) {
                 continue;
             }
