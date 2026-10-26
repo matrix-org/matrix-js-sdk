@@ -1780,6 +1780,8 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      *
      * If the event is not a sticky event (or not supported by the server),
      * then this returns `undefined`.
+     *
+     * @experimental Part of MSC4354.
      */
     public get unstableStickyIntendedExpiresAt(): number | undefined {
         if (!this.unstableStickyInfo) {
