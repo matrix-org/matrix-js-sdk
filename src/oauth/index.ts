@@ -69,6 +69,16 @@ export interface OAuth2HttpOptions {
     fetchFn?: typeof globalThis.fetch;
 }
 
+/**
+ * Options for an individual request made by an {@link OAuth2} instance.
+ */
+export interface OAuth2RequestOptions {
+    /**
+     * A signal which, when aborted, aborts the request.
+     */
+    abortSignal?: AbortSignal;
+}
+
 export class OAuth2 {
     /**
      * Attempts dynamic registration against the configured registration endpoint.
@@ -232,14 +242,18 @@ export class OAuth2 {
     /**
      * Refresh the access token using the given refresh token and the refresh token grant
      * @param refreshToken - the token to use to refresh the access token
+     * @param opts - optional settings for this request
      */
-    public async performRefreshTokenGrant(refreshToken: string): Promise<BearerTokenResponse> {
+    public async performRefreshTokenGrant(
+        refreshToken: string,
+        opts?: OAuth2RequestOptions,
+    ): Promise<BearerTokenResponse> {
         const params = new URLSearchParams();
         params.append("grant_type", "refresh_token");
         params.append("client_id", this.context.clientId);
         params.append("refresh_token", refreshToken);
 
-        const res = await this.fetch("token", params, OAuth2Error.RefreshTokenFailed);
+        const res = await this.fetch("token", params, OAuth2Error.RefreshTokenFailed, opts);
         const tokenResponse = await res.json();
 
         // throws when response is invalid
@@ -251,8 +265,13 @@ export class OAuth2 {
      * Revokes the given token
      * @param token - the token to remove
      * @param type - the type of token, acts as a hint to the IdP
+     * @param opts - optional settings for this request
      */
-    public async revokeToken(token: string, type?: "access_token" | "refresh_token"): Promise<void> {
+    public async revokeToken(
+        token: string,
+        type?: "access_token" | "refresh_token",
+        opts?: OAuth2RequestOptions,
+    ): Promise<void> {
         const params = new URLSearchParams();
         params.append("token", token);
         params.append("client_id", this.context.clientId);
@@ -264,7 +283,7 @@ export class OAuth2 {
         // > The content of the response body is ignored by the client as all
         // > necessary information is conveyed in the response code.
         // so, we don't do anything with the response body.
-        await this.fetch("revocation", params, OAuth2Error.RevokeTokenFailed);
+        await this.fetch("revocation", params, OAuth2Error.RevokeTokenFailed, opts);
     }
 
     /**
@@ -304,13 +323,15 @@ export class OAuth2 {
     /**
      * Make a request to one of the OAuth 2.0 endpoints, throwing if it responds with an error.
      *
-     * The request is made using the `fetchFn` given in {@link OAuth2HttpOptions}.
+     * The request is made using the `fetchFn` given in {@link OAuth2HttpOptions}, and is aborted if
+     * `opts.abortSignal` is aborted.
      * @returns the {@link Response}, for the caller to parse if the endpoint returns a body.
      */
     private async fetch(
         target: "token" | "registration" | "revocation",
         params: URLSearchParams,
         error: OAuth2Error,
+        opts: OAuth2RequestOptions = {},
     ): Promise<Response> {
         const url = this.metadata[`${target}_endpoint`];
         const res = await fetchWithLogging(
@@ -323,6 +344,7 @@ export class OAuth2 {
                     "Accept": "application/json",
                 },
                 body: params,
+                signal: opts.abortSignal,
             },
             this.httpOptions.fetchFn,
         );
