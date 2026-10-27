@@ -569,7 +569,7 @@ export class RoomWidgetClient extends MatrixClient {
         this.addThreadRelationIfNeeded(content, threadId, roomId);
         txnId ??= this.makeTxnId();
         try {
-            return await this.sendStickyEventInOrder(roomId, eventType, content.msc4354_sticky_key, () =>
+            return await this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, () =>
                 this.sendCompleteEvent({
                     roomId,
                     threadId,

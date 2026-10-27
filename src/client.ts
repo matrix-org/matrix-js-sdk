@@ -214,6 +214,7 @@ import {
 import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
+import { StickyEventSendQueue } from "./StickyEventSendQueue.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
 import { type UIARequest } from "./@types/uia.ts";
@@ -1308,12 +1309,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected isGuestAccount = false;
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
-    /**
-     * The latest sticky event send per room, event type and sticky key, resolving to when it completed.
-     * The map key is the JSON serialization of [roomId, eventType, stickyKey].
-     * See {@link sendStickyEventInOrder}.
-     */
-    protected readonly stickyEventSends = new Map<string, Promise<number>>();
+    protected readonly stickyEventSendQueue = new StickyEventSendQueue();
 
     /**
      * Legacy crypto store used for migration from the legacy crypto to the rust crypto
@@ -3738,7 +3734,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     ): Promise<ISendEventResponse> {
         // Claim our place in the send order before anything asynchronous, so that concurrent calls go out in the
         // order they were made. The server support check can take a different number of ticks per call.
-        return this.sendStickyEventInOrder(roomId, eventType, content.msc4354_sticky_key, async () => {
+        return this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, async () => {
             if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
                 throw new UnsupportedStickyEventsEndpointError(
                     "Server does not support the sticky events",
@@ -3755,47 +3751,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 txnId,
             });
         });
-    }
-
-    /**
-     * Ensures sticky events are sent at least 1 millisecond apart. Otherwise both events
-     * could get the same `origin_server_ts` which would make them tie break on event ID
-     * in the ephemeral sticky map.
-     */
-    protected async sendStickyEventInOrder<T>(
-        roomId: string,
-        eventType: string,
-        stickyKey: string | undefined,
-        send: () => Promise<T>,
-    ): Promise<T> {
-        if (stickyKey === undefined) {
-            return send();
-        }
-        const key = JSON.stringify([roomId, eventType, stickyKey]);
-        const previous = this.stickyEventSends.get(key);
-        // Await in an inner function rather than here, so that this send is recorded synchronously below.
-        // Otherwise a send queued right after this one would wait for the one before it rather than for
-        // this one.
-        const result = (async (): Promise<T> => {
-            if (previous) {
-                const waitMs = (await previous) + 1 - Date.now();
-                if (waitMs > 0) await sleep(waitMs);
-            }
-            return send();
-        })();
-        // Record when the send completed, whether or not it succeeded, for the next send to wait on.
-        const completedAt = result.then(
-            () => Date.now(),
-            () => Date.now(),
-        );
-        this.stickyEventSends.set(key, completedAt);
-        // Once the gap has passed there is nothing left to wait for, so forget the key.
-        void completedAt
-            .then(() => sleep(1))
-            .then(() => {
-                if (this.stickyEventSends.get(key) === completedAt) this.stickyEventSends.delete(key);
-            });
-        return result;
     }
 
     /**
