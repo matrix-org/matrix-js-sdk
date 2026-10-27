@@ -1310,6 +1310,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected notifTimelineSet: EventTimelineSet | null = null;
     /**
      * The latest sticky event send per room, event type and sticky key, resolving to when it completed.
+     * The map key is the JSON serialization of [roomId, eventType, stickyKey].
      * See {@link sendStickyEventInOrder}.
      */
     protected readonly stickyEventSends = new Map<string, Promise<number>>();
