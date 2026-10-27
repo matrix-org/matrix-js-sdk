@@ -801,6 +801,22 @@ describe("MatrixClient", function () {
             await expect(second).resolves.toEqual({ event_id: "$event" });
         });
 
+        it("sends three or more events with the same sticky key one after the other", async () => {
+            void send("key", { n: 1 });
+            void send("key", { n: 2 });
+            void send("key", { n: 3 });
+            await vi.advanceTimersByTimeAsync(0);
+            expect(sends.map((s) => s.content.n)).toEqual([1]);
+
+            sends[0].resolve();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends.map((s) => s.content.n)).toEqual([1, 2]);
+
+            sends[1].resolve();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends.map((s) => s.content.n)).toEqual([1, 2, 3]);
+        });
+
         it("still sends the next event if an earlier one with the same sticky key failed", async () => {
             const first = send("key");
             const second = send("key");

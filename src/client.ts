@@ -3773,11 +3773,16 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         const key = JSON.stringify([roomId, eventType, stickyKey]);
         const previous = this.stickyEventSends.get(key);
-        if (previous) {
-            const waitMs = (await previous) + 1 - Date.now();
-            if (waitMs > 0) await sleep(waitMs);
-        }
-        const result = send();
+        // Await in an inner function rather than here, so that this send is recorded synchronously below.
+        // Otherwise a send queued right after this one would wait for the one before it rather than for
+        // this one.
+        const result = (async (): Promise<T> => {
+            if (previous) {
+                const waitMs = (await previous) + 1 - Date.now();
+                if (waitMs > 0) await sleep(waitMs);
+            }
+            return send();
+        })();
         // Record when the send completed, whether or not it succeeded, for the next send to wait on.
         const completedAt = result.then(
             () => Date.now(),
