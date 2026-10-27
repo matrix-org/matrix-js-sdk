@@ -12,11 +12,15 @@ export type StickyMatrixEvent = MatrixEvent & {
     /**
      * When the event actually expires, preferring the server-provided TTL.
      * This differs by homeserver and client and should be used for expiry only.
+     *
+     * @experimental Part of MSC4354.
      */
     unstableStickyExpiresAt: number;
     /**
      * When the sender's homeserver intended the event to expire. This is stable across
      * different homeservers and clients and should be used for ordering only.
+     *
+     * @experimental Part of MSC4354.
      */
     unstableStickyIntendedExpiresAt: number;
 };
