@@ -214,6 +214,7 @@ import {
 import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
+import { StickyEventSendQueue } from "./StickyEventSendQueue.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
 import { type UIARequest } from "./@types/uia.ts";
@@ -1313,6 +1314,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected isGuestAccount = false;
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
+    protected readonly stickyEventSendQueue = new StickyEventSendQueue();
 
     /**
      * Legacy crypto store used for migration from the legacy crypto to the rust crypto
@@ -3804,20 +3806,24 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
-            throw new UnsupportedStickyEventsEndpointError(
-                "Server does not support the sticky events",
-                "sendStickyEvent",
-            );
-        }
+        // Claim our place in the send order before anything asynchronous, so that concurrent calls go out in the
+        // order they were made. The server support check can take a different number of ticks per call.
+        return this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, async () => {
+            if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
+                throw new UnsupportedStickyEventsEndpointError(
+                    "Server does not support the sticky events",
+                    "sendStickyEvent",
+                );
+            }
 
-        this.addThreadRelationIfNeeded(content, threadId, roomId);
-        return this.sendCompleteEvent({
-            roomId,
-            threadId,
-            eventObject: { type: eventType, content },
-            queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
-            txnId,
+            this.addThreadRelationIfNeeded(content, threadId, roomId);
+            return this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
+                txnId,
+            });
         });
     }
 
