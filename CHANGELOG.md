@@ -1,3 +1,38 @@
+Changes in [45.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v45.0.0) (2026-10-27)
+==================================================================================================
+## 🚨 BREAKING CHANGES
+
+* Update LiveKit endpoint request types to use member\_id ([#5588](https://github.com/matrix-org/matrix-js-sdk/pull/5588)). Contributed by @robintown.
+
+## 🦖 Deprecations
+
+* MSC4140: remove parent delay IDs ([#5199](https://github.com/matrix-org/matrix-js-sdk/pull/5199)). Contributed by @AndrewFerr.
+
+## ✨ Features
+
+* Add `CryptoApi.setDeviceBlocked` ([#5613](https://github.com/matrix-org/matrix-js-sdk/pull/5613)). Contributed by @9clg6.
+* Add methods to enable publishing on remote SFUs ([#5630](https://github.com/matrix-org/matrix-js-sdk/pull/5630)). Contributed by @Johennes.
+* Add member.membership on RTC member events ([#5616](https://github.com/matrix-org/matrix-js-sdk/pull/5616)). Contributed by @Johennes.
+* Implement updated RTC to-device message format ([#5619](https://github.com/matrix-org/matrix-js-sdk/pull/5619)). Contributed by @Johennes.
+* Pin the WASM SDK to a specific release ([#5589](https://github.com/matrix-org/matrix-js-sdk/pull/5589)). Contributed by @kaylendog.
+* Add support for simplified sliding sync `expanded_timeline` ([#5614](https://github.com/matrix-org/matrix-js-sdk/pull/5614)). Contributed by @t3chguy.
+* Support the stable version of mutual rooms ([#5513](https://github.com/matrix-org/matrix-js-sdk/pull/5513)). Contributed by @CatCraftYT.
+* Strengthen the type of MatrixRTCSession.slotId ([#5611](https://github.com/matrix-org/matrix-js-sdk/pull/5611)). Contributed by @robintown.
+
+## 🐛 Bug Fixes
+
+* Honour abort() for OAuth 2.0 requests ([#5620](https://github.com/matrix-org/matrix-js-sdk/pull/5620)). Contributed by @hughns.
+* Match RTC key messages to member IDs by user, device \_and\_ member ID ([#5632](https://github.com/matrix-org/matrix-js-sdk/pull/5632)). Contributed by @Johennes.
+* Honour fetchFn for OAuth 2.0 requests ([#5618](https://github.com/matrix-org/matrix-js-sdk/pull/5618)). Contributed by @hughns.
+* Check MSC4143 support before requesting RTC transports ([#5609](https://github.com/matrix-org/matrix-js-sdk/pull/5609)). Contributed by @frastefanini.
+* Use the configured logger for OAuth 2.0 requests ([#5617](https://github.com/matrix-org/matrix-js-sdk/pull/5617)). Contributed by @hughns.
+* MSC4140: handle 409 on delayed event management in the MatrixRTC MembershipManager ([#5553](https://github.com/matrix-org/matrix-js-sdk/pull/5553)). Contributed by @barodeur.
+* Fix race condition in MatrixClient::peek corrupting room in store ([#5606](https://github.com/matrix-org/matrix-js-sdk/pull/5606)). Contributed by @t3chguy.
+* Fix crypto database being stuck open after certain crypto methods ([#5605](https://github.com/matrix-org/matrix-js-sdk/pull/5605)). Contributed by @t3chguy.
+* Correctly handle sticky TTL in the sync accumulator ([#5608](https://github.com/matrix-org/matrix-js-sdk/pull/5608)). Contributed by @Johennes.
+* Stop CapabilityPoller when fetch is in flight and stop RetentionPolicyService on stopClient ([#5604](https://github.com/matrix-org/matrix-js-sdk/pull/5604)). Contributed by @shyamsharmas124-commits.
+
+
 Changes in [44.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v44.0.0) (2026-10-13)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
