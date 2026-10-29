@@ -28,7 +28,7 @@ import {
     MatrixRTCMembershipParseError,
 } from "./membershipData/index.ts";
 import { EventType } from "../@types/event.ts";
-import { isUnstableLivekitTransport } from "./LivekitTransport.ts";
+import { isUnstableLivekitTransport, selectLivekitTransport } from "./LivekitTransport.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -100,7 +100,7 @@ function getTransports({ kind, data }: MembershipData): Transport[] {
         case MembershipKind.RTC:
             return data.transports.published;
         case MembershipKind.Session:
-            return data.foci_preferred;
+            return data.foci_preferred ?? []; // Validation allows memberships without `foci_preferred`
     }
 }
 
@@ -411,29 +411,27 @@ export class CallMembership {
     }
 
     /**
-     * ## RTC Membership
-     * Gets the primary transport to use for this RTC membership (m.rtc.member).
-     * This will return the primary transport that is used by this call membership to publish their media.
-     * Directly relates to the `transports.published` field.
+     * Gets the primary transport used by this call membership to publish media.
      *
-     * ## Legacy session membership
-     * In case of a legacy session membership (m.call.member) this will return the first transport of the
-     * `foci_preferred` list. (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
+     * For RTC membership (m.rtc.member), the transport is computed from the `transports.published` array.
+     * For legacy session membership (m.call.member), in turn, the transport is computed from the `foci_preferred`
+     * array.
+     *
+     * Regardless of the membership kind, the transport is chosen in the following sequence:
+     *
+     * 1. Return the first `m.livekit` transport from the array if there is one.
+     * 2. Otherwise, return the first `livekit` transport from the array if there is one.
+     * 3. Otherwise, return the first element of the array.
      *
      * @param _oldestMembership Deprecated and unused.
      *
-     * @returns The transport this membership uses to publish media or undefined if no transport is available.
+     * @returns The transport this membership uses to publish media.
+     *
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
      */
     public getTransport(_oldestMembership?: CallMembership): Transport | undefined {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.transports.published[0];
-            case MembershipKind.Session:
-                return data.foci_preferred[0];
-            default:
-                return undefined;
-        }
+        const transports = getTransports(this.membershipData);
+        return selectLivekitTransport(transports) ?? transports[0];
     }
 
     /**
