@@ -33,6 +33,7 @@ export * from "./errors.ts";
 export * from "./base64.ts";
 export * from "./models/beacon.ts";
 export * from "./models/event.ts";
+export * from "./models/member-info.ts";
 export * from "./models/room.ts";
 export * from "./models/event-timeline.ts";
 export * from "./models/event-timeline-set.ts";

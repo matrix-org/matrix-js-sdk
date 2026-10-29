@@ -2727,6 +2727,105 @@ describe("MatrixClient syncing", () => {
         });
     });
 
+    describe("MSC4428 stable IDs", () => {
+        const MEMBER_INFO = "org.matrix.msc4428.member_info";
+        const STABLE_ID = "org.matrix.msc4428.stable_id";
+        const aliceKey = "@euEdVN1DimRHWErEnH3KVVNXduH3SiqMW7yMfO7qVOg";
+        const bobKey = "@oG9tWFba7ul1sREui6GTYvJDW8qkoTAxMNWsIexIu-g";
+        const carolKey = "@g--WRBBVRi3AVLhJEdCnK0XR8sbXDGbL2vOjMPlKZ1A";
+
+        /** A membership event as a member key room serves it: keys throughout. */
+        const memberKeyMembership = (key: string, displayname: string) => ({
+            type: "m.room.member",
+            sender: key,
+            state_key: key,
+            room_id: roomOne,
+            event_id: "$member-" + key,
+            origin_server_ts: 1792049255917,
+            content: { membership: KnownMembership.Join, displayname, localpart: displayname, domain: "localhost" },
+            unsigned: { [STABLE_ID]: key },
+        });
+
+        const initialSync = {
+            next_batch: "s_5_3",
+            rooms: {
+                join: {
+                    [roomOne]: {
+                        [MEMBER_INFO]: {
+                            [aliceKey]: { user_id: selfUserId },
+                            [bobKey]: { user_id: otherUserId },
+                        },
+                        timeline: { events: [], prev_batch: "t_1" },
+                        state: {
+                            events: [
+                                {
+                                    type: "m.room.create",
+                                    sender: aliceKey,
+                                    state_key: "",
+                                    room_id: roomOne,
+                                    event_id: "$create",
+                                    content: { room_version: "org.matrix.msc4430.12" },
+                                    unsigned: { [STABLE_ID]: aliceKey },
+                                },
+                                memberKeyMembership(aliceKey, "alice"),
+                                memberKeyMembership(bobKey, "bob"),
+                            ],
+                        },
+                    },
+                },
+            },
+        };
+
+        it("builds a member key room's state from the mapping in /sync", async () => {
+            httpBackend!.when("GET", "/sync").respond(200, initialSync);
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomOne)!;
+
+            // Members are keyed by their member key, and resolve to user IDs.
+            expect(Object.keys(room.currentState.members).sort()).toEqual([aliceKey, bobKey].sort());
+            expect(room.getUserIdForStableId(bobKey)).toEqual(otherUserId);
+            expect(room.getMember(bobKey)!.userId).toEqual(otherUserId);
+
+            // Our own membership is found despite our key bearing no resemblance to our
+            // user ID, and so the room is seen as joined.
+            expect(room.getMyStableId()).toEqual(aliceKey);
+            expect(room.getMyMembership()).toEqual(KnownMembership.Join);
+
+            // Display names come from the member event, not from the key.
+            expect(room.getMember(bobKey)!.name).toEqual("bob");
+        });
+
+        it("merges a member_info delta from an incremental sync", async () => {
+            httpBackend!.when("GET", "/sync").respond(200, initialSync);
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "s_5_4",
+                rooms: {
+                    join: {
+                        [roomOne]: {
+                            // An incremental sync carries only the new entry.
+                            [MEMBER_INFO]: { [carolKey]: { user_id: "@carol:localhost" } },
+                            timeline: { events: [memberKeyMembership(carolKey, "carol")], prev_batch: "t_2" },
+                            state: { events: [] },
+                        },
+                    },
+                },
+            });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent(2)]);
+
+            const room = client!.getRoom(roomOne)!;
+
+            expect(room.getUserIdForStableId(carolKey)).toEqual("@carol:localhost");
+            // The entries which did not change are still there.
+            expect(room.getUserIdForStableId(bobKey)).toEqual(otherUserId);
+            expect(room.getStableIdForUserId("@carol:localhost")).toEqual(carolKey);
+        });
+    });
+
     /**
      * waits for the MatrixClient to emit one or more 'sync' events.
      *

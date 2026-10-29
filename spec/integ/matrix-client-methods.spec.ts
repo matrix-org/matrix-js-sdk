@@ -1543,6 +1543,76 @@ describe("MatrixClient", function () {
             await prom;
         });
 
+        describe("in a room with member keys", () => {
+            const bobKey = "@oG9tWFba7ul1sREui6GTYvJDW8qkoTAxMNWsIexIu-g";
+
+            /** A room whose power levels name bob by his member key, not his user ID. */
+            function memberKeyRoom(): Room {
+                const room = new Room("!room_id:server", client, client.getUserId()!);
+                room.applyMemberInfo({ [bobKey]: { user_id: "@bob:localhost" } }, true);
+                room.currentState.events.set("m.room.power_levels", new Map());
+                room.currentState.events.get("m.room.power_levels")!.set(
+                    "",
+                    new MatrixEvent({
+                        type: "m.room.power_levels",
+                        state_key: "",
+                        content: { users: { [bobKey]: 50 } },
+                    }),
+                );
+                client.clientRunning = true;
+                client.isInitialSyncComplete = () => true;
+                client.getRoom = () => room;
+                return room;
+            }
+
+            it("writes an existing member's level under their key when named by user ID", async () => {
+                memberKeyRoom();
+
+                httpBackend
+                    .when("PUT", "/state/m.room.power_levels")
+                    .check((req) => {
+                        // Naming the same member twice, once by key and once by user ID,
+                        // is rejected by the server, so there must be exactly one entry.
+                        expect(req.data).toStrictEqual({ users: { [bobKey]: 100 } });
+                    })
+                    .respond(200, {});
+
+                const prom = client.setPowerLevel("!room_id:server", "@bob:localhost", 100);
+                await httpBackend.flushAllExpected();
+                await prom;
+            });
+
+            it("removes an existing member's entry when named by user ID", async () => {
+                memberKeyRoom();
+
+                httpBackend
+                    .when("PUT", "/state/m.room.power_levels")
+                    .check((req) => {
+                        expect(req.data).toStrictEqual({ users: {} });
+                    })
+                    .respond(200, {});
+
+                const prom = client.setPowerLevel("!room_id:server", "@bob:localhost", undefined);
+                await httpBackend.flushAllExpected();
+                await prom;
+            });
+
+            it("accepts a member key directly", async () => {
+                memberKeyRoom();
+
+                httpBackend
+                    .when("PUT", "/state/m.room.power_levels")
+                    .check((req) => {
+                        expect(req.data).toStrictEqual({ users: { [bobKey]: 25 } });
+                    })
+                    .respond(200, {});
+
+                const prom = client.setPowerLevel("!room_id:server", bobKey, 25);
+                await httpBackend.flushAllExpected();
+                await prom;
+            });
+        });
+
         it("should throw error if state API errors", async () => {
             httpBackend.when("GET", "/state/m.room.power_levels/").respond(500, {
                 errcode: "ERR_DERP",

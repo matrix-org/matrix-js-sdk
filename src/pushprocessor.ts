@@ -755,12 +755,22 @@ export class PushProcessor {
         return val;
     }
 
+    /**
+     * Was this event sent by us? Compares stable IDs (MSC4428): in a room with member
+     * keys the event's sender is our key in that room rather than our user ID.
+     */
+    private isOwnEvent(ev: MatrixEvent): boolean {
+        const room = this.client.getRoom(ev.getRoomId());
+        if (!room) return ev.getSender() === this.client.getSafeUserId();
+        return ev.getStableId() === room.getMyStableId();
+    }
+
     private matchingRuleForEventWithRulesets(ev: MatrixEvent, rulesets?: IPushRules): IAnnotatedPushRule | null {
         if (!rulesets) {
             return null;
         }
 
-        if (ev.getSender() === this.client.getSafeUserId()) {
+        if (this.isOwnEvent(ev)) {
             return null;
         }
 

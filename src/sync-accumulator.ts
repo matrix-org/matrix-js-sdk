@@ -21,6 +21,7 @@ limitations under the License.
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
 import { MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
+import { MEMBER_INFO_FIELD, type MemberInfoMapContent } from "./models/member-info.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
 import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
@@ -95,6 +96,9 @@ export interface ISticky {
 
 export interface IJoinedRoom {
     "summary": IRoomSummary;
+    // https://github.com/matrix-org/matrix-spec-proposals/pull/4428
+    // The full mapping on an initial sync, only the changed entries on an incremental one.
+    [MEMBER_INFO_FIELD]?: MemberInfoMapContent;
     // One of `state` or `state_after` is required.
     "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
@@ -127,6 +131,8 @@ export interface IInvitedRoom {
 }
 
 export interface ILeftRoom {
+    // https://github.com/matrix-org/matrix-spec-proposals/pull/4428
+    [MEMBER_INFO_FIELD]?: MemberInfoMapContent;
     // One of `state` or `state_after` is required.
     "state"?: IState;
     "org.matrix.msc4222.state_after"?: IState;
@@ -224,6 +230,10 @@ interface IRoom {
         token: string | null;
     }[];
     _summary: Partial<IRoomSummary>;
+    // The accumulated MSC4428 stable ID -> user ID mapping for this room. The server
+    // only sends the full map on an initial sync, so we have to keep it ourselves or a
+    // client restoring from this store would lose every mapping.
+    _memberInfo: MemberInfoMapContent;
     _accountData: { [eventType: string]: IMinimalEvent };
     _unreadNotifications: Partial<UnreadNotificationCounts>;
     _unreadThreadNotifications?: Record<string, Partial<UnreadNotificationCounts>>;
@@ -566,6 +576,7 @@ export class SyncAccumulator {
                 _unreadNotifications: {},
                 _unreadThreadNotifications: {},
                 _summary: {},
+                _memberInfo: Object.create(null),
                 _receipts: new ReceiptAccumulator(),
                 _stickyEvents: [],
             };
@@ -596,6 +607,15 @@ export class SyncAccumulator {
             acc[HEROES_KEY] = sum[HEROES_KEY] ?? acc[HEROES_KEY];
             acc[JOINED_COUNT_KEY] = sum[JOINED_COUNT_KEY] ?? acc[JOINED_COUNT_KEY];
             acc[INVITED_COUNT_KEY] = sum[INVITED_COUNT_KEY] ?? acc[INVITED_COUNT_KEY];
+        }
+
+        // Merge the member info delta. Entries are only ever added or updated by the
+        // server; an entry disappearing from an incremental sync means "unchanged".
+        const memberInfoDelta = data[MEMBER_INFO_FIELD];
+        if (memberInfoDelta) {
+            for (const stableId of Object.keys(memberInfoDelta)) {
+                currentData._memberInfo[stableId] = memberInfoDelta[stableId];
+            }
         }
 
         // We purposefully do not persist m.typing events.
@@ -731,6 +751,10 @@ export class SyncAccumulator {
                 "unread_notifications": roomData._unreadNotifications,
                 "unread_thread_notifications": roomData._unreadThreadNotifications,
                 "summary": roomData._summary as IRoomSummary,
+                // Always the full map: what we hand back is consumed as an initial sync.
+                // Omitted entirely when empty, so that a server without MSC4428 round-trips
+                // byte for byte.
+                ...(Object.keys(roomData._memberInfo).length ? { [MEMBER_INFO_FIELD]: roomData._memberInfo } : {}),
                 "msc4354_sticky": stickyEvents.length ? { events: stickyEvents } : undefined,
             };
             // Add account data

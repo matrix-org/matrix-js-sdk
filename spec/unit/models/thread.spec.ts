@@ -1205,7 +1205,9 @@ function createThreadMessage(threadId: string, user: string, room: string, msg: 
  */
 async function createThread(client: MatrixClient, user: string, roomId: string): Promise<Thread> {
     const root = mkMessage({ event: true, user, room: roomId, msg: "Thread root" });
-    const room = new Room(roomId, client, "@roomcreator:x");
+    // The room must be created for the syncing user: "did I participate?" is answered
+    // against the room's own member, not the client's user ID.
+    const room = new Room(roomId, client, client.getUserId() ?? "@roomcreator:x");
 
     // Ensure the root is in the room timeline
     root.setThreadId(root.getId());
