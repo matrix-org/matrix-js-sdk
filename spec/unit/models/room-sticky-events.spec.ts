@@ -700,5 +700,109 @@ describe("RoomStickyEvents", () => {
             expect(emitSpy).not.toHaveBeenCalled();
             expect([...stickyEvents.getStickyEvents()]).toEqual([keyedEv]);
         });
+
+        /**
+         * Adds a predecessor and a current event under the same key, plus an unrelated event that
+         * expires first. Expiring the unrelated event makes the timer only track the current event.
+         */
+        function addWithUntrackedPredecessor(predecessorDurationMs: number): {
+            predecessorEv: MatrixEvent;
+            currentEv: MatrixEvent;
+        } {
+            vi.setSystemTime(0);
+            const predecessorEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$predecessor",
+                origin_server_ts: 0,
+                msc4354_sticky: { duration_ms: predecessorDurationMs },
+            });
+            const currentEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$current",
+                origin_server_ts: 1000,
+                msc4354_sticky: { duration_ms: 60000 },
+            });
+            const unrelatedEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$unrelated",
+                sender: "@bob:example.org",
+                origin_server_ts: 0,
+                msc4354_sticky: { duration_ms: 10000 },
+            });
+            stickyEvents.addStickyEvents([predecessorEv, currentEv, unrelatedEv]);
+            vi.advanceTimersByTime(10000);
+            return { predecessorEv, currentEv };
+        }
+
+        it("should not promote an expired predecessor when the current event is redacted", () => {
+            const { currentEv } = addWithUntrackedPredecessor(15000);
+            vi.advanceTimersByTime(6000); // The predecessor has now expired
+            const emitSpy = vi.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(currentEv);
+            expect(emitSpy).toHaveBeenCalledWith([], [], [currentEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
+        });
+
+        it("should expire a promoted predecessor on time", () => {
+            const { predecessorEv, currentEv } = addWithUntrackedPredecessor(30000);
+            vi.advanceTimersByTime(6000);
+            stickyEvents.handleRedaction(currentEv);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([predecessorEv]);
+            const emitSpy = vi.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            vi.advanceTimersByTime(14000); // The predecessor expires at 30000
+            expect(emitSpy).toHaveBeenCalledWith([], [], [predecessorEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
+        });
+    });
+
+    describe("handleRedaction with an expired current event", () => {
+        beforeAll(() => {
+            vi.useFakeTimers();
+        });
+        afterAll(() => {
+            vi.useRealTimers();
+        });
+
+        it("should leave the expiry timer to remove the current event when a predecessor is redacted", () => {
+            vi.setSystemTime(0);
+            const currentEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$current",
+                origin_server_ts: 0,
+                msc4354_sticky: { duration_ms: 60000 },
+            });
+            const predecessorEv = new MatrixEvent({
+                ...stickyEvent,
+                event_id: "$predecessor",
+                origin_server_ts: 0,
+                msc4354_sticky: { duration_ms: 30000 },
+            });
+            stickyEvents.addStickyEvents([currentEv, predecessorEv]);
+            // Both events have expired, but the expiry timer has not fired yet.
+            vi.setSystemTime(60000);
+            const emitSpy = vi.fn();
+            stickyEvents.on(RoomStickyEventsEvent.Update, emitSpy);
+            stickyEvents.handleRedaction(predecessorEv);
+            // Dropping the current event here would mean its removal is never emitted.
+            expect(emitSpy).not.toHaveBeenCalled();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([currentEv]);
+            vi.runOnlyPendingTimers();
+            expect(emitSpy).toHaveBeenCalledWith([], [], [currentEv]);
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
+        });
+    });
+
+    describe("clear", () => {
+        it("should clear keyed and unkeyed events", () => {
+            stickyEvents.addStickyEvents([
+                new MatrixEvent({ ...stickyEvent, origin_server_ts: Date.now() }),
+                new MatrixEvent({ ...stickyEvent, event_id: "$unkeyed", content: {}, origin_server_ts: Date.now() }),
+            ]);
+            expect([...stickyEvents.getStickyEvents()]).toHaveLength(2);
+            stickyEvents.clear();
+            expect([...stickyEvents.getStickyEvents()]).toEqual([]);
+        });
     });
 });
