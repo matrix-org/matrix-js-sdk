@@ -446,7 +446,13 @@ describe("FetchHttpApi", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
                         fetchMock.post(authMetadata.token_endpoint, {
                             status: 400,
-                            body: { errcode: "M_UNKNOWN", error: "failed" },
+                            body: {
+                                // These fields mean the error is interpreted as an OAuth error which
+                                // is what would be thrown: the client doesn't log out on general errors.
+                                error: "failed",
+                                error_description: "It didn't work",
+                                error_uri: "http://fail.dummy/dunwork",
+                            },
                         });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
