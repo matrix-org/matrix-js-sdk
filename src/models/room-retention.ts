@@ -66,6 +66,10 @@ export class RoomRetentionPolicy {
         // Only bind RoomEvent.Timeline once we know we have a retention policy.
     }
 
+    public getMaxLifetime(): number | null {
+        return this.maxRetention;
+    }
+
     public shouldEventBeRetained(ev: MatrixEvent): boolean {
         if (!this.maxRetention) {
             return true;
@@ -75,29 +79,36 @@ export class RoomRetentionPolicy {
     }
 
     private readonly handleRetentionUpdate = async (): Promise<void> => {
-        // First store if we currently have a retention period.
-        const hadRetentionPeriod = this.maxRetention !== null;
-
+        let maxRetention: number | null;
         try {
-            await this.recalculateRetention(this.room.currentState);
+            maxRetention = this.recalculateRetention(this.room.currentState);
         } catch (err) {
             this.logger.warn("Failed to recalculate retention policy", err);
             return;
         }
 
-        // Bind/unbind the Timeline event handler based on whether we should be running retention.
-        if (hadRetentionPeriod !== (this.maxRetention !== null)) {
-            this.logger.info("retention recalculated to be", this.maxRetention);
-            // We've changed
-            if (this.maxRetention) {
-                this.room.on(RoomEvent.Timeline, this.timelineUpdated);
-            } else {
-                this.room.off(RoomEvent.Timeline, this.timelineUpdated);
+        const previousMaxRetention = this.maxRetention;
+        this.maxRetention = maxRetention;
+
+        try {
+            if ((previousMaxRetention !== null) !== (maxRetention !== null)) {
+                this.logger.info("retention recalculated to be", maxRetention);
+                if (maxRetention) {
+                    this.room.on(RoomEvent.Timeline, this.timelineUpdated);
+                } else {
+                    this.room.off(RoomEvent.Timeline, this.timelineUpdated);
+                }
             }
+            if (maxRetention !== null) this.processTimeline();
+        } catch (err) {
+            this.logger.warn("Failed to update retention policy", err);
+        }
+        if (previousMaxRetention !== maxRetention) {
+            this.room.emit(RoomEvent.RetentionChanged, this.room, maxRetention);
         }
     };
 
-    private readonly recalculateRetention = async (roomState: RoomState): Promise<void> => {
+    private readonly recalculateRetention = (roomState: RoomState): number | null => {
         const unstableEvent = roomState.getStateEvents(ROOM_RETENTION_TYPE.name).find((e) => e.getStateKey() === "");
         const stableEvent = roomState.getStateEvents(ROOM_RETENTION_TYPE.altName).find((e) => e.getStateKey() === "");
 
@@ -117,8 +128,7 @@ export class RoomRetentionPolicy {
 
         if (!content) {
             // * otherwise, don't apply a retention policy in this room.
-            this.maxRetention = null;
-            return;
+            return null;
         }
 
         const validatePolicy = !serverRoomPolicy && roomStatePolicy;
@@ -130,8 +140,7 @@ export class RoomRetentionPolicy {
             // if there is no value specified in the room's state, use the limit's min value for the effective retention policy of the room (which can be null or absent).
             maxLifetime = serverPolicy?.limits?.max_lifetime?.min;
             if (!maxLifetime) {
-                this.maxRetention = null;
-                return;
+                return null;
             }
         }
 
@@ -141,7 +150,6 @@ export class RoomRetentionPolicy {
         if (maxLifetime < 0 || !Number.isInteger(maxLifetime)) {
             throw Error(`max_lifetime must be >= 0, got ${maxLifetime}`);
         }
-        this.maxRetention = maxLifetime;
 
         if (validatePolicy && serverPolicy?.limits?.max_lifetime) {
             // We're using room state so we need to validate this policy matches the server.
@@ -150,14 +158,11 @@ export class RoomRetentionPolicy {
             if the value specified in the room's state is lower than the limit's min value, use the min value for the effective retention policy of the room.
             if the value specified in the room's state is greater than the limit's max value, use the max value for the effective retention policy of the room.
             */
-            this.maxRetention = Math.max(this.maxRetention, serverPolicy.limits.max_lifetime.min ?? 0);
-            this.maxRetention = Math.min(
-                this.maxRetention,
-                serverPolicy.limits.max_lifetime.max ?? Number.MAX_SAFE_INTEGER,
-            );
+            maxLifetime = Math.max(maxLifetime, serverPolicy.limits.max_lifetime.min ?? 0);
+            maxLifetime = Math.min(maxLifetime, serverPolicy.limits.max_lifetime.max ?? Number.MAX_SAFE_INTEGER);
         }
 
-        this.processTimeline();
+        return maxLifetime;
     };
 
     private readonly timelineUpdated = (): void => {

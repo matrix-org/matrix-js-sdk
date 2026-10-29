@@ -148,6 +148,7 @@ export enum RoomEvent {
     Tags = "Room.tags",
     AccountData = "Room.accountData",
     Receipt = "Room.receipt",
+    RetentionChanged = "Room.retentionChanged",
     Name = "Room.name",
     Redaction = "Room.redaction",
     RedactionCancelled = "Room.redactionCancelled",
@@ -231,6 +232,18 @@ export type RoomEventHandlerMap = {
      * ```
      */
     [RoomEvent.Receipt]: (event: MatrixEvent, room: Room) => void;
+    /**
+     * Fires when the room's message retention lifetime changes.
+     * @param room - The room whose retention lifetime changed.
+     * @param maxLifetime - The new lifetime in milliseconds, or null if messages are kept forever.
+     * @example
+     * ```
+     * matrixClient.on("Room.retentionChanged", function(room, maxLifetime){
+     *   var expireBefore = Date.now() - maxLifetime;
+     * });
+     * ```
+     */
+    [RoomEvent.RetentionChanged]: (room: Room, maxLifetime: number | null) => void;
     /**
      * Fires whenever the name of a room is updated.
      * @param room - The room whose Room.name was updated.
@@ -536,6 +549,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         if (this.client?._unstable_shouldApplyMessageRetention) {
             this.retention = new RoomRetentionPolicy(this, client.retentionPolicyService, client.store);
         }
+    }
+
+    /**
+     * Gets the room's message retention lifetime
+     * @returns The lifetime in milliseconds, or null if messages are kept forever
+     */
+    public getRetentionMaxLifetime(): number | null {
+        return this.retention?.getMaxLifetime() ?? null;
     }
 
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
