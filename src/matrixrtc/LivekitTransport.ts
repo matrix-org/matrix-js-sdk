@@ -17,6 +17,24 @@ limitations under the License.
 import { type Transport } from "./types.ts";
 
 /**
+ * The type of the LiveKit transport as defined in the stable version of
+ * [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export const LIVEKIT_TRANSPORT_TYPE = "m.livekit";
+
+/**
+ * The type of the LiveKit transport used by implementations of earlier versions of
+ * [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export const LEGACY_LIVEKIT_TRANSPORT_TYPE = "livekit";
+
+type LivekitTransportType = typeof LIVEKIT_TRANSPORT_TYPE | typeof LEGACY_LIVEKIT_TRANSPORT_TYPE;
+
+/**
  * @deprecated Use {@link UnstableLivekitTransport} instead, which has multiple
  *   variants to support the migration to newer versions of MSC4195.
  */
@@ -60,32 +78,36 @@ type ServiceUrl = {
 
 /**
  * Any LiveKit transport that can be advertised by a homeserver or published by
- * a session member in unstable MSC4195 implementations: `url` only,
- * `livekit_service_url` only, or both during the migration.
+ * a session member: `url` only, `livekit_service_url` only, or both during the
+ * migration.
  *
- * It uses the `Unstable` prefix as the MSC is not yet stable and it includes the
- * `livekit_service_url` case which is only here for compatibility reasons.
+ * It uses the `Unstable` prefix as it includes the `livekit` type and the
+ * `livekit_service_url` case which are only here for compatibility reasons.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
  */
-export type UnstableLivekitTransport =
+export type UnstableLivekitTransport = { type: LivekitTransportType } & LivekitTransportUrls;
+
+type LivekitTransportUrls =
     // Latest MSC4195 variant, with `url`. Indicates that both publishers and
     // subscribers will use the /_matrix/client/v1/rtc/livekit/get_token
     // endpoint.
-    | ({ type: "livekit" } & WebsocketUrl)
+    | WebsocketUrl
     // Legacy variant, with `livekit_service_url`. Indicates that both
     // publishers and subscribers will use the endpoints of the provided LiveKit
     // JWT service.
-    | ({ type: "livekit" } & ServiceUrl)
+    | ServiceUrl
     // Transitional variant, with both `url` and `livekit_service_url`.
     // Indicates that both publishers and subscribers may use either the
     // /_matrix/client/v1/rtc/livekit/get_token endpoint or the provided LiveKit
     // JWT service.
-    | ({ type: "livekit" } & WebsocketUrl & ServiceUrl);
+    | (WebsocketUrl & ServiceUrl);
 
 export const isUnstableLivekitTransport = (object: unknown): object is UnstableLivekitTransport => {
     if (typeof object !== "object" || object === null) return false;
     const transport = object as Transport;
 
-    if (transport.type !== "livekit") return false;
+    if (transport.type !== LIVEKIT_TRANSPORT_TYPE && transport.type !== LEGACY_LIVEKIT_TRANSPORT_TYPE) return false;
     if (!("url" in transport || "livekit_service_url" in transport)) return false;
     if ("url" in transport && typeof transport.url !== "string") return false;
     if ("livekit_service_url" in transport && typeof transport.livekit_service_url !== "string") return false;
@@ -109,6 +131,19 @@ export type UnstableLivekitTransportWithUrl = UnstableLivekitTransport & Websock
  */
 export const isUnstableLivekitTransportWithUrl = (object: unknown): object is UnstableLivekitTransportWithUrl =>
     isUnstableLivekitTransport(object) && "url" in object;
+
+/**
+ * Selects the LiveKit transport to use from a list of advertised transports. Picks the first
+ * `m.livekit` transport, otherwise the first `livekit` transport.
+ *
+ * @returns The selected transport.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export function selectLivekitTransport(transports: Transport[]): UnstableLivekitTransport | undefined {
+    const livekitTransports = transports.filter(isUnstableLivekitTransport);
+    return livekitTransports.find((t) => t.type === LIVEKIT_TRANSPORT_TYPE) ?? livekitTransports[0];
+}
 
 /**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.

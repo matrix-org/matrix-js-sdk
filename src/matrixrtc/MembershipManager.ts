@@ -46,6 +46,11 @@ import {
     type SessionMembershipData,
 } from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
+import {
+    isUnstableLivekitTransport,
+    LEGACY_LIVEKIT_TRANSPORT_TYPE,
+    LIVEKIT_TRANSPORT_TYPE,
+} from "./LivekitTransport.ts";
 import { deepCompare } from "../utils.ts";
 
 /* MembershipActionTypes:
@@ -1038,7 +1043,12 @@ export class MembershipManager
             "m.call.intent": this.callIntent,
             ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" } as const,
-            "foci_preferred": this.publishedTransports,
+            // Always publish LiveKit transports under the legacy `livekit` type. Clients that only know `livekit` use the
+            // first preferred focus via CallMembership.getTransport. Ruma-based clients that only know `livekit` fail to
+            // parse the whole membership if it contains `m.livekit`.
+            "foci_preferred": this.publishedTransports.map((t) =>
+                isUnstableLivekitTransport(t) ? { ...t, type: LEGACY_LIVEKIT_TRANSPORT_TYPE } : t,
+            ),
             ...(ownMembership !== undefined ? { created_ts: ownMembership.createdTs() } : undefined),
         };
     }
@@ -1370,7 +1380,20 @@ export class StickyEventMembershipManager extends MembershipManager {
                 ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
-            transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
+            transports: {
+                // Publish LiveKit transports under both the legacy `livekit` and the stable `m.livekit`
+                // type. Clients that only know `livekit` use the first published transport via
+                // CallMembership.getTransport.
+                published: this.publishedTransports.flatMap((t) =>
+                    isUnstableLivekitTransport(t)
+                        ? [
+                              { ...t, type: LEGACY_LIVEKIT_TRANSPORT_TYPE },
+                              { ...t, type: LIVEKIT_TRANSPORT_TYPE },
+                          ]
+                        : [t],
+                ),
+                can_subscribe: [LEGACY_LIVEKIT_TRANSPORT_TYPE, LIVEKIT_TRANSPORT_TYPE],
+            },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId, membership: "join" },
         };
     }
