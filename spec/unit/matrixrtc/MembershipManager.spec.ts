@@ -397,9 +397,7 @@ describe("MembershipManager", () => {
         describe("delayed leave event", () => {
             describe("maximum delay", () => {
                 const delays = (): number[] =>
-                    vi
-                        .mocked(client._unstable_sendDelayedStateEvent)
-                        .mock.calls.map(([, opts]) => (opts as { delay: number }).delay);
+                    vi.mocked(client._unstable_sendDelayedStateEvent).mock.calls.map(([, delay]) => delay as number);
 
                 it("clamps the delay to the cached capability before the first attempt", async () => {
                     vi.mocked(client.getCachedCapabilities).mockReturnValue({
