@@ -27,6 +27,7 @@ import { ReEmitter } from "../../../src/ReEmitter";
 import { Feature, ServerSupport } from "../../../src/feature";
 import { eventMapperFor } from "../../../src/event-mapper";
 import { sleep } from "../../../src/utils.ts";
+import { TimelineWindow } from "../../../src/timeline-window";
 
 describe("Thread", () => {
     describe("constructor", () => {
@@ -711,6 +712,33 @@ describe("Thread", () => {
                 // And the first message has been edited
                 expect(secondLastEvent.getContent().body).toEqual("edit");
             });
+
+            it("Does not report edits fetched on demand as live events", async () => {
+                // Given we don't support recursive relations, and we have a thread
+                const client = createClient(new Map([[Feature.RelationsRecursion, ServerSupport.Unsupported]]));
+                const user = "@alice:matrix.org";
+                const room = "!room:z";
+                const thread = await createThread(client, user, room);
+                const liveEvents: MatrixEvent[] = [];
+                thread.timelineSet.on(RoomEvent.Timeline, (event, _room, _toStartOfTimeline, _removed, data) => {
+                    if (data.liveEvent) liveEvents.push(event);
+                });
+
+                // When a message is added to the thread, and an edit to it is fetched on demand
+                const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
+                messageToEdit.event.type = EventType.RoomMessageEncrypted;
+                const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
+                vi.mocked(client.relations).mockImplementation(async (_roomId, eventId) => {
+                    return { events: eventId === messageToEdit.getId() ? [editEvent] : [] };
+                });
+                thread.addEvent(messageToEdit, false);
+                await sleep(0); // wait for events to update
+
+                // Then the edit is added at the end of the timeline, but only the
+                // message is reported as live: the edit may be old
+                expect(thread.timeline.at(-1)).toBe(editEvent);
+                expect(liveEvents).toEqual([messageToEdit]);
+            });
         });
     });
 
@@ -836,6 +864,67 @@ describe("Thread", () => {
                 const firstEvent = thread.timeline.at(0)!;
                 expect(lastEvent).toBe(message1);
                 expect(firstEvent).toBe(message2);
+            });
+
+            it("Keeps a window on the live timeline in step when a reaction arrives before a reply", async () => {
+                // Given a thread on a server without relations recursion support,
+                // so reactions are inserted into the thread timeline by timestamp
+                const client = createClient();
+                const user = "@alice:matrix.org";
+                const bot = "@bot:matrix.org";
+                const room = "!room:z";
+                const thread = await createThread(client, user, room);
+                const message = createThreadMessage(thread.id, user, room, "message");
+                thread.addEvent(message, false);
+                const timelineWindow = await followLiveTimeline(client, thread);
+
+                // When the bot reacts to the message and then replies
+                const reaction = mkReaction(message, client, bot, room, message.getTs() + 1);
+                thread.addEvent(reaction, false);
+                const reply = makeThreadEvent({
+                    event: true,
+                    user: bot,
+                    room,
+                    msg: "reply",
+                    ts: message.getTs() + 2,
+                    rootEventId: thread.id,
+                    replyToEventId: message.getId(),
+                });
+                thread.addEvent(reply, false);
+
+                // Then the window ends with the reply, not with the reaction
+                expect(thread.timeline.slice(-2)).toEqual([reaction, reply]);
+                expect(timelineWindow.getEvents().slice(-2)).toEqual([reaction, reply]);
+            });
+
+            it("Keeps a window on the live timeline in step when replies arrive out of order", async () => {
+                // Given a thread, and a window that follows its live end
+                const client = createClient();
+                const user = "@alice:matrix.org";
+                const room = "!room:z";
+                const thread = await createThread(client, user, room);
+                const timelineWindow = await followLiveTimeline(client, thread);
+
+                // When two replies come in, but the later one has an older timestamp
+                const mkReply = (msg: string, ts: number): MatrixEvent =>
+                    makeThreadEvent({
+                        event: true,
+                        user,
+                        room,
+                        msg,
+                        ts,
+                        rootEventId: thread.id,
+                        replyToEventId: thread.id,
+                    });
+                const message1 = mkReply("message1", 20);
+                const message2 = mkReply("message2", 10);
+                thread.addEvent(message1, false);
+                thread.addEvent(message2, false);
+
+                // Then message2 is inserted before message1, and the window still
+                // shows the whole timeline, including message1
+                expect(thread.timeline.slice(-2)).toEqual([message2, message1]);
+                expect(timelineWindow.getEvents()).toEqual(thread.timeline);
             });
 
             it("Edit events are properly aggregated in threads with server-side support", async () => {
@@ -1197,6 +1286,21 @@ function createThreadMessage(threadId: string, user: string, room: string, msg: 
         rootEventId: threadId,
         replyToEventId: threadId,
     });
+}
+
+/**
+ * Create a window on the live end of a thread that moves forward one event for
+ * each live event, as element-web's TimelinePanel does while scrolled to the bottom.
+ */
+async function followLiveTimeline(client: MatrixClient, thread: Thread): Promise<TimelineWindow> {
+    const timelineWindow = new TimelineWindow(client, thread.timelineSet);
+    await timelineWindow.load();
+    thread.timelineSet.on(RoomEvent.Timeline, (_event, _room, toStartOfTimeline, _removed, data) => {
+        if (!toStartOfTimeline && data.liveEvent) {
+            void timelineWindow.paginate(Direction.Forward, 1, false);
+        }
+    });
+    return timelineWindow;
 }
 
 /**
