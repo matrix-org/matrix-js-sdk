@@ -224,6 +224,15 @@ export function isValidStickyDuration(value: unknown): value is number {
     return Number.isInteger(value) && (value as number) > 0;
 }
 
+/**
+ * Check whether a value is a valid sticky TTL, i.e. a non-negative integer.
+ * Values above {@link MAX_STICKY_DURATION_MS} are valid but get clamped.
+ * @param value The remaining sticky duration in milliseconds.
+ */
+export function isValidStickyTtl(value: unknown): value is number {
+    return Number.isInteger(value) && (value as number) >= 0;
+}
+
 export enum MatrixEventEvent {
     /**
      * An event has been decrypted, or we have failed to decrypt it.
@@ -1780,10 +1789,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         const ttlMs = this.event.unsigned?.msc4354_sticky_duration_ttl_ms;
         return {
             duration_ms: Math.min(MAX_STICKY_DURATION_MS, durationMs),
-            duration_ttl_ms:
-                typeof ttlMs === "number" && Number.isInteger(ttlMs) && ttlMs >= 0
-                    ? Math.min(MAX_STICKY_DURATION_MS, ttlMs)
-                    : undefined,
+            duration_ttl_ms: isValidStickyTtl(ttlMs) ? Math.min(MAX_STICKY_DURATION_MS, ttlMs) : undefined,
         };
     }
 }

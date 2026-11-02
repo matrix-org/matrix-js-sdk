@@ -20,7 +20,13 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
-import { isValidStickyDuration, MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
+import {
+    isValidStickyDuration,
+    isValidStickyTtl,
+    MAX_STICKY_DURATION_MS,
+    type IContent,
+    type IUnsigned,
+} from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
 import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
@@ -284,10 +290,7 @@ function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
     const age = event.unsigned?.age;
     const rawStickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
     // Ignore a malformed TTL, as MatrixEvent does, so that the expiry falls back to `duration_ms`.
-    const stickyTtl =
-        typeof rawStickyTtl === "number" && Number.isInteger(rawStickyTtl) && rawStickyTtl >= 0
-            ? rawStickyTtl
-            : undefined;
+    const stickyTtl = isValidStickyTtl(rawStickyTtl) ? rawStickyTtl : undefined;
     if (age === undefined && stickyTtl === undefined) return event;
     const copy: T & EventTags = copyEventForModifyingUnsigned(event);
     if (age !== undefined) copy._localTs = now - age;
@@ -333,7 +336,10 @@ function computeStickyExpiresTs(event: (IStickyEvent | IStickyStateEvent) & Even
  * Checks whether an event is a well-formed sticky event.
  */
 function isStickyEvent<T extends IRoomEvent>(event: T): event is T & StickyEventFields {
-    return isValidStickyDuration((event as Partial<IStickyEvent>).msc4354_sticky?.duration_ms);
+    const { msc4354_sticky: sticky, content } = event as Partial<IStickyEvent>;
+    if (!isValidStickyDuration(sticky?.duration_ms)) return false;
+    const stickyKey = content?.msc4354_sticky_key;
+    return stickyKey === undefined || typeof stickyKey === "string";
 }
 
 /**

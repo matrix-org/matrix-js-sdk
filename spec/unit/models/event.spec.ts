@@ -16,7 +16,14 @@ limitations under the License.
 
 import { type MockedObject } from "vitest";
 
-import { type IContent, MatrixEvent, MatrixEventEvent, MAX_STICKY_DURATION_MS } from "../../../src/models/event";
+import {
+    type IContent,
+    isValidStickyDuration,
+    isValidStickyTtl,
+    MatrixEvent,
+    MatrixEventEvent,
+    MAX_STICKY_DURATION_MS,
+} from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
@@ -682,6 +689,26 @@ describe("MatrixEvent", () => {
             expect(event.unstableStickyExpiresAt).toBeUndefined();
         },
     );
+});
+
+describe("isValidStickyDuration", () => {
+    it.each([1, 1000, MAX_STICKY_DURATION_MS + 1])("accepts %s", (value) => {
+        expect(isValidStickyDuration(value)).toBe(true);
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, "1000", true, null, undefined])("rejects %s", (value) => {
+        expect(isValidStickyDuration(value)).toBe(false);
+    });
+});
+
+describe("isValidTtlDuration", () => {
+    it.each([0, 1, 1000, MAX_STICKY_DURATION_MS + 1])("accepts %s", (value) => {
+        expect(isValidStickyTtl(value)).toBe(true);
+    });
+
+    it.each([-1, 1.5, NaN, Infinity, "1000", true, null, undefined])("rejects %s", (value) => {
+        expect(isValidStickyTtl(value)).toBe(false);
+    });
 });
 
 function mainTimelineLiveEventIds(room: Room): Array<string> {
