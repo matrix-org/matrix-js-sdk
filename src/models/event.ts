@@ -218,7 +218,7 @@ export const MAX_STICKY_DURATION_MS = 3600000;
 /**
  * Check whether a value is a valid sticky duration, i.e. a strictly positive integer.
  * Values above {@link MAX_STICKY_DURATION_MS} are valid but get clamped.
- * @param value The sticky duration in milliseconds.
+ * @param value The sticky duration as set by the sender in milliseconds.
  */
 export function isValidStickyDuration(value: unknown): value is number {
     return Number.isInteger(value) && (value as number) > 0;
@@ -227,7 +227,7 @@ export function isValidStickyDuration(value: unknown): value is number {
 /**
  * Check whether a value is a valid sticky TTL, i.e. a non-negative integer.
  * Values above {@link MAX_STICKY_DURATION_MS} are valid but get clamped.
- * @param value The remaining sticky duration in milliseconds.
+ * @param value The remaining sticky duration computed by the HS on sync (`unsigned`) in milliseconds.
  */
 export function isValidStickyTtl(value: unknown): value is number {
     return Number.isInteger(value) && (value as number) >= 0;
