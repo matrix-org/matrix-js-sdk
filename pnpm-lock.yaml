@@ -174,8 +174,8 @@ importers:
         specifier: ^8.0.7
         version: 8.0.7
       '@matrix-org/matrix-sdk-crypto-wasm':
-        specifier: matrix-org/matrix-sdk-crypto-wasm#c9a58fd1842d4d89afa601d2b1f61659c9cc150f
-        version: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/c9a58fd1842d4d89afa601d2b1f61659c9cc150f
+        specifier: ^19.0.0
+        version: 19.0.0
       another-json:
         specifier: ^0.2.0
         version: 0.2.0
@@ -945,9 +945,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/c9a58fd1842d4d89afa601d2b1f61659c9cc150f':
-    resolution: {gitHosted: true, integrity: sha512-zBiJ/4+3HdNlOJqnC67dem4yoL6CWU5kfZKSWcal3OjIete2upEGgffFD+3VysG91gUyxy0IdKR+qLy6Mt4Zjw==, tarball: https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/c9a58fd1842d4d89afa601d2b1f61659c9cc150f}
-    version: 18.9.0
+  '@matrix-org/matrix-sdk-crypto-wasm@19.0.0':
+    resolution: {integrity: sha512-IVsm25JsEZjN1DPcIv19sFLsd+7ABRrMJk4SJQQPf8ktCgzhcoMgP/EDkVfF0kOX4XaX3z8nDO78WOtaLHGhLA==}
     engines: {node: '>= 18'}
 
   '@matrix-org/olm@3.2.15':
@@ -3437,7 +3436,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.6.0
 
-  '@matrix-org/matrix-sdk-crypto-wasm@https://codeload.github.com/matrix-org/matrix-sdk-crypto-wasm/tar.gz/c9a58fd1842d4d89afa601d2b1f61659c9cc150f': {}
+  '@matrix-org/matrix-sdk-crypto-wasm@19.0.0': {}
 
   '@matrix-org/olm@3.2.15': {}
 
