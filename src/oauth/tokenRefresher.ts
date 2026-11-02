@@ -17,7 +17,7 @@ limitations under the License.
 import { HTTPError, TokenRefreshLogoutError } from "../http-api/errors.ts";
 import { type AccessTokens } from "../http-api/interface.ts";
 import { OAuth2HTTPError } from "./error.ts";
-import { type OAuth2 } from "./index.ts";
+import { type OAuth2, type OAuth2RequestOptions } from "./index.ts";
 
 /**
  * Class responsible for refreshing OAuth2 access tokens
@@ -33,11 +33,13 @@ export class TokenRefresher {
     /**
      * Attempt token refresh using given refresh token
      * @param refreshToken - refresh token to use in request with token issuer
+     * @param opts - optional settings for the request. If a refresh is already in flight, that request's
+     *     settings apply and these are ignored.
      * @throws when token refresh fails
      */
-    public async refreshTokens(refreshToken: string): Promise<AccessTokens> {
+    public async refreshTokens(refreshToken: string, opts?: OAuth2RequestOptions): Promise<AccessTokens> {
         if (!this.inflightRefreshRequest) {
-            this.inflightRefreshRequest = this.getNewTokens(refreshToken);
+            this.inflightRefreshRequest = this.getNewTokens(refreshToken, opts);
         }
 
         try {
@@ -58,10 +60,15 @@ export class TokenRefresher {
      * Revoke a token with the OP, e.g. as part of logging out.
      * @param token - the token to revoke
      * @param type - the type of token, acts as a hint to the OP
+     * @param opts - optional settings for the request
      * @throws when revocation fails
      */
-    public async revokeToken(token: string, type?: "access_token" | "refresh_token"): Promise<void> {
-        await this.auth.revokeToken(token, type);
+    public async revokeToken(
+        token: string,
+        type?: "access_token" | "refresh_token",
+        opts?: OAuth2RequestOptions,
+    ): Promise<void> {
+        await this.auth.revokeToken(token, type, opts);
     }
 
     private shouldLogoutOnError(error: HTTPError): boolean {
@@ -75,10 +82,10 @@ export class TokenRefresher {
         );
     }
 
-    private async getNewTokens(refreshToken: string): Promise<AccessTokens> {
+    private async getNewTokens(refreshToken: string, opts?: OAuth2RequestOptions): Promise<AccessTokens> {
         const requestStart = Date.now();
 
-        const response = await this.auth.performRefreshTokenGrant(refreshToken);
+        const response = await this.auth.performRefreshTokenGrant(refreshToken, opts);
 
         const tokens = {
             accessToken: response.access_token,

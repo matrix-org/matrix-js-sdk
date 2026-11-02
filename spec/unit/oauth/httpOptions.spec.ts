@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import fetchMock from "@fetch-mock/vitest";
+import { type MockedFunction } from "vitest";
 
 import { OAuth2 } from "../../../src";
 import { OAuthGrantType } from "../../../src/oauth/register";
@@ -27,6 +28,18 @@ describe("OAuth2 http options", () => {
 
     const jsonResponse = (body: unknown, status = 200): Response =>
         new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+
+    /**
+     * A `fetchFn` which never responds, but rejects with an `AbortError` if the request's signal is aborted,
+     * in the same way as a real `fetch` would.
+     */
+    const makeHangingFetchFn = (): MockedFunction<typeof globalThis.fetch> =>
+        vi.fn(
+            (_resource: URL | RequestInfo, init?: RequestInit) =>
+                new Promise<Response>((_resolve, reject) => {
+                    init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+                }),
+        );
 
     describe("fetchFn", () => {
         it("should be used for token endpoint requests", async () => {
@@ -85,6 +98,44 @@ describe("OAuth2 http options", () => {
             );
 
             expect(fetchMock).toHaveFetched(metadata.token_endpoint);
+        });
+    });
+
+    describe("abortSignal", () => {
+        it("should abort a token endpoint request when aborted", async () => {
+            const fetchFn = makeHangingFetchFn();
+            const auth = new OAuth2(metadata, { clientId }, undefined, { fetchFn });
+            const controller = new AbortController();
+
+            const prom = auth.performRefreshTokenGrant("refresh", { abortSignal: controller.signal });
+            const requestSignal = fetchFn.mock.calls[0][1]!.signal!;
+            expect(requestSignal.aborted).toBe(false);
+
+            controller.abort();
+
+            await expect(prom).rejects.toThrow("Aborted");
+            expect(requestSignal.aborted).toBe(true);
+        });
+
+        it("should abort a revocation endpoint request when aborted", async () => {
+            const fetchFn = makeHangingFetchFn();
+            const auth = new OAuth2(metadata, { clientId }, undefined, { fetchFn });
+            const controller = new AbortController();
+
+            const prom = auth.revokeToken("access-token", "access_token", { abortSignal: controller.signal });
+            controller.abort();
+
+            await expect(prom).rejects.toThrow("Aborted");
+            expect(fetchFn.mock.calls[0][1]!.signal!.aborted).toBe(true);
+        });
+
+        it("should not abort the request if the signal is never aborted", async () => {
+            const fetchFn = vi.fn().mockResolvedValue(jsonResponse(tokenResponse));
+            const auth = new OAuth2(metadata, { clientId }, undefined, { fetchFn });
+
+            await auth.performRefreshTokenGrant("refresh", { abortSignal: new AbortController().signal });
+
+            expect(fetchFn.mock.calls[0][1]!.signal!.aborted).toBe(false);
         });
     });
 });

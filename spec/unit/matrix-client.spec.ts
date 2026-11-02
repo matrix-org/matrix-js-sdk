@@ -44,6 +44,7 @@ import {
 } from "../../src/@types/event";
 import { EventStatus, MatrixEvent } from "../../src/models/event";
 import { Preset } from "../../src/@types/partials";
+import { type ISendEventResponse } from "../../src/@types/requests";
 import { ReceiptType } from "../../src/@types/read_receipts";
 import * as testUtils from "../test-utils/test-utils";
 import { flushPromises } from "../test-utils/flushPromises";
@@ -764,6 +765,118 @@ describe("MatrixClient", function () {
         });
     });
 
+    describe("_unstable_sendStickyEvent ordering", () => {
+        const roomId = "!room:example.org";
+        let sends: Array<{ key?: string; content: any; resolve: () => void; reject: (e: Error) => void }>;
+
+        beforeEach(() => {
+            // This file runs on fake timers throughout.
+            sends = [];
+            vi.spyOn(client, "doesServerSupportUnstableFeature").mockResolvedValue(true);
+            vi.spyOn(client as any, "sendCompleteEvent").mockImplementation((params: any) => {
+                const { promise, resolve, reject } = Promise.withResolvers<ISendEventResponse>();
+                sends.push({
+                    key: params.eventObject.content.msc4354_sticky_key,
+                    content: params.eventObject.content,
+                    resolve: () => resolve({ event_id: "$event" }),
+                    reject,
+                });
+                return promise;
+            });
+        });
+
+        function send(stickyKey?: string, extraContent: object = {}): Promise<ISendEventResponse> {
+            const content: any = { ...extraContent };
+            if (stickyKey !== undefined) content.msc4354_sticky_key = stickyKey;
+            return client._unstable_sendStickyEvent(roomId, 60000, null, EventType.RTCMembership, content);
+        }
+
+        it("keeps the call order even if the server support check for the first call takes longer", async () => {
+            // The first call pays for fetching /versions: getVersions() makes it wait for the feature map while
+            // later calls get the cached promise back directly. One extra tick is enough to reproduce that.
+            vi.mocked(client.doesServerSupportUnstableFeature).mockImplementationOnce(async () => {
+                await Promise.resolve();
+                return true;
+            });
+            void send("key", { n: 1 });
+            void send("key", { n: 2 });
+            await vi.advanceTimersByTimeAsync(0);
+            expect(sends.map((s) => s.content.n)).toEqual([1]);
+
+            sends[0].resolve();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends.map((s) => s.content.n)).toEqual([1, 2]);
+        });
+
+        it("sends events with the same sticky key one after the other, at least 1ms apart", async () => {
+            const first = send("key");
+            const second = send("key");
+            await vi.advanceTimersByTimeAsync(0);
+            expect(sends).toHaveLength(1);
+
+            sends[0].resolve();
+            await first;
+            await vi.advanceTimersByTimeAsync(0);
+            // The first send has completed, but the 1ms gap hasn't passed yet.
+            expect(sends).toHaveLength(1);
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends).toHaveLength(2);
+            sends[1].resolve();
+            await expect(second).resolves.toEqual({ event_id: "$event" });
+        });
+
+        it("sends three or more events with the same sticky key one after the other", async () => {
+            void send("key", { n: 1 });
+            void send("key", { n: 2 });
+            void send("key", { n: 3 });
+            await vi.advanceTimersByTimeAsync(0);
+            expect(sends.map((s) => s.content.n)).toEqual([1]);
+
+            sends[0].resolve();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends.map((s) => s.content.n)).toEqual([1, 2]);
+
+            sends[1].resolve();
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends.map((s) => s.content.n)).toEqual([1, 2, 3]);
+        });
+
+        it("still sends the next event if an earlier one with the same sticky key failed", async () => {
+            const first = send("key");
+            const second = send("key");
+            await vi.advanceTimersByTimeAsync(0);
+            sends[0].reject(new Error("boom"));
+            await expect(first).rejects.toThrow("boom");
+
+            await vi.advanceTimersByTimeAsync(1);
+            expect(sends).toHaveLength(2);
+            sends[1].resolve();
+            await expect(second).resolves.toEqual({ event_id: "$event" });
+        });
+
+        it("doesn't hold back events with a different or no sticky key", async () => {
+            void send("key1");
+            void send("key2");
+            void send();
+            void send();
+            await vi.advanceTimersByTimeAsync(0);
+            expect(sends.map((s) => s.key)).toEqual(["key1", "key2", undefined, undefined]);
+        });
+
+        it("doesn't wait once the gap after the previous send has passed", async () => {
+            const first = send("key");
+            await vi.advanceTimersByTimeAsync(0);
+            sends[0].resolve();
+            await first;
+            await vi.advanceTimersByTimeAsync(5);
+
+            void send("key");
+            await vi.advanceTimersByTimeAsync(0);
+            expect(sends).toHaveLength(2);
+        });
+    });
+
     describe("sendEvent", () => {
         const roomId = "!room:example.org";
         const body = "This is the body";
@@ -958,10 +1071,10 @@ describe("MatrixClient", function () {
             httpLookups = [
                 {
                     method: "PUT",
-                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    prefix: unstableMSC4140Prefix,
+                    path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
                     data: delayData,
-                    expectQueryParams: realDelayOpts,
-                    expectBody: content,
+                    expectBody: { delay_ms: 2000, content },
                 },
             ];
 
@@ -991,10 +1104,10 @@ describe("MatrixClient", function () {
             httpLookups = [
                 {
                     method: "PUT",
-                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                    prefix: unstableMSC4140Prefix,
+                    path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
                     data: delayData,
-                    expectQueryParams: realDelayOpts,
-                    expectBody,
+                    expectBody: { delay_ms: 2000, content: expectBody },
                 },
             ];
 
@@ -1036,10 +1149,10 @@ describe("MatrixClient", function () {
             httpLookups = [
                 {
                     method: "PUT",
-                    path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${timeoutDelayTxnId}`,
+                    prefix: unstableMSC4140Prefix,
+                    path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${timeoutDelayTxnId}`,
                     data: delayData,
-                    expectQueryParams: realDelayOpts,
-                    expectBody,
+                    expectBody: { delay_ms: 2000, content: expectBody },
                 },
             ];
 
@@ -1078,20 +1191,34 @@ describe("MatrixClient", function () {
         });
 
         // eslint-disable-next-line @vitest/expect-expect
-        it.each([delayMs, delayOpts])("can send a delayed state event", async (delayMsOrOpts) => {
+        it.each([
+            ["without a state key (delay ms)", undefined, "", delayMs],
+            ["with a state key (delay ms)", "@alice:bar", "@alice:bar", delayMs],
+            ["without a state key (delay opts)", undefined, "", delayOpts],
+            ["with a state key (delay opts)", "@alice:bar", "@alice:bar", delayOpts],
+        ])("can send a delayed state event %s", async (_name, stateKey, expectedStateKey, delayMsOrOpts) => {
             const content = { topic: "The year 2000" };
+            const txnId = client.makeTxnId();
 
             httpLookups = [
                 {
                     method: "PUT",
-                    path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                    prefix: unstableMSC4140Prefix,
+                    path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.topic/${txnId}`,
                     data: delayData,
-                    expectQueryParams: realDelayOpts,
-                    expectBody: content,
+                    expectBody: { delay_ms: 2000, state_key: expectedStateKey, content },
                 },
             ];
 
-            await client._unstable_sendDelayedStateEvent(roomId, delayMsOrOpts, EventType.RoomTopic, { ...content });
+            await client._unstable_sendDelayedStateEvent(
+                roomId,
+                delayMsOrOpts,
+                EventType.RoomTopic,
+                { ...content },
+                stateKey,
+                {},
+                txnId,
+            );
         });
 
         describe("parent_delay_id", () => {
@@ -1141,6 +1268,192 @@ describe("MatrixClient", function () {
                 }
                 Object.setPrototypeOf(client, Subclass.prototype);
                 await expect((client as Subclass).sendCompleteEventWithParentDelayId()).rejects.toThrow(error);
+            });
+        });
+
+        it.each([delayMs, delayOpts])("sends the sticky duration in the request body", async (delayMsOrOpts) => {
+            unstableFeatures["org.matrix.msc4354"] = true;
+            const txnId = client.makeTxnId();
+            httpLookups = [
+                {
+                    method: "PUT",
+                    prefix: unstableMSC4140Prefix,
+                    path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
+                    expectQueryParams: { "org.matrix.msc4354.sticky_duration_ms": undefined },
+                    data: { delay_id: "id1" },
+                    expectBody: { "delay_ms": 2000, "org.matrix.msc4354.sticky_duration_ms": 5000, content },
+                },
+            ];
+
+            await expect(
+                client._unstable_sendStickyDelayedEvent(
+                    roomId,
+                    5000,
+                    delayMsOrOpts,
+                    null,
+                    EventType.RoomMessage,
+                    { ...content },
+                    txnId,
+                ),
+            ).resolves.toEqual({ delay_id: "id1" });
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("prevents subclasses from sending a delayed state event with a sticky duration", async () => {
+            class Subclass extends MatrixClient {
+                async sendStickyDelayedStateEvent() {
+                    return this.sendCompleteEvent({
+                        roomId,
+                        threadId: null,
+                        eventObject: { type: EventType.RoomTopic, state_key: "", content: { topic: "The year 2000" } },
+                        queryDict: { "org.matrix.msc4354.sticky_duration_ms": 5000 },
+                        delayMs: 2000,
+                    });
+                }
+            }
+            Object.setPrototypeOf(client, Subclass.prototype);
+            httpLookups = [];
+            await expect((client as Subclass).sendStickyDelayedStateEvent()).rejects.toThrow(
+                new Error("A delayed state event cannot have a sticky duration"),
+            );
+        });
+
+        describe.each([delayMs, delayOpts])("without dedicated endpoint support", (delayMsOrOpts) => {
+            const unrecognised = { httpStatus: 404, errcode: "M_UNRECOGNIZED" };
+
+            it("falls back to the query parameter, and only tries the dedicated endpoint once", async () => {
+                const txnId1 = client.makeTxnId();
+                const txnId2 = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId1}`,
+                        error: unrecognised,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId1}`,
+                        expectQueryParams: realDelayOpts,
+                        data: { delay_id: "id1" },
+                        expectBody: content,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId2}`,
+                        expectQueryParams: realDelayOpts,
+                        data: { delay_id: "id2" },
+                        expectBody: content,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/state/m.room.topic/`,
+                        expectQueryParams: realDelayOpts,
+                        data: { delay_id: "id3" },
+                        expectBody: { topic: "topic" },
+                    },
+                ];
+
+                for (const [txnId, delayId] of [
+                    [txnId1, "id1"],
+                    [txnId2, "id2"],
+                ]) {
+                    await expect(
+                        client._unstable_sendDelayedEvent(
+                            roomId,
+                            delayMsOrOpts,
+                            null,
+                            EventType.RoomMessage,
+                            { ...content },
+                            txnId,
+                        ),
+                    ).resolves.toEqual({ delay_id: delayId });
+                }
+                await expect(
+                    client._unstable_sendDelayedStateEvent(roomId, delayMsOrOpts, EventType.RoomTopic, {
+                        topic: "topic",
+                    }),
+                ).resolves.toEqual({ delay_id: "id3" });
+                expect(httpLookups).toHaveLength(0);
+            });
+
+            it("falls back for sticky events", async () => {
+                unstableFeatures["org.matrix.msc4354"] = true;
+                const txnId = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId}`,
+                        error: unrecognised,
+                    },
+                    {
+                        method: "PUT",
+                        path: `/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,
+                        expectQueryParams: {
+                            ...realDelayOpts,
+                            "org.matrix.msc4354.sticky_duration_ms": 5000,
+                        },
+                        data: { delay_id: "id1" },
+                        expectBody: content,
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendStickyDelayedEvent(
+                        roomId,
+                        5000,
+                        delayMsOrOpts,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId,
+                    ),
+                ).resolves.toEqual({ delay_id: "id1" });
+                expect(httpLookups).toHaveLength(0);
+            });
+
+            it("does not fall back on other errors", async () => {
+                const txnId1 = client.makeTxnId();
+                const txnId2 = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId1}`,
+                        error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
+                    },
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.message/${txnId2}`,
+                        data: { delay_id: "id2" },
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        delayMsOrOpts,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId1,
+                    ),
+                ).rejects.toMatchObject({ errcode: "M_INVALID_PARAM" });
+
+                // The dedicated endpoint is still the one in use afterwards
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        delayMsOrOpts,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId2,
+                    ),
+                ).resolves.toEqual({ delay_id: "id2" });
+                expect(httpLookups).toHaveLength(0);
             });
         });
 

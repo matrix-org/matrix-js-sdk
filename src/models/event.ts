@@ -1792,6 +1792,21 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
             duration_ttl_ms: isValidStickyTtl(ttlMs) ? Math.min(MAX_STICKY_DURATION_MS, ttlMs) : undefined,
         };
     }
+
+    /**
+     * The expiry timestamp that the sender's homeserver intended for this sticky event, in milliseconds.
+     *
+     * If the event is not a sticky event (or not supported by the server),
+     * then this returns `undefined`.
+     *
+     * @experimental Part of MSC4354.
+     */
+    public get unstableStickyIntendedExpiresAt(): number | undefined {
+        if (!this.unstableStickyInfo) {
+            return undefined;
+        }
+        return this.getTs() + this.event.msc4354_sticky!.duration_ms;
+    }
 }
 
 /* REDACT_KEEP_KEYS gives the keys we keep when an event is redacted

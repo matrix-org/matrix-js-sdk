@@ -4450,4 +4450,35 @@ describe("Room", function () {
             expect(room.getThreads()).toHaveLength(0);
         });
     });
+
+    describe("_unstable_addStickyEvents", () => {
+        it("should decrypt encrypted sticky events so that they can be indexed", async () => {
+            const crypto = {
+                decryptEvent: vi.fn().mockResolvedValue({
+                    clearEvent: { type: "org.example.any_type", content: { msc4354_sticky_key: "foobar" } },
+                }),
+            } as unknown as CryptoBackend;
+            const client = getMockClientWithEventEmitter({
+                decryptEventIfNeeded: vi.fn((event: MatrixEvent) => event.attemptDecryption(crypto)),
+            });
+            const room = new Room(roomId, client, userA);
+            // Timeline events are mapped without decryption, so nothing else would decrypt this event.
+            const event = new MatrixEvent({
+                event_id: "$encrypted",
+                room_id: roomId,
+                type: "m.room.encrypted",
+                content: { ciphertext: "secrets" },
+                msc4354_sticky: { duration_ms: 15000 },
+                sender: userB,
+                origin_server_ts: Date.now(),
+                unsigned: {},
+            });
+
+            room._unstable_addStickyEvents([event]);
+
+            expect(client.decryptEventIfNeeded).toHaveBeenCalledWith(event);
+            await event.getDecryptionPromise();
+            expect(room._unstable_getKeyedStickyEvent(userB, "org.example.any_type", "foobar")).toBe(event);
+        });
+    });
 });
