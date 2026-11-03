@@ -305,11 +305,11 @@ export class MSC4388RendezvousSession {
      * Builds the additional authentication data for the secure channel as defined in MSC4388:
      * `EncodeStringAsBytes8(BaseUrl) || EncodeStringAsBytes8(RendezvousId) || EncodeStringAsBytes8(SequenceToken)`
      */
-    private buildAdditionalAuthenticationData(sequenceToken: string): Uint8Array {
+    private buildAdditionalAuthenticationData(qrCodeBaseUrl: string, sequenceToken: string): Uint8Array {
         if (!this.id) {
             throw new Error("Rendezvous session not ready");
         }
-        const parts = [this.baseUrl, this.id, sequenceToken].map(encodeStringAsBytes8);
+        const parts = [qrCodeBaseUrl, this.id, sequenceToken].map(encodeStringAsBytes8);
         const result = new Uint8Array(parts.reduce((total, part) => total + part.length, 0));
         let offset = 0;
         for (const part of parts) {
@@ -327,12 +327,15 @@ export class MSC4388RendezvousSession {
      * sequence token from the last `GET` that the device received", which gives the same value except when a device
      * sends two payloads in a row (as the existing device does with LoginOkMessage followed by `m.login.protocols`),
      * where the two definitions diverge.
+     *
+     * @param qrCodeBaseUrl the base URL exactly as encoded in the QR code. MSC4388 forbids normalising it, so this
+     *   may differ from {@link baseUrl} (e.g. by a trailing `/`).
      */
-    public getAdditionalAuthenticationDataForSend(): Uint8Array {
+    public getAdditionalAuthenticationDataForSend(qrCodeBaseUrl: string): Uint8Array {
         if (!this.sequenceToken) {
             throw new Error("Rendezvous session not ready");
         }
-        return this.buildAdditionalAuthenticationData(this.sequenceToken);
+        return this.buildAdditionalAuthenticationData(qrCodeBaseUrl, this.sequenceToken);
     }
 
     /**
@@ -341,11 +344,14 @@ export class MSC4388RendezvousSession {
      * The sequence token is the one of the payload that the received payload replaced, i.e. the token we knew before
      * the `GET` that returned it. This is the counterpart of {@link getAdditionalAuthenticationDataForSend} and
      * matches matrix-rust-sdk. See there for how it relates to the MSC4388 text.
+     *
+     * @param qrCodeBaseUrl the base URL exactly as encoded in the QR code. See
+     *   {@link getAdditionalAuthenticationDataForSend}.
      */
-    public getAdditionalAuthenticationDataForReceive(): Uint8Array {
+    public getAdditionalAuthenticationDataForReceive(qrCodeBaseUrl: string): Uint8Array {
         if (!this.sequenceTokenBeforeLastReceive) {
             throw new Error("Rendezvous session not ready");
         }
-        return this.buildAdditionalAuthenticationData(this.sequenceTokenBeforeLastReceive);
+        return this.buildAdditionalAuthenticationData(qrCodeBaseUrl, this.sequenceTokenBeforeLastReceive);
     }
 }

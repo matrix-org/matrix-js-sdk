@@ -50,6 +50,11 @@ export class MSC4388SecureChannel {
     private readonly recipientChannel: HpkeRecipientChannel;
     private establishedChannel?: EstablishedHpkeChannel;
     private connected = false;
+    /**
+     * The base URL exactly as encoded in the QR code, which is what MSC4388 requires in the additional authentication
+     * data. Set by {@link generateCode}.
+     */
+    private qrCodeBaseUrl?: string;
 
     public constructor(
         private readonly rendezvousSession: MSC4388RendezvousSession,
@@ -73,7 +78,25 @@ export class MSC4388SecureChannel {
         if (!baseUrl) {
             throw new Error("No rendezvous session base URL");
         }
-        return QrCodeData.newMsc4388(this.recipientChannel.publicKey, id, baseUrl, this.intent).toBytes();
+        const qrCodeData = QrCodeData.newMsc4388(this.recipientChannel.publicKey, id, baseUrl, this.intent);
+        // The QR code holds the base URL as parsed by the crypto library (e.g. with a trailing `/` added), so read it
+        // back rather than assuming it matches the session's base URL
+        this.qrCodeBaseUrl = qrCodeData.intentData.msc4388?.baseUrl;
+        return qrCodeData.toBytes();
+    }
+
+    private getAdditionalAuthenticationDataForSend(): Uint8Array {
+        if (!this.qrCodeBaseUrl) {
+            throw new Error("QR code not generated");
+        }
+        return this.rendezvousSession.getAdditionalAuthenticationDataForSend(this.qrCodeBaseUrl);
+    }
+
+    private getAdditionalAuthenticationDataForReceive(): Uint8Array {
+        if (!this.qrCodeBaseUrl) {
+            throw new Error("QR code not generated");
+        }
+        return this.rendezvousSession.getAdditionalAuthenticationDataForReceive(this.qrCodeBaseUrl);
     }
 
     /**
@@ -111,11 +134,11 @@ export class MSC4388SecureChannel {
 
         let unidirectionalChannel: UnidirectionalRecipientChannel;
         let candidateLoginInitiateMessage: string;
+        const receiveAad = this.getAdditionalAuthenticationDataForReceive();
+        logger.info(`Decrypting payload with AAD: ${formatAAD(receiveAad)}`);
         try {
-            const aad = this.rendezvousSession.getAdditionalAuthenticationDataForReceive();
-            logger.info(`Decrypting payload with AAD: ${formatAAD(aad)}`);
             ({ channel: unidirectionalChannel, message: candidateLoginInitiateMessage } =
-                this.recipientChannel.establishChannel(loginInitiateMessage, aad));
+                this.recipientChannel.establishChannel(loginInitiateMessage, receiveAad));
         } catch (e) {
             // the message could not be parsed or decrypted: either it wasn't sent by a device that scanned our QR
             // code, or it is bound to a different rendezvous session
@@ -135,7 +158,7 @@ export class MSC4388SecureChannel {
         }
         logger.info("LoginInitiateMessage received");
 
-        const aad = this.rendezvousSession.getAdditionalAuthenticationDataForSend();
+        const aad = this.getAdditionalAuthenticationDataForSend();
         logger.info(`Sending LoginOkMessage with AAD: ${formatAAD(aad)}`);
         const { channel, initialResponse: loginOkMessage } = unidirectionalChannel.establishBidirectionalChannel(
             "MATRIX_QR_CODE_LOGIN_OK",
@@ -158,7 +181,7 @@ export class MSC4388SecureChannel {
             throw new Error("Channel closed");
         }
 
-        const aad = this.rendezvousSession.getAdditionalAuthenticationDataForReceive();
+        const aad = this.getAdditionalAuthenticationDataForReceive();
         logger.info(`Decrypting payload with AAD: ${formatAAD(aad)}`);
         try {
             return this.establishedChannel.open(ciphertext, aad);
@@ -177,7 +200,7 @@ export class MSC4388SecureChannel {
             throw new Error("Channel closed");
         }
 
-        const aad = this.rendezvousSession.getAdditionalAuthenticationDataForSend();
+        const aad = this.getAdditionalAuthenticationDataForSend();
         logger.info(`Encrypting payload with AAD: ${formatAAD(aad)}`);
 
         return this.establishedChannel.seal(plaintext, aad);
