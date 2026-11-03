@@ -1732,7 +1732,6 @@ describe("MatrixClient", function () {
             await expect(client.getExtendedProfileProperty(userId, "test_key")).rejects.toThrow(MatrixError);
             expect(httpLookups).toHaveLength(0);
         });
-
         it("preserves previously cached keys when writing through the profile cache", async () => {
             const storedProfile = { other_key: "bar" };
             const testProfile = { test_key: "foo" };
@@ -1752,7 +1751,110 @@ describe("MatrixClient", function () {
             await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("foo");
 
             expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
-                new Map([[userId, { ...storedProfile, ...testProfile }]]),
+                new Map([
+                    [
+                        userId,
+                        {
+                            ...storedProfile,
+                            ...testProfile,
+                            _profile_timestamps: { test_key: expect.any(Number) },
+                        },
+                    ],
+                ]),
+            );
+        });
+
+        it("returns cached property if not expired within TTL", async () => {
+            const cachedProfile = {
+                test_key: "cached_foo",
+                _profile_timestamps: { test_key: Date.now() - 1000 },
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(cachedProfile);
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("cached_foo");
+            expect(client.store.storeUserProfiles).not.toHaveBeenCalled();
+        });
+
+        it("refetches property from server if cached property is expired past TTL", async () => {
+            const expiredProfile = {
+                test_key: "stale_foo",
+                _profile_timestamps: { test_key: Date.now() - 10 * 60 * 1000 },
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(expiredProfile);
+            const freshProfile = { test_key: "fresh_foo" };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: freshProfile,
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("fresh_foo");
+            expect(httpLookups).toHaveLength(0);
+            expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
+                new Map([
+                    [
+                        userId,
+                        {
+                            ...expiredProfile,
+                            ...freshProfile,
+                            _profile_timestamps: { test_key: expect.any(Number) },
+                        },
+                    ],
+                ]),
+            );
+        });
+
+        it("forces refetch when maxAgeMs is 0", async () => {
+            const cachedProfile = {
+                test_key: "cached_foo",
+                _profile_timestamps: { test_key: Date.now() },
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(cachedProfile);
+            const freshProfile = { test_key: "fresh_foo" };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: freshProfile,
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key", 0)).resolves.toEqual("fresh_foo");
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("cleans up cached property when server returns 404 M_NOT_FOUND", async () => {
+            const storedProfile = {
+                other_key: "bar",
+                test_key: "old_val",
+                _profile_timestamps: { other_key: 100, test_key: 100 },
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(storedProfile);
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    error: { errcode: "M_NOT_FOUND", httpStatus: 404 },
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key", 0)).resolves.toBeUndefined();
+            expect(httpLookups).toHaveLength(0);
+            expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
+                new Map([
+                    [
+                        userId,
+                        {
+                            other_key: "bar",
+                            _profile_timestamps: { other_key: 100 },
+                        },
+                    ],
+                ]),
             );
         });
 
@@ -2556,7 +2658,7 @@ describe("MatrixClient", function () {
                             `/rooms/${encodeURIComponent(roomId)}/redact/${encodeURIComponent(eventId)}` +
                             `/${encodeURIComponent(txnId)}`,
                         expectBody: {
-                            reason: "redaction test",
+                            "reason": "redaction test",
                             ["org.matrix.msc3912.with_relations"]: ["m.reference"],
                         },
                         data: { event_id: eventId },
