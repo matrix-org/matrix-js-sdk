@@ -210,6 +210,34 @@ describe("MSC4108RendezvousSession", () => {
         }
     });
 
+    it("GET with content-type parameters, e.g. added by an intermediary proxy", async function () {
+        const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
+        const transport = new MSC4108RendezvousSession({
+            client,
+            fallbackRzServer: "https://fallbackserver/rz",
+        });
+        {
+            // initial POST
+            fetchMock.postOnce("https://fallbackserver/rz", {
+                status: 201,
+                body: { url: "https://fallbackserver/rz/123" },
+            });
+            await expect(transport.send("foo=baa")).resolves.toStrictEqual(undefined);
+            await fetchMock.callHistory.flush(true);
+        }
+        {
+            // GET where the content-type has a charset parameter appended, as nginx's
+            // `charset` directive does — the payload must still be received
+            fetchMock.getOnce("https://fallbackserver/rz/123", {
+                status: 200,
+                body: "foo=baa",
+                headers: { "content-type": "text/plain; charset=utf-8", "etag": "aaa" },
+            });
+            await expect(transport.receive()).resolves.toEqual("foo=baa");
+            await fetchMock.callHistory.flush(true);
+        }
+    });
+
     it("POST and PUTs", async function () {
         const client = makeMockClient({ userId: "@alice:example.com", deviceId: "DEVICEID", msc4108Enabled: false });
         const transport = new MSC4108RendezvousSession({
