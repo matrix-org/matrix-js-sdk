@@ -45,7 +45,7 @@ export function encodeStringAsBytes8(input: string): Uint8Array {
 }
 
 /**
- * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4108)
+ * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4388)
  * insecure rendezvous session protocol.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */

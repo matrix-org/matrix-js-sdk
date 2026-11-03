@@ -65,8 +65,7 @@ export class MSC4388SecureChannel {
     }
 
     /**
-     * Generate a QR code for the current session.
-     * @param mode the mode to generate the QR code in, either `Login` or `Reciprocate`.
+     * Generate a QR code for the current session, with the {@link intent} given to the constructor.
      */
     public async generateCode(): Promise<Uint8Array> {
         const { id, baseUrl } = this.rendezvousSession;
@@ -79,8 +78,11 @@ export class MSC4388SecureChannel {
             throw new Error("No rendezvous session base URL");
         }
         const qrCodeData = QrCodeData.newMsc4388(this.recipientChannel.publicKey, id, baseUrl, this.intent);
-        // The QR code holds the base URL as parsed by the crypto library (e.g. with a trailing `/` added), so read it
-        // back rather than assuming it matches the session's base URL
+        // The additional authentication data must use the base URL exactly as encoded in the QR code, so read it back
+        // rather than assuming it matches the session's base URL. The crypto library currently normalises it (e.g. by
+        // adding a trailing `/`).
+        // TODO: once https://github.com/matrix-org/matrix-sdk-crypto-wasm/pull/364 lands, the QR code contains the
+        // base URL exactly as given, so this can be reverted to use the session's base URL directly.
         this.qrCodeBaseUrl = qrCodeData.intentData.msc4388?.baseUrl;
         return qrCodeData.toBytes();
     }
