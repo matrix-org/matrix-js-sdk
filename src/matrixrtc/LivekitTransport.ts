@@ -142,7 +142,9 @@ export const isUnstableLivekitTransportWithUrl = (object: unknown): object is Un
  */
 export function selectLivekitTransport(transports: Transport[]): UnstableLivekitTransport | undefined {
     const livekitTransports = transports.filter(isUnstableLivekitTransport);
-    return livekitTransports.find((t) => t.type === LIVEKIT_TRANSPORT_TYPE) ?? livekitTransports[0];
+    return livekitTransports.find((t) => t.type === LIVEKIT_TRANSPORT_TYPE)
+      // will be a LEGACY_LIVEKIT_TRANSPORT_TYPE because we checked `isUnstableLivekitTransport` before.
+      ?? livekitTransports[0];
 }
 
 /**
