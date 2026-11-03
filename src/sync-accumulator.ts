@@ -20,7 +20,13 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
-import { MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
+import {
+    isValidStickyDuration,
+    isValidStickyTtl,
+    MAX_STICKY_DURATION_MS,
+    type IContent,
+    type IUnsigned,
+} from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
 import { type EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
@@ -282,7 +288,9 @@ function copyEventForModifyingUnsigned<T extends IRoomEvent>(event: T): T {
  */
 function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
     const age = event.unsigned?.age;
-    const stickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
+    const rawStickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
+    // Ignore a malformed TTL, as MatrixEvent does, so that the expiry falls back to `duration_ms`.
+    const stickyTtl = isValidStickyTtl(rawStickyTtl) ? rawStickyTtl : undefined;
     if (age === undefined && stickyTtl === undefined) return event;
     const copy: T & EventTags = copyEventForModifyingUnsigned(event);
     if (age !== undefined) copy._localTs = now - age;
@@ -322,6 +330,16 @@ function computeStickyExpiresTs(event: (IStickyEvent | IStickyStateEvent) & Even
     // If `origin_server_ts` claims to have been from the future, we still bound it to now.
     const createdTs = Math.min(event.origin_server_ts, now);
     return cappedDuration + createdTs;
+}
+
+/**
+ * Checks whether an event is a well-formed sticky event.
+ */
+function isStickyEvent<T extends IRoomEvent>(event: T): event is T & StickyEventFields {
+    const { msc4354_sticky: sticky, content } = event as Partial<IStickyEvent>;
+    if (!isValidStickyDuration(sticky?.duration_ms)) return false;
+    const stickyKey = content?.msc4354_sticky_key;
+    return stickyKey === undefined || typeof stickyKey === "string";
 }
 
 /**
@@ -643,10 +661,13 @@ export class SyncAccumulator {
         // process these events into the correct mapped order.
         if (data.msc4354_sticky?.events) {
             currentData._stickyEvents = currentData._stickyEvents.concat(
-                data.msc4354_sticky.events.map((e) => {
-                    const event = fromDatabase ? e : tagEvent(e, now);
-                    return { event, expiresTs: computeStickyExpiresTs(event, now) };
-                }),
+                data.msc4354_sticky.events
+                    // Skip malformed events so that the cache agrees with MatrixEvent on what is sticky.
+                    .filter((e) => isStickyEvent(e))
+                    .map((e) => {
+                        const event = fromDatabase ? e : tagEvent(e, now);
+                        return { event, expiresTs: computeStickyExpiresTs(event, now) };
+                    }),
             );
         }
 

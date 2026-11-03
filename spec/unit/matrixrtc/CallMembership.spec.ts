@@ -18,11 +18,29 @@ import { type RtcMembershipData, type SessionMembershipData } from "../../../src
 import { type IContent, type MatrixEvent } from "../../../src/models/event.ts";
 import { EventType } from "../../../src/@types/event.ts";
 import { CallMembership, DEFAULT_EXPIRE_DURATION } from "../../../src/matrixrtc/CallMembership.ts";
+import { type Transport } from "../../../src/matrixrtc/types.ts";
 
 function createCallMembership(ev: MatrixEvent, content: IContent): CallMembership {
     vi.mocked(ev.getContent).mockReturnValue(content);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, ["xx"], "(deprecated)");
+}
+
+/**
+ * Tests that `getTransport` picks the `m.livekit` transport, else the `livekit` one, else the first,
+ * for the kind of membership that `withTransports` builds from a list of transports.
+ */
+function testGetTransport(withTransports: (transports: Transport[]) => CallMembership): void {
+    const other = { type: "this_is_a_mock_transport" };
+    const livekit = { type: "livekit", url: "wss://legacy.example.org" };
+    const mLivekit = { type: "m.livekit", url: "wss://example.org" };
+    it.each([
+        ["gets the first transport without a LiveKit one", [other], other],
+        ["prefers the m.livekit transport", [livekit, mLivekit], mLivekit],
+        ["falls back to the livekit transport", [other, livekit], livekit],
+    ])("%s", (_name, transports, expected) => {
+        expect(withTransports(transports).getTransport()).toStrictEqual(expected);
+    });
 }
 
 describe("CallMembership", () => {
@@ -120,6 +138,16 @@ describe("CallMembership", () => {
             expect(membership.transports).toEqual([mockFocus]);
         });
 
+        it("handles membership without foci_preferred", async () => {
+            const content = { ...membershipTemplate, foci_preferred: undefined };
+            const fakeEvent = makeMockEvent();
+            vi.mocked(fakeEvent.getContent).mockReturnValue(content);
+            const membership = await CallMembership.parseFromEvent(fakeEvent);
+            expect(membership.transports).toEqual([]);
+            expect(membership.getTransport()).toBeUndefined();
+            expect(membership.backendIdentities).toEqual([]);
+        });
+
         describe("getTransport", () => {
             const mockFocus = { type: "this_is_a_mock_focus" };
             it("gets the correct active transport from session membership", () => {
@@ -130,6 +158,9 @@ describe("CallMembership", () => {
                 });
                 expect(membership.getTransport()).toStrictEqual(mockFocus);
             });
+            testGetTransport((transports) =>
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, foci_preferred: transports }),
+            );
         });
 
         describe("correct values from computed fields", () => {
@@ -493,14 +524,21 @@ describe("CallMembership", () => {
                 expect(membership.isExpired()).toBe(false);
             });
         });
-        it("uses unpadded base64 for hashed backend identities", async () => {
+        it.each([
+            ["a livekit transport", [{ type: "livekit", url: "wss://example.org" }]],
+            ["an m.livekit transport", [{ type: "m.livekit", url: "wss://example.org" }]],
+            [
+                "a transport published under both types",
+                [
+                    { type: "livekit", url: "wss://example.org" },
+                    { type: "m.livekit", url: "wss://example.org" },
+                ],
+            ],
+        ])("uses unpadded base64 for the hashed backend identity of %s", async (_name, published) => {
             const membership = await CallMembership.parseFromEvent(
                 makeMockEvent(0, {
                     ...membershipTemplate,
-                    transports: {
-                        published: [{ type: "livekit", url: "wss://example.org" }],
-                        can_subscribe: ["livekit"],
-                    },
+                    transports: { published, can_subscribe: ["livekit", "m.livekit"] },
                 }),
             );
             expect(membership.backendIdentities).toEqual(["b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0"]);
@@ -534,6 +572,14 @@ describe("CallMembership", () => {
                 "b26mhWogBA/nZZLXqXYD9AQLx3Wp5nbFPiZSiIFyGu0",
                 "@alice:example.org:AAAAAAA",
             ]);
+        });
+        describe("getTransport", () => {
+            testGetTransport((transports) =>
+                createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    transports: { published: transports, can_subscribe: [] },
+                }),
+            );
         });
     });
 });
