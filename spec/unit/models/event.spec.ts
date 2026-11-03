@@ -701,7 +701,7 @@ describe("isValidStickyDuration", () => {
     });
 });
 
-describe("isValidTtlDuration", () => {
+describe("isValidStickyTtl", () => {
     it.each([0, 1, 1000, MAX_STICKY_DURATION_MS + 1])("accepts %s", (value) => {
         expect(isValidStickyTtl(value)).toBe(true);
     });
