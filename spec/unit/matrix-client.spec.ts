@@ -24,6 +24,7 @@ import { type MockedObject, type Mocked, type MockInstance } from "vitest";
 import { logger } from "../../src/logger";
 import {
     ClientEvent,
+    EXTENDED_PROFILE_CACHE_TTL_MS,
     type IClientWellKnown,
     type IMatrixClientCreateOpts,
     type ITurnServerResponse,
@@ -1778,6 +1779,101 @@ describe("MatrixClient", function () {
 
             expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
                 new Map([[userId, { ...storedProfile, ...testProfile }]]),
+            );
+        });
+
+        it("returns cached property if not expired within TTL", async () => {
+            httpLookups = [];
+            const cachedProfile = { test_key: "cached_foo" };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(cachedProfile);
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("cached_foo");
+            expect(client.store.storeUserProfiles).not.toHaveBeenCalled();
+            expect(httpLookups).toHaveLength(0);
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("cached_foo");
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("refetches property from server if cached property is expired past TTL", async () => {
+            httpLookups = [];
+            const storedProfile = { test_key: "stale_foo" };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(storedProfile);
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("stale_foo");
+            expect(httpLookups).toHaveLength(0);
+
+            vi.advanceTimersByTime(EXTENDED_PROFILE_CACHE_TTL_MS + 1000);
+
+            const freshProfile = { test_key: "fresh_foo" };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: freshProfile,
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key")).resolves.toEqual("fresh_foo");
+            expect(httpLookups).toHaveLength(0);
+            expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
+                new Map([[userId, { ...storedProfile, ...freshProfile }]]),
+            );
+        });
+
+        it("forces refetch when maxAgeMs is 0", async () => {
+            const cachedProfile = { test_key: "cached_foo" };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(cachedProfile);
+            const freshProfile = { test_key: "fresh_foo" };
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    data: freshProfile,
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key", 0)).resolves.toEqual("fresh_foo");
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("cleans up cached property when server returns 404 M_NOT_FOUND", async () => {
+            const storedProfile = {
+                other_key: "bar",
+                test_key: "old_val",
+            };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(storedProfile);
+            httpLookups = [
+                {
+                    method: "GET",
+                    prefix: unstableMSC4133Prefix,
+                    path: "/profile/" + encodeURIComponent(userId) + "/test_key",
+                    error: { errcode: "M_NOT_FOUND", httpStatus: 404 },
+                },
+            ];
+
+            await expect(client.getExtendedProfileProperty(userId, "test_key", 0)).resolves.toBeUndefined();
+            expect(httpLookups).toHaveLength(0);
+            expect(client.store.storeUserProfiles).toHaveBeenCalledWith(
+                new Map([
+                    [
+                        userId,
+                        {
+                            other_key: "bar",
+                        },
+                    ],
+                ]),
+            );
+        });
+
+        it("does not interfere if profile contains a _profile_timestamps property", async () => {
+            const storedProfile = { _profile_timestamps: "user_value" };
+            (client.store as MockedObject<IStore>).getUserProfile.mockResolvedValue(storedProfile);
+
+            await expect(client.getExtendedProfileProperty(userId, "_profile_timestamps")).resolves.toEqual(
+                "user_value",
             );
         });
 
