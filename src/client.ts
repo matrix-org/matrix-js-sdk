@@ -25,6 +25,7 @@ import {
     type IContent,
     type IDecryptOptions,
     type IEvent,
+    isValidStickyDuration,
     MatrixEvent,
     MatrixEventEvent,
     type MatrixEventHandlerMap,
@@ -3722,6 +3723,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<SendDelayedEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
                 "Server does not support the delayed events API",
@@ -3806,6 +3810,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
         // Claim our place in the send order before anything asynchronous, so that concurrent calls go out in the
         // order they were made. The server support check can take a different number of ticks per call.
         return this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, async () => {
