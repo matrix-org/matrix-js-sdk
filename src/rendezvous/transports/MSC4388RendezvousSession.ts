@@ -323,10 +323,8 @@ export class MSC4388RendezvousSession {
      * The additional authentication data to use when sealing a payload to send over the secure channel.
      *
      * The sequence token is the one of the payload that our `PUT` will replace, i.e. the compare-and-swap token that
-     * is sent in the request body. This matches matrix-rust-sdk. Note that the MSC4388 text instead says "the
-     * sequence token from the last `GET` that the device received", which gives the same value except when a device
-     * sends two payloads in a row (as the existing device does with LoginOkMessage followed by `m.login.protocols`),
-     * where the two definitions diverge.
+     * is sent in the request body, as required by MSC4388. Note that this is not the token from our last `GET` when we
+     * send two payloads in a row (as the existing device does with LoginOkMessage followed by `m.login.protocols`).
      *
      * @param qrCodeBaseUrl the base URL exactly as encoded in the QR code. MSC4388 forbids normalising it, so this
      *   may differ from {@link baseUrl} (e.g. by a trailing `/`).
@@ -342,8 +340,8 @@ export class MSC4388RendezvousSession {
      * The additional authentication data to use when opening a payload received over the secure channel.
      *
      * The sequence token is the one of the payload that the received payload replaced, i.e. the token we knew before
-     * the `GET` that returned it. This is the counterpart of {@link getAdditionalAuthenticationDataForSend} and
-     * matches matrix-rust-sdk. See there for how it relates to the MSC4388 text.
+     * the `GET` that returned it, as required by MSC4388. This is the counterpart of
+     * {@link getAdditionalAuthenticationDataForSend}.
      *
      * @param qrCodeBaseUrl the base URL exactly as encoded in the QR code. See
      *   {@link getAdditionalAuthenticationDataForSend}.
