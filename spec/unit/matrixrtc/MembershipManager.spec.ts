@@ -42,7 +42,7 @@ import {
     type MockClient,
 } from "./mocks.ts";
 import { MembershipManager, StickyEventMembershipManager } from "../../../src/matrixrtc/MembershipManager.ts";
-import { type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
+import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData/index.ts";
 
 /**
  * Create a promise that will resolve once a mocked method is called.
@@ -197,6 +197,20 @@ describe("MembershipManager", () => {
             it("sends correct call_id and state key when using non empty string. Not using empty string -> ROOM hack. See: INFO_SLOT_ID_LEGACY_CASE", async () => {
                 const customCallSession = { id: "custom", application: "m.call" };
                 await testSendMembershipEvent(customCallSession, customCallSession.id);
+            });
+
+            it("publishes LiveKit transports under the livekit type only", async () => {
+                const otherTransport = { type: "org.example.transport", foo: "bar" };
+                new MembershipManager(undefined, room, client, callSession).join([
+                    { type: "m.livekit", url: "wss://sfu.example.org" },
+                    otherTransport,
+                ]);
+                await waitForMockCall(client.sendStateEvent, Promise.resolve({ event_id: "id" }));
+                const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
+                expect(eventContent.foci_preferred).toStrictEqual([
+                    { type: "livekit", url: "wss://sfu.example.org" },
+                    otherTransport,
+                ]);
             });
 
             it("does not send capabilities if none are configured", async () => {
@@ -1780,8 +1794,12 @@ describe("MembershipManager", () => {
                             },
                             slot_id: "m.call#ROOM",
                             transports: {
-                                published: [{ type: focus.type, livekit_service_url: focus.livekit_service_url }],
-                                can_subscribe: ["livekit"],
+                                // The transport is published under both types, `livekit` first
+                                published: [
+                                    { type: "livekit", livekit_service_url: focus.livekit_service_url },
+                                    { type: "m.livekit", livekit_service_url: focus.livekit_service_url },
+                                ],
+                                can_subscribe: ["livekit", "m.livekit"],
                             },
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
@@ -1803,6 +1821,24 @@ describe("MembershipManager", () => {
                     );
                     // ..once
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
+                });
+                it("publishes LiveKit transports under both types and other transports as they are", async () => {
+                    const otherTransport = { type: "org.example.transport", foo: "bar" };
+                    new StickyEventMembershipManager({}, room, client, callSession, "member-id").join([
+                        { type: "m.livekit", url: "wss://sfu.example.org" },
+                        otherTransport,
+                    ]);
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                    const eventContent = vi.mocked(client._unstable_sendStickyEvent).mock
+                        .calls[0][4] as RtcMembershipData;
+                    expect(eventContent.transports).toStrictEqual({
+                        published: [
+                            { type: "livekit", url: "wss://sfu.example.org" },
+                            { type: "m.livekit", url: "wss://sfu.example.org" },
+                            otherTransport,
+                        ],
+                        can_subscribe: ["livekit", "m.livekit"],
+                    });
                 });
             });
             it("sends a leave event with member.membership leave when the scheduled delayed leave is gone", async () => {
