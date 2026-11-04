@@ -1049,3 +1049,98 @@ describe("getPushRuleGlobRegex", () => {
         expect(input.split(regex)).toEqual(["Foo ", "@room", " Bar"]);
     });
 });
+
+describe("recipient_permission condition (MSC4506 knock push rule)", () => {
+    const roomId = "!knockroom:server";
+    const adminId = "@admin:server";
+    const knockerId = "@knocker:server";
+
+    const knockRule: IPushRule = {
+        rule_id: ".org.matrix.msc4506.rule.knock",
+        default: true,
+        enabled: true,
+        conditions: [
+            { kind: ConditionKind.EventPropertyIs, key: "type", value: "m.room.member" },
+            { kind: ConditionKind.EventPropertyIs, key: "content.membership", value: "knock" },
+            { kind: ConditionKind.RecipientPermissionPrefix, key: "invite" },
+        ],
+        actions: [PushRuleActionName.Notify, { set_tweak: TweakName.Sound, value: "default" }],
+    };
+
+    const makeClient = (plContent: IContent): MatrixClient =>
+        ({
+            getRoom: () => ({
+                currentState: {
+                    getStateEvents: (type: string, stateKey: string) =>
+                        type === EventType.RoomPowerLevels && stateKey === "" ? { getContent: () => plContent } : null,
+                    getMember: () => null,
+                    getJoinedMemberCount: () => 2,
+                    members: {},
+                },
+            }),
+            ...mockClientMethodsUser(adminId),
+            supportsIntentionalMentions: () => true,
+            pushRules: {
+                device: {},
+                global: {
+                    override: [
+                        knockRule,
+                        {
+                            rule_id: ".m.rule.member_event",
+                            default: true,
+                            enabled: true,
+                            conditions: [{ kind: ConditionKind.EventPropertyIs, key: "type", value: "m.room.member" }],
+                            actions: [],
+                        },
+                    ],
+                },
+            },
+        }) as unknown as MatrixClient;
+
+    const mkKnock = (): MatrixEvent =>
+        utils.mkEvent({
+            type: "m.room.member",
+            room: roomId,
+            user: knockerId,
+            skey: knockerId,
+            event: true,
+            content: { membership: "knock" },
+        });
+
+    const actionsFor = (plContent: IContent): IActionsObject => {
+        const pushProcessor = new PushProcessor(makeClient(plContent));
+        return pushProcessor.actionsForEvent(mkKnock());
+    };
+
+    it("notifies a user whose power level allows them to invite", () => {
+        const actions = actionsFor({ invite: 50, users: { [adminId]: 100 } });
+        expect(actions.notify).toBeTruthy();
+    });
+
+    it("does not notify a user below the required invite level", () => {
+        const actions = actionsFor({ invite: 50, users: { [adminId]: 0 } });
+        expect(actions?.notify).toBeFalsy();
+    });
+
+    it("uses the spec default invite level (0) when absent", () => {
+        // invite defaults to 0, users_default defaults to 0 -> everyone can invite
+        const actions = actionsFor({ users: {} });
+        expect(actions.notify).toBeTruthy();
+    });
+
+    it("respects users_default for the recipient's level", () => {
+        const actions = actionsFor({ invite: 25, users_default: 30 });
+        expect(actions.notify).toBeTruthy();
+    });
+
+    it("does not match an unknown permission key", () => {
+        const pushProcessor = new PushProcessor(makeClient({ invite: 0, frobnicate: 0, users: { [adminId]: 100 } }));
+        const ruleWithBadKey: IPushRule = {
+            ...knockRule,
+            conditions: [{ kind: ConditionKind.RecipientPermissionPrefix, key: "frobnicate" }],
+        };
+        expect(
+            pushProcessor.ruleMatchesEvent({ ...ruleWithBadKey, rule_id: "test", kind: "override" } as any, mkKnock()),
+        ).toBe(false);
+    });
+});
