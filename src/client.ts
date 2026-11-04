@@ -793,7 +793,7 @@ export interface IPublicRoomsChunkRoom {
     guest_can_join: boolean;
     num_joined_members: number;
     room_type?: RoomType | string; // Added by MSC3827
-    join_rule?: JoinRule.Knock | JoinRule.Public; // Added by MSC2403
+    join_rule?: JoinRule.Knock | JoinRule.KnockRestricted | JoinRule.Public; // Added by MSC2403 and MSC3787
 }
 
 interface IPublicRoomsResponse {
