@@ -680,26 +680,30 @@ describe("Thread", () => {
                 expect(secondLastEvent.getContent().body).toEqual("edit");
             });
 
-            it("Adds edits fetched on demand to the thread timeline and applies them", async () => {
-                // Given we don't support recursive relations
+            /**
+             * A thread on a server without recursive relations, a message for it, and an edit to
+             * that message which the server provides on demand. The message is not added yet.
+             */
+            async function threadWithEditFetchedOnDemand() {
                 const client = createClient(new Map([[Feature.RelationsRecursion, ServerSupport.Unsupported]]));
-                // And we have a thread
                 const user = "@alice:matrix.org";
                 const room = "!room:z";
                 const thread = await createThread(client, user, room);
-
-                // When a message is added to the thread, and an edit to it is provided on demand
                 const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
                 // (fetchEditsWhereNeeded only applies to encrypted messages for some reason)
                 messageToEdit.event.type = EventType.RoomMessageEncrypted;
                 const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
                 vi.mocked(client.relations).mockImplementation(async (_roomId, eventId) => {
-                    if (eventId === messageToEdit.getId()) {
-                        return { events: [editEvent] };
-                    } else {
-                        return { events: [] };
-                    }
+                    return { events: eventId === messageToEdit.getId() ? [editEvent] : [] };
                 });
+                return { thread, messageToEdit, editEvent };
+            }
+
+            it("Adds edits fetched on demand to the thread timeline and applies them", async () => {
+                // Given we don't support recursive relations, and we have a thread
+                const { thread, messageToEdit, editEvent } = await threadWithEditFetchedOnDemand();
+
+                // When a message is added to the thread, and an edit to it is provided on demand
                 thread.addEvent(messageToEdit, false);
                 await sleep(0); // wait for events to update
 
@@ -715,22 +719,13 @@ describe("Thread", () => {
 
             it("Does not report edits fetched on demand as live events", async () => {
                 // Given we don't support recursive relations, and we have a thread
-                const client = createClient(new Map([[Feature.RelationsRecursion, ServerSupport.Unsupported]]));
-                const user = "@alice:matrix.org";
-                const room = "!room:z";
-                const thread = await createThread(client, user, room);
+                const { thread, messageToEdit, editEvent } = await threadWithEditFetchedOnDemand();
                 const liveEvents: MatrixEvent[] = [];
                 thread.timelineSet.on(RoomEvent.Timeline, (event, _room, _toStartOfTimeline, _removed, data) => {
                     if (data.liveEvent) liveEvents.push(event);
                 });
 
                 // When a message is added to the thread, and an edit to it is fetched on demand
-                const messageToEdit = createThreadMessage(thread.id, user, room, "Thread reply");
-                messageToEdit.event.type = EventType.RoomMessageEncrypted;
-                const editEvent = mkEdit(messageToEdit, client, user, room, "edit");
-                vi.mocked(client.relations).mockImplementation(async (_roomId, eventId) => {
-                    return { events: eventId === messageToEdit.getId() ? [editEvent] : [] };
-                });
                 thread.addEvent(messageToEdit, false);
                 await sleep(0); // wait for events to update
 
