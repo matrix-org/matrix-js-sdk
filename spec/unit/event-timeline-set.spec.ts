@@ -28,7 +28,9 @@ import {
     MatrixEvent,
     MatrixEventEvent,
     Room,
+    RoomEvent,
 } from "../../src";
+import { type IRoomTimelineData } from "../../src/models/event-timeline-set";
 import { Thread } from "../../src/models/thread";
 import { ReEmitter } from "../../src/ReEmitter";
 
@@ -221,6 +223,83 @@ describe("EventTimelineSet", () => {
             const relations = reactions.getRelations();
             expect(relations).toHaveLength(1);
             expect(relations[0].getId()).toBe(reactionEvent.getId());
+        });
+    });
+
+    describe("insertEventIntoTimeline", () => {
+        let liveTimeline: EventTimeline;
+        let timelineData: IRoomTimelineData[];
+
+        beforeEach(() => {
+            liveTimeline = eventTimelineSet.getLiveTimeline();
+            timelineData = [];
+            eventTimelineSet.on(RoomEvent.Timeline, (_event, _room, _toStartOfTimeline, _removed, data) => {
+                timelineData.push(data);
+            });
+        });
+
+        function addEvent(event: MatrixEvent, timeline = liveTimeline): void {
+            eventTimelineSet.addEventToTimeline(event, timeline, { toStartOfTimeline: false, addToState: false });
+        }
+
+        function insertEvent(event: MatrixEvent, timeline: EventTimeline, liveEvent?: boolean): void {
+            eventTimelineSet.insertEventIntoTimeline(
+                event,
+                timeline,
+                timeline.getState(EventTimeline.FORWARDS)!,
+                false,
+                liveEvent,
+            );
+        }
+
+        it("does not report an inserted event as live by default", () => {
+            // e.g. an edit we fetched from the server, which may be old
+            addEvent(messageEvent);
+            const reaction = utils.mkReaction(messageEvent, client, userA, roomId, messageEvent.getTs() + 1);
+
+            insertEvent(reaction, liveTimeline);
+
+            expect(liveTimeline.getEvents()).toEqual([messageEvent, reaction]);
+            expect(timelineData.at(-1)?.liveEvent).toBe(false);
+        });
+
+        it("reports a new event as live when it lands at the end of the live timeline", () => {
+            addEvent(messageEvent);
+            const reaction = utils.mkReaction(messageEvent, client, userA, roomId, messageEvent.getTs() + 1);
+
+            insertEvent(reaction, liveTimeline, true);
+
+            expect(liveTimeline.getEvents()).toEqual([messageEvent, reaction]);
+            expect(timelineData.at(-1)?.liveEvent).toBe(true);
+        });
+
+        it("reports a new event as live when it is inserted before later events in the live timeline", () => {
+            const laterMessage = utils.mkMessage({
+                room: roomId,
+                user: userA,
+                msg: "Later",
+                event: true,
+                ts: messageEvent.getTs() + 10,
+            });
+            addEvent(messageEvent);
+            addEvent(laterMessage);
+            const reaction = utils.mkReaction(messageEvent, client, userA, roomId, messageEvent.getTs() + 1);
+
+            insertEvent(reaction, liveTimeline, true);
+
+            expect(liveTimeline.getEvents()).toEqual([messageEvent, reaction, laterMessage]);
+            expect(timelineData.at(-1)?.liveEvent).toBe(true);
+        });
+
+        it("does not report a new event as live when it is inserted into a timeline that is not live", () => {
+            // eventTimeline belongs to eventTimelineSet but is not its live timeline
+            addEvent(messageEvent, eventTimeline);
+            const reaction = utils.mkReaction(messageEvent, client, userA, roomId, messageEvent.getTs() + 1);
+
+            insertEvent(reaction, eventTimeline, true);
+
+            expect(eventTimeline.getEvents()).toEqual([messageEvent, reaction]);
+            expect(timelineData.at(-1)?.liveEvent).toBe(false);
         });
     });
 
