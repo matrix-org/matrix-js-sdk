@@ -124,6 +124,10 @@ export interface InitRustCryptoArgs {
     x509Validity?: () => number;
 }
 
+export async function preloadRustCrypto(): Promise<void> {
+    await RustSdkCryptoJs.initAsync();
+}
+
 /**
  * Create a new `RustCrypto` implementation
  *
