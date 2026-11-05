@@ -1808,6 +1808,17 @@ describe("MatrixClient", function () {
             ]);
         });
 
+        it("should return the allowed rooms of a knock_restricted room", async () => {
+            const knockRestrictedSummary: RoomSummary = { ...roomSummary, join_rule: JoinRule.KnockRestricted };
+            expectVersions(["v1.14", "v1.15"]);
+            httpBackend.when("GET", stablePrefix + stableSuffix).respond(200, knockRestrictedSummary);
+
+            await Promise.all([
+                expect(client.getRoomSummary(roomId)).resolves.toEqual(knockRestrictedSummary),
+                httpBackend.flushAllExpected(),
+            ]);
+        });
+
         it("should use the stable endpoint when only the unstable feature is advertised", async () => {
             expectVersions(["v1.14"], { "org.matrix.msc3266": true });
             httpBackend.when("GET", stablePrefix + stableSuffix).respond(200, roomSummary);

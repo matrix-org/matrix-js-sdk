@@ -39,6 +39,7 @@ export enum JoinRule {
     Private = "private",
     Knock = "knock",
     Restricted = "restricted",
+    KnockRestricted = "knock_restricted",
 }
 
 export enum RestrictedAllowType {
