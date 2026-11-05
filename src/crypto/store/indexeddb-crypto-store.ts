@@ -104,8 +104,20 @@ export class IndexedDBCryptoStore implements CryptoStore {
         });
     }
 
-    private backendPromise?: Promise<CryptoStore>;
-    private backend?: CryptoStore;
+    /** The fallback store (localStorage or in-memory), if `startup()` found IndexedDB unusable. */
+    private fallbackStore?: CryptoStore;
+
+    /**
+     * Backend used by the methods which take an active transaction, set by `startup()`.
+     *
+     * Note: if using an IndexedDB backend, this `txnBackend` does not have a persistent connection
+     * to the database and should not be used for operations outside of {@link startup}. Using
+     * the backend via transactions is still fine, since those hold connections to the database
+     * themselves.
+     *
+     * TODO: We should probably remove this and make all transactional methods on CryptoStore static(?)
+     */
+    private txnBackend?: CryptoStore;
 
     /**
      * Create a new IndexedDBCryptoStore
@@ -130,33 +142,22 @@ export class IndexedDBCryptoStore implements CryptoStore {
     }
 
     /**
-     * Ensure the database exists and is up-to-date, or fall back to
-     * a local storage or in-memory store.
+     * Open a transient connection to the database, creating or upgrading it if necessary.
      *
-     * This must be called before the store can be used.
-     *
-     * @returns resolves to either an IndexedDBCryptoStoreBackend.Backend,
-     * or a MemoryCryptoStore
+     * The caller must close the returned connection once it is done with it. Prefer {@link run}
+     * if you'd rather not have to worry about that yourself.
      */
-    public startup(): Promise<CryptoStore> {
-        if (this.backendPromise) {
-            return this.backendPromise;
-        }
-
-        this.backendPromise = new Promise<CryptoStore>((resolve, reject) => {
+    private open(): Promise<IDBDatabase> {
+        return new Promise<IDBDatabase>((resolve, reject) => {
             if (!this.indexedDB) {
                 reject(new Error("no indexeddb support available"));
                 return;
             }
 
-            logger.log(`connecting to indexeddb ${this.dbName}`);
-
             const req = this.indexedDB.open(this.dbName, IndexedDBCryptoStoreBackend.VERSION);
 
             req.onupgradeneeded = (ev): void => {
-                const db = req.result;
-                const oldVersion = ev.oldVersion;
-                IndexedDBCryptoStoreBackend.upgradeDatabase(db, oldVersion);
+                IndexedDBCryptoStoreBackend.upgradeDatabase(req.result, ev.oldVersion);
             };
 
             req.onblocked = (): void => {
@@ -164,59 +165,90 @@ export class IndexedDBCryptoStore implements CryptoStore {
             };
 
             req.onerror = (ev): void => {
-                logger.log("Error connecting to indexeddb", ev);
-                reject(req.error);
+                if (req.error?.name === "VersionError") {
+                    logger.warn("Crypto DB is too new for us to use!", req.error);
+                    // don't fall back to a different store: the user has crypto data
+                    // in this db so we should use it or nothing at all.
+                    reject(new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew));
+                } else {
+                    logger.log("Error connecting to indexeddb", ev);
+                    reject(req.error);
+                }
             };
 
             req.onsuccess = (): void => {
-                const db = req.result;
-
-                logger.log(`connected to indexeddb ${this.dbName}`);
-                resolve(new IndexedDBCryptoStoreBackend.Backend(db));
+                resolve(req.result);
             };
-        })
-            .then((backend) => {
-                // Edge has IndexedDB but doesn't support compund keys which we use fairly extensively.
-                // Try a dummy query which will fail if the browser doesn't support compund keys, so
+        });
+    }
+
+    /**
+     * Run `func` against a `Backend` on a transient IndexedDB connection, automatically closing
+     * the connection once `func` completes.
+     *
+     * If `startup()` chose a fallback store, `func` will be run against that store instead.
+     */
+    private async run<T>(func: (backend: CryptoStore) => Promise<T>): Promise<T> {
+        if (this.fallbackStore) {
+            return func(this.fallbackStore);
+        }
+        const db = await this.open();
+        try {
+            return await func(new IndexedDBCryptoStoreBackend.Backend(db));
+        } finally {
+            db.close();
+        }
+    }
+
+    /**
+     * Ensure the database exists and is up-to-date, or fall back to
+     * a local storage or in-memory store.
+     *
+     * This must be called before the store can be used.
+     *
+     * @returns resolves to this store, once it is ready for use
+     */
+    public async startup(): Promise<CryptoStore> {
+        if (this.txnBackend) {
+            return this;
+        }
+
+        try {
+            await this.run(async (backend) => {
+                // Edge has IndexedDB but doesn't support compound keys which we use fairly extensively.
+                // Try a dummy query which will fail if the browser doesn't support compound keys, so
                 // we can fall back to a different backend.
-                return backend
-                    .doTxn(
-                        "readonly",
-                        [
-                            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
-                            IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
-                        ],
-                        (txn) => {
-                            backend.getEndToEndInboundGroupSession("", "", txn, () => {});
-                        },
-                    )
-                    .then(() => backend);
-            })
-            .catch((e) => {
-                if (e.name === "VersionError") {
-                    logger.warn("Crypto DB is too new for us to use!", e);
-                    // don't fall back to a different store: the user has crypto data
-                    // in this db so we should use it or nothing at all.
-                    throw new InvalidCryptoStoreError(InvalidCryptoStoreState.TooNew);
-                }
-                logger.warn(`unable to connect to indexeddb ${this.dbName}: falling back to localStorage store: ${e}`);
-
-                try {
-                    if (!(globalThis.localStorage instanceof Storage)) {
-                        throw new Error("localStorage is not available");
-                    }
-                    return new LocalStorageCryptoStore(globalThis.localStorage);
-                } catch (e) {
-                    logger.warn(`Unable to open localStorage: falling back to in-memory store: ${e}`);
-                    return new MemoryCryptoStore();
-                }
-            })
-            .then((backend) => {
-                this.backend = backend;
-                return backend;
+                await backend.doTxn(
+                    "readonly",
+                    [
+                        IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS,
+                        IndexedDBCryptoStore.STORE_INBOUND_GROUP_SESSIONS_WITHHELD,
+                    ],
+                    (txn) => {
+                        backend.getEndToEndInboundGroupSession("", "", txn, () => {});
+                    },
+                );
+                logger.log(`connected to indexeddb ${this.dbName}`);
+                this.txnBackend = backend;
             });
+        } catch (e) {
+            if (e instanceof InvalidCryptoStoreError) {
+                throw e;
+            }
+            logger.warn(`unable to connect to indexeddb ${this.dbName}: falling back to localStorage store: ${e}`);
 
-        return this.backendPromise;
+            try {
+                if (!(globalThis.localStorage instanceof Storage)) {
+                    throw new Error("localStorage is not available", { cause: e });
+                }
+                this.fallbackStore = new LocalStorageCryptoStore(globalThis.localStorage);
+            } catch (e) {
+                logger.warn(`Unable to open localStorage: falling back to in-memory store: ${e}`);
+                this.fallbackStore = new MemoryCryptoStore();
+            }
+            this.txnBackend = this.fallbackStore;
+        }
+        return this;
     }
 
     /**
@@ -224,35 +256,37 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *
      * @returns resolves when the store has been cleared.
      */
-    public deleteAllData(): Promise<void> {
-        return new Promise<void>((resolve, reject) => {
-            if (!this.indexedDB) {
-                reject(new Error("no indexeddb support available"));
-                return;
-            }
+    public async deleteAllData(): Promise<void> {
+        try {
+            return await new Promise<void>((resolve, reject) => {
+                if (!this.indexedDB) {
+                    reject(new Error("no indexeddb support available"));
+                    return;
+                }
 
-            logger.log(`Removing indexeddb instance: ${this.dbName}`);
-            const req = this.indexedDB.deleteDatabase(this.dbName);
+                logger.log(`Removing indexeddb instance: ${this.dbName}`);
+                const req = this.indexedDB.deleteDatabase(this.dbName);
 
-            req.onblocked = (): void => {
-                logger.log(`can't yet delete IndexedDBCryptoStore because it is open elsewhere`);
-            };
+                req.onblocked = (): void => {
+                    logger.log(`can't yet delete IndexedDBCryptoStore because it is open elsewhere`);
+                };
 
-            req.onerror = (ev): void => {
-                logger.log("Error deleting data from indexeddb", ev);
-                reject(req.error);
-            };
+                req.onerror = (ev): void => {
+                    logger.log("Error deleting data from indexeddb", ev);
+                    reject(req.error);
+                };
 
-            req.onsuccess = (): void => {
-                logger.log(`Removed indexeddb instance: ${this.dbName}`);
-                resolve();
-            };
-        }).catch((e) => {
+                req.onsuccess = (): void => {
+                    logger.log(`Removed indexeddb instance: ${this.dbName}`);
+                    resolve();
+                };
+            });
+        } catch (e) {
             // in firefox, with indexedDB disabled, this fails with a
             // DOMError. We treat this as non-fatal, so that people can
             // still use the app.
             logger.warn(`unable to delete IndexedDBCryptoStore: ${e}`);
-        });
+        }
     }
 
     /**
@@ -263,7 +297,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @internal
      */
     public getMigrationState(): Promise<MigrationState> {
-        return this.backend!.getMigrationState();
+        return this.run((backend) => backend.getMigrationState());
     }
 
     /**
@@ -274,7 +308,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @internal
      */
     public setMigrationState(migrationState: MigrationState): Promise<void> {
-        return this.backend!.setMigrationState(migrationState);
+        return this.run((backend) => backend.setMigrationState(migrationState));
     }
 
     // Olm Account
@@ -287,7 +321,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param func - Called with the account pickle
      */
     public getAccount(txn: IDBTransaction, func: (accountPickle: string | null) => void): void {
-        this.backend!.getAccount(txn, func);
+        this.txnBackend!.getAccount(txn, func);
     }
 
     /**
@@ -298,7 +332,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param accountPickle - The new account pickle to store.
      */
     public storeAccount(txn: IDBTransaction, accountPickle: string): void {
-        this.backend!.storeAccount(txn, accountPickle);
+        this.txnBackend!.storeAccount(txn, accountPickle);
     }
 
     /**
@@ -313,7 +347,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (keys: Record<string, CrossSigningKeyInfo> | null) => void,
     ): void {
-        this.backend!.getCrossSigningKeys(txn, func);
+        this.txnBackend!.getCrossSigningKeys(txn, func);
     }
 
     /**
@@ -326,7 +360,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         func: (key: SecretStorePrivateKeys[K] | null) => void,
         type: K,
     ): void {
-        this.backend!.getSecretStorePrivateKey(txn, func, type);
+        this.txnBackend!.getSecretStorePrivateKey(txn, func, type);
     }
 
     /**
@@ -341,7 +375,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         type: K,
         key: SecretStorePrivateKeys[K],
     ): void {
-        this.backend!.storeSecretStorePrivateKey(txn, type, key);
+        this.txnBackend!.storeSecretStorePrivateKey(txn, type, key);
     }
 
     // Olm sessions
@@ -352,7 +386,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param func - Called with the count of sessions
      */
     public countEndToEndSessions(txn: IDBTransaction, func: (count: number) => void): void {
-        this.backend!.countEndToEndSessions(txn, func);
+        this.txnBackend!.countEndToEndSessions(txn, func);
     }
 
     /**
@@ -373,7 +407,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (session: ISessionInfo | null) => void,
     ): void {
-        this.backend!.getEndToEndSession(deviceKey, sessionId, txn, func);
+        this.txnBackend!.getEndToEndSession(deviceKey, sessionId, txn, func);
     }
 
     /**
@@ -392,7 +426,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (sessions: { [sessionId: string]: ISessionInfo }) => void,
     ): void {
-        this.backend!.getEndToEndSessions(deviceKey, txn, func);
+        this.txnBackend!.getEndToEndSessions(deviceKey, txn, func);
     }
 
     /**
@@ -408,7 +442,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionInfo: ISessionInfo,
         txn: IDBTransaction,
     ): void {
-        this.backend!.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
+        this.txnBackend!.storeEndToEndSession(deviceKey, sessionId, sessionInfo, txn);
     }
 
     /**
@@ -419,7 +453,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @internal
      */
     public countEndToEndInboundGroupSessions(): Promise<number> {
-        return this.backend!.countEndToEndInboundGroupSessions();
+        return this.run((backend) => backend.countEndToEndInboundGroupSessions());
     }
 
     /**
@@ -430,7 +464,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @internal
      */
     public getEndToEndSessionsBatch(): Promise<null | ISessionInfo[]> {
-        return this.backend!.getEndToEndSessionsBatch();
+        return this.run((backend) => backend.getEndToEndSessionsBatch());
     }
 
     /**
@@ -441,7 +475,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @internal
      */
     public deleteEndToEndSessionsBatch(sessions: { deviceKey: string; sessionId: string }[]): Promise<void> {
-        return this.backend!.deleteEndToEndSessionsBatch(sessions);
+        return this.run((backend) => backend.deleteEndToEndSessionsBatch(sessions));
     }
 
     // Inbound group sessions
@@ -461,7 +495,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         txn: IDBTransaction,
         func: (groupSession: InboundGroupSessionData | null, groupSessionWithheld: IWithheld | null) => void,
     ): void {
-        this.backend!.getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func);
+        this.txnBackend!.getEndToEndInboundGroupSession(senderCurve25519Key, sessionId, txn, func);
     }
 
     /**
@@ -479,7 +513,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
         sessionData: InboundGroupSessionData,
         txn: IDBTransaction,
     ): void {
-        this.backend!.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
+        this.txnBackend!.storeEndToEndInboundGroupSession(senderCurve25519Key, sessionId, sessionData, txn);
     }
 
     /**
@@ -490,7 +524,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @internal
      */
     public getEndToEndInboundGroupSessionsBatch(): Promise<SessionExtended[] | null> {
-        return this.backend!.getEndToEndInboundGroupSessionsBatch();
+        return this.run((backend) => backend.getEndToEndInboundGroupSessionsBatch());
     }
 
     /**
@@ -503,7 +537,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
     public deleteEndToEndInboundGroupSessionsBatch(
         sessions: { senderKey: string; sessionId: string }[],
     ): Promise<void> {
-        return this.backend!.deleteEndToEndInboundGroupSessionsBatch(sessions);
+        return this.run((backend) => backend.deleteEndToEndInboundGroupSessionsBatch(sessions));
     }
 
     /**
@@ -512,7 +546,7 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @param func - Function called with the end-to-end encrypted rooms
      */
     public getEndToEndRooms(txn: IDBTransaction, func: (rooms: Record<string, IRoomEncryption>) => void): void {
-        this.backend!.getEndToEndRooms(txn, func);
+        this.txnBackend!.getEndToEndRooms(txn, func);
     }
 
     /**
@@ -522,7 +556,11 @@ export class IndexedDBCryptoStore implements CryptoStore {
      * @returns resolves when the sessions are marked
      */
     public markSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
-        return this.backend!.markSessionsNeedingBackup(sessions, txn);
+        // With an active transaction, the work must be queued synchronously, before the txn expires.
+        if (txn) {
+            return this.txnBackend!.markSessionsNeedingBackup(sessions, txn);
+        }
+        return this.run((backend) => backend.markSessionsNeedingBackup(sessions));
     }
 
     /**
@@ -548,6 +586,6 @@ export class IndexedDBCryptoStore implements CryptoStore {
      *     exception will propagate to the caller of the getFoo method.
      */
     public doTxn<T>(mode: Mode, stores: Iterable<string>, func: (txn: IDBTransaction) => T, log?: Logger): Promise<T> {
-        return this.backend!.doTxn<T>(mode, stores, func as (txn: unknown) => T, log);
+        return this.run((backend) => backend.doTxn<T>(mode, stores, func as (txn: unknown) => T, log));
     }
 }
