@@ -273,6 +273,12 @@ const SCROLLBACK_DELAY_MS = 3000;
 
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
+/**
+ * Default time-to-live for extended profile properties cached in the store (5 minutes).
+ * Prevents stale profile entries over time while avoiding hammering homeservers on restart.
+ */
+export const EXTENDED_PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export interface IKeysUploadResponse {
     one_time_key_counts: {
         [algorithm: string]: number;
@@ -7800,14 +7806,21 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws An error if the server does not support MSC4133.
      */
-    public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
+    public async getExtendedProfileProperty(
+        userId: string,
+        key: string,
+        maxAgeMs = EXTENDED_PROFILE_CACHE_TTL_MS,
+    ): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
         // NOTE: We only read individual keys from a cached profile as we don't have the full profile
-        // cached, only the keys that the user has configured via their sync filter.
+        // cached, only the keys that the user has configured via their sync filter or previously fetched.
         const storedProfile = await this.store.getUserProfile(userId);
-        if (storedProfile?.[key] !== undefined) {
+        const timestamp = (storedProfile?._profile_timestamps as Record<string, number> | undefined)?.[key];
+        const isExpired = timestamp !== undefined ? Date.now() - timestamp >= maxAgeMs : maxAgeMs === 0;
+
+        if (storedProfile?.[key] !== undefined && !isExpired) {
             return storedProfile[key];
         }
         let profile: SyncUserProfile;
@@ -7824,12 +7837,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } catch (e) {
             if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
                 // The key is not set on the profile (or the profile does not exist).
+                if (storedProfile && key in storedProfile) {
+                    const { [key]: _deleted, ...remainingProfile } = storedProfile;
+                    const timestamps = {
+                        ...(remainingProfile._profile_timestamps as Record<string, number> | undefined),
+                    };
+                    delete timestamps[key];
+                    await this.store.storeUserProfiles(
+                        new Map([[userId, { ...remainingProfile, _profile_timestamps: timestamps }]]),
+                    );
+                }
                 return undefined;
             }
             throw e;
         }
 
-        // write through to the cache
+        // write through to the cache with updated timestamp
+        const timestamps = {
+            ...(storedProfile?._profile_timestamps as Record<string, number> | undefined),
+            [key]: Date.now(),
+        };
         await this.store.storeUserProfiles(
             new Map([
                 [
@@ -7837,6 +7864,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                     {
                         ...storedProfile,
                         ...profile,
+                        _profile_timestamps: timestamps,
                     },
                 ],
             ]),
