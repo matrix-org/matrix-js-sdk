@@ -29,6 +29,7 @@ import { logger } from "../../../src/logger";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
 import { type RtcSlotEventContent } from "../../../src/matrixrtc/types";
+import { type Mock } from "vitest";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
@@ -62,6 +63,34 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                 client.emit(RoomStateEvent.Events, membEvent, roomState, null);
             } else {
                 membershipData.splice(0, 1, { user_id: sessionMembershipTemplate.user_id });
+                client.emit(ClientEvent.Event, mockRTCEvent(membershipData[0], room.roomId, 10000));
+            }
+            await flushPromises();
+        }
+
+        /** A second membership in the same call, from another device. */
+        function generateOtherDeviceMembership(): MembershipData {
+            if (eventKind === "sticky") {
+                return {
+                    ...rtcMembershipTemplate,
+                    member: { ...rtcMembershipTemplate.member, id: "OTHERID", device_id: "BBBBBBB" },
+                    msc4354_sticky_key: "m.call#other",
+                } satisfies RtcMembershipData & { user_id: string };
+            }
+            return { ...sessionMembershipTemplate, device_id: "BBBBBBB" } satisfies SessionMembershipData & {
+                user_id: string;
+            };
+        }
+
+        /** Replaces the room's memberships with the given ones and emits the event the manager reacts to. */
+        async function setMemberships(room: Room, membershipData: MembershipData[], newData: MembershipData[]) {
+            if (eventKind === "memberState") {
+                mockRoomState(room, newData);
+                const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+                const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
+                client.emit(RoomStateEvent.Events, membEvent, roomState, null);
+            } else {
+                membershipData.splice(0, membershipData.length, ...newData);
                 client.emit(ClientEvent.Event, mockRTCEvent(membershipData[0], room.roomId, 10000));
             }
             await flushPromises();
@@ -122,6 +151,107 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                 room1.roomId,
                 client.matrixRTC.getActiveRoomSession(room1),
             ]);
+        });
+
+        describe("sessions whose memberships are already known at startup", () => {
+            let manager: MatrixRTCSessionManager;
+            let onStarted: Mock;
+            let onEnded: Mock;
+
+            beforeEach(() => {
+                // A manager of our own, so we control when start() runs.
+                manager = new MatrixRTCSessionManager(logger, client);
+                onStarted = vi.fn();
+                onEnded = vi.fn();
+                manager.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+                manager.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
+            });
+
+            afterEach(() => {
+                manager.stop();
+            });
+
+            it("Fires SessionStarted for a call already in the room state when start() runs", async () => {
+                const room1 = makeMockRoom([generateMembership()], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+                manager.start();
+                await manager.getRoomSession(room1).initialMembershipCalculated;
+                await flushPromises();
+
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onStarted).toHaveBeenCalledWith(room1.roomId, manager.getRoomSession(room1));
+                expect(manager.getRoomSession(room1).memberships).toHaveLength(1);
+            });
+
+            it("Fires SessionStarted once for a session created by getRoomSession() before start()", async () => {
+                const room1 = makeMockRoom([generateMembership()], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
+
+                // This is what Element Web's CallStore does as the cached sync adds rooms.
+                const session = manager.getRoomSession(room1);
+                expect(session.memberships).toHaveLength(0);
+                manager.start();
+                expect(manager.getRoomSession(room1)).toBe(session);
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onStarted).toHaveBeenCalledWith(room1.roomId, session);
+
+                // Rooms being refreshed doesn't fire it again
+                client.emit(ClientEvent.Room, room1);
+                await flushPromises();
+                expect(onStarted).toHaveBeenCalledTimes(1);
+            });
+
+            it("Fires SessionStarted once for a session created by getRoomSession() after start(), then SessionEnded", async () => {
+                const membershipData: MembershipData[] = [generateMembership()];
+                const room1 = makeMockRoom(membershipData, eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([]);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
+
+                manager.start();
+                const session = manager.getRoomSession(room1);
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onStarted).toHaveBeenCalledWith(room1.roomId, session);
+
+                // Another device joins: not a new session
+                await setMemberships(room1, membershipData, [generateMembership(), generateOtherDeviceMembership()]);
+                await vi.waitFor(() => expect(session.memberships).toHaveLength(2));
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onEnded).not.toHaveBeenCalled();
+
+                // Everyone leaves
+                await setMemberships(room1, membershipData, [
+                    { user_id: sessionMembershipTemplate.user_id },
+                    { user_id: sessionMembershipTemplate.user_id },
+                ]);
+                await vi.waitFor(() => expect(session.memberships).toHaveLength(0));
+                expect(onEnded).toHaveBeenCalledTimes(1);
+                expect(onEnded).toHaveBeenCalledWith(room1.roomId, session);
+                expect(onStarted).toHaveBeenCalledTimes(1);
+            });
+
+            it("Doesn't fire events after stop()", async () => {
+                const room1 = makeMockRoom([generateMembership()], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+                manager.start();
+                // Stop while the initial membership calculation is still in progress
+                const session = manager.getRoomSession(room1);
+                manager.stop();
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                expect(session.memberships).toHaveLength(1);
+                expect(onStarted).not.toHaveBeenCalled();
+                expect(onEnded).not.toHaveBeenCalled();
+            });
         });
 
         it("Fires correctly with custom sessionDescription", async () => {
