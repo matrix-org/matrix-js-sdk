@@ -84,6 +84,9 @@ export type SessionMembershipData = {
     /**
      * The intent of the call from the perspective of this user. This may be an audio call, video call or
      * something else.
+     *
+     * This carries the unstable identifiers (`audio`, `video`) and should be read through
+     * {@link CallMembership.intent} which returns the matching stable identifiers.
      */
     "m.call.intent"?: RTCCallIntent;
 
