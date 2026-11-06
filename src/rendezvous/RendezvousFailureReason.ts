@@ -25,6 +25,8 @@ export enum MSC4108FailureReason {
     UnexpectedMessageReceived = "unexpected_message_received",
     UnsupportedProtocol = "unsupported_protocol",
     UserCancelled = "user_cancelled",
+    /** Sent by the existing device when it was unable to open the verification URI (2025 version of MSC4108) */
+    UnableToOpenVerificationUri = "unable_to_open_verification_uri",
 }
 
 export enum ClientRendezvousFailureReason {
