@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 export * from "./CallMembership.ts";
+export * from "./CallIntent.ts";
 export * from "./LivekitTransport.ts";
 export * from "./MatrixRTCSession.ts";
 export * from "./MatrixRTCSessionManager.ts";

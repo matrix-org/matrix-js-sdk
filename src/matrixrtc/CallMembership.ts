@@ -29,6 +29,7 @@ import {
 } from "./membershipData/index.ts";
 import { EventType } from "../@types/event.ts";
 import { isUnstableLivekitTransport, selectLivekitTransport } from "./LivekitTransport.ts";
+import { toStableCallIntent, toUnstableCallIntent } from "./CallIntent.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -270,13 +271,36 @@ export class CallMembership {
         return getDeviceId(this.membershipData);
     }
 
-    public get callIntent(): RTCCallIntent | undefined {
-        const intent = this.applicationData["m.call.intent"];
-        if (typeof intent === "string") {
-            return intent;
+    /**
+     * The stable call intent this member advertises, or `undefined` if none.
+     *
+     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
+     */
+    public get intent(): RTCCallIntent | undefined {
+        const { kind, data } = this.membershipData;
+        let intent: unknown;
+        switch (kind) {
+            case MembershipKind.RTC:
+                // Prefer the stable key `intent`. Otherwise, fall back to the unstable `m.call.intent`
+                // sent by older clients which don't know `intent`.
+                intent = data.application["intent"] ?? data.application["m.call.intent"];
+                break;
+            case MembershipKind.Session:
+            default:
+                intent = data["m.call.intent"];
         }
-        this.logger.warn("RTC membership has invalid m.call.intent");
-        return undefined;
+        // If we have an intent, try to map it to the stable identifiers.
+        return typeof intent === "string" ? toStableCallIntent(intent) : undefined;
+    }
+
+    /**
+     * The unstable call intent this member advertises, or `undefined` if none.
+     *
+     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
+     * @deprecated Use {@link CallMembership.intent} instead.
+     */
+    public get callIntent(): RTCCallIntent | undefined {
+        return toUnstableCallIntent(this.intent);
     }
 
     public get callCapabilities(): RTCCallCapability[] | undefined {

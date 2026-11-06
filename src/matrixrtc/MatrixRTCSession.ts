@@ -23,6 +23,7 @@ import { EventType, RelationType } from "../@types/event.ts";
 import { KnownMembership } from "../@types/membership.ts";
 import { type ISendEventResponse } from "../@types/requests.ts";
 import { CallMembership } from "./CallMembership.ts";
+import { toUnstableCallIntent } from "./CallIntent.ts";
 import { RoomStateEvent } from "../models/room-state.ts";
 import { MembershipManager, StickyEventMembershipManager } from "./MembershipManager.ts";
 import { type CallMembershipIdentityParts, type IEncryptionManager } from "./EncryptionManager.ts";
@@ -111,11 +112,15 @@ export interface SessionConfig {
     callCapabilities?: RTCCallCapability[];
 
     /**
-     * Application-specific data to publish in our membership alongside the
-     * application `type`, `m.call.intent` and `capabilities`: in the `application`
-     * object of an `m.rtc.member` event, or at the top level of a legacy
-     * `m.call.member` one. Keys should be namespaced. Read back through
-     * {@link CallMembership.applicationData}.
+     * Application-specific data to publish in our membership event (in the
+     * `application` object of an `m.rtc.member` event, or at the top level of a
+     * legacy `m.call.member` event).
+     *
+     * `type`, `intent`, `m.call.intent` and `capabilities` are written by the SDK
+     * from {@link SessionConfig.callIntent} and {@link SessionConfig.callCapabilities}.
+     * Any of those keys given here will be dropped.
+     *
+     * Read back through {@link CallMembership.applicationData}.
      */
     applicationData?: Record<string, unknown>;
 
@@ -673,19 +678,45 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
      *
      * If all members that specify a call intent agree, that value is returned.
+     *
+     * This method uses the stable intent identifiers (`m.audio`, `m.video`).
+     *
      * @returns A call intent, or `undefined` if no consensus or not given.
+     *
+     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
      */
-    public getConsensusCallIntent(): RTCCallIntent | undefined {
-        const getFirstCallIntent = this.memberships.find((m) => !!m.callIntent)?.callIntent;
-        if (!getFirstCallIntent) {
+    public getConsensusIntent(): RTCCallIntent | undefined {
+        const firstIntent = this.memberships.find((m) => !!m.intent)?.intent;
+        if (!firstIntent) {
             return undefined;
         }
-        if (this.memberships.every((m) => !m.callIntent || m.callIntent === getFirstCallIntent)) {
-            return getFirstCallIntent;
+        if (this.memberships.every((m) => !m.intent || m.intent === firstIntent)) {
+            return firstIntent;
         }
         return undefined;
     }
 
+    /**
+     * Get the call intent for the current call, based on what members are advertising. If one or more
+     * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
+     *
+     * If all members that specify a call intent agree, that value is returned.
+     *
+     * This method uses the unstable intent identifiers (`audio`, `video`).
+     *
+     * @returns A call intent, or `undefined` if no consensus or not given.
+     *
+     * @deprecated Use {@link MatrixRTCSession.getConsensusIntent}. This returns legacy values (`audio`, `video`).
+     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
+     */
+    public getConsensusCallIntent(): RTCCallIntent | undefined {
+        return toUnstableCallIntent(this.getConsensusIntent());
+    }
+
+    /**
+     * Update the intent we advertise for the call (see {@link SessionConfig.callIntent}), re-sending our
+     * membership if it changed.
+     */
     public async updateCallIntent(callIntent: RTCCallIntent): Promise<void> {
         const myMembership = this.membershipManager?.ownMembership;
         if (!myMembership) {
@@ -753,13 +784,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Note: This does not return a promise, instead scheduling the notification events to be sent.
      * @param parentEventId Event id linking to your RTC call membership event.
      * @param notificationType The type of notification to send
-     * @param callIntent The type of call this is (e.g. "audio").
+     * @param callIntent The type of call this is.
      */
-    private sendCallNotify(
-        parentEventId: string,
-        notificationType: RTCNotificationType,
-        callIntent?: RTCCallIntent,
-    ): void {
+    private sendCallNotify(parentEventId: string, notificationType: RTCNotificationType, intent?: RTCCallIntent): void {
         const lifetime = this.joinConfig?.notificationLifetimeMs ?? 90_000;
         const slotId = computeSlotId(this.slotDescription);
         const sendNotificationEvent = async (): Promise<{
@@ -778,7 +805,10 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 "lifetime": lifetime,
                 "msc4354_sticky_key": slotId,
             };
-            if (callIntent) {
+            if (intent) {
+                // Only include the unstable intent property here. The notification event itself
+                // is still unstable.
+                const callIntent = toUnstableCallIntent(intent);
                 content["m.call.intent"] = callIntent;
             }
             return { response: await this.sendNotificationEvent(content), content };
@@ -910,11 +940,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                 // If we're the first member in the call, we're responsible for
                 // sending the notification event
                 if (ownMembership.eventId && this.joinConfig?.notificationType) {
-                    this.sendCallNotify(
-                        ownMembership.eventId,
-                        this.joinConfig.notificationType,
-                        ownMembership.callIntent,
-                    );
+                    this.sendCallNotify(ownMembership.eventId, this.joinConfig.notificationType, ownMembership.intent);
                 } else {
                     this.logger.warn("Own membership eventId is undefined, cannot send call notification");
                 }

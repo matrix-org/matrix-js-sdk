@@ -206,7 +206,30 @@ describe("CallMembership", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
             });
             it("returns correct call intent", () => {
+                expect(membership.intent).toBe("voice");
                 expect(membership.callIntent).toBe("voice");
+            });
+            it("normalises the legacy intent values", () => {
+                const audio = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "m.call.intent": "audio",
+                });
+                expect(audio.intent).toBe("m.audio");
+                expect(audio.callIntent).toBe("audio");
+                const video = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "m.call.intent": "video",
+                });
+                expect(video.intent).toBe("m.video");
+                expect(video.callIntent).toBe("video");
+            });
+            it("returns undefined intent if not advertised", () => {
+                const withoutIntent = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "m.call.intent": undefined,
+                });
+                expect(withoutIntent.intent).toBeUndefined();
+                expect(withoutIntent.callIntent).toBeUndefined();
             });
             it("returns correct call capabilities", () => {
                 expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
@@ -481,7 +504,54 @@ describe("CallMembership", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
             });
             it("returns correct call intent", () => {
+                expect(membership.intent).toBe("voice");
                 expect(membership.callIntent).toBe("voice");
+            });
+            it("reads the MSC4196 intent key", () => {
+                const spec = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call", intent: "m.audio" },
+                });
+                expect(spec.intent).toBe("m.audio");
+                expect(spec.callIntent).toBe("audio");
+            });
+            it("prefers the intent key over the legacy m.call.intent key", () => {
+                const both = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { "type": "m.call", "intent": "m.audio", "m.call.intent": "video" },
+                });
+                expect(both.intent).toBe("m.audio");
+                expect(both.callIntent).toBe("audio");
+            });
+            it("normalises the legacy intent values", () => {
+                const legacy = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { "type": "m.call", "m.call.intent": "video" },
+                });
+                expect(legacy.intent).toBe("m.video");
+                expect(legacy.callIntent).toBe("video");
+            });
+            it("returns undefined intent if not advertised", () => {
+                const withoutIntent = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call" },
+                });
+                expect(withoutIntent.intent).toBeUndefined();
+                expect(withoutIntent.callIntent).toBeUndefined();
+            });
+            it("rejects membership with a non-string intent", () => {
+                expect(() => {
+                    createCallMembership(makeMockEvent(), {
+                        ...membershipTemplate,
+                        application: { type: "m.call", intent: 42 },
+                    });
+                }).toThrow();
+                expect(() => {
+                    createCallMembership(makeMockEvent(), {
+                        ...membershipTemplate,
+                        application: { "type": "m.call", "m.call.intent": 42 },
+                    });
+                }).toThrow();
             });
             it("returns correct call capabilities", () => {
                 expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
