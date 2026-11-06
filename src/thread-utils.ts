@@ -27,5 +27,5 @@ import { type IEvent } from "./models/event.ts";
 export function getRelationsThreadFilter(threadId: string): (e: Partial<IEvent>) => boolean {
     return (e: Partial<IEvent>) =>
         e.content?.["m.relates_to"]?.event_id !== threadId ||
-        e.content?.["m.relates_to"]?.rel_type === THREAD_RELATION_TYPE.name;
+        THREAD_RELATION_TYPE.matches(e.content?.["m.relates_to"]?.rel_type ?? "");
 }
