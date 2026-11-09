@@ -63,24 +63,6 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             } satisfies SessionMembershipData & { user_id: string };
         }
 
-        async function sendLeaveMembership(room: Room, membershipData: MembershipData[]): Promise<void> {
-            if (eventKind === "memberState") {
-                mockRoomState(room, [{ user_id: sessionMembershipTemplate.user_id }]);
-                const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
-                const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
-                room.emit(RoomStateEvent.Events, membEvent, roomState, null);
-            } else {
-                membershipData.splice(0, 1, { user_id: sessionMembershipTemplate.user_id });
-                room.emit(
-                    RoomStickyEventsEvent.Update,
-                    [mockRTCEvent(membershipData[0], room.roomId, 10000) as StickyMatrixEvent],
-                    [],
-                    [],
-                );
-            }
-            await flushPromises();
-        }
-
         /** A second membership in the same call, from another device. */
         function generateOtherDeviceMembership(): MembershipData {
             if (eventKind === "sticky") {
@@ -95,23 +77,36 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             };
         }
 
-        /** Replaces the room's memberships with the given ones and emits the event the manager reacts to. */
-        async function setMemberships(room: Room, membershipData: MembershipData[], newData: MembershipData[]) {
+        /**
+         * Replaces the room's memberships with `liveMembershipData` and emits the event that makes the session recalculate.
+         * @param liveMembershipData - the array the room was created with (`makeMockRoom`). In sticky mode the room
+         *     reads its sticky events from this array, so it is updated in place.
+         */
+        async function setMemberships(
+            room: Room,
+            liveMembershipData: MembershipData[],
+            newData: MembershipData[],
+        ): Promise<void> {
             if (eventKind === "memberState") {
                 mockRoomState(room, newData);
                 const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
                 const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
                 room.emit(RoomStateEvent.Events, membEvent, roomState, null);
             } else {
-                membershipData.splice(0, membershipData.length, ...newData);
+                liveMembershipData.splice(0, liveMembershipData.length, ...newData);
                 room.emit(
                     RoomStickyEventsEvent.Update,
-                    [mockRTCEvent(membershipData[0], room.roomId, 10000) as StickyMatrixEvent],
+                    [mockRTCEvent(liveMembershipData[0], room.roomId, 10000) as StickyMatrixEvent],
                     [],
                     [],
                 );
             }
             await flushPromises();
+        }
+
+        /** Makes the (single) member in the room leave the call. */
+        async function sendLeaveMembership(room: Room, liveMembershipData: MembershipData[]): Promise<void> {
+            await setMemberships(room, liveMembershipData, [{ user_id: sessionMembershipTemplate.user_id }]);
         }
 
         beforeEach(() => {
