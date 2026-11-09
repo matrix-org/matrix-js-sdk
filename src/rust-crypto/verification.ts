@@ -324,25 +324,6 @@ export class RustVerificationRequest
     }
 
     /**
-     * Create a {@link Verifier} to do this verification via a particular method.
-     *
-     * If a verifier has already been created for this request, returns that verifier.
-     *
-     * This does *not* send the `m.key.verification.start` event - to do so, call {@link Verifier#verifier} on the
-     * returned verifier.
-     *
-     * If no previous events have been sent, pass in `targetDevice` to set who to direct this request to.
-     *
-     * @param method - the name of the verification method to use.
-     * @param targetDevice - details of where to send the request to.
-     *
-     * @returns The verifier which will do the actual verification.
-     */
-    public beginKeyVerification(method: string, targetDevice?: { userId?: string; deviceId?: string }): Verifier {
-        throw new Error("not implemented");
-    }
-
-    /**
      * Send an `m.key.verification.start` event to start verification via a particular method.
      *
      * Implementation of {@link Crypto.VerificationRequest#startVerification}.
@@ -414,13 +395,6 @@ export class RustVerificationRequest
         // In that case, we should not return it to the application yet, since the application will not expect the
         // Verifier to be replaced during the lifetime of the VerificationRequest.
         return this.phase === VerificationPhase.Started ? this._verifier : undefined;
-    }
-
-    /**
-     * Stub implementation of {@link Crypto.VerificationRequest#getQRCodeBytes}.
-     */
-    public getQRCodeBytes(): Uint8ClampedArray | undefined {
-        throw new Error("getQRCodeBytes() unsupported in Rust Crypto; use generateQRCode() instead.");
     }
 
     /**
