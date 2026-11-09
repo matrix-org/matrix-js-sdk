@@ -16,12 +16,7 @@ limitations under the License.
 
 import debug from "debug";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import {
-    KeysQueryRequest,
-    OlmMachine,
-    type OtherUserIdentity,
-    StoreHandle,
-} from "@matrix-org/matrix-sdk-crypto-wasm";
+import { KeysQueryRequest, OlmMachine, type OtherUserIdentity, StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type Mocked } from "vitest";
 import fetchMock from "@fetch-mock/vitest";
 import { type CallLog } from "fetch-mock";
