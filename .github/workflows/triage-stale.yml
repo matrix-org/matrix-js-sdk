@@ -3,6 +3,8 @@ on:
     workflow_dispatch: {}
     schedule:
         - cron: "30 1 * * *"
+    pull_request_target:
+        types: [synchronize]
 permissions: {}
 jobs:
     close:
