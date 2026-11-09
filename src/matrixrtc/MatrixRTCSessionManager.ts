@@ -80,8 +80,6 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         }
 
         this.client.on(ClientEvent.Room, this.onRoom);
-        this.client.on(ClientEvent.Event, this.onEvent);
-        this.client.on(RoomStateEvent.Events, this.onRoomState);
     }
 
     public stop(): void {
@@ -150,20 +148,8 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         void this.refreshRoom(room);
     };
 
-    private readonly onEvent = (event: MatrixEvent): void => {
-        if (!event.unstableStickyExpiresAt) return; // Not sticky, not interested.
-
-        if (event.getType() !== EventType.RTCMembership) return;
-
-        const room = this.client.getRoom(event.getRoomId());
-        if (!room) return;
-
-        void this.refreshRoom(room);
     };
 
-    private readonly onRoomState = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.GroupCallMemberPrefix && event.getType() !== EventType.RTCSlot) {
-            return;
         }
         const room = this.client.getRoom(event.getRoomId());
         if (!room) {

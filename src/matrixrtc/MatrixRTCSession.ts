@@ -827,9 +827,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Call this when a room state event has been updated.
      */
     private readonly onRoomStateEvent = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.RTCSlot) return;
-        if (event.getStateKey() !== computeSlotId(this.slotDescription)) return;
-        void this.ensureRecalculateSessionMembers();
+        if (event.getType() === EventType.GroupCallMemberPrefix) {
+            // A (legacy) call membership state event: any of them can change our memberships.
+            void this.ensureRecalculateSessionMembers();
+        } else if (
+            event.getType() === EventType.RTCSlot &&
+            event.getStateKey() === computeSlotId(this.slotDescription)
+        ) {
+            void this.ensureRecalculateSessionMembers();
+        }
     };
 
     /**

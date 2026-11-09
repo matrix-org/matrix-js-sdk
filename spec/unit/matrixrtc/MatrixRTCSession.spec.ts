@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mock } from "vitest";
 
-import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
+import { EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
 import {
     type CallMembership,
     type JoinSessionConfig,
@@ -1298,6 +1298,23 @@ describe("MatrixRTCSession", () => {
             await sess.initialMembershipCalculated;
 
             expect(sess.memberships).toHaveLength(1);
+        });
+
+        it("recalculates memberships when a call member state event arrives", async () => {
+            const mockRoom = makeMockRoom([sessionMembershipTemplate]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(1);
+
+            // The member leaves
+            mockRoomState(mockRoom, [{ user_id: sessionMembershipTemplate.user_id }]);
+            const roomState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+            const memberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix)[0];
+            const membershipRecalculated = new Promise((r) => sess?.once(MatrixRTCSessionEvent.MembershipsChanged, r));
+            mockRoom.emit(RoomStateEvent.Events, memberEvent, roomState, null);
+            await membershipRecalculated;
+
+            expect(sess.memberships).toHaveLength(0);
         });
 
         it("recalculates memberships when the slot is closed via a room state update", async () => {
