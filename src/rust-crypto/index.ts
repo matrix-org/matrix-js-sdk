@@ -124,6 +124,13 @@ export interface InitRustCryptoArgs {
     x509Validity?: () => number;
 }
 
+/**
+ * Preload the Rust Crypto and call `initAsync` on it.
+ * Enables the downstream app to improve startup performance on the large WASM asset.
+ * Safe to be called at any time, will have no effect if Rust Crypto is already initialised.
+ *
+ * @internal
+ */
 export async function preloadRustCrypto(): Promise<void> {
     await RustSdkCryptoJs.initAsync();
 }
