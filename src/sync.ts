@@ -215,7 +215,6 @@ export class SyncApi {
     private connectionReturnedResolvers?: PromiseWithResolvers<boolean>;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
-    private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
     private presence?: SetPresence;
 
     /**
@@ -851,13 +850,6 @@ export class SyncApi {
             await this.processSyncResponse(syncEventData, data);
         } catch (e) {
             this.syncOpts.logger.error("Error processing cached sync", e);
-        }
-
-        // Don't emit a prepared if we've bailed because the store is invalid:
-        // in this case the client will not be usable until stopped & restarted
-        // so this would be useless and misleading.
-        if (!this.storeIsInvalid) {
-            this.updateSyncState(SyncState.Prepared, syncEventData);
         }
     }
 
