@@ -413,39 +413,6 @@ Once the cross-signing is set up on one of your devices, you can verify another 
 
 2. Request an interactive verification against existing devices, by calling [CryptoApi.requestOwnUserVerification](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#requestOwnUserVerification).
 
-## Migrating from the legacy crypto stack to Rust crypto
-
-If your application previously used the legacy crypto stack, (i.e, it called `MatrixClient.initLegacyCrypto()`), you will
-need to migrate existing devices to the Rust crypto stack.
-
-This migration happens automatically when you call `initRustCrypto()` instead of `initLegacyCrypto()`,
-but you need to provide the legacy [`cryptoStore`](https://matrix-org.github.io/matrix-js-sdk/interfaces/matrix.ICreateClientOpts.html#cryptoStore) and [`pickleKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/matrix.ICreateClientOpts.html#pickleKey) to [`createClient`](https://matrix-org.github.io/matrix-js-sdk/functions/matrix.createClient.html):
-
-```javascript
-// You should provide the legacy crypto store and the pickle key to the matrix client in order to migrate the data.
-const matrixClient = sdk.createClient({
-    cryptoStore: myCryptoStore,
-    pickleKey: myPickleKey,
-    baseUrl: "http://localhost:8008",
-    accessToken: myAccessToken,
-    userId: myUserId,
-});
-
-// The migration will be done automatically when you call `initRustCrypto`.
-await matrixClient.initRustCrypto();
-```
-
-To follow the migration progress, you can listen to the [`CryptoEvent.LegacyCryptoStoreMigrationProgress`](https://matrix-org.github.io/matrix-js-sdk/enums/crypto_api.CryptoEvent.html#LegacyCryptoStoreMigrationProgress) event:
-
-```javascript
-// When progress === total === -1, the migration is finished.
-matrixClient.on(CryptoEvent.LegacyCryptoStoreMigrationProgress, (progress, total) => {
-    ...
-});
-```
-
-The Rust crypto stack is not supported in a lot of deprecated methods of [`MatrixClient`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html). If you use them, you should migrate to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html). Also, the legacy `MatrixClient.crypto` object is not available any more: you should use `MatrixClient.getCrypto()` instead.
-
 # Contributing
 
 _This section is for people who want to modify the SDK. If you just

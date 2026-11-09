@@ -183,7 +183,6 @@ import {
     type RuleId,
 } from "./@types/PushRules.ts";
 import { type IThreepid } from "./@types/threepids.ts";
-import { type CryptoStore } from "./crypto/store/base.ts";
 import {
     GroupCall,
     type GroupCallIntent,
@@ -285,20 +284,6 @@ export interface ICreateClientOpts {
     store?: Store;
 
     /**
-     * A store to be used for end-to-end crypto session data.
-     * The `createClient` helper will create a default store if needed. Calls the factory supplied to
-     * {@link setCryptoStoreFactory} if unspecified; or if no factory has been
-     * specified, uses a default implementation (indexeddb in the browser,
-     * in-memory otherwise).
-     *
-     * This is only used for the legacy crypto implementation,
-     * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
-     * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
-     * data can be migrated from the legacy store.
-     */
-    cryptoStore?: CryptoStore;
-
-    /**
      * The scheduler to use. If not
      * specified, this client will not retry requests on failure. This client
      * will supply its own processing function to
@@ -387,18 +372,6 @@ export interface ICreateClientOpts {
      * `?user_id=`.
      */
     queryParams?: QueryDict;
-
-    /**
-     * Encryption key used for encrypting sensitive data (such as e2ee keys) in {@link ICreateClientOpts#cryptoStore}.
-     *
-     * This must be set to the same value every time the client is initialised for the same device.
-     *
-     * This is only used for the legacy crypto implementation,
-     * but if you use the rust crypto implementation ({@link MatrixClient#initRustCrypto}) and the device
-     * previously used legacy crypto (so must be migrated), then this must still be provided, so that the
-     * data can be migrated from the legacy store.
-     */
-    pickleKey?: string;
 
     /**
      * Verification methods we should offer to the other side when performing an interactive verification.
@@ -1208,24 +1181,13 @@ const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action"
  * as it specifies 'sensible' defaults for these modules.
  */
 export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
-    public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = "RESTORE_BACKUP_ERROR_BAD_KEY";
-
     private readonly logger: Logger;
 
     public reEmitter = new TypedReEmitter<EmittedEvents, ClientEventHandlerMap>(this);
-    public olmVersion: [number, number, number] | null = null; // populated after initLegacyCrypto
     public usingExternalCrypto = false;
     private _store!: Store;
     public deviceId: string | null;
     public credentials: { userId: string | null };
-
-    /**
-     * Encryption key used for encrypting sensitive data (such as e2ee keys) in storage.
-     *
-     * As supplied in the constructor via {@link IMatrixClientCreateOpts#pickleKey}.
-     * Used for migration from the legacy crypto to the rust crypto
-     */
-    private readonly legacyPickleKey?: string;
 
     public scheduler?: MatrixScheduler;
     public clientRunning = false;
@@ -1277,11 +1239,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
 
-    /**
-     * Legacy crypto store used for migration from the legacy crypto to the rust crypto
-     * @private
-     */
-    private readonly legacyCryptoStore?: CryptoStore;
     protected verificationMethods?: string[];
     protected fallbackICEServerAllowed = false;
     protected syncApi?: SlidingSyncSdk | SyncApi;
@@ -1377,10 +1334,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             logger: this.logger,
         });
 
-        if (opts.pickleKey) {
-            this.legacyPickleKey = opts.pickleKey;
-        }
-
         this.useLivekitForGroupCalls = Boolean(opts.useLivekitForGroupCalls);
 
         this.scheduler = opts.scheduler;
@@ -1424,7 +1377,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.timelineSupport = Boolean(opts.timelineSupport);
 
-        this.legacyCryptoStore = opts.cryptoStore;
         this.verificationMethods = opts.verificationMethods;
         this.cryptoCallbacks = opts.cryptoCallbacks || {};
         this.enableEncryptedStateEvents = opts.enableEncryptedStateEvents ?? false;
@@ -1625,9 +1577,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const promises: Promise<void>[] = [];
 
         promises.push(this.store.deleteAllData());
-        if (this.legacyCryptoStore) {
-            promises.push(this.legacyCryptoStore.deleteAllData());
-        }
 
         // delete the stores used by the rust matrix-sdk-crypto, in case they were used
         const deleteRustSdkStore = async (): Promise<void> => {
@@ -2063,12 +2012,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             storePrefix: args.useIndexedDB === false ? null : (args.cryptoDatabasePrefix ?? RUST_SDK_STORE_PREFIX),
             storeKey: args.storageKey,
             storePassphrase: args.storagePassword,
-
-            legacyCryptoStore: this.legacyCryptoStore,
-            legacyPickleKey: this.legacyPickleKey ?? "DEFAULT_KEY",
-            legacyMigrationProgressListener: (progress: number, total: number): void => {
-                this.emit(CryptoEvent.LegacyCryptoStoreMigrationProgress, progress, total);
-            },
 
             enableEncryptedStateEvents: this.enableEncryptedStateEvents,
 

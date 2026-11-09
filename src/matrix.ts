@@ -16,12 +16,10 @@ limitations under the License.
 
 import { type WidgetApi } from "matrix-widget-api";
 
-import { MemoryCryptoStore } from "./crypto/store/memory-crypto-store.ts";
 import { MemoryStore } from "./store/memory.ts";
 import { MatrixScheduler } from "./scheduler.ts";
 import { MatrixClient, type ICreateClientOpts } from "./client.ts";
 import { RoomWidgetClient, type ICapabilities } from "./embedded.ts";
-import { type CryptoStore } from "./crypto/store/base.ts";
 
 export * from "./client.ts";
 export * from "./serverCapabilities.ts";
@@ -53,10 +51,6 @@ export * from "./version-support.ts";
 export * from "./service-types.ts";
 export * from "./store/memory.ts";
 export * from "./store/indexeddb.ts";
-export * from "./crypto/store/memory-crypto-store.ts";
-export * from "./crypto/store/localStorage-crypto-store.ts";
-export * from "./crypto/store/indexeddb-crypto-store.ts";
-export type { OutgoingRoomKeyRequest } from "./crypto/store/base.ts";
 export * from "./content-repo.ts";
 export type * from "./@types/common.ts";
 export type * from "./@types/uia.ts";
@@ -113,17 +107,6 @@ export type { IHierarchyRelation as HierarchyRelation, IHierarchyRoom as Hierarc
 export { LocationAssetType } from "./@types/location.ts";
 export { DebugLogger } from "./logger.ts";
 
-let cryptoStoreFactory = (): CryptoStore => new MemoryCryptoStore();
-
-/**
- * Configure a different factory to be used for creating crypto stores
- *
- * @param fac - a function which will return a new `CryptoStore`
- */
-export function setCryptoStoreFactory(fac: () => CryptoStore): void {
-    cryptoStoreFactory = fac;
-}
-
 function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
     opts.store =
         opts.store ??
@@ -131,7 +114,6 @@ function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
             localStorage: globalThis.localStorage,
         });
     opts.scheduler = opts.scheduler ?? new MatrixScheduler();
-    opts.cryptoStore = opts.cryptoStore ?? cryptoStoreFactory();
 
     return opts;
 }

@@ -30,7 +30,6 @@ export type CryptoEventHandlerMap = {
     [CryptoEvent.KeysChanged]: (data: EmptyObject) => void;
     [CryptoEvent.WillUpdateDevices]: (users: string[], initialFetch: boolean) => void;
     [CryptoEvent.DevicesUpdated]: (users: string[], initialFetch: boolean) => void;
-    [CryptoEvent.LegacyCryptoStoreMigrationProgress]: (progress: number, total: number) => void;
     [CryptoEvent.DehydratedDeviceCreated]: () => void;
     [CryptoEvent.DehydratedDeviceUploaded]: () => void;
     [CryptoEvent.RehydrationStarted]: () => void;

@@ -21,12 +21,6 @@ import { MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE, RustCrypto } from "./rust-cryp
 import { type IHttpOpts, type MatrixHttpApi } from "../http-api/index.ts";
 import { type ServerSideSecretStorage } from "../secret-storage.ts";
 import { type Logger } from "../logger.ts";
-import { type CryptoStore, MigrationState } from "../crypto/store/base.ts";
-import {
-    migrateFromLegacyCrypto,
-    migrateLegacyLocalTrustIfNeeded,
-    migrateRoomSettingsFromLegacyCrypto,
-} from "./libolm_migration.ts";
 import { type CryptoCallbacks } from "../crypto-api/index.ts";
 
 /**
@@ -77,19 +71,6 @@ export interface InitRustCryptoArgs {
      * will be used to encrypt the indexeddb. See also `storePassphrase`.
      */
     storeKey?: Uint8Array;
-
-    /** If defined, we will check if any data needs migrating from this store to the rust store. */
-    legacyCryptoStore?: CryptoStore;
-
-    /** The pickle key for `legacyCryptoStore` */
-    legacyPickleKey?: string;
-
-    /**
-     * A callback which will receive progress updates on migration from `legacyCryptoStore`.
-     *
-     * Called with (-1, -1) to mark the end of migration.
-     */
-    legacyMigrationProgressListener?: (progress: number, total: number) => void;
 
     /**
      * Whether to enable support for encrypting state events.
@@ -149,15 +130,6 @@ export async function initRustCrypto(args: InitRustCryptoArgs): Promise<RustCryp
         storeHandle = await StoreHandle.open(null, null, logger);
     }
 
-    if (args.legacyCryptoStore) {
-        // We have a legacy crypto store, which we may need to migrate from.
-        await migrateFromLegacyCrypto({
-            legacyStore: args.legacyCryptoStore,
-            storeHandle,
-            ...args,
-        });
-    }
-
     const rustCrypto = await initOlmMachine(args, storeHandle);
 
     storeHandle.free();
@@ -174,7 +146,6 @@ async function initOlmMachine(
         deviceId,
         secretStorage,
         cryptoCallbacks,
-        legacyCryptoStore,
         enableEncryptedStateEvents,
         caCertsPem,
         x509Signer,
@@ -193,15 +164,6 @@ async function initOlmMachine(
         x509Signer,
         x509Validity,
     );
-
-    // A final migration step, now that we have an OlmMachine.
-    if (legacyCryptoStore) {
-        await migrateRoomSettingsFromLegacyCrypto({
-            logger,
-            legacyStore: legacyCryptoStore,
-            olmMachine,
-        });
-    }
 
     // Disable room key requests, per https://github.com/vector-im/element-web/issues/26524.
     olmMachine.roomKeyRequestsEnabled = false;
@@ -249,35 +211,6 @@ async function initOlmMachine(
     //
     // XXX: find a less hacky way to do this.
     await olmMachine.outgoingRequests();
-
-    if (legacyCryptoStore && (await legacyCryptoStore.containsData())) {
-        const migrationState = await legacyCryptoStore.getMigrationState();
-        if (migrationState < MigrationState.INITIAL_OWN_KEY_QUERY_DONE) {
-            logger.debug(`Performing initial key query after migration`);
-            // We need to do an initial keys query so that the rust stack can properly update trust of
-            // the user device and identity from the migrated private keys.
-            // If not done, there is a short period where the own device/identity trust will be undefined after migration.
-            let initialKeyQueryDone = false;
-            while (!initialKeyQueryDone) {
-                try {
-                    await rustCrypto.userHasCrossSigningKeys(userId);
-                    initialKeyQueryDone = true;
-                } catch (e) {
-                    // If the initial key query fails, we retry until it succeeds.
-                    logger.error("Failed to check for cross-signing keys after migration, retrying", e);
-                }
-            }
-
-            // If the private master cross-signing key was not cached in the legacy store, the rust session
-            // will not be able to establish the trust of the user identity.
-            // That means that after migration the session could revert to unverified.
-            // In order to avoid asking the users to re-verify their sessions, we need to migrate the legacy local trust
-            // (if the legacy session was already verified) to the new session.
-            await migrateLegacyLocalTrustIfNeeded({ legacyCryptoStore, rustCrypto, logger });
-
-            await legacyCryptoStore.setMigrationState(MigrationState.INITIAL_OWN_KEY_QUERY_DONE);
-        }
-    }
 
     // If we have any recently-joined rooms, see if we have a pending key bundle for them.
     for (const pendingDetails of await olmMachine.getAllRoomsPendingKeyBundles()) {
