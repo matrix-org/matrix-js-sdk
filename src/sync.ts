@@ -851,6 +851,8 @@ export class SyncApi {
         } catch (e) {
             this.syncOpts.logger.error("Error processing cached sync", e);
         }
+
+        this.updateSyncState(SyncState.Prepared, syncEventData);
     }
 
     /**
