@@ -22,7 +22,6 @@ import { MatrixScheduler } from "./scheduler.ts";
 import { MatrixClient, type ICreateClientOpts } from "./client.ts";
 import { RoomWidgetClient, type ICapabilities } from "./embedded.ts";
 import { type CryptoStore } from "./crypto/store/base.ts";
-import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 
 export * from "./client.ts";
 export * from "./serverCapabilities.ts";
@@ -131,7 +130,8 @@ export function setCryptoStoreFactory(fac: () => CryptoStore): void {
  * Safe to be called at any time, will have no effect if Rust Crypto is already initialised.
  */
 export async function preloadRustCrypto(): Promise<void> {
-    await RustSdkCryptoJs.initAsync();
+    const RustCrypto = await import("./rust-crypto/index.ts");
+    await RustCrypto.preloadRustCrypto();
 }
 
 function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
