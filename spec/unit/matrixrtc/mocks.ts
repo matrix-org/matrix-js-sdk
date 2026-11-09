@@ -279,10 +279,3 @@ export function mockCallMembership(
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, backendIdentities, "(deprecated)");
 }
-
-export function makeKey(id: number, key: string): { key: string; index: number } {
-    return {
-        key: key,
-        index: id,
-    };
-}

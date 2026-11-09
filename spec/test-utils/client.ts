@@ -82,6 +82,7 @@ export const mockClientMethodsUser = (userId = "@alice:domain") => ({
         ...mockClientMethodsUser('@mytestuser:domain'),
     });
  * ```
+ * @knipignore
  */
 export const mockClientMethodsEvents = () => ({
     decryptEventIfNeeded: vi.fn() as Mock,
@@ -90,6 +91,7 @@ export const mockClientMethodsEvents = () => ({
 
 /**
  * Returns basic mocked client methods related to server support
+ * @knipignore
  */
 export const mockClientMethodsServer = (): Partial<Record<MethodLikeKeys<MatrixClient>, unknown>> => ({
     getIdentityServerUrl: vi.fn(),
