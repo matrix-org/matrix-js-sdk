@@ -6518,21 +6518,33 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Returns a set of configured RTC transports supported by the homeserver.
-     * Requires the homeserver to advertise `org.matrix.msc4143` in `/versions`.
+     * Requires the homeserver to advertise `org.matrix.msc4143` or
+     * `org.matrix.msc4143.stable` in `/versions`.
      * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
      */
-    public async _unstable_getRTCTransports(): Promise<Transport[]> {
-        if (!(await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))) {
-            throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
-        }
+    public async getRTCTransports(): Promise<Transport[]> {
+        let prefix: string;
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143.stable")) prefix = ClientPrefix.V1;
+        else if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))
+            prefix = `${ClientPrefix.Unstable}/org.matrix.msc4143`;
+        else throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
 
         return (
             await this.http.authedRequest<{
                 rtc_transports: Transport[];
-            }>(Method.Get, "/rtc/transports", undefined, undefined, {
-                prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
-            })
+            }>(Method.Get, "/rtc/transports", undefined, undefined, { prefix })
         ).rtc_transports;
+    }
+
+    /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     * Requires the homeserver to advertise `org.matrix.msc4143` or
+     * `org.matrix.msc4143.stable` in `/versions`.
+     * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
+     * @deprecated Use {@link getRTCTransports} instead.
+     */
+    public async _unstable_getRTCTransports(): Promise<Transport[]> {
+        return this.getRTCTransports();
     }
 
     /**
