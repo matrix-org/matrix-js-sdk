@@ -69,7 +69,7 @@ describe("CallMembership", () => {
             "device_id": "AAAAAAA",
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" },
             "foci_preferred": [{ type: "livekit" }],
-            "m.call.intent": "voice",
+            "m.call.intent": "audio",
             "capabilities": ["m.render_audio", "m.render_video"],
         };
 
@@ -206,8 +206,8 @@ describe("CallMembership", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
             });
             it("returns correct call intent", () => {
-                expect(membership.intent).toBe("voice");
-                expect(membership.callIntent).toBe("voice");
+                expect(membership.intent).toBe("m.audio");
+                expect(membership.callIntent).toBe("audio");
             });
             it("normalises the legacy intent values", () => {
                 const audio = createCallMembership(makeMockEvent(), {
@@ -222,6 +222,14 @@ describe("CallMembership", () => {
                 });
                 expect(video.intent).toBe("m.video");
                 expect(video.callIntent).toBe("video");
+            });
+            it("does not normalise custom intent values", () => {
+                const audio = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "m.call.intent": "voice",
+                });
+                expect(audio.intent).toBe("voice");
+                expect(audio.callIntent).toBe("voice");
             });
             it("returns undefined intent if not advertised", () => {
                 const withoutIntent = createCallMembership(makeMockEvent(), {
@@ -244,7 +252,7 @@ describe("CallMembership", () => {
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({
                     "type": "m.call",
-                    "m.call.intent": "voice",
+                    "m.call.intent": "audio",
                     "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
@@ -256,7 +264,7 @@ describe("CallMembership", () => {
                 expect(withData.applicationData).toStrictEqual({
                     "org.example.key": { nested: true },
                     "type": "m.call",
-                    "m.call.intent": "voice",
+                    "m.call.intent": "audio",
                     "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
@@ -308,7 +316,7 @@ describe("CallMembership", () => {
             application: {
                 "type": "m.call",
                 "m.call.id": "",
-                "m.call.intent": "voice",
+                "m.call.intent": "audio",
                 "capabilities": ["m.render_audio", "m.render_video"],
             },
             member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
@@ -504,8 +512,8 @@ describe("CallMembership", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
             });
             it("returns correct call intent", () => {
-                expect(membership.intent).toBe("voice");
-                expect(membership.callIntent).toBe("voice");
+                expect(membership.intent).toBe("m.audio");
+                expect(membership.callIntent).toBe("audio");
             });
             it("reads the MSC4196 intent key", () => {
                 const spec = createCallMembership(makeMockEvent(), {
@@ -530,6 +538,14 @@ describe("CallMembership", () => {
                 });
                 expect(legacy.intent).toBe("m.video");
                 expect(legacy.callIntent).toBe("video");
+            });
+            it("does not normalise custom intent values", () => {
+                const legacy = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { "type": "m.call", "m.call.intent": "voice" },
+                });
+                expect(legacy.intent).toBe("voice");
+                expect(legacy.callIntent).toBe("voice");
             });
             it("returns undefined intent if not advertised", () => {
                 const withoutIntent = createCallMembership(makeMockEvent(), {
@@ -559,7 +575,7 @@ describe("CallMembership", () => {
             it("returns undefined call capabilities if not advertised", () => {
                 const withoutCapabilities = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
-                    application: { "type": "m.call", "m.call.intent": "voice" },
+                    application: { "type": "m.call", "m.call.intent": "audio" },
                 });
                 expect(withoutCapabilities.callCapabilities).toBeUndefined();
             });
@@ -581,7 +597,7 @@ describe("CallMembership", () => {
                 expect(membership.applicationData).toStrictEqual({
                     "type": "m.call",
                     "m.call.id": "",
-                    "m.call.intent": "voice",
+                    "m.call.intent": "audio",
                     "capabilities": ["m.render_audio", "m.render_video"],
                 });
             });
