@@ -3304,6 +3304,16 @@ describe("MatrixClient", function () {
             expect(ruleWrongServerRoom).toBeFalsy();
         });
 
+        it("should not backtrack catastrophically on a malicious glob rule", async () => {
+            await client.ignoredInvites.addRule(PolicyScope.User, "@" + "a*".repeat(20) + "b", "just a test");
+
+            const rule = await client.ignoredInvites.getRuleForInvite({
+                sender: "@" + "a".repeat(48) + ":example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(rule).toBeFalsy();
+        });
+
         it("should not reject invites anymore once we have removed a rule", async () => {
             await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
 

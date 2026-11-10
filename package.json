@@ -64,6 +64,7 @@
         "matrix-events-sdk": "0.0.1",
         "matrix-widget-api": "^1.20.0",
         "p-retry": "^8.0.1",
+        "re2js": "^2.8.6",
         "sdp-transform": "^3.0.0",
         "unhomoglyph": "^1.0.6"
     },
