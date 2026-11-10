@@ -55,8 +55,13 @@ import {
 import { deepCompare } from "../utils.ts";
 import { toStableCallIntent, toUnstableCallIntent } from "./CallIntent.ts";
 
-/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself. */
-const RESERVED_APPLICATION_DATA_KEYS = ["type", "intent", "m.call.intent", "capabilities"];
+/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself regardless of the application type. */
+const GLOBALLY_RESERVED_APPLICATION_DATA_KEYS: readonly string[] = ["type"];
+
+/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself for a given application type. */
+const PER_APP_RESERVED_APPLICATION_DATA_KEYS: ReadonlyMap<string, readonly string[]> = new Map([
+    ["m.call", ["intent", "m.call.intent", "capabilities"]],
+]);
 
 /* MembershipActionTypes:
 On Join:  ───────────────────┐   ┌───────────────(1)───────────┐
@@ -377,7 +382,10 @@ export class MembershipManager
         applicationData: Record<string, unknown> | undefined,
     ): Record<string, unknown> | undefined {
         if (applicationData === undefined) return undefined;
-        const reserved = RESERVED_APPLICATION_DATA_KEYS.filter((key) => applicationData[key] !== undefined);
+        const reserved = [
+            ...GLOBALLY_RESERVED_APPLICATION_DATA_KEYS,
+            ...(PER_APP_RESERVED_APPLICATION_DATA_KEYS.get(this.slotDescription.application) ?? []),
+        ].filter((key) => applicationData[key] !== undefined);
         if (reserved.length === 0) return applicationData;
         this.logger.warn(
             `Ignoring reserved keys in applicationData: ${reserved.join(", ")}. Use the dedicated join options instead.`,

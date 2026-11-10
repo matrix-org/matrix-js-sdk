@@ -116,9 +116,11 @@ export interface SessionConfig {
      * `application` object of an `m.rtc.member` event, or at the top level of a
      * legacy `m.call.member` event).
      *
-     * `type`, `intent`, `m.call.intent` and `capabilities` are written by the SDK
-     * from {@link SessionConfig.callIntent} and {@link SessionConfig.callCapabilities}.
-     * Any of those keys given here will be dropped.
+     * `type` is always written by the SDK from the slot's application and will be
+     * dropped if given here. For `m.call` sessions, `intent`, `m.call.intent` and
+     * `capabilities` are also written by the SDK from {@link SessionConfig.callIntent}
+     * and {@link SessionConfig.callCapabilities} and will be dropped too. Other
+     * application types may use those keys freely.
      *
      * Read back through {@link CallMembership.applicationData}.
      */
