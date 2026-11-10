@@ -6517,22 +6517,51 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Returns a set of configured RTC transports supported by the homeserver.
-     * Requires the homeserver to advertise `org.matrix.msc4143` in `/versions`.
-     * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
+     * Returns the RTC transports advertised by the homeserver, in the homeserver's order of preference.
+     *
+     * Uses the stable `GET /_matrix/client/v1/rtc/transports` endpoint if the homeserver advertises
+     * `org.matrix.msc4143.stable` in `/versions`, and otherwise falls back to the unstable
+     * `GET /_matrix/client/unstable/org.matrix.msc4143/rtc/transports` endpoint if it advertises
+     * `org.matrix.msc4143`.
+     *
+     * @throws A M_UNRECOGNIZED error with HTTP status 404 if the homeserver advertises neither.
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
      */
-    public async _unstable_getRTCTransports(): Promise<Transport[]> {
-        if (!(await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))) {
-            throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
+    public async getRTCTransports(): Promise<Transport[]> {
+        const unstableFeatures = (await this.getVersions())?.unstable_features;
+
+        if (unstableFeatures?.["org.matrix.msc4143.stable"]) {
+            return (
+                (
+                    await this.http.authedRequest<{
+                        transports?: Transport[];
+                    }>(Method.Get, "/rtc/transports", undefined, undefined, { prefix: ClientPrefix.V1 })
+                ).transports ?? []
+            );
         }
 
-        return (
-            await this.http.authedRequest<{
-                rtc_transports: Transport[];
-            }>(Method.Get, "/rtc/transports", undefined, undefined, {
-                prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
-            })
-        ).rtc_transports;
+        if (unstableFeatures?.["org.matrix.msc4143"]) {
+            return (
+                (
+                    await this.http.authedRequest<{
+                        rtc_transports?: Transport[];
+                    }>(Method.Get, "/rtc/transports", undefined, undefined, {
+                        prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
+                    })
+                ).rtc_transports ?? []
+            );
+        }
+
+        throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
+    }
+
+    /**
+     * Returns the RTC transports advertised by the homeserver, in the homeserver's order of preference.
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     * @deprecated Use {@link MatrixClient.getRTCTransports} instead.
+     */
+    public async _unstable_getRTCTransports(): Promise<Transport[]> {
+        return this.getRTCTransports();
     }
 
     /**

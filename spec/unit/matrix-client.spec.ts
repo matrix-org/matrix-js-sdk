@@ -4319,8 +4319,8 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("_unstable_getRTCTransports", () => {
-        it("makes a well-formed request", async () => {
+    describe("getRTCTransports", () => {
+        it("makes a well-formed request to the unstable endpoint", async () => {
             unstableFeatures["org.matrix.msc4143"] = true;
             httpLookups = [
                 {
@@ -4330,7 +4330,7 @@ describe("MatrixClient", function () {
                     prefix: "/_matrix/client/unstable/org.matrix.msc4143",
                 },
             ];
-            expect(await client._unstable_getRTCTransports()).toEqual([
+            expect(await client.getRTCTransports()).toEqual([
                 {
                     type: "livekit",
                     extra_field: "foobar",
@@ -4346,27 +4346,79 @@ describe("MatrixClient", function () {
             expect(httpLookups).toHaveLength(0);
         });
 
-        it.each([{ unstable_features: { "org.matrix.msc4143": false } }, { unstable_features: {} }, {}])(
-            "does not request transports when support is not advertised: %j",
-            async (versionsResponse) => {
-                vi.mocked(client.http.authedRequest)
-                    .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
-                    .mockResolvedValue({ rtc_transports: [] });
+        it("treats an empty response from the unstable endpoint as no transports", async () => {
+            unstableFeatures["org.matrix.msc4143"] = true;
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rtc/transports`,
+                    data: {},
+                    prefix: "/_matrix/client/unstable/org.matrix.msc4143",
+                },
+            ];
+            expect(await client.getRTCTransports()).toEqual([]);
+            expect(httpLookups).toHaveLength(0);
+        });
 
-                await expect(client._unstable_getRTCTransports()).rejects.toMatchObject({
-                    errcode: "M_UNRECOGNIZED",
-                    httpStatus: 404,
-                });
-                expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
-                expect(client.http.authedRequest).toHaveBeenCalledWith(
-                    Method.Get,
-                    "/_matrix/client/versions",
-                    undefined,
-                    undefined,
-                    { prefix: "" },
-                );
-            },
-        );
+        it.each<Record<string, boolean>>([
+            { "org.matrix.msc4143.stable": true },
+            { "org.matrix.msc4143.stable": true, "org.matrix.msc4143": true },
+        ])("makes a well-formed request to the stable endpoint when advertised: %j", async (features) => {
+            unstableFeatures = features;
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rtc/transports`,
+                    data: {
+                        transports: [{ type: "m.livekit", url: "wss://livekit.example.com" }] satisfies Transport[],
+                    },
+                    prefix: "/_matrix/client/v1",
+                },
+            ];
+            expect(await client.getRTCTransports()).toEqual([{ type: "m.livekit", url: "wss://livekit.example.com" }]);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it("is also available under its deprecated name", async () => {
+            unstableFeatures = { "org.matrix.msc4143.stable": true };
+            httpLookups = [
+                {
+                    method: "GET",
+                    path: `/rtc/transports`,
+                    data: {
+                        transports: [{ type: "m.livekit", url: "wss://livekit.example.com" }] satisfies Transport[],
+                    },
+                    prefix: "/_matrix/client/v1",
+                },
+            ];
+            expect(await client._unstable_getRTCTransports()).toEqual([
+                { type: "m.livekit", url: "wss://livekit.example.com" },
+            ]);
+            expect(httpLookups).toHaveLength(0);
+        });
+
+        it.each([
+            { unstable_features: { "org.matrix.msc4143": false, "org.matrix.msc4143.stable": false } },
+            { unstable_features: {} },
+            {},
+        ])("does not request transports when support is not advertised: %j", async (versionsResponse) => {
+            vi.mocked(client.http.authedRequest)
+                .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
+                .mockResolvedValue({ rtc_transports: [] });
+
+            await expect(client.getRTCTransports()).rejects.toMatchObject({
+                errcode: "M_UNRECOGNIZED",
+                httpStatus: 404,
+            });
+            expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(
+                Method.Get,
+                "/_matrix/client/versions",
+                undefined,
+                undefined,
+                { prefix: "" },
+            );
+        });
 
         it("caches unsupported discovery without requesting transports", async () => {
             vi.mocked(client.http.authedRequest)
