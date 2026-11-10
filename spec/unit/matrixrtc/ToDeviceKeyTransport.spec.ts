@@ -81,6 +81,12 @@ describe("ToDeviceKeyTransport", () => {
                 { userId: "@mat:example.org", deviceId: "MATDEVICE" },
             ],
             {
+                room_id: roomId,
+                member_id: "@alice:example.org:MYDEVICE",
+                media_key: {
+                    index: keyIndex,
+                    key: keyBase64Encoded,
+                },
                 keys: {
                     index: keyIndex,
                     key: keyBase64Encoded,
@@ -89,23 +95,27 @@ describe("ToDeviceKeyTransport", () => {
                     claimed_device_id: "MYDEVICE",
                     id: "@alice:example.org:MYDEVICE",
                 },
-                room_id: roomId,
-                session: {
-                    application: "m.call",
-                    call_id: "",
-                    scope: "m.room",
-                },
-                sent_ts: expect.any(Number),
             },
         );
 
         expect(statistics.counters.roomEventEncryptionKeysSent).toBe(1);
     });
 
-    it("should emit when a key is received", async () => {
+    /**
+     * Starts the transport, emits an encrypted key event with the given content from bob and returns
+     * what the transport emitted for it.
+     */
+    async function receiveKeyEvent(content: Record<string, unknown>): Promise<{
+        userId: string;
+        deviceId: string;
+        memberId: string;
+        keyBase64Encoded: string;
+        index: number;
+    }> {
         const receivedKeyResolvers = Promise.withResolvers<{
             userId: string;
             deviceId: string;
+            memberId: string;
             keyBase64Encoded: string;
             index: number;
         }>();
@@ -113,40 +123,121 @@ describe("ToDeviceKeyTransport", () => {
             receivedKeyResolvers.resolve({
                 userId: membership.userId,
                 deviceId: membership.deviceId,
+                memberId: membership.memberId,
                 keyBase64Encoded,
                 index,
             });
         });
         transport.start();
 
+        const mockEvent = makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, content);
+        mockEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+        mockClient.emit(ClientEvent.ToDeviceEvent, mockEvent);
+
+        return receivedKeyResolvers.promise;
+    }
+
+    it("should emit when a key is received in the MSC4143 format", async () => {
         const testEncoded = "ABCDEDF";
         const testKeyIndex = 2;
 
-        const mockEvent = makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, {
-            keys: {
+        const { userId, deviceId, memberId, keyBase64Encoded, index } = await receiveKeyEvent({
+            room_id: roomId,
+            member_id: "BOBMEMBERID",
+            media_key: {
                 index: testKeyIndex,
                 key: testEncoded,
             },
             member: {
                 claimed_device_id: "BOBDEVICE",
             },
-            room_id: roomId,
-            session: {
-                application: "m.call",
-                call_id: "",
-                scope: "m.room",
-            },
         });
-        mockEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
-        mockClient.emit(ClientEvent.ToDeviceEvent, mockEvent);
-
-        const { userId, deviceId, keyBase64Encoded, index } = await receivedKeyResolvers.promise;
         expect(userId).toBe("@bob:example.org");
         expect(deviceId).toBe("BOBDEVICE");
+        expect(memberId).toBe("BOBMEMBERID");
         expect(keyBase64Encoded).toBe(testEncoded);
         expect(index).toBe(testKeyIndex);
 
         expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(1);
+    });
+
+    it("should emit when a key is received in the deprecated format", async () => {
+        const testEncoded = "ABCDEDF";
+        const testKeyIndex = 2;
+
+        const { userId, deviceId, memberId, keyBase64Encoded, index } = await receiveKeyEvent({
+            keys: {
+                index: testKeyIndex,
+                key: testEncoded,
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+                id: "BOBMEMBERID",
+            },
+            room_id: roomId,
+        });
+        expect(userId).toBe("@bob:example.org");
+        expect(deviceId).toBe("BOBDEVICE");
+        expect(memberId).toBe("BOBMEMBERID");
+        expect(keyBase64Encoded).toBe(testEncoded);
+        expect(index).toBe(testKeyIndex);
+
+        expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(1);
+    });
+
+    it("should fall back to a member id derived from the sender and device when none is given", async () => {
+        const { memberId } = await receiveKeyEvent({
+            keys: {
+                index: 2,
+                key: "ABCDEDF",
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+            },
+            room_id: roomId,
+        });
+        expect(memberId).toBe("@bob:example.org:BOBDEVICE");
+    });
+
+    it("should prefer the MSC4143 properties over the deprecated ones", async () => {
+        const { memberId, keyBase64Encoded, index } = await receiveKeyEvent({
+            room_id: roomId,
+            member_id: "NEWMEMBERID",
+            media_key: {
+                index: 3,
+                key: "NEWKEY",
+            },
+            keys: {
+                index: 2,
+                key: "OLDKEY",
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+                id: "OLDMEMBERID",
+            },
+        });
+        expect(memberId).toBe("NEWMEMBERID");
+        expect(keyBase64Encoded).toBe("NEWKEY");
+        expect(index).toBe(3);
+    });
+
+    it("should fall back to the deprecated key property when media_key is malformed", async () => {
+        const { keyBase64Encoded, index } = await receiveKeyEvent({
+            room_id: roomId,
+            member_id: "BOBMEMBERID",
+            media_key: {
+                key: "NEWKEY",
+            },
+            keys: {
+                index: 2,
+                key: "OLDKEY",
+            },
+            member: {
+                claimed_device_id: "BOBDEVICE",
+            },
+        });
+        expect(keyBase64Encoded).toBe("OLDKEY");
+        expect(index).toBe(2);
     });
 
     it("should drop non-encrypted/clear to-device events", () => {
@@ -168,11 +259,6 @@ describe("ToDeviceKeyTransport", () => {
                 claimed_device_id: "BOBDEVICE",
             },
             room_id: roomId,
-            session: {
-                application: "m.call",
-                call_id: "",
-                scope: "m.room",
-            },
         });
         mockClient.emit(ClientEvent.ToDeviceEvent, clearEvent);
 
@@ -211,11 +297,6 @@ describe("ToDeviceKeyTransport", () => {
                 claimed_device_id: "BOBDEVICE",
             },
             room_id: "!anotherroom:id",
-            session: {
-                application: "m.call",
-                call_id: "",
-                scope: "m.room",
-            },
         });
 
         keyEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
@@ -231,41 +312,69 @@ describe("ToDeviceKeyTransport", () => {
                 keys: {},
                 member: { claimed_device_id: "MYDEVICE" },
                 room_id: "!room:id",
-                session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { index: 0 },
                 member: { claimed_device_id: "MYDEVICE" },
                 room_id: "!room:id",
-                session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF" },
                 member: { claimed_device_id: "MYDEVICE" },
                 room_id: "!room:id",
-                session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF", index: 2 },
                 room_id: "!room:id",
-                session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF", index: 2 },
                 member: {},
                 room_id: "!room:id",
-                session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF", index: 2 },
                 member: { claimed_device_id: "MYDEVICE" },
-                session: { application: "m.call", call_id: "", scope: "m.room" },
             },
             {
                 keys: { key: "ABCDEF", index: 2 },
                 member: { claimed_device_id: "MYDEVICE" },
                 room_id: "!wrong_room",
-                session: { application: "m.call", call_id: "", scope: "m.room" },
+            },
+            {
+                media_key: {},
+                member_id: "MEMBERID",
+                member: { claimed_device_id: "MYDEVICE" },
+                room_id: "!room:id",
+            },
+            {
+                media_key: { index: 0 },
+                member_id: "MEMBERID",
+                member: { claimed_device_id: "MYDEVICE" },
+                room_id: "!room:id",
+            },
+            {
+                media_key: { key: "ABCDEF" },
+                member_id: "MEMBERID",
+                member: { claimed_device_id: "MYDEVICE" },
+                room_id: "!room:id",
+            },
+            {
+                media_key: { key: "ABCDEF", index: 2 },
+                member_id: 42,
+                member: { claimed_device_id: "MYDEVICE" },
+                room_id: "!room:id",
+            },
+            {
+                media_key: { key: "ABCDEF", index: 2 },
+                member_id: "MEMBERID",
+                room_id: "!room:id",
+            },
+            {
+                media_key: { key: "ABCDEF", index: 2 },
+                member_id: "MEMBERID",
+                member: {},
+                room_id: "!room:id",
             },
         ];
 

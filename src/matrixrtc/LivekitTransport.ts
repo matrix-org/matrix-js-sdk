@@ -16,21 +16,138 @@ limitations under the License.
 
 import { type Transport } from "./types.ts";
 
+/**
+ * The type of the LiveKit transport as defined in the stable version of
+ * [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export const LIVEKIT_TRANSPORT_TYPE = "m.livekit";
+
+/**
+ * The type of the LiveKit transport used by implementations of earlier versions of
+ * [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export const LEGACY_LIVEKIT_TRANSPORT_TYPE = "livekit";
+
+type LivekitTransportType = typeof LIVEKIT_TRANSPORT_TYPE | typeof LEGACY_LIVEKIT_TRANSPORT_TYPE;
+
+/**
+ * @deprecated Use {@link UnstableLivekitTransport} instead, which has multiple
+ *   variants to support the migration to newer versions of MSC4195.
+ */
 export interface LivekitTransport extends Transport {
     type: "livekit";
     livekit_service_url: string;
 }
 
-export const isLivekitTransport = (object: any): object is LivekitTransport =>
-    object.type === "livekit" && "livekit_service_url" in object;
+/**
+ * @deprecated Use {@link isUnstableLivekitTransport} instead.
+ */
+export const isLivekitTransport = (object: unknown): object is LivekitTransport => {
+    if (typeof object !== "object" || object === null) return false;
+    const transport = object as Transport;
+
+    return transport.type === "livekit" && typeof transport.livekit_service_url === "string";
+};
 
 /**
- * @alias
- * @deprecated Use {@link isLivekitTransport} instead.
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
  */
-// TODO: Delete, this is only preserved here due to avoid briefly breaking
-// Element Web's CI while we make breaking changes in this module.
-export const isLivekitTransportConfig = isLivekitTransport;
+type WebsocketUrl = {
+    /**
+     * WebSocket URL of the LiveKit server.
+     */
+    url: string;
+    /**
+     * The server name of the homeserver that operates the SFU at `url`.
+     *
+     * When omitted, the SFU belongs to the homeserver of the member event's sender.
+     */
+    server_name?: string;
+};
+
+type ServiceUrl = {
+    /**
+     * Base URL of the LiveKit JWT service.
+     */
+    livekit_service_url: string;
+};
+
+/**
+ * Any LiveKit transport that can be advertised by a homeserver or published by
+ * a session member: `url` only, `livekit_service_url` only, or both during the
+ * migration.
+ *
+ * It uses the `Unstable` prefix as it includes the `livekit` type and the
+ * `livekit_service_url` case which are only here for compatibility reasons.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export type UnstableLivekitTransport = { type: LivekitTransportType } & LivekitTransportUrls;
+
+type LivekitTransportUrls =
+    // Latest MSC4195 variant, with `url`. Indicates that both publishers and
+    // subscribers will use the /_matrix/client/v1/rtc/livekit/get_token
+    // endpoint.
+    | WebsocketUrl
+    // Legacy variant, with `livekit_service_url`. Indicates that both
+    // publishers and subscribers will use the endpoints of the provided LiveKit
+    // JWT service.
+    | ServiceUrl
+    // Transitional variant, with both `url` and `livekit_service_url`.
+    // Indicates that both publishers and subscribers may use either the
+    // /_matrix/client/v1/rtc/livekit/get_token endpoint or the provided LiveKit
+    // JWT service.
+    | (WebsocketUrl & ServiceUrl);
+
+export const isUnstableLivekitTransport = (object: unknown): object is UnstableLivekitTransport => {
+    if (typeof object !== "object" || object === null) return false;
+    const transport = object as Transport;
+
+    if (transport.type !== LIVEKIT_TRANSPORT_TYPE && transport.type !== LEGACY_LIVEKIT_TRANSPORT_TYPE) return false;
+    if (!("url" in transport || "livekit_service_url" in transport)) return false;
+    if ("url" in transport && typeof transport.url !== "string") return false;
+    if ("livekit_service_url" in transport && typeof transport.livekit_service_url !== "string") return false;
+    // `server_name` only has meaning alongside `url`. It names the homeserver associated with the URL.
+    if ("server_name" in transport && (typeof transport.server_name !== "string" || !("url" in transport)))
+        return false;
+    return true;
+};
+
+/**
+ * A LiveKit transport with an SFU WebSocket `url`.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export type UnstableLivekitTransportWithUrl = UnstableLivekitTransport & WebsocketUrl;
+
+/**
+ * Checks whether an object represents a LiveKit transport with an SFU WebSocket `url`.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export const isUnstableLivekitTransportWithUrl = (object: unknown): object is UnstableLivekitTransportWithUrl =>
+    isUnstableLivekitTransport(object) && "url" in object;
+
+/**
+ * Selects the LiveKit transport to use from a list of advertised transports. Picks the first
+ * `m.livekit` transport, otherwise the first `livekit` transport.
+ *
+ * @returns The selected transport.
+ *
+ * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+ */
+export function selectLivekitTransport(transports: Transport[]): UnstableLivekitTransport | undefined {
+    const livekitTransports = transports.filter(isUnstableLivekitTransport);
+    return (
+        livekitTransports.find((t) => t.type === LIVEKIT_TRANSPORT_TYPE) ??
+        // will be a LEGACY_LIVEKIT_TRANSPORT_TYPE because we checked `isUnstableLivekitTransport` before.
+        livekitTransports[0]
+    );
+}
 
 /**
  * @deprecated this is just needed for the old focus active / focus fields of a call membership.
@@ -45,23 +162,6 @@ export interface LivekitFocusSelection extends Transport {
  */
 export const isLivekitFocusSelection = (object: any): object is LivekitFocusSelection =>
     object.type === "livekit" && "focus_selection" in object;
-
-/**
- * Identifies the MatrixRTC membership that a LiveKit request is made for (MSC4195).
- *
- * Note that this is *not* the `member` field of an `m.rtc.member` event verbatim: the homeserver knows
- * the user ID from the access token, and the device ID is only ever claimed, never verified.
- */
-export interface LivekitRtcMember {
-    /**
-     * The ID of the member within the MatrixRTC session, i.e. the `member.id` of the `m.rtc.member` event.
-     */
-    id: string;
-    /**
-     * The device ID the member claims to be using, i.e. the `member.device_id` of the `m.rtc.member` event.
-     */
-    claimed_device_id?: string;
-}
 
 /**
  * The body of a request to the LiveKit `get_token` endpoint (MSC4195).
@@ -83,9 +183,9 @@ export type LivekitGetTokenRequest = {
      */
     slot_id: string;
     /**
-     * The MatrixRTC membership to obtain a token for.
+     * The `member.id` value from the `m.rtc.member` event.
      */
-    member: LivekitRtcMember;
+    member_id: string;
     /**
      * The server name of the `m.rtc.member` event's sender. If omitted, the homeserver uses its own
      * server name. This is what makes it possible to obtain a token for an SFU of a remote homeserver.
@@ -123,9 +223,9 @@ export type LivekitDelegateDelayedLeaveRequest = {
      */
     slot_id: string;
     /**
-     * The MatrixRTC membership the delayed leave event belongs to.
+     * The `member.id` value from the `m.rtc.member` event.
      */
-    member: LivekitRtcMember;
+    member_id: string;
     /**
      * The delay ID of the delayed leave event to hand over to the homeserver.
      */

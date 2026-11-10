@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { RE2JS } from "re2js";
+
 import { type MatrixClient } from "../client.ts";
 import { type IContent, type MatrixEvent } from "./event.ts";
 import { EventTimeline } from "./event-timeline.ts";
@@ -153,19 +155,20 @@ export class IgnoredInvites {
                         continue;
                     }
                     const glob = content?.entity;
-                    if (!glob) {
+                    if (!glob || typeof glob !== "string") {
                         // Invalid event.
                         continue;
                     }
-                    let regexp: RegExp;
+                    // Use a linear-time RE2 matcher rather than a RegEx to avoid ReDos
+                    let matcher: RE2JS;
                     try {
-                        regexp = new RegExp(globToRegexp(glob));
+                        matcher = RE2JS.compile(globToRegexp(glob));
                     } catch {
                         // Assume invalid event.
                         continue;
                     }
                     for (const entity of entities) {
-                        if (entity && regexp.test(entity)) {
+                        if (entity && matcher.test(entity)) {
                             return event;
                         }
                     }

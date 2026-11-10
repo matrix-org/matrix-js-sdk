@@ -38,13 +38,12 @@ import {
     type LivekitGetTokenResponse,
     type Transport,
 } from "./matrixrtc/index.ts";
-import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
+import { MatrixEvent, type IEvent, EventStatus, isValidStickyDuration } from "./models/event.ts";
 import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
     UpdateDelayedEventAction,
-    isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents, type TimelineEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -421,33 +420,41 @@ export class RoomWidgetClient extends MatrixClient {
         event: MatrixEvent,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse>;
+    /**
+     * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
+     */
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
-    ): Promise<ISendEventResponse>;
+    ): Promise<SendDelayedEventResponse>;
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
-        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
+        delayMs: number,
+        queryDict?: QueryDict,
+    ): Promise<SendDelayedEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        delayOrQueryDict?: number | SendDelayedEventRequestOpts | QueryDict,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        let queryOpts = queryDict;
-        let delayOpts: SendDelayedEventRequestOpts | undefined;
-        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            delayOpts = delayOptsOrQuery;
-        } else if (!queryOpts) {
-            queryOpts = delayOptsOrQuery;
+        let delayMs: number | undefined;
+        if (this.isDelayMsOrOpts(delayOrQueryDict)) {
+            delayMs = this.getDelayMsFromArg(delayOrQueryDict);
+        } else {
+            queryDict = delayOrQueryDict;
         }
 
-        const stickyDurationMs = queryOpts?.["org.matrix.msc4354.sticky_duration_ms"];
-        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
-            throw new Error("Sticky duration must be a number when defined");
+        const stickyDurationMs = queryDict?.["org.matrix.msc4354.sticky_duration_ms"];
+        if (stickyDurationMs !== undefined && !isValidStickyDuration(stickyDurationMs)) {
+            throw new Error("Sticky duration must be a positive integer when defined");
         }
         // This is save since we just checked that above
         // We need the additional as assertion for the EW linter to be happy.
-        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
+        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && !isValidStickyDuration(stickyDurationMs)`
         // above
         const stickyDurationMsAsNumber: number | undefined = stickyDurationMs;
 
@@ -459,17 +466,10 @@ export class RoomWidgetClient extends MatrixClient {
             : event.getContent();
 
         // Delayed event special case.
-        if (delayOpts) {
+        if (delayMs !== undefined) {
             // TODO: updatePendingEvent for delayed events?
             const response = await this.widgetApi
-                .sendRoomEvent(
-                    event.getType(),
-                    content,
-                    room.roomId,
-                    "delay" in delayOpts ? delayOpts.delay : undefined,
-                    "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-                    stickyDurationMsAsNumber,
-                )
+                .sendRoomEvent(event.getType(), content, room.roomId, delayMs, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
         }
@@ -481,7 +481,7 @@ export class RoomWidgetClient extends MatrixClient {
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMsAsNumber)
+                .sendRoomEvent(event.getType(), content, room.roomId, undefined, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
@@ -519,7 +519,7 @@ export class RoomWidgetClient extends MatrixClient {
      */
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
@@ -530,16 +530,10 @@ export class RoomWidgetClient extends MatrixClient {
                 "sendDelayedStateEvent",
             );
         }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
 
         const response = await this.widgetApi
-            .sendStateEvent(
-                eventType,
-                stateKey,
-                content,
-                roomId,
-                "delay" in delayOpts ? delayOpts.delay : undefined,
-                "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-            )
+            .sendStateEvent(eventType, stateKey, content, roomId, delayMs)
             .catch(timeoutToConnectionError);
         return this.validateSendDelayedEventResponse(response);
     }
@@ -565,6 +559,9 @@ export class RoomWidgetClient extends MatrixClient {
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
         if (!this.widgetApi.hasCapability(MatrixCapabilities.MSC4407SendStickyEvent)) {
             throw new UnsupportedStickyEventsEndpointError(
                 "Widget was not granted the capability to send sticky events",
@@ -575,13 +572,15 @@ export class RoomWidgetClient extends MatrixClient {
         this.addThreadRelationIfNeeded(content, threadId, roomId);
         txnId ??= this.makeTxnId();
         try {
-            return await this.sendCompleteEvent({
-                roomId,
-                threadId,
-                eventObject: { type: eventType, content },
-                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-                txnId,
-            });
+            return await this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, () =>
+                this.sendCompleteEvent({
+                    roomId,
+                    threadId,
+                    eventObject: { type: eventType, content },
+                    queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                    txnId,
+                }),
+            );
         } catch (error) {
             if (!(error instanceof WidgetApiResponseError) || error.data.matrix_api_error !== undefined) throw error;
 

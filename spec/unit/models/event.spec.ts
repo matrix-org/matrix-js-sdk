@@ -16,7 +16,14 @@ limitations under the License.
 
 import { type MockedObject } from "vitest";
 
-import { type IContent, MatrixEvent, MatrixEventEvent } from "../../../src/models/event";
+import {
+    type IContent,
+    isValidStickyDuration,
+    isValidStickyTtl,
+    MatrixEvent,
+    MatrixEventEvent,
+    MAX_STICKY_DURATION_MS,
+} from "../../../src/models/event";
 import { emitPromise } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
@@ -632,6 +639,20 @@ describe("MatrixEvent", () => {
             vi.setSystemTime(50);
             // Prefer unsigned
             expect(new MatrixEvent({ ...evData } satisfies IStickyEvent).unstableStickyExpiresAt).toEqual(5050);
+            // The TTL is capped to the spec limit
+            expect(
+                new MatrixEvent({
+                    ...evData,
+                    unsigned: { msc4354_sticky_duration_ttl_ms: MAX_STICKY_DURATION_MS * 10 },
+                } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(50 + MAX_STICKY_DURATION_MS);
+            // A TTL of 0 means already expired.
+            expect(
+                new MatrixEvent({
+                    ...evData,
+                    unsigned: { msc4354_sticky_duration_ttl_ms: 0 },
+                } satisfies IStickyEvent).unstableStickyExpiresAt,
+            ).toEqual(50);
             // Fall back to `duration_ms`
             expect(
                 new MatrixEvent({ ...evData, unsigned: undefined } satisfies IStickyEvent).unstableStickyExpiresAt,
@@ -641,9 +662,52 @@ describe("MatrixEvent", () => {
                 new MatrixEvent({ ...evData, unsigned: undefined, origin_server_ts: 5000 } satisfies IStickyEvent)
                     .unstableStickyExpiresAt,
             ).toEqual(1050);
+            // Fall back to `duration_ms` if the TTL is malformed
+            for (const ttl of [-1, 1.5, "5000", null]) {
+                expect(
+                    new MatrixEvent({ ...evData, unsigned: { msc4354_sticky_duration_ttl_ms: ttl as any } })
+                        .unstableStickyExpiresAt,
+                ).toEqual(1050);
+            }
         } finally {
             vi.useRealTimers();
         }
+    });
+
+    it.each([0, -1000, 1.5, NaN, Infinity, "600000", true, null])(
+        "should not treat an event with sticky duration %s as sticky",
+        (duration) => {
+            const event = new MatrixEvent({
+                event_id: "$event_id",
+                type: "org.example.any_type",
+                content: {},
+                sender: "@alice:example.org",
+                origin_server_ts: 50,
+                msc4354_sticky: { duration_ms: duration as any },
+            });
+            expect(event.unstableStickyInfo).toBeUndefined();
+            expect(event.unstableStickyExpiresAt).toBeUndefined();
+        },
+    );
+});
+
+describe("isValidStickyDuration", () => {
+    it.each([1, 1000, MAX_STICKY_DURATION_MS + 1])("accepts %s", (value) => {
+        expect(isValidStickyDuration(value)).toBe(true);
+    });
+
+    it.each([0, -1, 1.5, NaN, Infinity, "1000", true, null, undefined])("rejects %s", (value) => {
+        expect(isValidStickyDuration(value)).toBe(false);
+    });
+});
+
+describe("isValidStickyTtl", () => {
+    it.each([0, 1, 1000, MAX_STICKY_DURATION_MS + 1])("accepts %s", (value) => {
+        expect(isValidStickyTtl(value)).toBe(true);
+    });
+
+    it.each([-1, 1.5, NaN, Infinity, "1000", true, null, undefined])("rejects %s", (value) => {
+        expect(isValidStickyTtl(value)).toBe(false);
     });
 });
 

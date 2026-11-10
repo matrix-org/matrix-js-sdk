@@ -17,16 +17,22 @@ limitations under the License.
 import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
+import { EventType, MatrixError, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
-import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
+import {
+    type RtcLeftMembershipData,
+    type RtcMembershipData,
+    type SessionMembershipData,
+} from "../../../src/matrixrtc/membershipData";
 import { type CallMembershipIdentityParts } from "../../../src/matrixrtc/EncryptionManager";
 import { type EmptyObject } from "../../../src/@types/common";
 import { type RtcSlotEventContent, type SlotDescription } from "../../../src/matrixrtc/types";
 import { computeSlotId } from "../../../src/matrixrtc/utils";
 
-export type MembershipData = (SessionMembershipData | RtcMembershipData | {}) & { user_id: string };
+export type MembershipData = (SessionMembershipData | RtcMembershipData | RtcLeftMembershipData | {}) & {
+    user_id: string;
+};
 
 export const owmMemberIdentity: CallMembershipIdentityParts = {
     deviceId: "AAAAAAA",
@@ -43,12 +49,10 @@ export const sessionMembershipTemplate: SessionMembershipData & { user_id: strin
     focus_active: { type: "livekit", focus_selection: "multi_sfu" },
     foci_preferred: [
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.io",
             type: "livekit",
         },
         {
-            livekit_alias: "!alias:something.org",
             livekit_service_url: "https://livekit-jwt.something.dev",
             type: "livekit",
         },
@@ -64,26 +68,14 @@ export const rtcMembershipTemplate: RtcMembershipData & { user_id: string } = {
         id: "IDIDID",
         user_id: "@mock:user.example",
         device_id: "AAAAAAA",
+        membership: "join",
     },
     slot_id: "m.call#ROOM",
-    versions: [],
     transports: {
         published: [
             {
                 type: "livekit",
-                focus_active: { type: "livekit", focus_selection: "multi_sfu" },
-                foci_preferred: [
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.io",
-                        type: "livekit",
-                    },
-                    {
-                        livekit_alias: "!alias:something.org",
-                        livekit_service_url: "https://livekit-jwt.something.dev",
-                        type: "livekit",
-                    },
-                ],
+                url: "wss://livekit.something.io",
             },
         ],
         can_subscribe: ["livekit"],
@@ -96,6 +88,8 @@ export type MockClient = MockedObject<
         MatrixClient,
         | "getUserId"
         | "getDeviceId"
+        | "fetchCapabilities"
+        | "getCachedCapabilities"
         | "sendEvent"
         | "sendStateEvent"
         | "_unstable_sendDelayedStateEvent"
@@ -116,6 +110,11 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
         getDeviceId: vi.fn(() => deviceId),
         getUserId: vi.fn(() => userId),
+        // By default the capabilities are not reachable, as it is the case in widget mode.
+        fetchCapabilities: vi
+            .fn()
+            .mockRejectedValue(new MatrixError({ errcode: "M_MISSING_TOKEN", error: "Missing access token" }, 401)),
+        getCachedCapabilities: vi.fn(() => undefined),
         sendEvent: vi.fn(),
         sendStateEvent: vi.fn(),
         cancelPendingEvent: vi.fn(),
@@ -273,17 +272,10 @@ export function mockRTCEvent(
 export function mockCallMembership(
     membershipData: MembershipData,
     roomId: string,
-    rtcBackendIdentity?: string,
+    backendIdentities = ["xx"],
 ): CallMembership {
     const ev = mockRTCEvent(membershipData, roomId);
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
-    return new CallMembership(ev, data, rtcBackendIdentity ?? "xx");
-}
-
-export function makeKey(id: number, key: string): { key: string; index: number } {
-    return {
-        key: key,
-        index: id,
-    };
+    return new CallMembership(ev, data, backendIdentities, "(deprecated)");
 }

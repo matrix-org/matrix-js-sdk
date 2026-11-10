@@ -33,6 +33,7 @@ import type {
     Status,
     IRTCNotificationContent,
     RTCCallIntent,
+    RTCCallCapability,
     Transport,
     SlotDescription,
     RtcSlotEventContent,
@@ -83,7 +84,7 @@ export type MatrixRTCSessionEventHandlerMap = {
         key: Uint8Array<ArrayBuffer>,
         encryptionKeyIndex: number,
         membership: CallMembershipIdentityParts,
-        rtcBackendIdentity: string,
+        backendIdentity: string,
     ) => void;
     [MatrixRTCSessionEvent.MembershipManagerError]: (error: unknown) => void;
     [MatrixRTCSessionEvent.DidSendCallNotification]: (
@@ -105,10 +106,15 @@ export interface SessionConfig {
     callIntent?: RTCCallIntent;
 
     /**
+     * What kinds of media this device is capable of handling for the call.
+     */
+    callCapabilities?: RTCCallCapability[];
+
+    /**
      * Application-specific data to publish in our membership alongside the
-     * application `type` and `m.call.intent`: in the `application` object of
-     * an `m.rtc.member` event, or at the top level of a legacy `m.call.member`
-     * one. Keys should be namespaced. Read back through
+     * application `type`, `m.call.intent` and `capabilities`: in the `application`
+     * object of an `m.rtc.member` event, or at the top level of a legacy
+     * `m.call.member` one. Keys should be namespaced. Read back through
      * {@link CallMembership.applicationData}.
      */
     applicationData?: Record<string, unknown>;
@@ -202,12 +208,6 @@ export interface EncryptionConfig {
      *  media keys for other participants become available.
      */
     manageMediaKeys?: boolean;
-    /**
-     * The minimum time (in milliseconds) between each attempt to send encryption key(s).
-     * e.g. if this is set to 1000, then we will send at most one key event every second.
-     * @deprecated - Not used by the new encryption manager.
-     */
-    updateEncryptionKeyThrottle?: number;
 
     /**
      * Sometimes it is necessary to rotate the encryption key after a membership update.
@@ -332,22 +332,11 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * The callId (sessionId) of the call.
-     *
-     * It can be undefined since the callId is only known once the first membership joins.
-     * The callId is the property that, per definition, groups memberships into one call.
-     * @deprecated use `slotId` instead.
-     */
-    public get callId(): string | undefined {
-        return this.slotDescription?.id;
-    }
-    /**
      * The slotId of the call.
      * `{application}#{appSpecificId}`
-     * It can be undefined since the slotId is only known once the first membership joins.
      * The slotId is the property that, per definition, groups memberships into one call.
      */
-    public get slotId(): string | undefined {
+    public get slotId(): string {
         return computeSlotId(this.slotDescription);
     }
 
@@ -509,6 +498,8 @@ export class MatrixRTCSession extends TypedEventEmitter<
             MatrixClient,
             | "getUserId"
             | "getDeviceId"
+            | "fetchCapabilities"
+            | "getCachedCapabilities"
             | "sendEvent"
             | "sendStateEvent"
             | "_unstable_sendDelayedStateEvent"
@@ -550,12 +541,12 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.initialMembershipCalculated = this.ensureRecalculateSessionMembers();
         this.setExpiryTimer();
     }
+
     /*
      * Returns true if we intend to be participating in the MatrixRTC session.
-     * This is determined by checking if the relativeExpiry has been set.
      */
     public isJoined(): boolean {
-        return this.membershipManager?.isJoined() ?? false;
+        return this.membershipManager?.isActivated() ?? false;
     }
 
     /**
@@ -625,14 +616,14 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyBin: Uint8Array<ArrayBuffer>,
                     encryptionKeyIndex: number,
                     membership: CallMembershipIdentityParts,
-                    rtcBackendIdentity: string,
+                    backendIdentity: string,
                 ) => {
                     this.emit(
                         MatrixRTCSessionEvent.EncryptionKeyChanged,
                         keyBin,
                         encryptionKeyIndex,
                         membership,
-                        rtcBackendIdentity,
+                        backendIdentity,
                     );
                 },
                 this.logger,
@@ -648,23 +639,9 @@ export class MatrixRTCSession extends TypedEventEmitter<
             this.emit(MatrixRTCSessionEvent.MembershipManagerError, e);
             this.emit(MatrixRTCSessionEvent.JoinStateChanged, this.isJoined());
         });
-        this.encryptionManager.join(joinConfig);
+        this.encryptionManager.join(joinConfig, publishedTransports);
 
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, true);
-    }
-
-    /**
-     * @deprecated Use {@link join} instead.
-     */
-    // TODO: Delete, this is only preserved here to avoid briefly breaking
-    // Element Web's CI while we make breaking changes to this class.
-    public joinRTCSession(
-        ownMembershipIdentity: CallMembershipIdentityParts,
-        fociPreferred: Transport[],
-        multiSfuFocus?: Transport,
-        joinConfig?: JoinSessionConfig,
-    ): void {
-        this.join(ownMembershipIdentity, [...fociPreferred, ...(multiSfuFocus ? [multiSfuFocus] : [])], joinConfig);
     }
 
     /**
@@ -689,24 +666,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         this.emit(MatrixRTCSessionEvent.JoinStateChanged, false);
 
         return await leavePromise;
-    }
-
-    /**
-     * @deprecated Use {@link leave} instead.
-     */
-    // TODO: Delete, this is only preserved here to avoid briefly breaking
-    // Element Web's CI while we make breaking changes to this class.
-    public async leaveRoomSession(timeout?: number): Promise<boolean> {
-        return this.leave(timeout);
-    }
-
-    /**
-     * @returns The oldest membership, if any, as determined by {@link CallMembership.createdTs}.
-     * @deprecated This SDK no longer selects transports based on the transport preferred by the
-     *   oldest member, so the oldest membership should generally not be of interest anymore.
-     */
-    public getOldestMembership(): CallMembership | undefined {
-        return this.memberships[0];
     }
 
     /**
@@ -759,7 +718,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
                     keyInfo.key,
                     keyInfo.keyIndex,
                     keyInfo.membership,
-                    keyInfo.rtcBackendIdentity,
+                    keyInfo.backendIdentity,
                 );
             });
         });
@@ -868,9 +827,15 @@ export class MatrixRTCSession extends TypedEventEmitter<
      * Call this when a room state event has been updated.
      */
     private readonly onRoomStateEvent = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.RTCSlot) return;
-        if (event.getStateKey() !== computeSlotId(this.slotDescription)) return;
-        void this.ensureRecalculateSessionMembers();
+        if (event.getType() === EventType.GroupCallMemberPrefix) {
+            // A (legacy) call membership state event: any of them can change our memberships.
+            void this.ensureRecalculateSessionMembers();
+        } else if (
+            event.getType() === EventType.RTCSlot &&
+            event.getStateKey() === computeSlotId(this.slotDescription)
+        ) {
+            void this.ensureRecalculateSessionMembers();
+        }
     };
 
     /**
@@ -888,15 +853,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
         ) {
             void this.ensureRecalculateSessionMembers();
         }
-    };
-
-    /**
-     * Call this when something changed that may impacts the current MatrixRTC members in this session.
-     *
-     * @deprecated use {@link ensureRecalculateSessionMembers} instead.
-     */
-    public _onRTCSessionMemberUpdate = async (): Promise<void> => {
-        await this.ensureRecalculateSessionMembers();
     };
 
     // Recalculations are chained onto this promise, so they never run in parallel.

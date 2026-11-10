@@ -663,10 +663,15 @@ export class SlidingSyncSdk {
 
         // TODO: handle threaded / beacon events
 
-        if (roomData.limited || roomData.initial) {
+        // The timeline may contain events which predate ones we already have: when it is `limited`, when the server
+        // is resending the room as `initial`, or when it is `expanded_timeline` because the `timeline_limit` for the
+        // room increased (e.g. requesting timeline_limit: 1 for this room, then timeline_limit: 50). Servers do not
+        // necessarily set `initial` in the latter case, so without checking `expanded_timeline` the older events would
+        // be appended after the newer ones we already have.
+        const expandedTimeline = roomData.expanded_timeline || roomData.unstable_expanded_timeline;
+        if (roomData.limited || roomData.initial || expandedTimeline) {
             // we should not know about any of these timeline entries if this is a genuinely new room.
-            // If we do, then we've effectively done scrollback (e.g requesting timeline_limit: 1 for
-            // this room, then timeline_limit: 50).
+            // If we do, then we've effectively done scrollback.
             const knownEvents = new Set<string>();
             room.getLiveTimeline()
                 .getEvents()

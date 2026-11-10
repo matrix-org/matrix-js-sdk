@@ -29,6 +29,7 @@ import { type Logger } from "../logger.ts";
  * @param logger - the logger to write the request and response lines to.
  * @param resource - the URL to request.
  * @param options - the options to pass to `fetch`.
+ * @param fetchFn - the `fetch` implementation to use, defaults to the global `fetch`.
  * @returns the `Response`, whatever its status code.
  * @throws rethrows whatever `fetch` threw, having logged it.
  */
@@ -36,6 +37,7 @@ export async function fetchWithLogging(
     logger: Logger,
     resource: URL | string,
     options: RequestInit = {},
+    fetchFn: typeof globalThis.fetch = globalThis.fetch,
 ): Promise<Response> {
     const method = options.method ?? Method.Get;
     const urlForLogs = sanitizeUrlForLogs(resource);
@@ -44,7 +46,7 @@ export async function fetchWithLogging(
 
     const start = Date.now();
     try {
-        const res = await globalThis.fetch(resource, options);
+        const res = await fetchFn(resource, options);
         logger.debug(`OAuth2: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`);
         return res;
     } catch (e) {

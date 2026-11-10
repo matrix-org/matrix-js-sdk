@@ -676,6 +676,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Mark the given device as locally blocked.
+     *
+     * Implementation of {@link CryptoApi#setDeviceBlocked}.
+     */
+    public async setDeviceBlocked(userId: string, deviceId: string, blocked = true): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) {
+            throw new Error(`Unknown device ${userId}|${deviceId}`);
+        }
+        try {
+            await device.setLocalTrust(
+                blocked ? RustSdkCryptoJs.LocalTrust.BlackListed : RustSdkCryptoJs.LocalTrust.Unset,
+            );
+        } finally {
+            device.free();
+        }
+    }
+
+    /**
      * Blindly cross-sign one of our other devices.
      *
      * Implementation of {@link CryptoApi#crossSignDevice}.
@@ -714,6 +737,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 signedByOwner: device.isCrossSignedByOwner(),
                 crossSigningVerified: device.isCrossSigningTrusted(),
                 localVerified: device.isLocallyTrusted(),
+                blocked: device.isBlacklisted(),
                 trustCrossSignedDevices: this._trustCrossSignedDevices,
             });
         } finally {
@@ -807,10 +831,12 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             Boolean(privateKeysCachedLocally.userSigningKey);
 
         const identity = await this.getOwnIdentity();
+        const identityVerified = !!identity?.isVerified();
+        identity?.free();
 
         // Cross-signing is ready if the public identity is trusted, and the private keys
         // are either cached, or accessible via secret-storage.
-        return !!identity?.isVerified() && (hasKeysInCache || privateKeysInSecretStorage);
+        return identityVerified && (hasKeysInCache || privateKeysInSecretStorage);
     }
 
     /**
@@ -1639,7 +1665,9 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
 
         // 0. We can only share room history if our user has set up cross-signing.
         const identity = await this.getOwnIdentity();
-        if (!identity?.isVerified()) {
+        const identityVerified = !!identity?.isVerified();
+        identity?.free();
+        if (!identityVerified) {
             logger.warn(
                 "Not sharing message history as the current device is not verified by our cross-signing identity",
             );

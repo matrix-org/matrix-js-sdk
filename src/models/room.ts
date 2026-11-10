@@ -3496,6 +3496,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         // ALWAYS filter out any events that are past retention
         events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
 
+        // Sticky events must be decrypted before they can be filed under their type and sticky key.
+        // Timeline events are mapped without decryption, so kick it off here.
+        for (const event of events) {
+            void this.client.decryptEventIfNeeded(event);
+        }
+
         return this.stickyEvents.addStickyEvents(events);
     }
 

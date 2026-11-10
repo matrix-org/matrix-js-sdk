@@ -62,6 +62,10 @@ export interface OAuth2ClientConfig {
 
 /** Options object for `FetchHttpApi` and {@link MatrixHttpApi}. */
 export interface IHttpOpts {
+    /**
+     * The function to invoke for HTTP requests, including those made to the OAuth 2.0 authorization server
+     * when refreshing or revoking tokens. Defaults to the global `fetch`.
+     */
     fetchFn?: typeof globalThis.fetch;
 
     baseUrl: string;

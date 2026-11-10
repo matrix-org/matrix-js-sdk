@@ -16,7 +16,7 @@ limitations under the License.
 
 import { type Mock } from "vitest";
 
-import { type EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
+import { EventTimeline, EventType, KnownMembership, MatrixClient, type Room } from "../../../src";
 import {
     type CallMembership,
     type JoinSessionConfig,
@@ -401,15 +401,26 @@ describe("MatrixRTCSession", () => {
                 await sess.initialMembershipCalculated;
                 expect(sess?.memberships.length).toEqual(1);
                 // Backend identity is expected to not be hashed with a legacy (session) membership
-                expect(sess?.memberships[0].rtcBackendIdentity).toEqual(
+                // which publishes a legacy (livekit_service_url) transport
+                expect(sess?.memberships[0].backendIdentities).toEqual([
                     testConfig.testCreateSticky
                         ? await computeRtcIdentityRaw(
                               rtcMembershipTemplate.member.user_id,
-                              rtcMembershipTemplate.member.device_id,
                               rtcMembershipTemplate.member.id,
                           )
                         : "@mock:user.example:AAAAAAA",
+                ]);
+            });
+
+            it("computes the right slot ID", () => {
+                const mockRoom = makeMockRoom([]);
+                sess = MatrixRTCSession.sessionForSlot(
+                    client,
+                    mockRoom,
+                    callSession,
+                    testConfig.createWithDefaults ? undefined : testConfig,
                 );
+                expect(sess.slotId).toBe("m.call#ROOM");
             });
         },
     );
@@ -439,7 +450,7 @@ describe("MatrixRTCSession", () => {
             expect(sess?.memberships.length).toEqual(1);
             expect(sess?.memberships[0].slotDescription.id).toEqual("ROOM");
             expect(sess?.memberships[0].scope).toEqual(undefined);
-            expect(sess?.memberships[0].application).toEqual("m.call");
+            expect(sess?.memberships[0].applicationData).toEqual({ type: "m.call" });
             expect(sess?.memberships[0].deviceId).toEqual("AAAAAAA");
             expect(sess?.memberships[0].isExpired()).toEqual(false);
             expect(sess?.slotDescription.id).toEqual("ROOM");
@@ -462,6 +473,67 @@ describe("MatrixRTCSession", () => {
             });
             await sess.initialMembershipCalculated;
             expect(sess.memberships).toEqual([]);
+        });
+        it("ignores sticky memberships with member.membership leave", async () => {
+            const mockRoom = makeMockRoom([]);
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent(
+                    {
+                        user_id: "@left:user.example",
+                        slot_id: "m.call#ROOM",
+                        member: { id: "MEMBER", membership: "leave" },
+                        leave_reason: { code: "leave" },
+                        msc4354_sticky_key: "MEMBER",
+                    },
+                    mockRoom.roomId,
+                    5000,
+                );
+                return [ev as StickyMatrixEvent];
+            });
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toEqual([]);
+        });
+        it("ignores sticky memberships that carry member.membership leave alongside join data", async () => {
+            const mockRoom = makeMockRoom([]);
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent(
+                    {
+                        ...rtcMembershipTemplate,
+                        member: { ...rtcMembershipTemplate.member, membership: "leave" },
+                    },
+                    mockRoom.roomId,
+                    5000,
+                );
+                return [ev as StickyMatrixEvent];
+            });
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toEqual([]);
+        });
+        it("accepts sticky memberships without member.membership for compatibility with older events", async () => {
+            const mockRoom = makeMockRoom([]);
+            const { membership: _membership, ...legacyMember } = rtcMembershipTemplate.member;
+            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
+                const ev = mockRTCEvent({ ...rtcMembershipTemplate, member: legacyMember }, mockRoom.roomId, 5000);
+                return [ev as StickyMatrixEvent];
+            });
+
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
+                listenForStickyEvents: true,
+                listenForMemberStateEvents: true,
+            });
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships.length).toEqual(1);
+            expect(sess.memberships[0].deviceId).toEqual("AAAAAAA");
         });
         it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
@@ -536,23 +608,6 @@ describe("MatrixRTCSession", () => {
             mockRoom.emit(RoomStickyEventsEvent.Update, [stickyEv], [], []);
             await membershipRecalculated;
             expect(sess.memberships.length).toEqual(2);
-        });
-    });
-
-    describe("getOldestMembership", () => {
-        it("returns the oldest membership event", async () => {
-            vi.useFakeTimers();
-            vi.setSystemTime(4000);
-            const mockRoom = makeMockRoom([
-                Object.assign({}, sessionMembershipTemplate, { device_id: "foo", created_ts: 3000 }),
-                Object.assign({}, sessionMembershipTemplate, { device_id: "old", created_ts: 1000 }),
-                Object.assign({}, sessionMembershipTemplate, { device_id: "bar", created_ts: 2000 }),
-            ]);
-
-            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
-            await sess.initialMembershipCalculated;
-            expect(sess.getOldestMembership()!.deviceId).toEqual("old");
-            vi.useRealTimers();
         });
     });
 
@@ -633,7 +688,7 @@ describe("MatrixRTCSession", () => {
             sess!.join(owmMemberIdentity, [mockFocus], joinConfig);
             await Promise.race([sentStateEvent, new Promise((resolve) => setTimeout(resolve, 5000))]);
             mockRoomState(mockRoom, [{ ...sessionMembershipTemplate, user_id: client.getUserId()!, ...ownMembership }]);
-            await sess!._onRTCSessionMemberUpdate();
+            await sess!.ensureRecalculateSessionMembers();
             return sess!.memberships[0].eventId;
         }
 
@@ -643,11 +698,6 @@ describe("MatrixRTCSession", () => {
 
         it("shows joined once join is called", () => {
             sess!.join(owmMemberIdentity, [mockFocus]);
-            expect(sess!.isJoined()).toEqual(true);
-        });
-
-        it("joins with deprecated method", () => {
-            sess!.joinRTCSession(owmMemberIdentity, [], mockFocus);
             expect(sess!.isJoined()).toEqual(true);
         });
 
@@ -674,12 +724,24 @@ describe("MatrixRTCSession", () => {
             mockRoomState(mockRoom, [
                 { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "org.example.key": 1 } as any,
             ]);
-            await sess!._onRTCSessionMemberUpdate();
+            await sess!.ensureRecalculateSessionMembers();
             expect(sess!.memberships[0].applicationData["org.example.key"]).toBe(1);
 
             await sess!.updateApplicationData({ "org.example.key": 2 });
             expect(sendStateEventMock).toHaveBeenCalledTimes(2);
             expect((sendStateEventMock.mock.calls[1][2] as Record<string, unknown>)["org.example.key"]).toBe(2);
+        });
+
+        it("publishes the call capabilities in the membership and reads them back", async () => {
+            await joinAsFirstMember(
+                { callCapabilities: ["m.render_audio", "m.render_video"] },
+                { capabilities: ["m.render_audio", "m.render_video"] },
+            );
+            expect((sendStateEventMock.mock.calls[0][2] as SessionMembershipData).capabilities).toStrictEqual([
+                "m.render_audio",
+                "m.render_video",
+            ]);
+            expect(sess!.memberships[0].callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
         });
 
         it("sends a notification when starting a call and emit DidSendCallNotification", async () => {
@@ -859,7 +921,7 @@ describe("MatrixRTCSession", () => {
         it("doesn't send a notification when joining an existing call", async () => {
             // Add another member to the call so that it is considered an existing call
             mockRoomState(mockRoom, [sessionMembershipTemplate]);
-            await sess!._onRTCSessionMemberUpdate();
+            await sess!.ensureRecalculateSessionMembers();
 
             // Simulate a join, including the update to the room state
             sess!.join(owmMemberIdentity, [mockFocus], { notificationType: "ring" });
@@ -868,7 +930,7 @@ describe("MatrixRTCSession", () => {
                 sessionMembershipTemplate,
                 { ...sessionMembershipTemplate, user_id: client.getUserId()! },
             ]);
-            await sess!._onRTCSessionMemberUpdate();
+            await sess!.ensureRecalculateSessionMembers();
 
             // check we send out join event
             expect(client.sendStateEvent).toHaveBeenCalled();
@@ -883,12 +945,12 @@ describe("MatrixRTCSession", () => {
             // But this time we want to simulate a race condition in which we receive a state event
             // from someone else, starting the call before our own state event has been sent
             mockRoomState(mockRoom, [sessionMembershipTemplate]);
-            await sess!._onRTCSessionMemberUpdate();
+            await sess!.ensureRecalculateSessionMembers();
             mockRoomState(mockRoom, [
                 sessionMembershipTemplate,
                 { ...sessionMembershipTemplate, user_id: client.getUserId()! },
             ]);
-            await sess!._onRTCSessionMemberUpdate();
+            await sess!.ensureRecalculateSessionMembers();
 
             // check we send out join event
             expect(client.sendStateEvent).toHaveBeenCalled();
@@ -909,12 +971,12 @@ describe("MatrixRTCSession", () => {
             sess.on(MatrixRTCSessionEvent.MembershipsChanged, onMembershipsChanged);
 
             // no change -> no emission
-            await sess._onRTCSessionMemberUpdate();
+            await sess.ensureRecalculateSessionMembers();
             expect(onMembershipsChanged).not.toHaveBeenCalled();
 
             // no change -> emission
             mockRoomState(mockRoom, []);
-            await sess._onRTCSessionMemberUpdate();
+            await sess.ensureRecalculateSessionMembers();
             expect(onMembershipsChanged).toHaveBeenCalled();
         });
 
@@ -934,9 +996,9 @@ describe("MatrixRTCSession", () => {
             // `_onRTCSessionMemberUpdate` is the entry point that used to bypass the coalescing,
             // so it is what this test drives; the session manager now calls the public method.
             mockRoomState(mockRoom, [sessionMembershipTemplate]);
-            const first = sess._onRTCSessionMemberUpdate();
+            const first = sess.ensureRecalculateSessionMembers();
             mockRoomState(mockRoom, []);
-            const second = sess._onRTCSessionMemberUpdate();
+            const second = sess.ensureRecalculateSessionMembers();
             await Promise.all([first, second]);
 
             expect(sess.memberships).toHaveLength(0);
@@ -969,9 +1031,9 @@ describe("MatrixRTCSession", () => {
                 .mockReturnValueOnce(bobLeft.promise)
                 .mockReturnValueOnce(aliceLeft.promise);
             try {
-                const first = sess._onRTCSessionMemberUpdate();
+                const first = sess.ensureRecalculateSessionMembers();
                 await flushPromises(); // the first recalculation is now started and stalled
-                const second = sess._onRTCSessionMemberUpdate();
+                const second = sess.ensureRecalculateSessionMembers();
                 aliceLeft.resolve([]);
                 await flushPromises();
                 bobLeft.resolve(aliceOnly);
@@ -1063,14 +1125,14 @@ describe("MatrixRTCSession", () => {
 
             // A third participant takes us to the limit
             mockRoomState(mockRoom, [ownMembership, bob, carl]);
-            await sess._onRTCSessionMemberUpdate();
+            await sess.ensureRecalculateSessionMembers();
 
             expect(sess.isKeyRotationSuppressed).toBe(true);
             expect(onKeyRotationSuppressedChanged).toHaveBeenCalledExactlyOnceWith(true);
 
             // Back below the limit
             mockRoomState(mockRoom, [ownMembership, bob]);
-            await sess._onRTCSessionMemberUpdate();
+            await sess.ensureRecalculateSessionMembers();
 
             expect(sess.isKeyRotationSuppressed).toBe(false);
             expect(onKeyRotationSuppressedChanged).toHaveBeenLastCalledWith(false);
@@ -1236,6 +1298,23 @@ describe("MatrixRTCSession", () => {
             await sess.initialMembershipCalculated;
 
             expect(sess.memberships).toHaveLength(1);
+        });
+
+        it("recalculates memberships when a call member state event arrives", async () => {
+            const mockRoom = makeMockRoom([sessionMembershipTemplate]);
+            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
+            await sess.initialMembershipCalculated;
+            expect(sess.memberships).toHaveLength(1);
+
+            // The member leaves
+            mockRoomState(mockRoom, [{ user_id: sessionMembershipTemplate.user_id }]);
+            const roomState = mockRoom.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
+            const memberEvent = roomState.getStateEvents(EventType.GroupCallMemberPrefix)[0];
+            const membershipRecalculated = new Promise((r) => sess?.once(MatrixRTCSessionEvent.MembershipsChanged, r));
+            mockRoom.emit(RoomStateEvent.Events, memberEvent, roomState, null);
+            await membershipRecalculated;
+
+            expect(sess.memberships).toHaveLength(0);
         });
 
         it("recalculates memberships when the slot is closed via a room state update", async () => {

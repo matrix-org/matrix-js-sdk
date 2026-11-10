@@ -190,6 +190,56 @@ describe("Device dehydration", () => {
 
         matrixClient.stopClient();
     });
+
+    it("should let the crypto store be deleted once the client has stopped", async () => {
+        vi.useRealTimers();
+
+        const matrixClient = createClient({
+            baseUrl: "http://test.server",
+            userId: "@alice:localhost",
+            deviceId: "aliceDevice",
+            cryptoCallbacks: {
+                getSecretStorageKey: async (keys: any, name: string) => {
+                    return [Object.keys(keys.keys)[0], new Uint8Array(32)];
+                },
+            },
+            logger: new DebugLogger(debug(`matrix-js-sdk:dehydration`)),
+        });
+        await initializeSecretStorage(matrixClient, "@alice:localhost", "http://test.server");
+
+        // Dehydrate a device, then rehydrate it, so that every kind of dehydration object has been used
+        let dehydratedDeviceBody: any;
+        fetchMock.get(
+            "path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device",
+            { status: 404, body: { errcode: "M_NOT_FOUND", error: "Not found" } },
+            { name: "get-dehydrated-device" },
+        );
+        fetchMock.put("path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device", (callLog) => {
+            dehydratedDeviceBody = JSON.parse(callLog.options.body as string);
+            return {};
+        });
+        const crypto = matrixClient.getCrypto()!;
+        await crypto.startDehydration();
+        fetchMock.modifyRoute("get-dehydrated-device", {
+            response: { device_id: dehydratedDeviceBody.device_id, device_data: dehydratedDeviceBody.device_data },
+        });
+        fetchMock.get(
+            `path:/_matrix/client/unstable/org.matrix.msc3814.v1/dehydrated_device/${encodeURIComponent(dehydratedDeviceBody.device_id)}/events`,
+            { events: [] },
+        );
+        await crypto.startDehydration();
+
+        matrixClient.stopClient();
+
+        // Deleting a database waits for every connection to it to close, so this hangs if any
+        // dehydration object is still holding the crypto store open
+        const timedOut = Symbol("timed out");
+        const result = await Promise.race([
+            matrixClient.clearStores().then(() => undefined),
+            new Promise<symbol>((resolve) => setTimeout(() => resolve(timedOut), 2000)),
+        ]);
+        expect(result).not.toBe(timedOut);
+    });
 });
 
 /** create a new secret storage and cross-signing keys */
