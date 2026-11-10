@@ -239,6 +239,16 @@ describe("CallMembership", () => {
                 expect(withoutIntent.intent).toBeUndefined();
                 expect(withoutIntent.callIntent).toBeUndefined();
             });
+            it("returns undefined intent if type is not m.call", () => {
+                const membership = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "slot_id": "foo.bar#foobar",
+                    "application": "foo.bar",
+                    "m.call.intent": "m.audio",
+                });
+                expect(membership.intent).toBeUndefined();
+                expect(membership.callIntent).toBeUndefined();
+            });
             it("returns correct call capabilities", () => {
                 expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
             });
@@ -548,9 +558,18 @@ describe("CallMembership", () => {
                 expect(legacy.callIntent).toBe("voice");
             });
             it("returns undefined intent if not advertised", () => {
-                const withoutIntent = createCallMembership(makeMockEvent(), {
+                const membership = createCallMembership(makeMockEvent(), {
                     ...membershipTemplate,
                     application: { type: "m.call" },
+                });
+                expect(membership.intent).toBeUndefined();
+                expect(membership.callIntent).toBeUndefined();
+            });
+            it("returns undefined intent if type is not m.call", () => {
+                const withoutIntent = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    slot_id: "foo.bar#foobar",
+                    application: { type: "foo.bar", intent: "m.audio" },
                 });
                 expect(withoutIntent.intent).toBeUndefined();
                 expect(withoutIntent.callIntent).toBeUndefined();

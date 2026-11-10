@@ -281,13 +281,17 @@ export class CallMembership {
         let intent: unknown;
         switch (kind) {
             case MembershipKind.RTC:
-                // Prefer the stable key `intent`. Otherwise, fall back to the unstable `m.call.intent`
-                // sent by older clients which don't know `intent`.
-                intent = data.application["intent"] ?? data.application["m.call.intent"];
+                if (data.application["type"] == "m.call") {
+                    // Prefer the stable key `intent`. Otherwise, fall back to the unstable `m.call.intent`
+                    // sent by older clients which don't know `intent`.
+                    intent = data.application["intent"] ?? data.application["m.call.intent"];
+                }
                 break;
             case MembershipKind.Session:
-            default:
-                intent = data["m.call.intent"];
+                if (data.application == "m.call") {
+                    intent = data["m.call.intent"];
+                }
+                break;
         }
         // If we have an intent, try to map it to the stable identifiers.
         return typeof intent === "string" ? toStableCallIntent(intent) : undefined;
