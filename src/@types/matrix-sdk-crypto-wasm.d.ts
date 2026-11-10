@@ -15,20 +15,10 @@ limitations under the License.
 */
 
 import type * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
+import type { SecretsBundleJson } from "./secrets-bundle.ts";
 
-/** Return type of `SecretsBundle.to_json` */
-type SecretsBundleJson = {
-    cross_signing: {
-        master_key: string;
-        self_signing_key: string;
-        user_signing_key: string;
-    };
-    backup?: {
-        algorithm: string;
-        key: string;
-        backup_version: string;
-    };
-};
+// NB: `tsc` does not emit `.d.ts` source files into `lib/`, so nothing in here may be imported by other modules:
+// put any types that need to be shared in a `.ts` file instead (such as `secrets-bundle.ts`).
 
 declare module "@matrix-org/matrix-sdk-crypto-wasm" {
     interface SecretsBundle {
