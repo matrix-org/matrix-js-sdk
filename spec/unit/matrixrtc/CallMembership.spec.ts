@@ -91,21 +91,6 @@ describe("CallMembership", () => {
             }).not.toThrow();
         });
 
-        it("rejects membership with non-array capabilities", () => {
-            expect(() => {
-                createCallMembership(
-                    makeMockEvent(),
-                    Object.assign({}, membershipTemplate, { capabilities: "m.render_audio" }),
-                );
-            }).toThrow();
-        });
-
-        it("rejects membership with non-string entries in capabilities", () => {
-            expect(() => {
-                createCallMembership(makeMockEvent(), Object.assign({}, membershipTemplate, { capabilities: [42] }));
-            }).toThrow();
-        });
-
         it("uses event timestamp if no created_ts", () => {
             const membership = createCallMembership(makeMockEvent(12345), membershipTemplate);
             expect(membership.createdTs()).toEqual(12345);
@@ -249,6 +234,14 @@ describe("CallMembership", () => {
                 expect(membership.intent).toBeUndefined();
                 expect(membership.callIntent).toBeUndefined();
             });
+            it("returns undefined intent if it is not a string", () => {
+                const invalidIntent = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    "m.call.intent": 42,
+                });
+                expect(invalidIntent.intent).toBeUndefined();
+                expect(invalidIntent.callIntent).toBeUndefined();
+            });
             it("returns correct call capabilities", () => {
                 expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);
             });
@@ -258,6 +251,20 @@ describe("CallMembership", () => {
                     capabilities: undefined,
                 });
                 expect(withoutCapabilities.callCapabilities).toBeUndefined();
+            });
+            it("returns undefined call capabilities if it is not an array", () => {
+                const invalidCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    capabilities: "m.render_audio",
+                });
+                expect(invalidCapabilities.callCapabilities).toBeUndefined();
+            });
+            it("returns undefined call capabilities if an entry is not a string", () => {
+                const invalidCapabilities = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    capabilities: ["m.render_audio", 42],
+                });
+                expect(invalidCapabilities.callCapabilities).toBeUndefined();
             });
             it("returns correct applicationData", () => {
                 expect(membership.applicationData).toStrictEqual({
@@ -574,19 +581,19 @@ describe("CallMembership", () => {
                 expect(withoutIntent.intent).toBeUndefined();
                 expect(withoutIntent.callIntent).toBeUndefined();
             });
-            it("rejects membership with a non-string intent", () => {
-                expect(() => {
-                    createCallMembership(makeMockEvent(), {
-                        ...membershipTemplate,
-                        application: { type: "m.call", intent: 42 },
-                    });
-                }).toThrow();
-                expect(() => {
-                    createCallMembership(makeMockEvent(), {
-                        ...membershipTemplate,
-                        application: { "type": "m.call", "m.call.intent": 42 },
-                    });
-                }).toThrow();
+            it("returns undefined intent if it is not a string", () => {
+                const invalidStableIntent = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { type: "m.call", intent: 42 },
+                });
+                expect(invalidStableIntent.intent).toBeUndefined();
+                expect(invalidStableIntent.callIntent).toBeUndefined();
+                const invalidUnstableIntent = createCallMembership(makeMockEvent(), {
+                    ...membershipTemplate,
+                    application: { "type": "m.call", "m.call.intent": 42 },
+                });
+                expect(invalidUnstableIntent.intent).toBeUndefined();
+                expect(invalidUnstableIntent.callIntent).toBeUndefined();
             });
             it("returns correct call capabilities", () => {
                 expect(membership.callCapabilities).toStrictEqual(["m.render_audio", "m.render_video"]);

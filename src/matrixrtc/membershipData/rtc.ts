@@ -138,12 +138,6 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
         } else {
             if (data.application.type.includes("#")) errors.push(prefix + 'application.type must not include "#"');
         }
-        // m.call.intent is still sent for backwards compatibility so we validate it here as well.
-        for (const key of ["intent", "m.call.intent"]) {
-            if (data.application[key] !== undefined && typeof data.application[key] !== "string") {
-                errors.push(prefix + `application.${key} must be a string`);
-            }
-        }
     }
     if (typeof data.transports !== "object" || data.transports === null || !Array.isArray(data.transports.published)) {
         errors.push(prefix + "transports.published must be an array");
