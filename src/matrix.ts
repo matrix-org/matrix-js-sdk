@@ -124,6 +124,16 @@ export function setCryptoStoreFactory(fac: () => CryptoStore): void {
     cryptoStoreFactory = fac;
 }
 
+/**
+ * Preload the Rust Crypto and call `initAsync` on it.
+ * Enables the downstream app to improve startup performance on the large WASM asset.
+ * Safe to be called at any time, will have no effect if Rust Crypto is already initialised.
+ */
+export async function preloadRustCrypto(): Promise<void> {
+    const RustCrypto = await import("./rust-crypto/index.ts");
+    await RustCrypto.preloadRustCrypto();
+}
+
 function amendClientOpts(opts: ICreateClientOpts): ICreateClientOpts {
     opts.store =
         opts.store ??

@@ -140,43 +140,55 @@ export class FetchHttpApi<O extends IHttpOpts> {
         body?: Body,
         paramOpts: IRequestOpts = {},
     ): Promise<T> {
-        return this.doAuthedRequest<T>(1, method, path, queryParams, body, paramOpts);
+        return this.withTokenRefresh((accessToken) => {
+            // avoid mutating paramOpts so they can be used on retry
+            const opts = deepCopy(paramOpts);
+            // we have to manually copy the abortSignal over as it is not a plain object
+            opts.abortSignal = paramOpts.abortSignal;
+
+            if (accessToken) {
+                if (this.opts.useAuthorizationHeader) {
+                    if (!opts.headers) {
+                        opts.headers = {};
+                    }
+                    if (!opts.headers.Authorization) {
+                        opts.headers.Authorization = `Bearer ${accessToken}`;
+                    }
+                    if (queryParams.access_token) {
+                        delete queryParams.access_token;
+                    }
+                } else if (!queryParams.access_token) {
+                    queryParams.access_token = accessToken;
+                }
+            }
+
+            return this.request<T>(method, path, queryParams, body, opts);
+        }, paramOpts.inhibitLogoutEmit);
     }
 
-    // Wrapper around public method authedRequest to allow for tracking retry attempt counts
-    private async doAuthedRequest<T>(
-        attempt: number,
-        method: Method,
-        path: string,
-        queryParams: QueryDict,
-        body?: Body,
-        paramOpts: IRequestOpts = {},
+    /**
+     * Perform an authenticated request, ensuring that the access token is fresh before it is made, and
+     * refreshing the token and retrying the request if it fails with `M_UNKNOWN_TOKEN`.
+     *
+     * Emits {@link HttpApiEvent.SessionLoggedOut} and {@link HttpApiEvent.NoConsent} as appropriate.
+     *
+     * @param request - performs the request using the given access token, and rejects with a
+     *     {@link MatrixError} if the homeserver returns an error. May be called more than once.
+     * @param inhibitLogoutEmit - if true, {@link HttpApiEvent.SessionLoggedOut} will not be emitted.
+     * @param attempt - the number of attempts made so far, including this one. Used to back off between
+     *     token refresh attempts.
+     * @returns the result of `request`.
+     */
+    protected async withTokenRefresh<T>(
+        request: (accessToken: string | undefined) => Promise<T>,
+        inhibitLogoutEmit?: boolean,
+        attempt = 1,
     ): Promise<T> {
-        // avoid mutating paramOpts so they can be used on retry
-        const opts = deepCopy(paramOpts);
-        // we have to manually copy the abortSignal over as it is not a plain object
-        opts.abortSignal = paramOpts.abortSignal;
-
         // Take a snapshot of the current token state before we start the request so we can reference it if we error
         const requestSnapshot = await this.tokenManager.prepareForRequest();
-        if (requestSnapshot.accessToken) {
-            if (this.opts.useAuthorizationHeader) {
-                if (!opts.headers) {
-                    opts.headers = {};
-                }
-                if (!opts.headers.Authorization) {
-                    opts.headers.Authorization = `Bearer ${requestSnapshot.accessToken}`;
-                }
-                if (queryParams.access_token) {
-                    delete queryParams.access_token;
-                }
-            } else if (!queryParams.access_token) {
-                queryParams.access_token = requestSnapshot.accessToken;
-            }
-        }
 
         try {
-            const response = await this.request<T>(method, path, queryParams, body, opts);
+            const response = await request(requestSnapshot.accessToken);
             return response;
         } catch (error) {
             if (!(error instanceof MatrixError)) {
@@ -187,13 +199,13 @@ export class FetchHttpApi<O extends IHttpOpts> {
                 const outcome = await this.tokenManager.handleUnknownToken(requestSnapshot, attempt);
                 if (outcome === TokenRefreshOutcome.Success) {
                     // if we got a new token retry the request
-                    return this.doAuthedRequest(attempt + 1, method, path, queryParams, body, paramOpts);
+                    return this.withTokenRefresh(request, inhibitLogoutEmit, attempt + 1);
                 }
                 if (outcome === TokenRefreshOutcome.Failure) {
                     throw new TokenRefreshError(error);
                 }
 
-                if (!opts?.inhibitLogoutEmit) {
+                if (!inhibitLogoutEmit) {
                     this.eventEmitter.emit(HttpApiEvent.SessionLoggedOut, error);
                 }
             } else if (error.errcode == "M_CONSENT_NOT_GIVEN") {

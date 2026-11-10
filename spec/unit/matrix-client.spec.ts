@@ -211,7 +211,6 @@ describe("MatrixClient", function () {
     const RTC_TRANSPORT_RESPONSE: HttpLookup = {
         method: "GET",
         path: "/rtc/transports",
-        prefix: "/_matrix/client/unstable/org.matrix.msc4143",
         data: { rtc_transports: [] },
     };
 
@@ -404,7 +403,7 @@ describe("MatrixClient", function () {
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
             "org.matrix.msc3440.stable": true,
-            "org.matrix.msc4143": true,
+            "org.matrix.msc4143.stable": true,
         };
 
         makeClient();
@@ -3304,6 +3303,16 @@ describe("MatrixClient", function () {
             expect(ruleWrongServerRoom).toBeFalsy();
         });
 
+        it("should not backtrack catastrophically on a malicious glob rule", async () => {
+            await client.ignoredInvites.addRule(PolicyScope.User, "@" + "a*".repeat(20) + "b", "just a test");
+
+            const rule = await client.ignoredInvites.getRuleForInvite({
+                sender: "@" + "a".repeat(48) + ":example.org",
+                roomId: "!snafu:somewhere.org",
+            });
+            expect(rule).toBeFalsy();
+        });
+
         it("should not reject invites anymore once we have removed a rule", async () => {
             await client.ignoredInvites.addRule(PolicyScope.User, "*:example.org", "just a test");
 
@@ -4319,18 +4328,21 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("_unstable_getRTCTransports", () => {
-        it("makes a well-formed request", async () => {
-            unstableFeatures["org.matrix.msc4143"] = true;
+    describe.each([["getRTCTransports" as const], ["_unstable_getRTCTransports" as const]])("%s", (method) => {
+        it.each([
+            ["org.matrix.msc4143", "/_matrix/client/unstable/org.matrix.msc4143", "rtc_transports"],
+            ["org.matrix.msc4143.stable", "/_matrix/client/v1", "transports"],
+        ])("makes a request to %s endpoint", async (feature, prefix, transportsField) => {
+            unstableFeatures = { [feature]: true };
             httpLookups = [
                 {
                     method: "GET",
                     path: `/rtc/transports`,
-                    data: { rtc_transports: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc4143",
+                    data: { [transportsField]: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
+                    prefix,
                 },
             ];
-            expect(await client._unstable_getRTCTransports()).toEqual([
+            expect(await client[method]()).toEqual([
                 {
                     type: "livekit",
                     extra_field: "foobar",
@@ -4346,27 +4358,28 @@ describe("MatrixClient", function () {
             expect(httpLookups).toHaveLength(0);
         });
 
-        it.each([{ unstable_features: { "org.matrix.msc4143": false } }, { unstable_features: {} }, {}])(
-            "does not request transports when support is not advertised: %j",
-            async (versionsResponse) => {
-                vi.mocked(client.http.authedRequest)
-                    .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
-                    .mockResolvedValue({ rtc_transports: [] });
+        it.each([
+            { unstable_features: { "org.matrix.msc4143": false, "org.matrix.msc4143.stable": false } },
+            { unstable_features: {} },
+            {},
+        ])("does not request transports when support is not advertised: %j", async (versionsResponse) => {
+            vi.mocked(client.http.authedRequest)
+                .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
+                .mockResolvedValue({ rtc_transports: [] });
 
-                await expect(client._unstable_getRTCTransports()).rejects.toMatchObject({
-                    errcode: "M_UNRECOGNIZED",
-                    httpStatus: 404,
-                });
-                expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
-                expect(client.http.authedRequest).toHaveBeenCalledWith(
-                    Method.Get,
-                    "/_matrix/client/versions",
-                    undefined,
-                    undefined,
-                    { prefix: "" },
-                );
-            },
-        );
+            await expect(client.getRTCTransports()).rejects.toMatchObject({
+                errcode: "M_UNRECOGNIZED",
+                httpStatus: 404,
+            });
+            expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(
+                Method.Get,
+                "/_matrix/client/versions",
+                undefined,
+                undefined,
+                { prefix: "" },
+            );
+        });
 
         it("caches unsupported discovery without requesting transports", async () => {
             vi.mocked(client.http.authedRequest)
