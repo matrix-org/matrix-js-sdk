@@ -127,7 +127,7 @@ export interface InitRustCryptoArgs {
 /**
  * Preload the Rust Crypto and call `initAsync` on it.
  * Enables the downstream app to improve startup performance on the large WASM asset.
- * Safe to be called at any time, will have no effect if Rust Crypto is already initialised.
+ * Safe to be called at any time, since `RustCryptoJs.initAsync()` is idempotent.
  *
  * @internal
  */
