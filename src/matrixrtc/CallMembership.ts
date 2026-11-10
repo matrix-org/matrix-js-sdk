@@ -288,7 +288,7 @@ export class CallMembership {
                 }
                 break;
             case MembershipKind.Session:
-                if (data.application == "m.call") {
+                if (data.application === "m.call") {
                     intent = data["m.call.intent"];
                 }
                 break;
