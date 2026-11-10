@@ -4320,15 +4320,15 @@ describe("MatrixClient", function () {
 
     describe.each([["getRTCTransports" as const], ["_unstable_getRTCTransports" as const]])("%s", (method) => {
         it.each([
-            ["org.matrix.msc4143", "/_matrix/client/unstable/org.matrix.msc4143"],
-            ["org.matrix.msc4143.stable", "/_matrix/client/v1"],
-        ])("makes a request to %s endpoint", async (feature, prefix) => {
+            ["org.matrix.msc4143", "/_matrix/client/unstable/org.matrix.msc4143", "rtc_transports"],
+            ["org.matrix.msc4143.stable", "/_matrix/client/v1", "transports"],
+        ])("makes a request to %s endpoint", async (feature, prefix, transportsField) => {
             unstableFeatures = { [feature]: true };
             httpLookups = [
                 {
                     method: "GET",
                     path: `/rtc/transports`,
-                    data: { rtc_transports: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
+                    data: { [transportsField]: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
                     prefix,
                 },
             ];

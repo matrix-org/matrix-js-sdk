@@ -6523,17 +6523,23 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
      */
     public async getRTCTransports(): Promise<Transport[]> {
-        let prefix: string;
-        if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143.stable")) prefix = ClientPrefix.V1;
-        else if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))
-            prefix = `${ClientPrefix.Unstable}/org.matrix.msc4143`;
-        else throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
-
-        return (
-            await this.http.authedRequest<{
-                rtc_transports: Transport[];
-            }>(Method.Get, "/rtc/transports", undefined, undefined, { prefix })
-        ).rtc_transports;
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143.stable")) {
+            return (
+                await this.http.authedRequest<{
+                    transports: Transport[];
+                }>(Method.Get, "/rtc/transports", undefined, undefined, { prefix: ClientPrefix.V1 })
+            ).transports;
+        } else if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143")) {
+            return (
+                await this.http.authedRequest<{
+                    rtc_transports: Transport[];
+                }>(Method.Get, "/rtc/transports", undefined, undefined, {
+                    prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
+                })
+            ).rtc_transports;
+        } else {
+            throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
+        }
     }
 
     /**
