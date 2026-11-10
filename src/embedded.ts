@@ -719,12 +719,12 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * Returns a set of configured RTC transports supported by the homeserver.
      *
-     * Overrides the homeserver-side {@link MatrixClient._unstable_getRTCTransports} (MSC4143):
+     * Overrides the homeserver-side {@link MatrixClient.getRTCTransports} (MSC4143):
      * a widget cannot make authenticated homeserver calls itself, so we ask the host over the
      * widget API instead (MSC4515). Requires the `rtcTransports` capability and a host that
      * advertises the `org.matrix.msc4515` API version (otherwise the request throws).
      */
-    public override async _unstable_getRTCTransports(): Promise<Transport[]> {
+    public override async getRTCTransports(): Promise<Transport[]> {
         const { rtc_transports: rtcTransports } = await this.widgetApi
             .getRtcTransports()
             .catch(timeoutToConnectionError);
