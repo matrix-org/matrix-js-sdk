@@ -496,37 +496,6 @@ export function mkEdit(
 }
 
 /**
- * A mock implementation of webstorage
- */
-export class MockStorageApi implements Storage {
-    private data: Record<string, any> = {};
-
-    public get length() {
-        return Object.keys(this.data).length;
-    }
-
-    public key(i: number): any {
-        return Object.keys(this.data)[i];
-    }
-
-    public setItem(k: string, v: any): void {
-        this.data[k] = v;
-    }
-
-    public getItem(k: string): any {
-        return this.data[k] || null;
-    }
-
-    public removeItem(k: string): void {
-        delete this.data[k];
-    }
-
-    public clear(): void {
-        this.data = {};
-    }
-}
-
-/**
  * If an event is being decrypted, wait for it to finish being decrypted.
  *
  * @returns promise which resolves (to `event`) when the event has been decrypted
