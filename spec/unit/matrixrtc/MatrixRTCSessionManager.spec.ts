@@ -14,8 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { ClientEvent, EventTimeline, MatrixClient, type Room, RoomStateEvent } from "../../../src";
-import { MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc";
+import {
+    ClientEvent,
+    EventTimeline,
+    MatrixClient,
+    type Room,
+    RoomStateEvent,
+    RoomStickyEventsEvent,
+    type StickyMatrixEvent,
+} from "../../../src";
+import { MatrixRTCSessionEvent, MatrixRTCSessionManager, MatrixRTCSessionManagerEvents } from "../../../src/matrixrtc";
 import {
     makeMockRoom,
     type MembershipData,
@@ -29,6 +37,7 @@ import { logger } from "../../../src/logger";
 import { flushPromises } from "../../test-utils/flushPromises";
 import { type RtcMembershipData, type SessionMembershipData } from "../../../src/matrixrtc/membershipData";
 import { type RtcSlotEventContent } from "../../../src/matrixrtc/types";
+import { type Mock } from "vitest";
 
 describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
     "MatrixRTCSessionManager ($eventKind)",
@@ -54,17 +63,50 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
             } satisfies SessionMembershipData & { user_id: string };
         }
 
-        async function sendLeaveMembership(room: Room, membershipData: MembershipData[]): Promise<void> {
+        /** A second membership in the same call, from another device. */
+        function generateOtherDeviceMembership(): MembershipData {
+            if (eventKind === "sticky") {
+                return {
+                    ...rtcMembershipTemplate,
+                    member: { ...rtcMembershipTemplate.member, id: "OTHERID", device_id: "BBBBBBB" },
+                    msc4354_sticky_key: "m.call#other",
+                } satisfies RtcMembershipData & { user_id: string };
+            }
+            return { ...sessionMembershipTemplate, device_id: "BBBBBBB" } satisfies SessionMembershipData & {
+                user_id: string;
+            };
+        }
+
+        /**
+         * Replaces the room's memberships with `liveMembershipData` and emits the event that makes the session recalculate.
+         * @param liveMembershipData - the array the room was created with (`makeMockRoom`). In sticky mode the room
+         *     reads its sticky events from this array, so it is updated in place.
+         */
+        async function setMemberships(
+            room: Room,
+            liveMembershipData: MembershipData[],
+            newData: MembershipData[],
+        ): Promise<void> {
             if (eventKind === "memberState") {
-                mockRoomState(room, [{ user_id: sessionMembershipTemplate.user_id }]);
+                mockRoomState(room, newData);
                 const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS)!;
                 const membEvent = roomState.getStateEvents("org.matrix.msc3401.call.member")[0];
-                client.emit(RoomStateEvent.Events, membEvent, roomState, null);
+                room.emit(RoomStateEvent.Events, membEvent, roomState, null);
             } else {
-                membershipData.splice(0, 1, { user_id: sessionMembershipTemplate.user_id });
-                client.emit(ClientEvent.Event, mockRTCEvent(membershipData[0], room.roomId, 10000));
+                liveMembershipData.splice(0, liveMembershipData.length, ...newData);
+                room.emit(
+                    RoomStickyEventsEvent.Update,
+                    [mockRTCEvent(liveMembershipData[0], room.roomId, 10000) as StickyMatrixEvent],
+                    [],
+                    [],
+                );
             }
             await flushPromises();
+        }
+
+        /** Makes the (single) member in the room leave the call. */
+        async function sendLeaveMembership(room: Room, liveMembershipData: MembershipData[]): Promise<void> {
+            await setMemberships(room, liveMembershipData, [{ user_id: sessionMembershipTemplate.user_id }]);
         }
 
         beforeEach(() => {
@@ -122,6 +164,149 @@ describe.each([{ eventKind: "sticky" }, { eventKind: "memberState" }])(
                 room1.roomId,
                 client.matrixRTC.getActiveRoomSession(room1),
             ]);
+        });
+
+        describe("sessions whose memberships are already known at startup", () => {
+            let manager: MatrixRTCSessionManager;
+            let onStarted: Mock;
+            let onEnded: Mock;
+
+            beforeEach(() => {
+                // A manager of our own, so we control when start() runs.
+                manager = new MatrixRTCSessionManager(logger, client);
+                onStarted = vi.fn();
+                onEnded = vi.fn();
+                manager.on(MatrixRTCSessionManagerEvents.SessionStarted, onStarted);
+                manager.on(MatrixRTCSessionManagerEvents.SessionEnded, onEnded);
+            });
+
+            afterEach(() => {
+                manager.stop();
+            });
+
+            it("Fires SessionStarted for a call already in the room state when start() runs", async () => {
+                const room1 = makeMockRoom([generateMembership()], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+                manager.start();
+                await manager.getRoomSession(room1).initialMembershipCalculated;
+                await flushPromises();
+
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onStarted).toHaveBeenCalledWith(room1.roomId, manager.getRoomSession(room1));
+                expect(manager.getRoomSession(room1).memberships).toHaveLength(1);
+            });
+
+            it("Fires SessionStarted once for a session created by getRoomSession() before start()", async () => {
+                const room1 = makeMockRoom([generateMembership()], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
+
+                // This is what Element Web's CallStore does as the cached sync adds rooms.
+                const session = manager.getRoomSession(room1);
+                expect(session.memberships).toHaveLength(0);
+                manager.start();
+                expect(manager.getRoomSession(room1)).toBe(session);
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onStarted).toHaveBeenCalledWith(room1.roomId, session);
+
+                // Rooms being refreshed doesn't fire it again
+                client.emit(ClientEvent.Room, room1);
+                await flushPromises();
+                expect(onStarted).toHaveBeenCalledTimes(1);
+            });
+
+            it("Fires SessionStarted once for a session created by getRoomSession() after start(), then SessionEnded", async () => {
+                const membershipData: MembershipData[] = [generateMembership()];
+                const room1 = makeMockRoom(membershipData, eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([]);
+                vi.spyOn(client, "getRoom").mockReturnValue(room1);
+
+                manager.start();
+                const session = manager.getRoomSession(room1);
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onStarted).toHaveBeenCalledWith(room1.roomId, session);
+
+                // Another device joins: not a new session
+                await setMemberships(room1, membershipData, [generateMembership(), generateOtherDeviceMembership()]);
+                await vi.waitFor(() => expect(session.memberships).toHaveLength(2));
+                expect(onStarted).toHaveBeenCalledTimes(1);
+                expect(onEnded).not.toHaveBeenCalled();
+
+                // Everyone leaves
+                await setMemberships(room1, membershipData, [
+                    { user_id: sessionMembershipTemplate.user_id },
+                    { user_id: sessionMembershipTemplate.user_id },
+                ]);
+                await vi.waitFor(() => expect(session.memberships).toHaveLength(0));
+                expect(onEnded).toHaveBeenCalledTimes(1);
+                expect(onEnded).toHaveBeenCalledWith(room1.roomId, session);
+                expect(onStarted).toHaveBeenCalledTimes(1);
+            });
+
+            it("Fires SessionEnded and forgets the session when a room with a call is deleted", async () => {
+                const membershipData: MembershipData[] = [generateMembership()];
+                const room1 = makeMockRoom(membershipData, eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+                manager.start();
+                const session = manager.getRoomSession(room1);
+                await session.initialMembershipCalculated;
+                await flushPromises();
+                expect(onStarted).toHaveBeenCalledTimes(1);
+
+                const stopSpy = vi.spyOn(session, "stop");
+                client.emit(ClientEvent.DeleteRoom, room1.roomId);
+                expect(onEnded).toHaveBeenCalledTimes(1);
+                expect(onEnded).toHaveBeenCalledWith(room1.roomId, session);
+                expect(stopSpy).toHaveBeenCalled();
+                expect(session.listenerCount(MatrixRTCSessionEvent.MembershipsChanged)).toBe(0);
+                expect(manager.getActiveRoomSession(room1)).toBeUndefined();
+
+                // The session no longer reaches the manager, so members leaving doesn't end it again
+                await setMemberships(room1, membershipData, [{ user_id: sessionMembershipTemplate.user_id }]);
+                expect(onEnded).toHaveBeenCalledTimes(1);
+
+                // Asking for the room again gives a new session
+                expect(manager.getRoomSession(room1)).not.toBe(session);
+            });
+
+            it("Doesn't fire SessionEnded when a room without a call is deleted", async () => {
+                const room1 = makeMockRoom([], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+                manager.start();
+                const session = manager.getRoomSession(room1);
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                client.emit(ClientEvent.DeleteRoom, room1.roomId);
+                expect(onStarted).not.toHaveBeenCalled();
+                expect(onEnded).not.toHaveBeenCalled();
+                expect(manager.getActiveRoomSession(room1)).toBeUndefined();
+            });
+
+            it("Doesn't fire events after stop()", async () => {
+                const room1 = makeMockRoom([generateMembership()], eventKind === "sticky");
+                vi.spyOn(client, "getRooms").mockReturnValue([room1]);
+
+                manager.start();
+                // Stop while the initial membership calculation is still in progress
+                const session = manager.getRoomSession(room1);
+                manager.stop();
+                await session.initialMembershipCalculated;
+                await flushPromises();
+
+                expect(session.memberships).toHaveLength(1);
+                expect(onStarted).not.toHaveBeenCalled();
+                expect(onEnded).not.toHaveBeenCalled();
+            });
         });
 
         it("Fires correctly with custom sessionDescription", async () => {
@@ -233,7 +418,7 @@ describe("MatrixRTCSessionManager slots", () => {
 
         const slotEvent = mockSlotEvent(defaultSlotDescription, closedSlotContent, room1.roomId);
         mockRoomState(room1, [], slotEvent);
-        client.emit(RoomStateEvent.Events, slotEvent, {} as any, null);
+        room1.emit(RoomStateEvent.Events, slotEvent, {} as any, null);
 
         await expect(sessionEndedPromise).resolves.toStrictEqual([
             room1.roomId,
@@ -261,7 +446,7 @@ describe("MatrixRTCSessionManager slots", () => {
         );
         const closedSlotEvent = mockSlotEvent(defaultSlotDescription, closedSlotContent, room1.roomId);
         mockRoomState(room1, [], closedSlotEvent);
-        client.emit(RoomStateEvent.Events, closedSlotEvent, {} as any, null);
+        room1.emit(RoomStateEvent.Events, closedSlotEvent, {} as any, null);
         await sessionEndedPromise;
         expect(client.matrixRTC.getRtcSlot(room1)).toEqual(closedSlotContent);
         expect(client.matrixRTC.isSlotClosed(room1)).toBe(true);
@@ -272,7 +457,7 @@ describe("MatrixRTCSessionManager slots", () => {
         );
         const openSlotEvent = mockSlotEvent(defaultSlotDescription, openSlotContent, room1.roomId);
         mockRoomState(room1, [], openSlotEvent);
-        client.emit(RoomStateEvent.Events, openSlotEvent, {} as any, null);
+        room1.emit(RoomStateEvent.Events, openSlotEvent, {} as any, null);
 
         await expect(reopenedSessionStartedPromise).resolves.toStrictEqual([
             room1.roomId,
