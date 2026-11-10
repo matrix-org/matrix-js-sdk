@@ -281,7 +281,7 @@ export class CallMembership {
         let intent: unknown;
         switch (kind) {
             case MembershipKind.RTC:
-                if (data.application["type"] == "m.call") {
+                if (data.application["type"] === "m.call") {
                     // Prefer the stable key `intent`. Otherwise, fall back to the unstable `m.call.intent`
                     // sent by older clients which don't know `intent`.
                     intent = data.application["intent"] ?? data.application["m.call.intent"];
