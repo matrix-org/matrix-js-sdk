@@ -427,6 +427,26 @@ describe("FetchHttpApi", () => {
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
+                    it("should not emit logout but still throw when token refresh fails with a regular MatrixError", async () => {
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 400,
+                            headers: { "Content-Type": "application/json" },
+                            body: {
+                                // A Matrix-style error body rather than an OAuth one, so this is
+                                // a regular MatrixError which should not cause a logout.
+                                errcode: "M_UNKNOWN",
+                                error: "Something went wrong",
+                            },
+                        });
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            new TokenRefreshError(unknownTokenErr),
+                        );
+                        expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
+                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {
                         fetchMock.post(authMetadata.token_endpoint, { throws: new Error("transitive fault") });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
