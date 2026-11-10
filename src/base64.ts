@@ -28,7 +28,7 @@ function toBase64(uint8Array: Uint8Array, options: Uint8ArrayToBase64Options): s
 
     let base64 = btoa(uint8Array.reduce((acc, current) => acc + String.fromCharCode(current), ""));
     if (options.omitPadding) {
-        base64 = base64.replace(/={1,2}$/, "");
+        base64 = base64.replace(/[=]{1,2}$/, "");
     }
     if (options.alphabet === "base64url") {
         base64 = base64.replace(/\+/g, "-").replace(/\//g, "_");
