@@ -475,7 +475,7 @@ describe("FetchHttpApi", () => {
                             },
                         });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
-                        const { api, emitter } = makeOAuthApi(fetchFn);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
                         await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
                             new TokenRefreshError(unknownTokenErr),
                         );
