@@ -1121,6 +1121,109 @@ describe("MatrixClient", function () {
             );
         });
 
+        describe("in an encrypted room", () => {
+            const encryptedContent = { algorithm: "m.megolm.v1.aes-sha2", ciphertext: "ciphertext" };
+            let mockRoom: Mocked<Pick<Room, "hasEncryptionStateEvent" | "updatePendingEvent">>;
+            let mockCrypto: Mocked<CryptoBackend>;
+
+            beforeEach(() => {
+                mockRoom = {
+                    hasEncryptionStateEvent: vi.fn().mockReturnValue(true),
+                    updatePendingEvent: vi.fn(),
+                };
+                client.getRoom = (getRoomId) => {
+                    expect(getRoomId).toEqual(roomId);
+                    return mockRoom as unknown as Room;
+                };
+                mockCrypto = {
+                    encryptEvent: vi.fn().mockImplementation(async (event: MatrixEvent) => {
+                        event.makeEncrypted(EventType.RoomMessageEncrypted, encryptedContent, "", "");
+                    }),
+                    stop: vi.fn(),
+                } as unknown as Mocked<CryptoBackend>;
+                client["cryptoBackend"] = mockCrypto;
+            });
+
+            it("encrypts a delayed message event", async () => {
+                const txnId = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.encrypted/${txnId}`,
+                        data: delayData,
+                        expectBody: { delay_ms: 2000, content: encryptedContent },
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        delayMs,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId,
+                    ),
+                ).resolves.toEqual(delayData);
+                expect(httpLookups).toHaveLength(0);
+                expect(mockCrypto.encryptEvent).toHaveBeenCalledTimes(1);
+                expect(mockCrypto.encryptEvent.mock.calls[0][0].getContent()).toEqual(content);
+                // Delayed events are not pending events of the room, so no local echo status is updated.
+                expect(mockRoom.updatePendingEvent).not.toHaveBeenCalled();
+            });
+
+            it("encrypts a sticky delayed event", async () => {
+                unstableFeatures["org.matrix.msc4354"] = true;
+                const txnId = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.encrypted/${txnId}`,
+                        data: delayData,
+                        expectBody: {
+                            "delay_ms": 2000,
+                            "org.matrix.msc4354.sticky_duration_ms": 5000,
+                            "content": encryptedContent,
+                        },
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendStickyDelayedEvent(
+                        roomId,
+                        5000,
+                        delayMs,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId,
+                    ),
+                ).resolves.toEqual(delayData);
+                expect(httpLookups).toHaveLength(0);
+                expect(mockCrypto.encryptEvent).toHaveBeenCalledTimes(1);
+                expect(mockRoom.updatePendingEvent).not.toHaveBeenCalled();
+            });
+
+            it("does not schedule the event when encryption fails", async () => {
+                const error = new Error("encryption failed");
+                mockCrypto.encryptEvent.mockRejectedValue(error);
+                httpLookups = [];
+
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        delayMs,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        client.makeTxnId(),
+                    ),
+                ).rejects.toThrow(error);
+            });
+        });
+
         async function testThreadRelation(
             content: RoomMessageEventContent,
             inReplyTo: string,
