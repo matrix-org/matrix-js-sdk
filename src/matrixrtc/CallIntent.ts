@@ -17,7 +17,7 @@ limitations under the License.
 import { type RTCCallIntent } from "./types.ts";
 
 /**
- * The member intends to join the call sending and receiving audio only.
+ * The member intends to join the call sending audio only.
  *
  * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
  */
