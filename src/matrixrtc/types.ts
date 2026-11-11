@@ -146,9 +146,12 @@ export type RTCNotificationType = "ring" | "notification";
 
 /**
  * Represents the intention of the call from the perspective of the sending user.
- * May be any string, although `"audio"` and `"video"` are commonly accepted values.
+ * May be any string, although `"m.audio"` and `"m.video"` are the stable values
+ * specified in MSC4196.
+ *
+ * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
  */
-export type RTCCallIntent = "audio" | "video" | string;
+export type RTCCallIntent = "m.audio" | "m.video" | (string & {});
 
 /**
  * Represents one kind of media a member's device is capable of handling.

@@ -611,14 +611,17 @@ describe("MatrixRTCSession", () => {
         });
     });
 
-    describe("getConsensusCallIntent", () => {
+    describe("getConsensusIntent / getConsensusCallIntent", () => {
         it.each([
-            [undefined, undefined, undefined],
-            ["audio", undefined, "audio"],
-            [undefined, "audio", "audio"],
-            ["audio", "audio", "audio"],
-            ["audio", "video", undefined],
-        ])("gets correct consensus for %s + %s = %s", async (intentA, intentB, result) => {
+            [undefined, undefined, undefined, undefined],
+            ["audio", undefined, "m.audio", "audio"],
+            ["m.audio", undefined, "m.audio", "audio"],
+            ["audio", "m.audio", "m.audio", "audio"],
+            ["m.video", "video", "m.video", "video"],
+            ["audio", "video", undefined, undefined],
+            ["m.audio", "m.video", undefined, undefined],
+            ["custom", "custom", "custom", "custom"],
+        ])("gets correct consensus for %s + %s = %s (%s)", async (intentA, intentB, stable, legacy) => {
             vi.useFakeTimers();
             vi.setSystemTime(4000);
             const mockRoom = makeMockRoom([
@@ -628,7 +631,8 @@ describe("MatrixRTCSession", () => {
 
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             await sess.initialMembershipCalculated;
-            expect(sess.getConsensusCallIntent()).toEqual(result);
+            expect(sess.getConsensusIntent()).toEqual(stable);
+            expect(sess.getConsensusCallIntent()).toEqual(legacy);
             vi.useRealTimers();
         });
     });
@@ -916,6 +920,30 @@ describe("MatrixRTCSession", () => {
                 "m.call.intent": "audio",
                 "sender_ts": expect.any(Number),
             });
+        });
+
+        it("writes the legacy intent value to the notification for an MSC4196 intent", async () => {
+            sendStickyEventMock.mockResolvedValueOnce({ event_id: "new-evt" });
+            const didSendNotification = new Promise((resolve) => {
+                sess!.once(MatrixRTCSessionEvent.DidSendCallNotification, resolve);
+            });
+
+            await joinAsFirstMember(
+                { notificationType: "ring", callIntent: "m.video" },
+                // Our own membership is read back from the (legacy) state event
+                { "m.call.intent": "video" },
+            );
+            expect(sess!.getConsensusIntent()).toEqual("m.video");
+            expect(sess!.getConsensusCallIntent()).toEqual("video");
+
+            expect(sendStickyEventMock).toHaveBeenCalledWith(
+                mockRoom!.roomId,
+                110_000,
+                null,
+                EventType.RTCNotification,
+                expect.objectContaining({ "m.call.intent": "video" }),
+            );
+            await didSendNotification;
         });
 
         it("doesn't send a notification when joining an existing call", async () => {
