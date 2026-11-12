@@ -24,6 +24,12 @@ import type { IStore } from "../store/index.ts";
 import { ROOM_RETENTION_TYPE, type RoomRetentionContent } from "../@types/retention.ts";
 
 /**
+ * The largest delay `setTimeout` accepts (2^31 - 1 ms, ~24.8 days). Larger values overflow
+ * and cause the callback to fire immediately.
+ */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
+/**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
  * state of the room and applying the *latest* retention policy to all preceeding events.
  * Currently does not:
@@ -190,10 +196,13 @@ export class RoomRetentionPolicy {
         if (this.retentionTimeout) {
             clearTimeout(this.retentionTimeout);
         }
-        this.retentionTimeout = setTimeout(() => {
-            this.processTimeline();
-            this.retentionTimeout = undefined;
-        }, nextTs);
+        this.retentionTimeout = setTimeout(
+            () => {
+                this.retentionTimeout = undefined;
+                this.processTimeline();
+            },
+            Math.min(nextTs, MAX_TIMEOUT_MS),
+        );
     };
 
     private processTimeline(): void {

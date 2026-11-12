@@ -30,6 +30,7 @@ describe("RoomRetentionPolicy", () => {
     let getCachedMock: ReturnType<typeof vi.fn>;
     let removeEventsFromRoom: ReturnType<typeof vi.fn>;
     let retentionPolicyUpdateHandler: (() => void) | undefined;
+    let retentionServiceOff: ReturnType<typeof vi.fn>;
     let eventCounter = 0;
 
     function getPolicy(): RoomRetentionPolicy {
@@ -70,6 +71,7 @@ describe("RoomRetentionPolicy", () => {
         retentionPolicyUpdateHandler = undefined;
         getCachedMock = vi.fn().mockReturnValue(undefined);
         removeEventsFromRoom = vi.fn().mockResolvedValue(undefined);
+        retentionServiceOff = vi.fn();
 
         const mockClient = {
             supportsThreads: vi.fn().mockReturnValue(true),
@@ -79,6 +81,7 @@ describe("RoomRetentionPolicy", () => {
                 on: vi.fn((event: string, handler: () => void) => {
                     if (event === "update") retentionPolicyUpdateHandler = handler;
                 }),
+                off: retentionServiceOff,
                 getCached: getCachedMock,
             },
             store: { removeEventsFromRoom },
@@ -307,6 +310,31 @@ describe("RoomRetentionPolicy", () => {
             // The earliest-expiring event should be processed
             expect(redactSpy).toHaveBeenCalledOnce();
             expect(redactSpy.mock.calls[0][0].event.redacts).toBe(soonToExpire.getId());
+        });
+
+        it("clamps long expiry delays to the setTimeout maximum and still expires on time", async () => {
+            const maxLifetime = 365 * ONE_DAY_MS;
+            const event = makeMessageEvent(Date.now());
+            await room.addLiveEvents([event], { addToState: false });
+
+            const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+            const redactSpy = vi.spyOn(room, "tryApplyRedaction");
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: maxLifetime } } });
+            await applyPolicy();
+
+            expect(setTimeoutSpy).toHaveBeenCalled();
+            for (const [, delay] of setTimeoutSpy.mock.calls) {
+                expect(delay).toBeLessThanOrEqual(2 ** 31 - 1);
+            }
+
+            // Should not have fired early
+            vi.advanceTimersByTime(maxLifetime - 1000);
+            expect(redactSpy).not.toHaveBeenCalled();
+            // Only a handful of re-arms over a year, not a busy loop.
+            expect(setTimeoutSpy.mock.calls.length).toBeLessThan(20);
+
+            vi.advanceTimersByTime(2000);
+            expect(redactSpy).toHaveBeenCalledOnce();
         });
 
         it("does not process timeline when no policy is active", async () => {
