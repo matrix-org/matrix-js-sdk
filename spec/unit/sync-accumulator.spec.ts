@@ -36,6 +36,12 @@ import { MAX_STICKY_DURATION_MS } from "../../src/models/event";
 import * as utils from "../test-utils/test-utils";
 import { KnownMembership, type Membership } from "../../src/@types/membership";
 
+const COMMON_ROOM_SYNC_BLOCK = {
+    account_data: { events: [] },
+    ephemeral: { events: [] },
+    unread_notifications: {},
+};
+
 // The event body & unsigned object get frozen to assert that they don't get altered
 // by the impl
 const RES_WITH_AGE = {
@@ -45,9 +51,7 @@ const RES_WITH_AGE = {
         leave: {},
         join: {
             "!foo:bar": {
-                account_data: { events: [] },
-                ephemeral: { events: [] },
-                unread_notifications: {},
+                ...COMMON_ROOM_SYNC_BLOCK,
                 unread_thread_notifications: {
                     "$143273582443PhrSn:example.org": {
                         highlight_count: 0,
@@ -96,17 +100,15 @@ describe("SyncAccumulator", function () {
                 leave: {},
                 join: {
                     "!foo:bar": {
-                        "account_data": { events: [] },
-                        "ephemeral": { events: [] },
-                        "unread_notifications": {},
-                        "org.matrix.msc4222.state_after": { events },
-                        "state": { events },
-                        "summary": {
+                        ...COMMON_ROOM_SYNC_BLOCK,
+                        state_after: { events },
+                        state: { events },
+                        summary: {
                             "m.heroes": undefined,
                             "m.joined_member_count": undefined,
                             "m.invited_member_count": undefined,
                         },
-                        "timeline": {
+                        timeline: {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
                         },
@@ -589,9 +591,7 @@ describe("SyncAccumulator", function () {
 
         // Room transitions from knock to join (e.g., after approval and joining)
         const joinState = {
-            account_data: { events: [] },
-            ephemeral: { events: [] },
-            unread_notifications: {},
+            ...COMMON_ROOM_SYNC_BLOCK,
             state: {
                 events: [member("bob", KnownMembership.Join)],
             },
@@ -822,9 +822,7 @@ describe("SyncAccumulator", function () {
                     leave: {},
                     join: {
                         "!foo:bar": {
-                            account_data: { events: [] },
-                            ephemeral: { events: [] },
-                            unread_notifications: {},
+                            ...COMMON_ROOM_SYNC_BLOCK,
                             state: {
                                 events: [],
                             },
@@ -936,14 +934,14 @@ describe("SyncAccumulator", function () {
             };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": initState,
+                    state_after: initState,
                 }),
             );
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
 
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [
                             utils.mkEvent({
                                 user: "alice",
@@ -966,7 +964,7 @@ describe("SyncAccumulator", function () {
 
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [
                             utils.mkEvent({
                                 user: "alice",
@@ -994,17 +992,17 @@ describe("SyncAccumulator", function () {
             };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": initState,
+                    state_after: initState,
                 }),
             );
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
 
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [],
                     },
-                    "timeline": {
+                    timeline: {
                         events: [
                             utils.mkEvent({
                                 user: "alice",
@@ -1033,8 +1031,8 @@ describe("SyncAccumulator", function () {
             };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": initState,
-                    "timeline": {
+                    state_after: initState,
+                    timeline: {
                         events: initState.events,
                         prev_batch: null,
                     },
@@ -1046,10 +1044,10 @@ describe("SyncAccumulator", function () {
             joinEvent.unsigned = { prev_content: initState.events[0].content, prev_sender: initState.events[0].sender };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [joinEvent],
                     },
-                    "timeline": {
+                    timeline: {
                         events: [joinEvent],
                         prev_batch: "something",
                     },
@@ -1060,10 +1058,9 @@ describe("SyncAccumulator", function () {
             expect(roomData.state?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
                 KnownMembership.Knock,
             );
-            expect(
-                roomData["org.matrix.msc4222.state_after"]?.events.find((e) => e.type === "m.room.member")?.content
-                    .membership,
-            ).toEqual(KnownMembership.Join);
+            expect(roomData["state_after"]?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
+                KnownMembership.Join,
+            );
             expect(roomData.timeline?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
                 KnownMembership.Join,
             );
