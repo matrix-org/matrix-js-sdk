@@ -273,6 +273,12 @@ const SCROLLBACK_DELAY_MS = 3000;
 
 const TURN_CHECK_INTERVAL = 10 * 60 * 1000; // poll for turn credentials every 10 minutes
 
+/**
+ * Default time-to-live for extended profile properties cached in the store (5 minutes).
+ * Prevents stale profile entries over time while avoiding hammering homeservers on restart.
+ */
+export const EXTENDED_PROFILE_CACHE_TTL_MS = 5 * 60 * 1000;
+
 export interface IKeysUploadResponse {
     one_time_key_counts: {
         [algorithm: string]: number;
@@ -1316,6 +1322,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
     protected readonly stickyEventSendQueue = new StickyEventSendQueue();
+    protected readonly extendedProfileTimestamps = new Map<string, Map<string, number>>();
 
     /**
      * Legacy crypto store used for migration from the legacy crypto to the rust crypto
@@ -1648,6 +1655,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
         this.cachedRtcTransports.stop();
         this.cachedWellKnown.stop();
+        this.extendedProfileTimestamps.clear();
     }
 
     /**
@@ -1664,6 +1672,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (this.clientRunning) {
             throw new Error("Cannot clear stores while client is running");
         }
+
+        this.extendedProfileTimestamps.clear();
 
         const promises: Promise<void>[] = [];
 
@@ -7818,14 +7828,41 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      *
      * @throws An error if the server does not support MSC4133.
      */
-    public async getExtendedProfileProperty(userId: string, key: string): Promise<unknown> {
+    private getExtendedProfileTimestamp(userId: string, key: string): number | undefined {
+        return this.extendedProfileTimestamps.get(userId)?.get(key);
+    }
+
+    private setExtendedProfileTimestamp(userId: string, key: string, timestamp: number): void {
+        let userTimestamps = this.extendedProfileTimestamps.get(userId);
+        if (!userTimestamps) {
+            userTimestamps = new Map();
+            this.extendedProfileTimestamps.set(userId, userTimestamps);
+        }
+        userTimestamps.set(key, timestamp);
+    }
+
+    private deleteExtendedProfileTimestamp(userId: string, key: string): void {
+        this.extendedProfileTimestamps.get(userId)?.delete(key);
+    }
+
+    public async getExtendedProfileProperty(
+        userId: string,
+        key: string,
+        maxAgeMs = EXTENDED_PROFILE_CACHE_TTL_MS,
+    ): Promise<unknown> {
         if (!(await this.doesServerSupportExtendedProfiles())) {
             throw new Error("Server does not support extended profiles");
         }
         // NOTE: We only read individual keys from a cached profile as we don't have the full profile
-        // cached, only the keys that the user has configured via their sync filter.
+        // cached, only the keys that the user has configured via their sync filter or previously fetched.
         const storedProfile = await this.store.getUserProfile(userId);
-        if (storedProfile?.[key] !== undefined) {
+        const timestamp = this.getExtendedProfileTimestamp(userId, key);
+        const isExpired = timestamp !== undefined ? Date.now() - timestamp >= maxAgeMs : maxAgeMs === 0;
+
+        if (storedProfile?.[key] !== undefined && !isExpired) {
+            if (timestamp === undefined) {
+                this.setExtendedProfileTimestamp(userId, key, Date.now());
+            }
             return storedProfile[key];
         }
         let profile: SyncUserProfile;
@@ -7842,12 +7879,18 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         } catch (e) {
             if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
                 // The key is not set on the profile (or the profile does not exist).
+                this.deleteExtendedProfileTimestamp(userId, key);
+                if (storedProfile && key in storedProfile) {
+                    const { [key]: _deleted, ...remainingProfile } = storedProfile;
+                    await this.store.storeUserProfiles(new Map([[userId, remainingProfile]]));
+                }
                 return undefined;
             }
             throw e;
         }
 
         // write through to the cache
+        this.setExtendedProfileTimestamp(userId, key, Date.now());
         await this.store.storeUserProfiles(
             new Map([
                 [
