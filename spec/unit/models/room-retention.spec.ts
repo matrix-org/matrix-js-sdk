@@ -354,6 +354,49 @@ describe("RoomRetentionPolicy", () => {
         });
     });
 
+    describe("dispose", () => {
+        it("cancels a pending expiry check", async () => {
+            const expiresIn = 1000;
+            await room.addLiveEvents([makeMessageEvent(Date.now() - ONE_DAY_MS + expiresIn)], { addToState: false });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+
+            const redactSpy = vi.spyOn(room, "tryApplyRedaction");
+            room.dispose();
+            vi.advanceTimersByTime(expiresIn + 100);
+
+            expect(redactSpy).not.toHaveBeenCalled();
+            expect(vi.getTimerCount()).toBe(0);
+        });
+
+        it("removes room and retention service listeners", async () => {
+            const offSpy = vi.spyOn(room, "off");
+            const timelineListeners = room.listenerCount(RoomEvent.Timeline);
+            const stateListeners = room.listenerCount(RoomStateEvent.Events);
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListeners + 1);
+
+            room.dispose();
+
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListeners);
+            expect(room.listenerCount(RoomStateEvent.Events)).toBe(stateListeners - 1);
+            expect(offSpy).toHaveBeenCalledWith(RoomStateEvent.Events, expect.any(Function));
+            expect(retentionServiceOff).toHaveBeenCalledWith("update", retentionPolicyUpdateHandler);
+        });
+
+        it("does not bind the timeline listener if disposed during a policy update", async () => {
+            const timelineListeners = room.listenerCount(RoomEvent.Timeline);
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            retentionPolicyUpdateHandler!();
+            room.dispose();
+            await flushPromises();
+
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListeners);
+            expect(vi.getTimerCount()).toBe(0);
+        });
+    });
+
     describe("reactivity", () => {
         it("recalculates policy when stable retention room state event changes", async () => {
             expect(getPolicy().shouldEventBeRetained(makeMessageEvent(0))).toBe(true);
