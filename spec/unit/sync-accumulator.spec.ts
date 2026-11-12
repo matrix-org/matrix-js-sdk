@@ -96,17 +96,17 @@ describe("SyncAccumulator", function () {
                 leave: {},
                 join: {
                     "!foo:bar": {
-                        "account_data": { events: [] },
-                        "ephemeral": { events: [] },
-                        "unread_notifications": {},
-                        "org.matrix.msc4222.state_after": { events },
-                        "state": { events },
-                        "summary": {
+                        account_data: { events: [] },
+                        ephemeral: { events: [] },
+                        unread_notifications: {},
+                        state_after: { events },
+                        state: { events },
+                        summary: {
                             "m.heroes": undefined,
                             "m.joined_member_count": undefined,
                             "m.invited_member_count": undefined,
                         },
-                        "timeline": {
+                        timeline: {
                             events: [msg("alice", "hi")],
                             prev_batch: "something",
                         },

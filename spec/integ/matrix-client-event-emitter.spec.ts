@@ -417,9 +417,7 @@ function mockSyncResponse({
                         prev_batch: "s",
                     },
                     ...(stateEvents ? { state: { events: stateEvents } } : undefined),
-                    ...(msc4222StateEvents
-                        ? { "org.matrix.msc4222.state_after": { events: msc4222StateEvents } }
-                        : undefined),
+                    ...(msc4222StateEvents ? { state_after: { events: msc4222StateEvents } } : undefined),
                     ephemeral: {
                         events: ephemeralEvents,
                     },
