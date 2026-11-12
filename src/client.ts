@@ -4513,6 +4513,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         });
         const response = await this.http.authedRequest<EmptyObject>(Method.Post, path);
         if (deleteRoom) {
+            this.store.getRoom(roomId)?.dispose();
             this.store.removeRoom(roomId);
             this.emit(ClientEvent.DeleteRoom, roomId);
         }

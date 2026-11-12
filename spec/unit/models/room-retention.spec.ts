@@ -30,6 +30,7 @@ describe("RoomRetentionPolicy", () => {
     let getCachedMock: ReturnType<typeof vi.fn>;
     let removeEventsFromRoom: ReturnType<typeof vi.fn>;
     let retentionPolicyUpdateHandler: (() => void) | undefined;
+    let retentionServiceOff: ReturnType<typeof vi.fn>;
     let eventCounter = 0;
 
     function getPolicy(): RoomRetentionPolicy {
@@ -70,6 +71,7 @@ describe("RoomRetentionPolicy", () => {
         retentionPolicyUpdateHandler = undefined;
         getCachedMock = vi.fn().mockReturnValue(undefined);
         removeEventsFromRoom = vi.fn().mockResolvedValue(undefined);
+        retentionServiceOff = vi.fn();
 
         const mockClient = {
             supportsThreads: vi.fn().mockReturnValue(true),
@@ -79,6 +81,7 @@ describe("RoomRetentionPolicy", () => {
                 on: vi.fn((event: string, handler: () => void) => {
                     if (event === "update") retentionPolicyUpdateHandler = handler;
                 }),
+                off: retentionServiceOff,
                 getCached: getCachedMock,
             },
             store: { removeEventsFromRoom },
@@ -309,6 +312,31 @@ describe("RoomRetentionPolicy", () => {
             expect(redactSpy.mock.calls[0][0].event.redacts).toBe(soonToExpire.getId());
         });
 
+        it("clamps long expiry delays to the setTimeout maximum and still expires on time", async () => {
+            const maxLifetime = 365 * ONE_DAY_MS;
+            const event = makeMessageEvent(Date.now());
+            await room.addLiveEvents([event], { addToState: false });
+
+            const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+            const redactSpy = vi.spyOn(room, "tryApplyRedaction");
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: maxLifetime } } });
+            await applyPolicy();
+
+            expect(setTimeoutSpy).toHaveBeenCalled();
+            for (const [, delay] of setTimeoutSpy.mock.calls) {
+                expect(delay).toBeLessThanOrEqual(2 ** 31 - 1);
+            }
+
+            // Should not have fired early
+            vi.advanceTimersByTime(maxLifetime - 1000);
+            expect(redactSpy).not.toHaveBeenCalled();
+            // Only a handful of re-arms over a year, not a busy loop.
+            expect(setTimeoutSpy.mock.calls.length).toBeLessThan(20);
+
+            vi.advanceTimersByTime(2000);
+            expect(redactSpy).toHaveBeenCalledOnce();
+        });
+
         it("does not process timeline when no policy is active", async () => {
             await room.addLiveEvents([makeMessageEvent(0)], { addToState: false });
 
@@ -351,6 +379,49 @@ describe("RoomRetentionPolicy", () => {
 
             const timelineUnbindings = offSpy.mock.calls.filter(([event]) => event === RoomEvent.Timeline);
             expect(timelineUnbindings.length).toBe(1);
+        });
+    });
+
+    describe("dispose", () => {
+        it("cancels a pending expiry check", async () => {
+            const expiresIn = 1000;
+            await room.addLiveEvents([makeMessageEvent(Date.now() - ONE_DAY_MS + expiresIn)], { addToState: false });
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+
+            const redactSpy = vi.spyOn(room, "tryApplyRedaction");
+            room.dispose();
+            vi.advanceTimersByTime(expiresIn + 100);
+
+            expect(redactSpy).not.toHaveBeenCalled();
+            expect(vi.getTimerCount()).toBe(0);
+        });
+
+        it("removes room and retention service listeners", async () => {
+            const offSpy = vi.spyOn(room, "off");
+            const timelineListeners = room.listenerCount(RoomEvent.Timeline);
+            const stateListeners = room.listenerCount(RoomStateEvent.Events);
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListeners + 1);
+
+            room.dispose();
+
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListeners);
+            expect(room.listenerCount(RoomStateEvent.Events)).toBe(stateListeners - 1);
+            expect(offSpy).toHaveBeenCalledWith(RoomStateEvent.Events, expect.any(Function));
+            expect(retentionServiceOff).toHaveBeenCalledWith("update", retentionPolicyUpdateHandler);
+        });
+
+        it("does not bind the timeline listener if disposed during a policy update", async () => {
+            const timelineListeners = room.listenerCount(RoomEvent.Timeline);
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            retentionPolicyUpdateHandler!();
+            room.dispose();
+            await flushPromises();
+
+            expect(room.listenerCount(RoomEvent.Timeline)).toBe(timelineListeners);
+            expect(vi.getTimerCount()).toBe(0);
         });
     });
 

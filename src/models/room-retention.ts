@@ -24,6 +24,12 @@ import type { IStore } from "../store/index.ts";
 import { ROOM_RETENTION_TYPE, type RoomRetentionContent } from "../@types/retention.ts";
 
 /**
+ * The largest delay `setTimeout` accepts (2^31 - 1 ms, ~24.8 days). Larger values overflow
+ * and cause the callback to fire immediately.
+ */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
+/**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
  * state of the room and applying the *latest* retention policy to all preceeding events.
  * Currently does not:
@@ -35,6 +41,7 @@ export class RoomRetentionPolicy {
     // minRetention is not implemented.
     private maxRetention: number | null = null;
     private retentionTimeout?: ReturnType<typeof setTimeout>;
+    private disposed = false;
     private readonly logger: Logger;
 
     public constructor(
@@ -45,26 +52,43 @@ export class RoomRetentionPolicy {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
 
         // Recalculate on room state update.
-        room.on(RoomStateEvent.Events, (event) => {
-            if (
-                event.getStateKey() !== "" ||
-                (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
-            ) {
-                return;
-            }
-            void this.handleRetentionUpdate();
-        });
+        room.on(RoomStateEvent.Events, this.onRoomStateEvent);
 
         // Recalculate our retention whenever the global policy changes.
-        this.retentionService.on("update", () => {
-            this.logger.info("Got global retention policy update!");
-            void this.handleRetentionUpdate();
-        });
+        this.retentionService.on("update", this.onRetentionServiceUpdate);
         // Do an initial check on construction.
         void this.handleRetentionUpdate();
 
         // Only bind RoomEvent.Timeline once we know we have a retention policy.
     }
+
+    /**
+     * Stop applying the retention policy: cancels any pending expiry check and removes all listeners.
+     * The instance must not be used after this is called.
+     */
+    public dispose(): void {
+        this.disposed = true;
+        this.room.off(RoomStateEvent.Events, this.onRoomStateEvent);
+        this.room.off(RoomEvent.Timeline, this.timelineUpdated);
+        this.retentionService.off("update", this.onRetentionServiceUpdate);
+        clearTimeout(this.retentionTimeout);
+        this.retentionTimeout = undefined;
+    }
+
+    private readonly onRoomStateEvent = (event: MatrixEvent): void => {
+        if (
+            event.getStateKey() !== "" ||
+            (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
+        ) {
+            return;
+        }
+        void this.handleRetentionUpdate();
+    };
+
+    private readonly onRetentionServiceUpdate = (): void => {
+        this.logger.info("Got global retention policy update!");
+        void this.handleRetentionUpdate();
+    };
 
     public shouldEventBeRetained(ev: MatrixEvent): boolean {
         if (!this.maxRetention) {
@@ -84,6 +108,9 @@ export class RoomRetentionPolicy {
             this.logger.warn("Failed to recalculate retention policy", err);
             return;
         }
+
+        // We may have been disposed while recalculating; don't re-bind listeners.
+        if (this.disposed) return;
 
         // Bind/unbind the Timeline event handler based on whether we should be running retention.
         if (hadRetentionPeriod !== (this.maxRetention !== null)) {
@@ -169,14 +196,17 @@ export class RoomRetentionPolicy {
         if (this.retentionTimeout) {
             clearTimeout(this.retentionTimeout);
         }
-        this.retentionTimeout = setTimeout(() => {
-            this.processTimeline();
-            this.retentionTimeout = undefined;
-        }, nextTs);
+        this.retentionTimeout = setTimeout(
+            () => {
+                this.retentionTimeout = undefined;
+                this.processTimeline();
+            },
+            Math.min(nextTs, MAX_TIMEOUT_MS),
+        );
     };
 
     private processTimeline(): void {
-        if (!this.maxRetention) {
+        if (this.disposed || !this.maxRetention) {
             return; // No policy, skip.
         }
         this.logger.info(`Running processTimeline`);
