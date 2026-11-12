@@ -98,7 +98,7 @@
         "knip": "^6.41.0",
         "lint-staged": "^17.6.0",
         "matrix-mock-request": "^2.6.0",
-        "oxfmt": "^0.75.0",
+        "oxfmt": "^0.77.0",
         "oxlint": "^1.88.0",
         "oxlint-tsgolint": "^7.0.2004",
         "typedoc": "^0.28.20",
