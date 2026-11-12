@@ -16,7 +16,7 @@ limitations under the License.
 
 import type HttpBackend from "matrix-mock-request";
 import * as utils from "../test-utils/test-utils";
-import { type IStoredClientOpts, MatrixClient } from "../../src/client";
+import { type IPublicRoomsChunkRoom, type IStoredClientOpts, MatrixClient } from "../../src/client";
 import { MatrixEvent } from "../../src/models/event";
 import {
     Filter,
@@ -1417,6 +1417,20 @@ describe("MatrixClient", function () {
                 .respond(200, {});
             client.publicRooms({ filter: { generic_search_term: "foobar" } });
             return httpBackend.flushAllExpected();
+        });
+
+        it("should return knock_restricted rooms", async () => {
+            const room: IPublicRoomsChunkRoom = {
+                room_id: "!room:example.org",
+                world_readable: false,
+                guest_can_join: false,
+                num_joined_members: 1,
+                join_rule: JoinRule.KnockRestricted,
+            };
+            httpBackend.when("GET", "/publicRooms").respond(200, { chunk: [room] });
+
+            const [res] = await Promise.all([client.publicRooms({}), httpBackend.flushAllExpected()]);
+            expect(res.chunk[0].join_rule).toBe(JoinRule.KnockRestricted);
         });
     });
 
