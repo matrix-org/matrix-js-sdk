@@ -176,6 +176,9 @@ importers:
       '@matrix-org/matrix-sdk-crypto-wasm':
         specifier: ^19.0.0
         version: 19.0.0
+      '@panva/hpke-noble':
+        specifier: ^1.1.8
+        version: 1.1.8(hpke@1.1.8)
       another-json:
         specifier: ^0.2.0
         version: 0.2.0
@@ -185,6 +188,9 @@ importers:
       content-type:
         specifier: ^3.1.1
         version: 3.1.1
+      hpke:
+        specifier: ^1.1.8
+        version: 1.1.8
       loglevel:
         specifier: ^1.9.2
         version: 1.9.2
@@ -959,6 +965,22 @@ packages:
       '@emnapi/core': ^1.7.1 || ^2.0.0-alpha.4
       '@emnapi/runtime': ^1.7.1 || ^2.0.0-alpha.4
 
+  '@noble/ciphers@2.4.0':
+    resolution: {integrity: sha512-AnjFn0Jv92laAkvMrghlFZq4qQCIN/4DxFV/eooqtC2YTjB7kBeLMS2T9KJX4Dn+ZVXLOwK0lSgqDtx9gvxtiw==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/curves@2.4.0':
+    resolution: {integrity: sha512-P4/62zrgfH33CneE3Dn4WhJVA22YUU0eR51wKIan4NVRvwsA0YnPTwWGpNbpuacSujmSFLvyzpyuR30+fbq2Ew==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/hashes@2.4.0':
+    resolution: {integrity: sha512-X5XaVWZIBCT7HHZGm5I7ZQXDwLG+bGXuSrMQAW+7Zvl87h1kmc1ZB1VSRJcpUfoUrGQp4Fkoxm5kZ+Ms+aW+eA==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/post-quantum@0.7.1':
+    resolution: {integrity: sha512-+P9981IiAnVh+rmcubozzVwrEy3XsN/tMhTnvsjV9VDaYpOnNCqWqKo2FLWxbu92YHfjGIlE5XnW175UK+ln+Q==}
+    engines: {node: '>= 20.19.0'}
+
   '@oxc-parser/binding-android-arm-eabi@0.153.0':
     resolution: {integrity: sha512-BcWu25dMwMjHpaDCEidmpAi7rGg1qZoihJeUUH9bD55pVZ0z4Wa5CQgqSTo0R41H81oozisQKW3WqvAN2m77IQ==}
     engines: {node: ^20.19.0 || >=22.12.0}
@@ -1463,6 +1485,11 @@ packages:
     engines: {node: ^20.19.0 || >=22.12.0}
     cpu: [x64]
     os: [win32]
+
+  '@panva/hpke-noble@1.1.8':
+    resolution: {integrity: sha512-2btKppvJTOsfEjTaTMVJSqQvfld3CQXi7oPa7v0MzbIIJPCcr8PRwrAM1NBcJeqUxYUG6R9N5gjNAAbDOPylrA==}
+    peerDependencies:
+      hpke: ^1.0.0
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
@@ -2074,6 +2101,9 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  hpke@1.1.8:
+    resolution: {integrity: sha512-SYkH+rlJWclHv/GIrs2PB24B3rEaQr8rIRIpcCd1RIki3ZFck+c3tUukm6gR9k2MQ/LUJ8Gt5JQhaGfkBGaJsg==}
 
   husky@9.1.7:
     resolution: {integrity: sha512-5gs5ytaNjBrh5Ow3zrvdUUY+0VxIuWVL4i9irt6friV+BqdCfmV11CQTWMiBYWHbXhco+J1kHfTOUkePhCDvMA==}
@@ -3447,6 +3477,20 @@ snapshots:
       '@tybys/wasm-util': 0.10.4
     optional: true
 
+  '@noble/ciphers@2.4.0': {}
+
+  '@noble/curves@2.4.0':
+    dependencies:
+      '@noble/hashes': 2.4.0
+
+  '@noble/hashes@2.4.0': {}
+
+  '@noble/post-quantum@0.7.1':
+    dependencies:
+      '@noble/ciphers': 2.4.0
+      '@noble/curves': 2.4.0
+      '@noble/hashes': 2.4.0
+
   '@oxc-parser/binding-android-arm-eabi@0.153.0':
     optional: true
 
@@ -3700,6 +3744,14 @@ snapshots:
 
   '@oxlint/binding-win32-x64-msvc@1.88.0':
     optional: true
+
+  '@panva/hpke-noble@1.1.8(hpke@1.1.8)':
+    dependencies:
+      '@noble/ciphers': 2.4.0
+      '@noble/curves': 2.4.0
+      '@noble/hashes': 2.4.0
+      '@noble/post-quantum': 0.7.1
+      hpke: 1.1.8
 
   '@polka/url@1.0.0-next.29': {}
 
@@ -4163,6 +4215,8 @@ snapshots:
       - utf-8-validate
 
   has-flag@4.0.0: {}
+
+  hpke@1.1.8: {}
 
   husky@9.1.7: {}
 

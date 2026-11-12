@@ -15,13 +15,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import {
-    HpkeRecipientChannel,
-    type EstablishedHpkeChannel,
-    QrCodeData,
-    type QrCodeIntent,
-    type UnidirectionalRecipientChannel,
-} from "@matrix-org/matrix-sdk-crypto-wasm";
+import { QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 
 import {
     ClientRendezvousFailureReason,
@@ -32,6 +26,12 @@ import {
 import { type MSC4388RendezvousSession } from "../transports/MSC4388RendezvousSession.ts";
 import { logger } from "../../logger.ts";
 import { type MSC4108v2025Payload } from "../MSC4108v2025SignInWithQR.ts";
+import {
+    type EstablishedHpkeChannel,
+    HpkeRecipientChannel,
+    type UnidirectionalRecipientChannel,
+} from "./MSC4388HpkeChannel.ts";
+import { encodeMSC4388QrCode, MSC4388QrCodeIntent, QR_CODE_PREFIX_UNSTABLE } from "./MSC4388QrCode.ts";
 
 // TODO: temp function for formatting additional authentication data for debugging purposes
 function formatAAD(aad: Uint8Array): string {
@@ -43,11 +43,14 @@ function formatAAD(aad: Uint8Array): string {
 /**
  * Prototype of the unstable [MSC4388](https://github.com/matrix-org/matrix-spec-proposals/pull/4388)
  * secure rendezvous session protocol.
+ *
+ * The secure channel and QR code format are implemented by {@link HpkeRecipientChannel} and
+ * {@link encodeMSC4388QrCode} rather than by `@matrix-org/matrix-sdk-crypto-wasm`.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
- * Imports @matrix-org/matrix-sdk-crypto-wasm so should be async-imported to avoid bundling the WASM into the main bundle.
  */
 export class MSC4388SecureChannel {
-    private readonly recipientChannel: HpkeRecipientChannel;
+    /** Holds our ephemeral key pair. Created by {@link generateCode}. */
+    private recipientChannel?: HpkeRecipientChannel;
     private establishedChannel?: EstablishedHpkeChannel;
     private connected = false;
     /**
@@ -60,9 +63,7 @@ export class MSC4388SecureChannel {
         private readonly rendezvousSession: MSC4388RendezvousSession,
         public readonly intent: QrCodeIntent,
         public onFailure?: RendezvousFailureListener,
-    ) {
-        this.recipientChannel = new HpkeRecipientChannel();
-    }
+    ) {}
 
     /**
      * Generate a QR code for the current session, with the {@link intent} given to the constructor.
@@ -77,14 +78,16 @@ export class MSC4388SecureChannel {
         if (!baseUrl) {
             throw new Error("No rendezvous session base URL");
         }
-        const qrCodeData = QrCodeData.newMsc4388(this.recipientChannel.publicKey, id, baseUrl, this.intent);
-        // The additional authentication data must use the base URL exactly as encoded in the QR code, so read it back
-        // rather than assuming it matches the session's base URL. The crypto library currently normalises it (e.g. by
-        // adding a trailing `/`).
-        // TODO: once https://github.com/matrix-org/matrix-sdk-crypto-wasm/pull/364 lands, the QR code contains the
-        // base URL exactly as given, so this can be reverted to use the session's base URL directly.
-        this.qrCodeBaseUrl = qrCodeData.intentData.msc4388?.baseUrl;
-        return qrCodeData.toBytes();
+        this.recipientChannel ??= await HpkeRecipientChannel.create();
+        this.qrCodeBaseUrl = baseUrl;
+        return encodeMSC4388QrCode({
+            prefix: QR_CODE_PREFIX_UNSTABLE,
+            intent:
+                this.intent === QrCodeIntent.Login ? MSC4388QrCodeIntent.NewDevice : MSC4388QrCodeIntent.ExistingDevice,
+            publicKey: this.recipientChannel.publicKey,
+            rendezvousId: id,
+            baseUrl: this.qrCodeBaseUrl,
+        });
     }
 
     private getAdditionalAuthenticationDataForSend(): Uint8Array {
@@ -105,14 +108,8 @@ export class MSC4388SecureChannel {
      * Returns the check code for the secure channel or undefined if not generated yet.
      */
     public getCheckCode(): string | undefined {
-        const x = this.establishedChannel?.checkCode;
-
-        if (!x) {
-            return undefined;
-        }
-
-        // in this version of the MSC the is never a leading zero
-        return String(x.to_digit());
+        // in this version of the MSC there is never a leading zero
+        return this.establishedChannel?.checkCode;
     }
 
     /**
@@ -137,10 +134,13 @@ export class MSC4388SecureChannel {
         let unidirectionalChannel: UnidirectionalRecipientChannel;
         let candidateLoginInitiateMessage: string;
         const receiveAad = this.getAdditionalAuthenticationDataForReceive();
+        if (!this.recipientChannel) {
+            throw new Error("QR code not generated");
+        }
         logger.info(`Decrypting payload with AAD: ${formatAAD(receiveAad)}`);
         try {
             ({ channel: unidirectionalChannel, message: candidateLoginInitiateMessage } =
-                this.recipientChannel.establishChannel(loginInitiateMessage, receiveAad));
+                await this.recipientChannel.establishChannel(loginInitiateMessage, receiveAad));
         } catch (e) {
             // the message could not be parsed or decrypted: either it wasn't sent by a device that scanned our QR
             // code, or it is bound to a different rendezvous session
@@ -162,7 +162,7 @@ export class MSC4388SecureChannel {
 
         const aad = this.getAdditionalAuthenticationDataForSend();
         logger.info(`Sending LoginOkMessage with AAD: ${formatAAD(aad)}`);
-        const { channel, initialResponse: loginOkMessage } = unidirectionalChannel.establishBidirectionalChannel(
+        const { channel, initialResponse: loginOkMessage } = await unidirectionalChannel.establishBidirectionalChannel(
             "MATRIX_QR_CODE_LOGIN_OK",
             aad,
         );
@@ -186,7 +186,7 @@ export class MSC4388SecureChannel {
         const aad = this.getAdditionalAuthenticationDataForReceive();
         logger.info(`Decrypting payload with AAD: ${formatAAD(aad)}`);
         try {
-            return this.establishedChannel.open(ciphertext, aad);
+            return await this.establishedChannel.open(ciphertext, aad);
         } catch (e) {
             // a payload that doesn't decrypt was not sealed by the other device with the expected sequence token
             logger.warn("Failed to decrypt payload from secure channel", e);

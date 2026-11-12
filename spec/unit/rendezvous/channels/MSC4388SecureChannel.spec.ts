@@ -16,6 +16,7 @@ limitations under the License.
 
 import { HpkeSenderChannel, QrCodeData, QrCodeIntent } from "@matrix-org/matrix-sdk-crypto-wasm";
 
+import { decodeMSC4388QrCode } from "../../../../src/rendezvous/channels/MSC4388QrCode.ts";
 import { MSC4388SecureChannel } from "../../../../src/rendezvous/channels/MSC4388SecureChannel.ts";
 import {
     encodeStringAsBytes8,
@@ -43,19 +44,17 @@ describe("MSC4388SecureChannel", () => {
     }
 
     it("should bind the secure channel to the base URL exactly as encoded in the QR code", async () => {
-        // the URL parser used to build the QR code adds a trailing slash to a base URL with no path
+        // a base URL which URL parsing would change, by adding a trailing slash
         const mockSession = makeMockSession("https://example.com");
         const channel = new MSC4388SecureChannel(mockSession, QrCodeIntent.Reciprocate);
 
         const code = await channel.generateCode();
-        expect(new TextDecoder().decode(code).endsWith("https://example.com/")).toBeTruthy();
 
         // act as the scanning device, which uses the base URL from the QR code in the additional authentication data
-        const qrCodeData = QrCodeData.fromBytes(code);
-        const qrCodeBaseUrl = qrCodeData.intentData.msc4388!.baseUrl;
-        expect(qrCodeBaseUrl).toBe("https://example.com/");
+        const qrCodeBaseUrl = decodeMSC4388QrCode(code).baseUrl;
+        expect(qrCodeBaseUrl).toBe("https://example.com");
         const { message } = new HpkeSenderChannel().establishChannel(
-            qrCodeData.publicKey,
+            QrCodeData.fromBytes(code).publicKey,
             "MATRIX_QR_CODE_LOGIN_INITIATE",
             buildAad(qrCodeBaseUrl, "0"),
         );
@@ -63,8 +62,8 @@ describe("MSC4388SecureChannel", () => {
 
         await channel.connect();
 
-        expect(mockSession.getAdditionalAuthenticationDataForReceive).toHaveBeenCalledWith("https://example.com/");
-        expect(mockSession.getAdditionalAuthenticationDataForSend).toHaveBeenCalledWith("https://example.com/");
+        expect(mockSession.getAdditionalAuthenticationDataForReceive).toHaveBeenCalledWith("https://example.com");
+        expect(mockSession.getAdditionalAuthenticationDataForSend).toHaveBeenCalledWith("https://example.com");
         expect(mockSession.send).toHaveBeenCalled();
     });
 
@@ -72,11 +71,15 @@ describe("MSC4388SecureChannel", () => {
         const mockSession = makeMockSession("https://example.com");
         const channel = new MSC4388SecureChannel(mockSession, QrCodeIntent.Reciprocate);
 
+        // act as a scanning device which normalises the base URL from the QR code, as the base URL getter of
+        // @matrix-org/matrix-sdk-crypto-wasm 19.0.0 does
         const qrCodeData = QrCodeData.fromBytes(await channel.generateCode());
+        const qrCodeBaseUrl = qrCodeData.intentData.msc4388!.baseUrl;
+        expect(qrCodeBaseUrl).toBe("https://example.com/");
         const { message } = new HpkeSenderChannel().establishChannel(
             qrCodeData.publicKey,
             "MATRIX_QR_CODE_LOGIN_INITIATE",
-            buildAad("https://example.com", "0"),
+            buildAad(qrCodeBaseUrl, "0"),
         );
         vi.mocked(mockSession.receive).mockResolvedValue(message);
 
