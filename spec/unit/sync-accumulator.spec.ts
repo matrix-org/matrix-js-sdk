@@ -936,14 +936,14 @@ describe("SyncAccumulator", function () {
             };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": initState,
+                    state_after: initState,
                 }),
             );
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
 
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [
                             utils.mkEvent({
                                 user: "alice",
@@ -966,7 +966,7 @@ describe("SyncAccumulator", function () {
 
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [
                             utils.mkEvent({
                                 user: "alice",
@@ -994,17 +994,17 @@ describe("SyncAccumulator", function () {
             };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": initState,
+                    state_after: initState,
                 }),
             );
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].state).toEqual(initState);
 
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [],
                     },
-                    "timeline": {
+                    timeline: {
                         events: [
                             utils.mkEvent({
                                 user: "alice",
@@ -1033,8 +1033,8 @@ describe("SyncAccumulator", function () {
             };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": initState,
-                    "timeline": {
+                    state_after: initState,
+                    timeline: {
                         events: initState.events,
                         prev_batch: null,
                     },
@@ -1046,10 +1046,10 @@ describe("SyncAccumulator", function () {
             joinEvent.unsigned = { prev_content: initState.events[0].content, prev_sender: initState.events[0].sender };
             sa.accumulate(
                 syncSkeleton({
-                    "org.matrix.msc4222.state_after": {
+                    state_after: {
                         events: [joinEvent],
                     },
-                    "timeline": {
+                    timeline: {
                         events: [joinEvent],
                         prev_batch: "something",
                     },
@@ -1060,10 +1060,9 @@ describe("SyncAccumulator", function () {
             expect(roomData.state?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
                 KnownMembership.Knock,
             );
-            expect(
-                roomData["org.matrix.msc4222.state_after"]?.events.find((e) => e.type === "m.room.member")?.content
-                    .membership,
-            ).toEqual(KnownMembership.Join);
+            expect(roomData["state_after"]?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
+                KnownMembership.Join,
+            );
             expect(roomData.timeline?.events.find((e) => e.type === "m.room.member")?.content.membership).toEqual(
                 KnownMembership.Join,
             );

@@ -103,7 +103,7 @@ export interface IJoinedRoom {
     "summary": IRoomSummary;
     // One of `state` or `state_after` is required.
     "state"?: IState;
-    "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
+    "state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
     "msc4354_sticky"?: ISticky; // https://github.com/matrix-org/matrix-spec-proposals/pull/4354
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
@@ -134,10 +134,10 @@ export interface IInvitedRoom {
 
 export interface ILeftRoom {
     // One of `state` or `state_after` is required.
-    "state"?: IState;
-    "org.matrix.msc4222.state_after"?: IState;
-    "timeline": ITimeline;
-    "account_data": IAccountData;
+    state?: IState;
+    state_after?: IState;
+    timeline: ITimeline;
+    account_data: IAccountData;
 }
 
 export interface IKnockedRoom {
@@ -641,11 +641,11 @@ export class SyncAccumulator {
         data.state?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
-        data["org.matrix.msc4222.state_after"]?.events?.forEach((e) => {
+        data["state_after"]?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
         data.timeline?.events?.forEach((e, index) => {
-            if (!data["org.matrix.msc4222.state_after"]) {
+            if (!data["state_after"]) {
                 // this nops if 'e' isn't a state event
                 setState(currentData._currentState, e);
             }
@@ -738,21 +738,21 @@ export class SyncAccumulator {
                 .map(({ event }) => (forDatabase ? event : untagEvent(event, now)));
             const roomJson: IJoinedRoom & {
                 // We track both `state` and `state_after` for downgrade compatibility
-                "state": IState;
-                "org.matrix.msc4222.state_after": IState;
+                state: IState;
+                state_after: IState;
             } = {
-                "ephemeral": { events: [] },
-                "account_data": { events: [] },
-                "state": { events: [] },
-                "org.matrix.msc4222.state_after": { events: [] },
-                "timeline": {
+                ephemeral: { events: [] },
+                account_data: { events: [] },
+                state: { events: [] },
+                state_after: { events: [] },
+                timeline: {
                     events: [],
                     prev_batch: null,
                 },
-                "unread_notifications": roomData._unreadNotifications,
-                "unread_thread_notifications": roomData._unreadThreadNotifications,
-                "summary": roomData._summary as IRoomSummary,
-                "msc4354_sticky": stickyEvents.length ? { events: stickyEvents } : undefined,
+                unread_notifications: roomData._unreadNotifications,
+                unread_thread_notifications: roomData._unreadThreadNotifications,
+                summary: roomData._summary as IRoomSummary,
+                msc4354_sticky: stickyEvents.length ? { events: stickyEvents } : undefined,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -811,7 +811,7 @@ export class SyncAccumulator {
                     let ev = roomData._currentState[evType][stateKey];
                     // Push to both fields to provide downgrade compatibility in the sync accumulator db
                     // the code will prefer `state_after` if it is present
-                    roomJson["org.matrix.msc4222.state_after"].events.push(ev);
+                    roomJson["state_after"].events.push(ev);
                     // Roll the state back to the value at the start of the timeline if it was changed
                     if (rollBackState[evType] && rollBackState[evType][stateKey]) {
                         ev = rollBackState[evType][stateKey];
