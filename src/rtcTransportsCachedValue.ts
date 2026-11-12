@@ -30,7 +30,7 @@ export function createRtcTransportsCachedValue(client: MatrixClient, logger: Log
         name: "RTCTransports",
         logger,
         ttlMillis: TRANSPORT_CACHE_TTL_MILLISECONDS,
-        fetch: () => client._unstable_getRTCTransports(),
+        fetch: () => client.getRTCTransports(),
         onValueCached: (transports) => client.emit(ClientEvent.RtcTransportsUpdated, transports),
         // If the end point is not supported by the homeserver it will be a 404 error.
         // This is a final error, it can be cached, no need to retry everytime.

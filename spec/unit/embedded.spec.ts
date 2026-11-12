@@ -1325,7 +1325,7 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcTransports.mockResolvedValue({ rtc_transports: [transport] });
 
             await makeClient({ rtcTransports: true });
-            expect(await client._unstable_getRTCTransports()).toEqual([transport]);
+            expect(await client.getRTCTransports()).toEqual([transport]);
             expect(widgetApi.getRtcTransports).toHaveBeenCalled();
         });
 
@@ -1334,14 +1334,14 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcTransports.mockRejectedValue(error);
 
             await makeClient({ rtcTransports: true });
-            await expect(client._unstable_getRTCTransports()).rejects.toThrow(error);
+            await expect(client.getRTCTransports()).rejects.toThrow(error);
         });
 
         it("maps a widget timeout to a ConnectionError", async () => {
             widgetApi.getRtcTransports.mockRejectedValue(new Error("Request timed out"));
 
             await makeClient({ rtcTransports: true });
-            await expect(client._unstable_getRTCTransports()).rejects.toThrow(ConnectionError);
+            await expect(client.getRTCTransports()).rejects.toThrow(ConnectionError);
         });
     });
 

@@ -84,6 +84,9 @@ export type SessionMembershipData = {
     /**
      * The intent of the call from the perspective of this user. This may be an audio call, video call or
      * something else.
+     *
+     * This carries the unstable identifiers (`audio`, `video`) and should be read through
+     * {@link CallMembership.intent} which returns the matching stable identifiers.
      */
     "m.call.intent"?: RTCCallIntent;
 
@@ -138,17 +141,6 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
 
     // application specific data (we first need to check if they exist)
     if (data.scope !== undefined && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
-
-    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
-        errors.push(prefix + "m.call.intent must be a string");
-    }
-
-    if (
-        data.capabilities !== undefined &&
-        !(Array.isArray(data.capabilities) && data.capabilities.every((c: unknown) => typeof c === "string"))
-    ) {
-        errors.push(prefix + "capabilities must be an array of strings");
-    }
 
     if (errors.length) {
         throw new MatrixRTCMembershipParseError("SessionMembership", errors);

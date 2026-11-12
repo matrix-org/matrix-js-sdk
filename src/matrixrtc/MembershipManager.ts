@@ -53,6 +53,15 @@ import {
     LIVEKIT_TRANSPORT_TYPE,
 } from "./LivekitTransport.ts";
 import { deepCompare } from "../utils.ts";
+import { toStableCallIntent, toUnstableCallIntent } from "./CallIntent.ts";
+
+/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself regardless of the application type. */
+const GLOBALLY_RESERVED_APPLICATION_DATA_KEYS: readonly string[] = ["type"];
+
+/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself for a given application type. */
+const PER_APP_RESERVED_APPLICATION_DATA_KEYS: ReadonlyMap<string, readonly string[]> = new Map([
+    ["m.call", ["intent", "m.call.intent", "capabilities"]],
+]);
 
 /* MembershipActionTypes:
 On Join:  ───────────────────┐   ┌───────────────(1)───────────┐
@@ -228,7 +237,15 @@ export class MembershipManager
 {
     private activated = false;
     private readonly logger: Logger;
+
+    /**
+     * The intent of the call from the perspective of this user. This may be an audio call, video call or
+     * something else.
+     *
+     * This carries the stable identifiers (`m.audio`, `m.video`)
+     */
     protected callIntent: RTCCallIntent | undefined;
+
     protected callCapabilities: RTCCallCapability[] | undefined;
     protected applicationData: Record<string, unknown> | undefined;
 
@@ -339,10 +356,11 @@ export class MembershipManager
         if (!this.activated || !this.ownMembership) {
             throw Error("You cannot update your intent before joining the call");
         }
-        if (this.ownMembership.callIntent === callIntent) {
+        const intent = toStableCallIntent(callIntent);
+        if (this.ownMembership.intent === intent) {
             return; // No-op
         }
-        this.callIntent = callIntent;
+        this.callIntent = intent;
         // Kick off a new membership event as a result.
         await this.sendJoinEvent();
     }
@@ -351,11 +369,30 @@ export class MembershipManager
         if (!this.activated || !this.ownMembership) {
             throw Error("You cannot update your application data before joining the call");
         }
-        if (deepCompare(this.applicationData ?? {}, applicationData)) {
+        const sanitized = this.stripReservedApplicationData(applicationData);
+        if (deepCompare(this.applicationData ?? {}, sanitized)) {
             return; // No-op
         }
-        this.applicationData = applicationData;
+        this.applicationData = sanitized;
         await this.sendJoinEvent();
+    }
+
+    /** Drops the keys the SDK writes itself from an application data record. */
+    private stripReservedApplicationData(
+        applicationData: Record<string, unknown> | undefined,
+    ): Record<string, unknown> | undefined {
+        if (applicationData === undefined) return undefined;
+        const reserved = [
+            ...GLOBALLY_RESERVED_APPLICATION_DATA_KEYS,
+            ...(PER_APP_RESERVED_APPLICATION_DATA_KEYS.get(this.slotDescription.application) ?? []),
+        ].filter((key) => applicationData[key] !== undefined);
+        if (reserved.length === 0) return applicationData;
+        this.logger.warn(
+            `Ignoring reserved keys in applicationData: ${reserved.join(", ")}. Use the dedicated join options instead.`,
+        );
+        const sanitized = { ...applicationData };
+        for (const key of reserved) delete sanitized[key];
+        return sanitized;
     }
 
     /**
@@ -382,9 +419,9 @@ export class MembershipManager
         // we keep it as a string for now for backwards compatibility.
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
-        this.callIntent = joinConfig?.callIntent;
+        this.callIntent = toStableCallIntent(joinConfig?.callIntent);
         this.callCapabilities = joinConfig?.callCapabilities;
-        this.applicationData = joinConfig?.applicationData;
+        this.applicationData = this.stripReservedApplicationData(joinConfig?.applicationData);
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
@@ -1056,7 +1093,8 @@ export class MembershipManager
             // assign those values to the media participant for those versions.
             "membershipID": `${this.userId}:${this.deviceId}`,
             expires,
-            "m.call.intent": this.callIntent,
+            // Only include the unstable intent property on legacy state events.
+            "m.call.intent": toUnstableCallIntent(this.callIntent),
             ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" } as const,
             // Always publish LiveKit transports under the legacy `livekit` type. Clients that only know `livekit` use the
@@ -1462,7 +1500,13 @@ export class StickyEventMembershipManager extends MembershipManager {
             application: {
                 ...this.applicationData,
                 type: this.slotDescription.application,
-                ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
+                ...(this.callIntent
+                    ? {
+                          // Include both the stable and the unstable property for compatibility with older clients.
+                          "intent": this.callIntent,
+                          "m.call.intent": toUnstableCallIntent(this.callIntent),
+                      }
+                    : {}),
                 ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
