@@ -4328,7 +4328,7 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe.each([["getRTCTransports" as const], ["_unstable_getRTCTransports" as const]])("%s", (method) => {
+    describe("getRTCTransports", () => {
         it.each([
             ["org.matrix.msc4143", "/_matrix/client/unstable/org.matrix.msc4143", "rtc_transports"],
             ["org.matrix.msc4143.stable", "/_matrix/client/v1", "transports"],
@@ -4342,7 +4342,7 @@ describe("MatrixClient", function () {
                     prefix,
                 },
             ];
-            expect(await client[method]()).toEqual([
+            expect(await client.getRTCTransports()).toEqual([
                 {
                     type: "livekit",
                     extra_field: "foobar",

@@ -6544,17 +6544,6 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
-     * Returns a set of configured RTC transports supported by the homeserver.
-     * Requires the homeserver to advertise `org.matrix.msc4143` or
-     * `org.matrix.msc4143.stable` in `/versions`.
-     * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
-     * @deprecated Use {@link getRTCTransports} instead.
-     */
-    public async _unstable_getRTCTransports(): Promise<Transport[]> {
-        return this.getRTCTransports();
-    }
-
-    /**
      * Requests a token to authenticate against a LiveKit SFU with (MSC4195).
      *
      * The homeserver checks that we are joined to `room_id` before obtaining a token from the SFU. If
