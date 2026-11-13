@@ -3016,8 +3016,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse>;
     /**
-     * Simply sends a delayed event without encrypting it.
-     * TODO: Allow encrypted delayed events, and encrypt them properly
+     * Encrypts the event if necessary, then schedules it as a delayed event.
      * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
      * @param delayOpts - Properties of the delay for this event.
      * @returns returns a promise which resolves with the result of the delayed send request
@@ -3029,8 +3028,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
     ): Promise<SendDelayedEventResponse>;
     /**
-     * Simply sends a delayed event without encrypting it.
-     * TODO: Allow encrypted delayed events, and encrypt them properly
+     * Encrypts the event if necessary, then schedules it as a delayed event.
      * @experimental based on MSC4140
      * @param delayMs - A positive non-zero integer of milliseconds the homeserver should wait before sending the event.
      * @returns returns a promise which resolves with the result of the delayed send request
@@ -3048,6 +3046,8 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         if (this.isDelayMsOrOpts(delayOrQueryDict)) {
+            // A delayed event has no local echo in the room, so there is no pending event status to update.
+            await this.encryptEventIfNeeded(event, room ?? undefined, false);
             return this.sendDelayedEventHttpRequest(event, this.getDelayMsFromArg(delayOrQueryDict), queryDict);
         }
         queryDict = delayOrQueryDict;
@@ -3114,7 +3114,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private async encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
+    /**
+     * Encrypts the event in place if the room requires it.
+     * @param updatePendingStatus - Whether to mark the event as `ENCRYPTING` while it is being encrypted. Pass
+     *     `false` for events that are not pending events of the room, such as delayed events.
+     */
+    private async encryptEventIfNeeded(event: MatrixEvent, room?: Room, updatePendingStatus = true): Promise<void> {
         // If the room is unknown, we cannot encrypt for it
         if (!room) return;
 
@@ -3131,7 +3136,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
-        this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
+        if (updatePendingStatus) this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
         await this.cryptoBackend.encryptEvent(event, room);
     }
 
