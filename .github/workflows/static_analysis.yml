@@ -28,6 +28,9 @@ jobs:
             - name: Typecheck
               run: "pnpm run lint:types"
 
+            - name: Typecheck published declarations
+              run: "pnpm run lint:types:lib"
+
     js_lint:
         name: "Oxc"
         runs-on: ubuntu-26.04
