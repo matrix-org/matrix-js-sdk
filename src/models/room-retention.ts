@@ -68,10 +68,8 @@ export class RoomRetentionPolicy {
 
         // Recalculate our retention whenever the global policy changes.
         this.retentionService.on("update", this.onRetentionServiceUpdate);
-        // Do an initial check on construction.
-        void this.handleRetentionUpdate();
-
-        // Only bind RoomEvent.Timeline once we know we have a retention policy.
+        // Do an initial check on construction. This also binds RoomEvent.Timeline if there is a policy.
+        this.handleRetentionUpdate();
     }
 
     /**
@@ -94,12 +92,12 @@ export class RoomRetentionPolicy {
         ) {
             return;
         }
-        void this.handleRetentionUpdate();
+        this.handleRetentionUpdate();
     };
 
     private readonly onRetentionServiceUpdate = (): void => {
         this.logger.info("Got global retention policy update!");
-        void this.handleRetentionUpdate();
+        this.handleRetentionUpdate();
     };
 
     /**
@@ -110,34 +108,32 @@ export class RoomRetentionPolicy {
         return isRetainedUnder(ev, this.maxRetention);
     }
 
-    private readonly handleRetentionUpdate = async (): Promise<void> => {
+    private readonly handleRetentionUpdate = (): void => {
+        if (this.disposed) return;
+
         // First store if we currently have a retention period.
         const hadRetentionPeriod = this.maxRetention !== null;
 
         try {
-            await this.recalculateRetention();
+            this.maxRetention = this.computeMaxRetention(this.getRoomStatePolicy());
         } catch (err) {
             this.logger.warn("Failed to recalculate retention policy", err);
             return;
         }
 
-        // We may have been disposed while recalculating; don't re-bind listeners.
-        if (this.disposed) return;
-
         // Bind/unbind the Timeline event handler based on whether we should be running retention.
+        // This must not wait: a sync applies the room state and adds the timeline events straight
+        // after, and those events are what schedule the next expiry. Binding later left messages on
+        // screen past their lifetime after a reload, until some other event arrived in the room.
         if (hadRetentionPeriod !== (this.maxRetention !== null)) {
             this.logger.info("retention recalculated to be", this.maxRetention);
-            // We've changed
             if (this.maxRetention) {
                 this.room.on(RoomEvent.Timeline, this.timelineUpdated);
             } else {
                 this.room.off(RoomEvent.Timeline, this.timelineUpdated);
             }
         }
-    };
 
-    private readonly recalculateRetention = async (): Promise<void> => {
-        this.maxRetention = this.computeMaxRetention(this.getRoomStatePolicy());
         this.processTimeline();
     };
 

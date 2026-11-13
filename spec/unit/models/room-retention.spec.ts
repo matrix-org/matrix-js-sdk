@@ -434,6 +434,19 @@ describe("RoomRetentionPolicy", () => {
 
             expect(room.currentState.getStateEvents("m.room.topic", "")).toBe(oldTopic);
         });
+
+        it("schedules the expiry of messages added straight after the policy is applied", async () => {
+            // A sync applies the room state and adds the timeline events in the same tick.
+            const expiresIn = 1000;
+            const message = makeMessageEvent(Date.now() - ONE_DAY_MS + expiresIn);
+            room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_DAY_MS })]);
+            await room.addLiveEvents([message], { addToState: false });
+            expect(message.isRedacted()).toBe(false);
+
+            vi.advanceTimersByTime(expiresIn + 300);
+
+            expect(message.isRedacted()).toBe(true);
+        });
     });
 
     describe("event listener binding", () => {
