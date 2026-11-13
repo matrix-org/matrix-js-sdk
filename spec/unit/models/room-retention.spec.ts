@@ -416,6 +416,26 @@ describe("RoomRetentionPolicy", () => {
         });
     });
 
+    describe("loading events", () => {
+        it("keeps state events that are older than the retention period", async () => {
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+            const oldTopic = new MatrixEvent({
+                type: "m.room.topic",
+                state_key: "",
+                content: { topic: "Old topic" },
+                event_id: "$old_topic",
+                sender: USER_ID,
+                origin_server_ts: Date.now() - 2 * ONE_DAY_MS,
+                room_id: ROOM_ID,
+            });
+
+            await room.addLiveEvents([oldTopic], { addToState: true });
+
+            expect(room.currentState.getStateEvents("m.room.topic", "")).toBe(oldTopic);
+        });
+    });
+
     describe("event listener binding", () => {
         it("binds timeline listener when retention policy becomes active", async () => {
             const onSpy = vi.spyOn(room, "on");

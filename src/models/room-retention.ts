@@ -30,6 +30,18 @@ import { ROOM_RETENTION_TYPE, type RoomRetentionContent } from "../@types/retent
 const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
 /**
+ * Whether a retention policy with the given maximum lifetime keeps an event.
+ *
+ * Only messages expire. Dropping an old state event as it loads would leave it out of the room
+ * state, and the room would show an outdated name, topic or membership. Redactions are kept too,
+ * as the expiry sweep in {@link RoomRetentionPolicy} already did.
+ */
+function isRetainedUnder(ev: MatrixEvent, maxRetention: number | null): boolean {
+    if (!maxRetention || ev.isState() || ev.isRedaction()) return true;
+    return ev.getTs() > Date.now() - maxRetention;
+}
+
+/**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
  * state of the room and applying the *latest* retention policy to all preceeding events.
  * Currently does not:
@@ -90,12 +102,12 @@ export class RoomRetentionPolicy {
         void this.handleRetentionUpdate();
     };
 
+    /**
+     * Whether the room's current retention policy keeps an event. State events and redactions are
+     * always kept: only messages expire.
+     */
     public shouldEventBeRetained(ev: MatrixEvent): boolean {
-        if (!this.maxRetention) {
-            return true;
-        }
-        const expireBefore = Date.now() - this.maxRetention;
-        return ev.getTs() > expireBefore;
+        return isRetainedUnder(ev, this.maxRetention);
     }
 
     private readonly handleRetentionUpdate = async (): Promise<void> => {
