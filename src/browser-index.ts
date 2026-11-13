@@ -27,18 +27,5 @@ if (globalThis.__js_sdk_entrypoint) {
 }
 globalThis.__js_sdk_entrypoint = true;
 
-// just *accessing* indexedDB throws an exception in firefox with indexeddb disabled.
-let indexedDB: IDBFactory | undefined;
-try {
-    indexedDB = globalThis.indexedDB;
-} catch {
-    // Do nothing
-}
-
-// if our browser (appears to) support indexeddb, use an indexeddb crypto store.
-if (indexedDB) {
-    sdk.setCryptoStoreFactory(() => new sdk.IndexedDBCryptoStore(indexedDB, "matrix-js-sdk:crypto"));
-}
-
 export * from "./matrix.ts";
 globalThis.matrixcs = sdk;

@@ -122,7 +122,7 @@ export const MAX_INVITE_ACCEPTANCE_MS_FOR_KEY_BUNDLE = 24 * 60 * 60 * 1000; // 2
  *
  * @internal
  */
-export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventHandlerMap> implements CryptoBackend {
+export class RustCrypto extends TypedEventEmitter<CryptoEvents, CryptoEventHandlerMap> implements CryptoBackend {
     /**
      * The number of iterations to use when deriving a recovery key from a passphrase.
      */
@@ -145,7 +145,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     private outgoingRequestsManager: OutgoingRequestsManager;
     private readonly perSessionBackupDownloader: PerSessionKeyBackupDownloader;
     private readonly dehydratedDeviceManager: DehydratedDeviceManager;
-    private readonly reemitter = new TypedReEmitter<RustCryptoEvents, CryptoEventHandlerMap>(this);
+    private readonly reemitter = new TypedReEmitter<CryptoEvents, CryptoEventHandlerMap>(this);
 
     public constructor(
         private readonly logger: Logger,
@@ -2602,4 +2602,3 @@ function isRoomKeyBundleMessage(message: IToDeviceEvent): message is IToDeviceEv
 }
 
 type CryptoEvents = (typeof CryptoEvent)[keyof typeof CryptoEvent];
-type RustCryptoEvents = Exclude<CryptoEvents, CryptoEvent.LegacyCryptoStoreMigrationProgress>;

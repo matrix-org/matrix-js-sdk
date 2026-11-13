@@ -16,16 +16,7 @@ limitations under the License.
 
 import debug from "debug";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
-import {
-    BaseMigrationData,
-    KeysQueryRequest,
-    Migration,
-    OlmMachine,
-    type OtherUserIdentity,
-    type PickledInboundGroupSession,
-    type PickledSession,
-    StoreHandle,
-} from "@matrix-org/matrix-sdk-crypto-wasm";
+import { KeysQueryRequest, OlmMachine, type OtherUserIdentity, StoreHandle } from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type Mocked } from "vitest";
 import fetchMock from "@fetch-mock/vitest";
 import { type CallLog } from "fetch-mock";
@@ -38,7 +29,6 @@ import {
     type Device,
     DeviceVerification,
     type EmptyObject,
-    encodeBase64,
     type HttpApiEvent,
     type HttpApiEventHandlerMap,
     type IHttpOpts,
@@ -46,7 +36,6 @@ import {
     type MatrixClient,
     MatrixEvent,
     MatrixHttpApi,
-    MemoryCryptoStore,
     TypedEventEmitter,
     MatrixError,
 } from "../../../src";
@@ -77,8 +66,6 @@ import { E2EKeyResponder } from "../../test-utils/E2EKeyResponder";
 import { OutgoingRequestsManager } from "../../../src/rust-crypto/OutgoingRequestsManager";
 import { ClientEvent, type ClientEventHandlerMap } from "../../../src/client";
 import { type Curve25519AuthData } from "../../../src/crypto-api/keybackup";
-import encryptAESSecretStorageItem from "../../../src/utils/encryptAESSecretStorageItem.ts";
-import { type CryptoStore, type SecretStorePrivateKeys } from "../../../src/crypto/store/base";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 import { RustBackupManager } from "../../../src/rust-crypto/backup.ts";
 
@@ -318,287 +305,6 @@ describe("initRustCrypto", () => {
             } else {
                 // Initialisation may have thrown before returning a RustCrypto instance.
                 olmMachine?.close();
-            }
-        }
-    });
-
-    describe("libolm migration", () => {
-        let mockStore: RustSdkCryptoJs.StoreHandle;
-
-        beforeEach(() => {
-            // Stub out a bunch of stuff in the Rust library
-            mockStore = { free: vi.fn() } as unknown as StoreHandle;
-            vi.spyOn(StoreHandle, "open").mockResolvedValue(mockStore);
-
-            vi.spyOn(Migration, "migrateBaseData").mockResolvedValue(undefined);
-            vi.spyOn(Migration, "migrateOlmSessions").mockResolvedValue(undefined);
-            vi.spyOn(Migration, "migrateMegolmSessions").mockResolvedValue(undefined);
-
-            const testOlmMachine = makeTestOlmMachine();
-            testOlmMachine.trackedUsers.mockResolvedValue(new Set([]));
-            vi.spyOn(OlmMachine, "initFromStore").mockResolvedValue(testOlmMachine);
-        });
-
-        it("migrates data from a legacy crypto store", async () => {
-            const PICKLE_KEY = "pickle1234";
-            const legacyStore = new MemoryCryptoStore();
-
-            // Populate the legacy store with some test data
-            const storeSecretKey = (type: string, key: string) =>
-                encryptAndStoreSecretKey(type, new TextEncoder().encode(key), PICKLE_KEY, legacyStore);
-
-            legacyStore.storeAccount({}, "not a real account");
-            await storeSecretKey("m.megolm_backup.v1", "backup key");
-            await storeSecretKey("master", "master key");
-            await storeSecretKey("self_signing", "ssk");
-            await storeSecretKey("user_signing", "usk");
-            const nDevices = 6;
-            const nSessionsPerDevice = 10;
-            createSessions(legacyStore, nDevices, nSessionsPerDevice);
-            createMegolmSessions(legacyStore, nDevices, nSessionsPerDevice);
-            await legacyStore.markSessionsNeedingBackup([{ senderKey: pad43("device5"), sessionId: "session5" }]);
-
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", {
-                auth_data: {
-                    public_key: "backup_key_public",
-                },
-                version: "45",
-                algorithm: "m.megolm_backup.v1.curve25519-aes-sha2",
-            });
-            // The cached key should be valid for the backup
-            const mockBackupDecryptionKey: any = {
-                megolmV1PublicKey: {
-                    publicKeyBase64: "backup_key_public",
-                },
-            };
-            vi.spyOn(RustSdkCryptoJs.BackupDecryptionKey, "fromBase64").mockReturnValue(mockBackupDecryptionKey);
-
-            function legacyMigrationProgressListener(progress: number, total: number): void {
-                // console.log(`migrated ${progress} of ${total}`);
-            }
-
-            const logger = new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto"));
-            await initRustCrypto({
-                logger,
-                http: makeMatrixHttpApi(),
-                userId: TEST_USER,
-                deviceId: TEST_DEVICE_ID,
-                secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {},
-                storePrefix: "storePrefix",
-                storePassphrase: "storePassphrase",
-                legacyCryptoStore: legacyStore,
-                legacyPickleKey: PICKLE_KEY,
-                legacyMigrationProgressListener,
-            });
-
-            // Check that the migration functions were correctly called
-            expect(Migration.migrateBaseData).toHaveBeenCalledWith(
-                expect.any(BaseMigrationData),
-                new Uint8Array(Buffer.from(PICKLE_KEY)),
-                mockStore,
-                logger,
-            );
-            const data = vi.mocked(Migration.migrateBaseData).mock.calls[0][0];
-            expect(data.pickledAccount).toEqual("not a real account");
-            expect(data.userId!.toString()).toEqual(TEST_USER);
-            expect(data.deviceId!.toString()).toEqual(TEST_DEVICE_ID);
-            expect(atob(data.backupRecoveryKey!)).toEqual("backup key");
-            expect(data.backupVersion).toEqual("45");
-            expect(atob(data.privateCrossSigningMasterKey!)).toEqual("master key");
-            expect(atob(data.privateCrossSigningUserSigningKey!)).toEqual("usk");
-            expect(atob(data.privateCrossSigningSelfSigningKey!)).toEqual("ssk");
-
-            expect(Migration.migrateOlmSessions).toHaveBeenCalledTimes(2);
-            expect(Migration.migrateOlmSessions).toHaveBeenCalledWith(
-                expect.any(Array),
-                new Uint8Array(Buffer.from(PICKLE_KEY)),
-                mockStore,
-                logger,
-            );
-            // First call should have 50 entries; second should have 10
-            const sessions1: PickledSession[] = vi.mocked(Migration.migrateOlmSessions).mock.calls[0][0];
-            expect(sessions1.length).toEqual(50);
-            const sessions2: PickledSession[] = vi.mocked(Migration.migrateOlmSessions).mock.calls[1][0];
-            expect(sessions2.length).toEqual(10);
-            const sessions = [...sessions1, ...sessions2];
-            for (let i = 0; i < nDevices; i++) {
-                for (let j = 0; j < nSessionsPerDevice; j++) {
-                    const session = sessions[i * nSessionsPerDevice + j];
-                    expect(session.senderKey).toEqual(`device${i}`);
-                    expect(session.pickle).toEqual(`session${i}.${j}`);
-                    expect(session.creationTime).toEqual(new Date(1000));
-                    expect(session.lastUseTime).toEqual(new Date(1000));
-                }
-            }
-
-            expect(Migration.migrateMegolmSessions).toHaveBeenCalledTimes(2);
-            expect(Migration.migrateMegolmSessions).toHaveBeenCalledWith(
-                expect.any(Array),
-                new Uint8Array(Buffer.from(PICKLE_KEY)),
-                mockStore,
-                logger,
-            );
-            // First call should have 50 entries; second should have 10
-            const megolmSessions1: PickledInboundGroupSession[] = vi.mocked(Migration.migrateMegolmSessions).mock
-                .calls[0][0];
-            expect(megolmSessions1.length).toEqual(50);
-            const megolmSessions2: PickledInboundGroupSession[] = vi.mocked(Migration.migrateMegolmSessions).mock
-                .calls[1][0];
-            expect(megolmSessions2.length).toEqual(10);
-            const megolmSessions = [...megolmSessions1, ...megolmSessions2];
-            for (let i = 0; i < nDevices; i++) {
-                for (let j = 0; j < nSessionsPerDevice; j++) {
-                    const session = megolmSessions[i * nSessionsPerDevice + j];
-                    expect(session.senderKey).toEqual(pad43(`device${i}`));
-                    expect(session.pickle).toEqual("sessionPickle");
-                    expect(session.roomId!.toString()).toEqual("!room:id");
-                    expect(session.senderSigningKey).toEqual("sender_signing_key");
-
-                    // only one of the sessions needs backing up
-                    expect(session.backedUp).toEqual(i !== 5 || j !== 5);
-                }
-            }
-        }, 10000);
-
-        it("migrates data from a legacy crypto store when secret are not encrypted", async () => {
-            const PICKLE_KEY = "pickle1234";
-            const legacyStore = new MemoryCryptoStore();
-
-            // It's possible for old sessions to directly store the secrets as raw UInt8Array,
-            // so we need to support that in the migration code.
-            // See https://github.com/matrix-org/matrix-js-sdk/commit/c81f11df0afd4d0da3b088892745ae2f8ba1c4a7
-            async function storeSecretKeyInClear(type: string, key: Uint8Array, store: CryptoStore) {
-                // @ts-ignore The API to store raw UInt8Array does not exist anymore, so we need that for this test.
-                store.privateKeys[type as keyof SecretStorePrivateKeys] = key;
-            }
-
-            // Populate the legacy store with some test data
-            const storeSecretKey = (type: string, key: string) =>
-                storeSecretKeyInClear(type, new TextEncoder().encode(key), legacyStore);
-
-            legacyStore.storeAccount({}, "not a real account");
-            await storeSecretKey("master", "master key");
-            await storeSecretKey("self_signing", "ssk");
-            await storeSecretKey("user_signing", "usk");
-
-            fetchMock.get("path:/_matrix/client/v3/room_keys/version", 404);
-
-            function legacyMigrationProgressListener(progress: number, total: number): void {
-                // console.log(`migrated ${progress} of ${total}`);
-            }
-
-            await initRustCrypto({
-                logger: new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto")),
-                http: makeMatrixHttpApi(),
-                userId: TEST_USER,
-                deviceId: TEST_DEVICE_ID,
-                secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {},
-                storePrefix: "storePrefix",
-                storePassphrase: "storePassphrase",
-                legacyCryptoStore: legacyStore,
-                legacyPickleKey: PICKLE_KEY,
-                legacyMigrationProgressListener,
-            });
-
-            const data = vi.mocked(Migration.migrateBaseData).mock.calls[0][0];
-            expect(data.pickledAccount).toEqual("not a real account");
-            expect(data.userId!.toString()).toEqual(TEST_USER);
-            expect(data.deviceId!.toString()).toEqual(TEST_DEVICE_ID);
-            expect(atob(data.privateCrossSigningMasterKey!)).toEqual("master key");
-            expect(atob(data.privateCrossSigningUserSigningKey!)).toEqual("usk");
-            expect(atob(data.privateCrossSigningSelfSigningKey!)).toEqual("ssk");
-        });
-
-        it("handles megolm sessions with no `keysClaimed`", async () => {
-            const legacyStore = new MemoryCryptoStore();
-            legacyStore.storeAccount({}, "not a real account");
-
-            legacyStore.storeEndToEndInboundGroupSession(
-                pad43(`device1`),
-                `session1`,
-                {
-                    forwardingCurve25519KeyChain: [],
-                    room_id: "!room:id",
-                    session: "sessionPickle",
-                },
-                undefined,
-            );
-
-            const PICKLE_KEY = "pickle1234";
-            const logger = new DebugLogger(debug("matrix-js-sdk:test:initRustCrypto"));
-            await initRustCrypto({
-                logger,
-                http: makeMatrixHttpApi(),
-                userId: TEST_USER,
-                deviceId: TEST_DEVICE_ID,
-                secretStorage: {} as ServerSideSecretStorage,
-                cryptoCallbacks: {},
-                storePrefix: "storePrefix",
-                storePassphrase: "storePassphrase",
-                legacyCryptoStore: legacyStore,
-                legacyPickleKey: PICKLE_KEY,
-            });
-
-            expect(Migration.migrateMegolmSessions).toHaveBeenCalledTimes(1);
-            expect(Migration.migrateMegolmSessions).toHaveBeenCalledWith(
-                expect.any(Array),
-                new Uint8Array(Buffer.from(PICKLE_KEY)),
-                mockStore,
-                logger,
-            );
-            const megolmSessions: PickledInboundGroupSession[] = vi.mocked(Migration.migrateMegolmSessions).mock
-                .calls[0][0];
-            expect(megolmSessions.length).toEqual(1);
-            const session = megolmSessions[0];
-            expect(session.senderKey).toEqual(pad43(`device1`));
-            expect(session.pickle).toEqual("sessionPickle");
-            expect(session.roomId!.toString()).toEqual("!room:id");
-            expect(session.senderSigningKey).toBe(undefined);
-        }, 10000);
-
-        async function encryptAndStoreSecretKey(
-            type: string,
-            key: Uint8Array,
-            pickleKey: string,
-            store: MemoryCryptoStore,
-        ) {
-            const encryptedKey = await encryptAESSecretStorageItem(encodeBase64(key), Buffer.from(pickleKey), type);
-            store.storeSecretStorePrivateKey(undefined, type as keyof SecretStorePrivateKeys, encryptedKey);
-        }
-
-        /** Create a bunch of fake Olm sessions and stash them in the DB. */
-        function createSessions(store: MemoryCryptoStore, nDevices: number, nSessionsPerDevice: number) {
-            for (let i = 0; i < nDevices; i++) {
-                for (let j = 0; j < nSessionsPerDevice; j++) {
-                    const sessionData = {
-                        deviceKey: `device${i}`,
-                        sessionId: `session${j}`,
-                        session: `session${i}.${j}`,
-                        lastReceivedMessageTs: 1000,
-                    };
-                    store.storeEndToEndSession(`device${i}`, `session${j}`, sessionData, undefined);
-                }
-            }
-        }
-
-        /** Create a bunch of fake Megolm sessions and stash them in the DB. */
-        function createMegolmSessions(store: MemoryCryptoStore, nDevices: number, nSessionsPerDevice: number) {
-            for (let i = 0; i < nDevices; i++) {
-                for (let j = 0; j < nSessionsPerDevice; j++) {
-                    store.storeEndToEndInboundGroupSession(
-                        pad43(`device${i}`),
-                        `session${j}`,
-                        {
-                            forwardingCurve25519KeyChain: [],
-                            keysClaimed: { ed25519: "sender_signing_key" },
-                            room_id: "!room:id",
-                            session: "sessionPickle",
-                        },
-                        undefined,
-                    );
-                }
             }
         }
     });
@@ -2918,9 +2624,4 @@ class DummyAccountDataClient
         );
         return {};
     }
-}
-
-/** Pad a string to 43 characters long */
-function pad43(x: string): string {
-    return x + ".".repeat(43 - x.length);
 }

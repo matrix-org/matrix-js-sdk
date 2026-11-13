@@ -83,15 +83,6 @@ export enum CryptoEvent {
     KeysChanged = "crossSigning.keysChanged",
 
     /**
-     * Fires when data is being migrated from legacy crypto to rust crypto.
-     *
-     * The payload is a pair `(progress, total)`, where `progress` is the number of steps completed so far, and
-     * `total` is the total number of steps. When migration is complete, a final instance of the event is emitted, with
-     * `progress === total === -1`.
-     */
-    LegacyCryptoStoreMigrationProgress = "crypto.legacyCryptoStoreMigrationProgress",
-
-    /**
      * Fires when a new dehydrated device is created locally.
      *
      * After the client calls {@link CryptoApi.startDehydration}, this event
