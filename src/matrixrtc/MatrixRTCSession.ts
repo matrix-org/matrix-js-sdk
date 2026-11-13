@@ -699,23 +699,6 @@ export class MatrixRTCSession extends TypedEventEmitter<
     }
 
     /**
-     * Get the call intent for the current call, based on what members are advertising. If one or more
-     * members disagree on the current call intent, or nobody specifies one then `undefined` is returned.
-     *
-     * If all members that specify a call intent agree, that value is returned.
-     *
-     * This method uses the unstable intent identifiers (`audio`, `video`).
-     *
-     * @returns A call intent, or `undefined` if no consensus or not given.
-     *
-     * @deprecated Use {@link MatrixRTCSession.getConsensusIntent}. This returns legacy values (`audio`, `video`).
-     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
-     */
-    public getConsensusCallIntent(): RTCCallIntent | undefined {
-        return toUnstableCallIntent(this.getConsensusIntent());
-    }
-
-    /**
      * Update the intent we advertise for the call (see {@link SessionConfig.callIntent}), re-sending our
      * membership if it changed.
      */

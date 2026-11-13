@@ -611,17 +611,17 @@ describe("MatrixRTCSession", () => {
         });
     });
 
-    describe("getConsensusIntent / getConsensusCallIntent", () => {
+    describe("getConsensusIntent", () => {
         it.each([
-            [undefined, undefined, undefined, undefined],
-            ["audio", undefined, "m.audio", "audio"],
-            ["m.audio", undefined, "m.audio", "audio"],
-            ["audio", "m.audio", "m.audio", "audio"],
-            ["m.video", "video", "m.video", "video"],
-            ["audio", "video", undefined, undefined],
-            ["m.audio", "m.video", undefined, undefined],
-            ["custom", "custom", "custom", "custom"],
-        ])("gets correct consensus for %s + %s = %s (%s)", async (intentA, intentB, stable, legacy) => {
+            [undefined, undefined, undefined],
+            ["audio", undefined, "m.audio"],
+            ["m.audio", undefined, "m.audio"],
+            ["audio", "m.audio", "m.audio"],
+            ["m.video", "video", "m.video"],
+            ["audio", "video", undefined],
+            ["m.audio", "m.video", undefined],
+            ["custom", "custom", "custom"],
+        ])("gets correct consensus for %s + %s = %s (%s)", async (intentA, intentB, stable) => {
             vi.useFakeTimers();
             vi.setSystemTime(4000);
             const mockRoom = makeMockRoom([
@@ -632,7 +632,6 @@ describe("MatrixRTCSession", () => {
             sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession);
             await sess.initialMembershipCalculated;
             expect(sess.getConsensusIntent()).toEqual(stable);
-            expect(sess.getConsensusCallIntent()).toEqual(legacy);
             vi.useRealTimers();
         });
     });
@@ -882,7 +881,7 @@ describe("MatrixRTCSession", () => {
                 // This is what triggers the intent type on the notification event.
                 { "m.call.intent": "audio" },
             );
-            expect(sess!.getConsensusCallIntent()).toEqual("audio");
+            expect(sess!.getConsensusIntent()).toEqual("m.audio");
 
             expect(sendStickyEventMock).toHaveBeenCalledWith(
                 mockRoom!.roomId,
@@ -934,7 +933,6 @@ describe("MatrixRTCSession", () => {
                 { "m.call.intent": "video" },
             );
             expect(sess!.getConsensusIntent()).toEqual("m.video");
-            expect(sess!.getConsensusCallIntent()).toEqual("video");
 
             expect(sendStickyEventMock).toHaveBeenCalledWith(
                 mockRoom!.roomId,
