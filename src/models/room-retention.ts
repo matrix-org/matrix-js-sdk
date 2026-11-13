@@ -205,16 +205,34 @@ export class RoomRetentionPolicy {
         );
     };
 
+    /**
+     * Every event the room has loaded: all timelines of every timeline set, including the ones
+     * left behind by a permalink jump, and every thread's timelines. Thread replies only live in
+     * their thread's timelines, so looking at the live timeline alone would never expire them.
+     */
+    private getLoadedEvents(): MatrixEvent[] {
+        const timelineSets = [
+            ...this.room.getTimelineSets(),
+            ...this.room.getThreads().map((thread) => thread.timelineSet),
+        ];
+        const events = new Set<MatrixEvent>();
+        for (const timelineSet of timelineSets) {
+            for (const timeline of timelineSet.getTimelines()) {
+                for (const event of timeline.getEvents()) events.add(event);
+            }
+        }
+        return [...events];
+    }
+
     private processTimeline(): void {
         if (this.disposed || !this.maxRetention) {
             return; // No policy, skip.
         }
         this.logger.info(`Running processTimeline`);
         const expireBefore = Date.now() - this.maxRetention;
-        const events = this.room
-            .getLiveTimeline()
-            .getEvents()
-            .filter((ev) => ev.getStateKey() === undefined && !ev.isRedacted() && ev.getType() !== "m.room.redaction");
+        const events = this.getLoadedEvents().filter(
+            (ev) => ev.getStateKey() === undefined && !ev.isRedacted() && ev.getType() !== "m.room.redaction",
+        );
 
         const expiredEvents = events.filter((ev) => ev.getTs() < expireBefore);
         const [earliestExpiringEvent] = events
