@@ -301,9 +301,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         const resetAllTimelines = !this.timelineSupport || !forwardPaginationToken;
 
         const oldTimeline = this.liveTimeline;
-        const newTimeline = resetAllTimelines
-            ? oldTimeline.forkLive(EventTimeline.FORWARDS)
-            : oldTimeline.fork(EventTimeline.FORWARDS);
+        const newTimeline = oldTimeline.forkLive(EventTimeline.FORWARDS);
 
         if (resetAllTimelines) {
             this.timelines = [newTimeline];

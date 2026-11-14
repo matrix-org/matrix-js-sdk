@@ -45,6 +45,7 @@ import {
     RelationType,
     RoomEvent,
     type RoomMember,
+    RoomMemberEvent,
 } from "../../src";
 import { EventTimeline } from "../../src/models/event-timeline";
 import { NotificationCountType, Room } from "../../src/models/room";
@@ -922,8 +923,24 @@ describe("Room", function () {
             expect(room.currentState).toEqual(newLiveTimeline.getState(EventTimeline.FORWARDS));
             // Make sure `RoomEvent.OldStateUpdated` was emitted
             expect(oldStateUpdateEmitCount).toEqual(1);
-            // Make sure `RoomEvent.OldStateUpdated` was emitted if necessary
-            expect(currentStateUpdateEmitCount).toEqual(timelineSupport ? 1 : 0);
+            // The live state moves to the new live timeline, so `RoomEvent.CurrentStateUpdated` is not emitted
+            expect(room.currentState).toBe(currentStateBeforeRunningReset);
+            expect(currentStateUpdateEmitCount).toEqual(0);
+        });
+
+        it("should keep the live room members and their listeners", function () {
+            room.currentState.setStateEvents([
+                utils.mkMembership({ room: roomId, mship: KnownMembership.Join, user: userA, event: true }),
+            ]);
+            const onTyping = vi.fn();
+            room.getMember(userA)!.on(RoomMemberEvent.Typing, onTyping);
+
+            room.resetLiveTimeline("sometoken", "someothertoken");
+            room.addEphemeralEvents([
+                utils.mkEvent({ room: roomId, type: EventType.Typing, event: true, content: { user_ids: [userA] } }),
+            ]);
+
+            expect(onTyping).toHaveBeenCalledTimes(1);
         });
 
         it("should emit Room.timelineReset event and set the correct pagination token", function () {
