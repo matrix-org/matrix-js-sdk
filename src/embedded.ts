@@ -734,14 +734,14 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * Requests a token to authenticate against a LiveKit SFU with.
      *
-     * Overrides the homeserver-side {@link MatrixClient._unstable_getLivekitToken} (MSC4195): a widget
+     * Overrides the homeserver-side {@link MatrixClient.getLivekitToken} (MSC4195): a widget
      * cannot make authenticated homeserver calls itself, so we ask the host to make the call on our
      * behalf over the widget API instead (MSC4533). Requires the `rtcLivekitGetToken` capability and a
      * host that advertises the `org.matrix.msc4533` API version (otherwise the request throws).
      *
      * `server_name` defaults to our own homeserver, matching what the endpoint would do server-side.
      */
-    public override async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+    public override async getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
         const serverName = body.server_name ?? this.getDomain();
         if (serverName === null) throw new Error("Cannot determine the server name to request a token from");
         const { jwt } = await this.widgetApi

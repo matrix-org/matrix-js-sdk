@@ -4398,65 +4398,71 @@ describe("MatrixClient", function () {
     });
 
     describe("MSC4195 LiveKit endpoints", () => {
-        describe("_unstable_getLivekitToken", () => {
-            it("makes a well-formed request", async () => {
-                const body = {
-                    url: "wss://livekit.example.com",
-                    room_id: "!room:example.com",
-                    slot_id: "m.call#ROOM",
-                    member_id: "xyzABCDEF10123",
-                } satisfies LivekitGetTokenRequest;
+        describe.each([["getLivekitToken" as const], ["_unstable_getLivekitToken" as const]])("%s", (method) => {
+            const body = {
+                url: "wss://livekit.example.com",
+                room_id: "!room:example.com",
+                slot_id: "m.call#ROOM",
+                member_id: "xyzABCDEF10123",
+            } satisfies LivekitGetTokenRequest;
+
+            it.each([
+                [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                [{}, "/_matrix/client/unstable/io.element.msc4195"],
+            ])("makes a well-formed request when /versions advertises %j", async (features, prefix) => {
+                unstableFeatures = features;
                 httpLookups = [
                     {
                         method: "POST",
                         path: "/rtc/livekit/get_token",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        prefix,
                         expectBody: body,
                         data: { jwt: "thejwt" } satisfies LivekitGetTokenResponse,
                     },
                 ];
-                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+                expect(await client[method](body)).toEqual({ jwt: "thejwt" });
                 expect(httpLookups.length).toEqual(0);
             });
 
-            it("passes on the server name of a remote homeserver", async () => {
-                const body = {
+            it.each([
+                [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                [{}, "/_matrix/client/unstable/io.element.msc4195"],
+            ])("passes on the server name of a remote homeserver", async (features, prefix) => {
+                const remoteBody = {
+                    ...body,
                     url: "wss://livekit.remote.example.com",
-                    room_id: "!room:example.com",
-                    slot_id: "m.call#ROOM",
-                    member_id: "xyzABCDEF10123",
                     server_name: "remote.example.com",
                 } satisfies LivekitGetTokenRequest;
+                unstableFeatures = features;
                 httpLookups = [
                     {
                         method: "POST",
                         path: "/rtc/livekit/get_token",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
-                        expectBody: body,
+                        prefix,
+                        expectBody: remoteBody,
                         data: { jwt: "theremotejwt" } satisfies LivekitGetTokenResponse,
                     },
                 ];
-                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "theremotejwt" });
+                expect(await client[method](remoteBody)).toEqual({ jwt: "theremotejwt" });
                 expect(httpLookups.length).toEqual(0);
             });
 
-            it("propagates errors from the homeserver", async () => {
+            it.each([
+                [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                [{}, "/_matrix/client/unstable/io.element.msc4195"],
+            ])("propagates errors from the homeserver", async (features, prefix) => {
+                unstableFeatures = features;
                 httpLookups = [
                     {
                         method: "POST",
                         path: "/rtc/livekit/get_token",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        prefix,
                         error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
                     },
                 ];
-                await expect(
-                    client._unstable_getLivekitToken({
-                        url: "wss://not-an-sfu.example.com",
-                        room_id: "!room:example.com",
-                        slot_id: "m.call#ROOM",
-                        member_id: "xyzABCDEF10123",
-                    }),
-                ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
+                await expect(client[method]({ ...body, url: "wss://not-an-sfu.example.com" })).rejects.toThrow(
+                    expect.objectContaining({ errcode: "M_INVALID_PARAM" }),
+                );
                 expect(httpLookups.length).toEqual(0);
             });
         });
