@@ -16,7 +16,15 @@ limitations under the License.
 
 import { type MockedObject } from "vitest";
 
-import { EventType, type MatrixClient, MatrixEvent, Room, RoomEvent, RoomStateEvent } from "../../../src";
+import {
+    EventType,
+    type MatrixClient,
+    MatrixEvent,
+    Room,
+    RoomEvent,
+    RoomStateEvent,
+    THREAD_RELATION_TYPE,
+} from "../../../src";
 import type { RoomRetentionPolicy } from "../../../src/models/room-retention";
 import { flushPromises } from "../../test-utils/flushPromises";
 
@@ -53,6 +61,20 @@ describe("RoomRetentionPolicy", () => {
         });
     }
 
+    function makeThreadReply(root: MatrixEvent, ts: number, eventId: string): MatrixEvent {
+        return new MatrixEvent({
+            type: "m.room.message",
+            content: {
+                "body": "reply",
+                "m.relates_to": { rel_type: THREAD_RELATION_TYPE.name, event_id: root.getId() },
+            },
+            event_id: eventId,
+            sender: USER_ID,
+            origin_server_ts: ts,
+            room_id: ROOM_ID,
+        });
+    }
+
     function makeRetentionStateEvent(content: object, type = "m.room.retention"): MatrixEvent {
         return new MatrixEvent({
             type,
@@ -77,6 +99,7 @@ describe("RoomRetentionPolicy", () => {
             supportsThreads: vi.fn().mockReturnValue(true),
             decryptEventIfNeeded: vi.fn().mockReturnThis(),
             getUserId: vi.fn().mockReturnValue(USER_ID),
+            canSupport: new Map(),
             retentionPolicyService: {
                 on: vi.fn((event: string, handler: () => void) => {
                     if (event === "update") retentionPolicyUpdateHandler = handler;
@@ -89,7 +112,7 @@ describe("RoomRetentionPolicy", () => {
             _unstable_shouldApplyMessageRetention: true,
         } as unknown as MockedObject<MatrixClient>;
 
-        room = new Room(ROOM_ID, mockClient, USER_ID);
+        room = new Room(ROOM_ID, mockClient, USER_ID, { timelineSupport: true });
         // Allow the constructor's void handleRetentionUpdate() call to complete
         await flushPromises();
     });
@@ -337,6 +360,51 @@ describe("RoomRetentionPolicy", () => {
             expect(redactSpy).toHaveBeenCalledOnce();
         });
 
+        it("redacts expired thread replies, which only live in their thread's timeline", async () => {
+            const root = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS, "$root");
+            const reply = makeThreadReply(root, Date.now() - 2 * ONE_DAY_MS + 1, "$reply");
+            await room.addLiveEvents([root], { addToState: false });
+            room.createThread(root.getId()!, root, [reply], false);
+            expect(room.getLiveTimeline().getEvents()).not.toContain(reply);
+
+            const redactSpy = vi.spyOn(room, "tryApplyRedaction");
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+
+            const redactedIds = redactSpy.mock.calls.map(([redaction]) => redaction.event.redacts);
+            expect(redactedIds).toEqual(expect.arrayContaining([root.getId(), reply.getId()]));
+            expect(reply.isRedacted()).toBe(true);
+        });
+
+        it("schedules the expiry of a thread reply that is not expired yet", async () => {
+            const expiresIn = 1000;
+            const root = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS, "$root");
+            const reply = makeThreadReply(root, Date.now() - ONE_DAY_MS + expiresIn, "$reply");
+            await room.addLiveEvents([root], { addToState: false });
+            room.createThread(root.getId()!, root, [reply], false);
+
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+            expect(reply.isRedacted()).toBe(false);
+
+            vi.advanceTimersByTime(expiresIn + 100);
+
+            expect(reply.isRedacted()).toBe(true);
+        });
+
+        it("redacts expired events in a timeline other than the live one", async () => {
+            // e.g. the timeline loaded around a permalink to an old message
+            const timelineSet = room.getUnfilteredTimelineSet();
+            const contextTimeline = timelineSet.addTimeline();
+            const expiredEvent = makeMessageEvent(Date.now() - 2 * ONE_DAY_MS);
+            timelineSet.addEventsToTimeline([expiredEvent], true, false, contextTimeline);
+
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+
+            expect(expiredEvent.isRedacted()).toBe(true);
+        });
+
         it("does not process timeline when no policy is active", async () => {
             await room.addLiveEvents([makeMessageEvent(0)], { addToState: false });
 
@@ -345,6 +413,39 @@ describe("RoomRetentionPolicy", () => {
             vi.advanceTimersByTime(ONE_WEEK_MS);
 
             expect(redactSpy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe("loading events", () => {
+        it("keeps state events that are older than the retention period", async () => {
+            getCachedMock.mockReturnValue({ policies: { [ROOM_ID]: { max_lifetime: ONE_DAY_MS } } });
+            await applyPolicy();
+            const oldTopic = new MatrixEvent({
+                type: "m.room.topic",
+                state_key: "",
+                content: { topic: "Old topic" },
+                event_id: "$old_topic",
+                sender: USER_ID,
+                origin_server_ts: Date.now() - 2 * ONE_DAY_MS,
+                room_id: ROOM_ID,
+            });
+
+            await room.addLiveEvents([oldTopic], { addToState: true });
+
+            expect(room.currentState.getStateEvents("m.room.topic", "")).toBe(oldTopic);
+        });
+
+        it("schedules the expiry of messages added straight after the policy is applied", async () => {
+            // A sync applies the room state and adds the timeline events in the same tick.
+            const expiresIn = 1000;
+            const message = makeMessageEvent(Date.now() - ONE_DAY_MS + expiresIn);
+            room.currentState.setStateEvents([makeRetentionStateEvent({ max_lifetime: ONE_DAY_MS })]);
+            await room.addLiveEvents([message], { addToState: false });
+            expect(message.isRedacted()).toBe(false);
+
+            vi.advanceTimersByTime(expiresIn + 300);
+
+            expect(message.isRedacted()).toBe(true);
         });
     });
 
