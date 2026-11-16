@@ -97,7 +97,6 @@ import { OutgoingRequestsManager } from "./OutgoingRequestsManager.ts";
 import { PerSessionKeyBackupDownloader } from "./PerSessionKeyBackupDownloader.ts";
 import { DehydratedDeviceManager } from "./DehydratedDeviceManager.ts";
 import { VerificationMethod } from "../types.ts";
-import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
 import { type RoomState } from "../matrix.ts";
@@ -1456,25 +1455,6 @@ export class RustCrypto extends TypedEventEmitter<CryptoEvents, CryptoEventHandl
 
         if (unsigned !== undefined) obj.unsigned = unsigned;
         obj.signatures = Object.fromEntries(sigs.entries());
-    }
-
-    /**
-     * Implementation of {@link CryptoApi#restoreKeyBackupWithPassphrase}.
-     */
-    public async restoreKeyBackupWithPassphrase(
-        passphrase: string,
-        opts?: KeyBackupRestoreOpts,
-    ): Promise<KeyBackupRestoreResult> {
-        const backupInfo = await this.backupManager.getServerBackupInfo();
-        if (!backupInfo?.version) {
-            throw new Error("No backup info available");
-        }
-
-        const privateKey = await keyFromAuthData(backupInfo.auth_data, passphrase);
-
-        // Cache the key
-        await this.storeSessionBackupPrivateKey(privateKey, backupInfo.version);
-        return this.restoreKeyBackup(opts);
     }
 
     /**

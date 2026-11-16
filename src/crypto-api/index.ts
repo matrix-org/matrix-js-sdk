@@ -666,17 +666,6 @@ export interface CryptoApi {
      */
     restoreKeyBackup(opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
 
-    /**
-     * Restores a key backup using a passphrase.
-     * The decoded key (derived from the passphrase) is stored locally by calling {@link CryptoApi#storeSessionBackupPrivateKey}.
-     *
-     * @param passphrase - The passphrase to use to restore the key backup.
-     * @param opts
-     *
-     * @deprecated Deriving a backup key from a passphrase is not part of the matrix spec. Instead, a random key is generated and stored/shared via 4S.
-     */
-    restoreKeyBackupWithPassphrase(passphrase: string, opts?: KeyBackupRestoreOpts): Promise<KeyBackupRestoreResult>;
-
     ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // Dehydrated devices
