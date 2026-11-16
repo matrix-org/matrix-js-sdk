@@ -1367,7 +1367,7 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            expect(await client._unstable_getLivekitToken({ ...body, server_name: "remote.example.org" })).toEqual({
+            expect(await client.getLivekitToken({ ...body, server_name: "remote.example.org" })).toEqual({
                 jwt: "thejwt",
             });
             expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "remote.example.org" });
@@ -1377,13 +1377,13 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+            expect(await client.getLivekitToken(body)).toEqual({ jwt: "thejwt" });
             expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "example.org" });
         });
 
         it("throws if the server name cannot be determined", async () => {
             await makeClient({ rtcLivekitGetToken: true });
-            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow("server name");
+            await expect(client.getLivekitToken(body)).rejects.toThrow("server name");
             expect(widgetApi.getRtcLivekitToken).not.toHaveBeenCalled();
         });
 
@@ -1392,14 +1392,14 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcLivekitToken.mockRejectedValue(error);
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(error);
+            await expect(client.getLivekitToken(body)).rejects.toThrow(error);
         });
 
         it("maps a widget timeout to a ConnectionError", async () => {
             widgetApi.getRtcLivekitToken.mockRejectedValue(new Error("Request timed out"));
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(ConnectionError);
+            await expect(client.getLivekitToken(body)).rejects.toThrow(ConnectionError);
         });
     });
 

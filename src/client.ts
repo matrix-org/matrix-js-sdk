@@ -6573,16 +6573,35 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
      * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
      * of the answering server's SFUs.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
      */
-    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
-        // There is no /versions flag to check for support, so we just have to attempt a request.
+    public async getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        // There is no unstable /versions flag so we always attempt to hit the unstable endpoint when falling back.
+        const prefix = (await this.doesServerSupportUnstableFeature("org.matrix.msc4195.stable"))
+            ? ClientPrefix.V1
+            : `${ClientPrefix.Unstable}/io.element.msc4195`;
         return await this.http.authedRequest<LivekitGetTokenResponse>(
             Method.Post,
             "/rtc/livekit/get_token",
             undefined,
             body,
-            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+            { prefix },
         );
+    }
+
+    /**
+     * Requests a token to authenticate against a LiveKit SFU with (MSC4195).
+     *
+     * @param body - The details of the `m.rtc.member` event to obtain a token for, and the SFU to obtain it from.
+     * @returns The JWT to authenticate with when connecting to the SFU.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
+     * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
+     * of the answering server's SFUs.
+     * @deprecated Use {@link getLivekitToken} instead.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+     */
+    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        return this.getLivekitToken(body);
     }
 
     /**
