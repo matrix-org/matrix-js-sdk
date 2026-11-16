@@ -6618,16 +6618,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * we are connected to.
      * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
      * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
      */
-    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
-        // There is no /versions flag to check for support, so we just have to attempt a request.
+    public async delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        // There is no unstable /versions flag so we always attempt to hit the unstable endpoint when falling back.
+        const prefix = (await this.doesServerSupportUnstableFeature("org.matrix.msc4195.stable"))
+            ? ClientPrefix.V1
+            : `${ClientPrefix.Unstable}/io.element.msc4195`;
         return await this.http.authedRequest<EmptyObject>(
             Method.Post,
             "/rtc/livekit/delegate_delayed_leave",
             undefined,
             body,
-            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+            { prefix },
         );
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver (MSC4195).
+     *
+     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate, and the SFU
+     * we are connected to.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
+     * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
+     * @deprecated Use {@link delegateDelayedLeave} instead.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+     */
+    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        return this.delegateDelayedLeave(body);
     }
 
     /**

@@ -4570,8 +4570,9 @@ describe("MatrixClient", function () {
             });
         });
 
-        describe("_unstable_delegateDelayedLeave", () => {
-            it("makes a well-formed request", async () => {
+        describe.each([["delegateDelayedLeave" as const], ["_unstable_delegateDelayedLeave" as const]])(
+            "%s",
+            (method) => {
                 const body = {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
@@ -4579,40 +4580,45 @@ describe("MatrixClient", function () {
                     member_id: "xyzABCDEF10123",
                     delay_id: "1234567890",
                 } satisfies LivekitDelegateDelayedLeaveRequest;
-                httpLookups = [
-                    {
-                        method: "POST",
-                        path: "/rtc/livekit/delegate_delayed_leave",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
-                        expectBody: body,
-                        data: {},
-                    },
-                ];
-                expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
-                expect(httpLookups.length).toEqual(0);
-            });
 
-            it("propagates errors from the homeserver", async () => {
-                httpLookups = [
-                    {
-                        method: "POST",
-                        path: "/rtc/livekit/delegate_delayed_leave",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
-                        error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
-                    },
-                ];
-                await expect(
-                    client._unstable_delegateDelayedLeave({
-                        url: "wss://livekit.example.com",
-                        room_id: "!room:example.com",
-                        slot_id: "m.call#ROOM",
-                        member_id: "xyzABCDEF10123",
-                        delay_id: "1234567890",
-                    }),
-                ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
-                expect(httpLookups.length).toEqual(0);
-            });
-        });
+                it.each([
+                    [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                    [{}, "/_matrix/client/unstable/io.element.msc4195"],
+                ])("makes a well-formed request when /versions advertises %j", async (features, prefix) => {
+                    unstableFeatures = features;
+                    httpLookups = [
+                        {
+                            method: "POST",
+                            path: "/rtc/livekit/delegate_delayed_leave",
+                            prefix,
+                            expectBody: body,
+                            data: {},
+                        },
+                    ];
+                    expect(await client[method](body)).toEqual({});
+                    expect(httpLookups.length).toEqual(0);
+                });
+
+                it.each([
+                    [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                    [{}, "/_matrix/client/unstable/io.element.msc4195"],
+                ])("propagates errors from the homeserver", async (features, prefix) => {
+                    unstableFeatures = features;
+                    httpLookups = [
+                        {
+                            method: "POST",
+                            path: "/rtc/livekit/delegate_delayed_leave",
+                            prefix,
+                            error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
+                        },
+                    ];
+                    await expect(client[method](body)).rejects.toThrow(
+                        expect.objectContaining({ errcode: "M_NOT_FOUND" }),
+                    );
+                    expect(httpLookups.length).toEqual(0);
+                });
+            },
+        );
     });
 
     describe("Well-known", () => {

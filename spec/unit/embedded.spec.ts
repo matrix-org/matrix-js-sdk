@@ -1428,7 +1428,7 @@ describe("RoomWidgetClient", () => {
 
         it("delegates the delayed leave event via the host", async () => {
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+            expect(await client.delegateDelayedLeave(body)).toEqual({});
             expect(widgetApi.delegateRtcLivekitDelayedLeave).toHaveBeenCalledWith(body);
         });
 
@@ -1437,14 +1437,14 @@ describe("RoomWidgetClient", () => {
             widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(error);
 
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(error);
+            await expect(client.delegateDelayedLeave(body)).rejects.toThrow(error);
         });
 
         it("maps a widget timeout to a ConnectionError", async () => {
             widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(new Error("Request timed out"));
 
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
+            await expect(client.delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
         });
     });
 

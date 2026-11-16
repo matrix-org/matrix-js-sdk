@@ -753,15 +753,13 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * Hands over the management of a delayed MatrixRTC leave event to the homeserver.
      *
-     * Overrides the homeserver-side {@link MatrixClient._unstable_delegateDelayedLeave} (MSC4195): a
+     * Overrides the homeserver-side {@link MatrixClient.delegateDelayedLeave} (MSC4195): a
      * widget cannot make authenticated homeserver calls itself, so we ask the host to make the call on
      * our behalf over the widget API instead (MSC4533). Requires the `rtcLivekitDelegateDelayedLeave`
      * capability and a host that advertises the `org.matrix.msc4533` API version (otherwise the request
      * throws).
      */
-    public override async _unstable_delegateDelayedLeave(
-        body: LivekitDelegateDelayedLeaveRequest,
-    ): Promise<EmptyObject> {
+    public override async delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
         await this.widgetApi.delegateRtcLivekitDelayedLeave(body).catch(timeoutToConnectionError);
         return {};
     }
