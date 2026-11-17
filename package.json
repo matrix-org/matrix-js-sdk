@@ -61,7 +61,7 @@
         "bs58": "^6.0.0",
         "content-type": "^3.1.1",
         "loglevel": "^1.9.2",
-        "matrix-events-sdk": "0.0.1",
+        "matrix-events-sdk": "2.0.0",
         "matrix-widget-api": "^1.20.0",
         "p-retry": "^9.0.0",
         "re2js": "^2.8.6",
