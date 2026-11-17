@@ -1247,6 +1247,7 @@ const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action"
  * as it specifies 'sensible' defaults for these modules.
  */
 export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
+    /** @deprecated Unused constant */
     public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = "RESTORE_BACKUP_ERROR_BAD_KEY";
 
     private readonly logger: Logger;
