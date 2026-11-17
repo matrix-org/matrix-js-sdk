@@ -96,7 +96,7 @@ export interface KeyBackupRoomSessions {
 }
 
 /**
- * Extra parameters for {@link CryptoApi.restoreKeyBackup} and {@link CryptoApi.restoreKeyBackupWithPassphrase}.
+ * Extra parameters for {@link CryptoApi.restoreKeyBackup}.
  */
 export interface KeyBackupRestoreOpts {
     /**
