@@ -168,6 +168,7 @@ export enum EventType {
     // MatrixRTC events
     RTCSlot = "org.matrix.msc4143.rtc.slot",
     RTCMembership = "org.matrix.msc4143.rtc.member",
+    RTCEncryptionKey = "m.rtc.encryption_key",
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
     RTCDecline = "org.matrix.msc4310.rtc.decline",

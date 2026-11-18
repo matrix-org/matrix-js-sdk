@@ -101,11 +101,109 @@ describe("ToDeviceKeyTransport", () => {
         expect(statistics.counters.roomEventEncryptionKeysSent).toBe(1);
     });
 
+    it("should send the stable event to sticky members and the legacy event to state members", async () => {
+        transport.start();
+
+        const keyBase64Encoded = "ABCDEDF";
+        const keyIndex = 2;
+        await transport.sendKey(keyBase64Encoded, keyIndex, [
+            { userId: "@bob:example.org", deviceId: "BOBDEVICE", membershipTs: 1234, isStickyMembership: true },
+            { userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1234, isStickyMembership: false },
+            { userId: "@mat:example.org", deviceId: "MATDEVICE", membershipTs: 1234 },
+            { userId: "@alice:example.org", deviceId: "MYDEVICE", membershipTs: 1234, isStickyMembership: true },
+        ]);
+
+        expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledTimes(2);
+        expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledWith(
+            "io.element.call.encryption_keys",
+            [
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE" },
+                { userId: "@mat:example.org", deviceId: "MATDEVICE" },
+            ],
+            {
+                room_id: roomId,
+                member_id: "@alice:example.org:MYDEVICE",
+                media_key: {
+                    index: keyIndex,
+                    key: keyBase64Encoded,
+                },
+                keys: {
+                    index: keyIndex,
+                    key: keyBase64Encoded,
+                },
+                member: {
+                    claimed_device_id: "MYDEVICE",
+                    id: "@alice:example.org:MYDEVICE",
+                },
+            },
+        );
+        expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledWith(
+            "m.rtc.encryption_key",
+            [{ userId: "@bob:example.org", deviceId: "BOBDEVICE" }],
+            {
+                room_id: roomId,
+                member_id: "@alice:example.org:MYDEVICE",
+                media_key: {
+                    index: keyIndex,
+                    key: keyBase64Encoded,
+                },
+                member: {
+                    claimed_device_id: "MYDEVICE",
+                },
+            },
+        );
+
+        expect(statistics.counters.roomEventEncryptionKeysSent).toBe(1);
+    });
+
+    it("should only send the stable event when all members use sticky events", async () => {
+        transport.start();
+
+        await transport.sendKey("ABCDEDF", 2, [
+            { userId: "@bob:example.org", deviceId: "BOBDEVICE", membershipTs: 1234, isStickyMembership: true },
+        ]);
+
+        expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledTimes(1);
+        expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledWith(
+            "m.rtc.encryption_key",
+            [{ userId: "@bob:example.org", deviceId: "BOBDEVICE" }],
+            expect.anything(),
+        );
+        expect(statistics.counters.roomEventEncryptionKeysSent).toBe(1);
+    });
+
+    it("should warn and keep going when a send fails for another reason", async () => {
+        mockClient.encryptAndSendToDevice.mockRejectedValueOnce(new Error("Not allowed to send to-device message"));
+        transport.start();
+
+        await transport.sendKey("ABCDEDF", 2, [
+            { userId: "@bob:example.org", deviceId: "BOBDEVICE", membershipTs: 1234, isStickyMembership: true },
+            { userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1234 },
+        ]);
+
+        expect(mockClient.encryptAndSendToDevice).toHaveBeenCalledTimes(2);
+        expect(mockLogger.warn).toHaveBeenCalledWith(expect.stringContaining("Not allowed to send to-device message"));
+    });
+
+    it("should throw NotSupportedError when the widget driver does not support to-device sending", async () => {
+        mockClient.encryptAndSendToDevice.mockRejectedValueOnce(new Error("unknown variant `send_to_device`"));
+        transport.start();
+
+        await expect(
+            transport.sendKey("ABCDEDF", 2, [
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE", membershipTs: 1234, isStickyMembership: true },
+            ]),
+        ).rejects.toThrow("The widget driver does not support to-device encryption");
+    });
+
     /**
-     * Starts the transport, emits an encrypted key event with the given content from bob and returns
-     * what the transport emitted for it.
+     * Starts the transport, emits an encrypted key event of the given type with the given content from bob and
+     * returns what the transport emitted for it.
      */
-    async function receiveKeyEvent(content: Record<string, unknown>): Promise<{
+    async function receiveKeyEvent(
+        content: Record<string, unknown>,
+        eventType: EventType = EventType.CallEncryptionKeysPrefix,
+    ): Promise<{
         userId: string;
         deviceId: string;
         memberId: string;
@@ -130,12 +228,88 @@ describe("ToDeviceKeyTransport", () => {
         });
         transport.start();
 
-        const mockEvent = makeMatrixEvent(EventType.CallEncryptionKeysPrefix, "@bob:example.org", undefined, content);
+        const mockEvent = makeMatrixEvent(eventType, "@bob:example.org", undefined, content);
         mockEvent.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
         mockClient.emit(ClientEvent.ToDeviceEvent, mockEvent);
 
         return receivedKeyResolvers.promise;
     }
+
+    it("should emit when a key is received with the stable event type", async () => {
+        const testEncoded = "ABCDEDF";
+        const testKeyIndex = 2;
+
+        const { userId, deviceId, memberId, keyBase64Encoded, index } = await receiveKeyEvent(
+            {
+                room_id: roomId,
+                member_id: "BOBMEMBERID",
+                media_key: {
+                    index: testKeyIndex,
+                    key: testEncoded,
+                },
+                member: {
+                    claimed_device_id: "BOBDEVICE",
+                },
+            },
+            EventType.RTCEncryptionKey,
+        );
+        expect(userId).toBe("@bob:example.org");
+        expect(deviceId).toBe("BOBDEVICE");
+        expect(memberId).toBe("BOBMEMBERID");
+        expect(keyBase64Encoded).toBe(testEncoded);
+        expect(index).toBe(testKeyIndex);
+
+        expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(1);
+    });
+
+    it("should ignore the deprecated properties on the stable event type", () => {
+        const receivedKeys = vi.fn();
+        transport.on(KeyTransportEvents.ReceivedKeys, receivedKeys);
+        transport.start();
+
+        for (const content of [
+            // `keys` is not a fallback for `media_key` on the stable event type
+            {
+                room_id: roomId,
+                member_id: "BOBMEMBERID",
+                keys: { index: 2, key: "ABCDEDF" },
+                member: { claimed_device_id: "BOBDEVICE" },
+            },
+            // `member.id` is not a fallback for `member_id` on the stable event type
+            {
+                room_id: roomId,
+                media_key: { index: 2, key: "ABCDEDF" },
+                member: { claimed_device_id: "BOBDEVICE", id: "BOBMEMBERID" },
+            },
+        ]) {
+            const event = makeMatrixEvent(EventType.RTCEncryptionKey, "@bob:example.org", undefined, content);
+            event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+            mockClient.emit(ClientEvent.ToDeviceEvent, event);
+        }
+
+        expect(receivedKeys).not.toHaveBeenCalled();
+        expect(mockLogger.warn).toHaveBeenCalledWith("Malformed Event: Missing media key");
+        expect(mockLogger.warn).toHaveBeenCalledWith("Malformed Event: Missing member id");
+        expect(statistics.counters.roomEventEncryptionKeysReceived).toBe(0);
+    });
+
+    it("should ignore to-device events of other types", () => {
+        const receivedKeys = vi.fn();
+        transport.on(KeyTransportEvents.ReceivedKeys, receivedKeys);
+        transport.start();
+
+        const event = makeMatrixEvent("m.rtc.something_else", "@bob:example.org", undefined, {
+            room_id: roomId,
+            member_id: "BOBMEMBERID",
+            media_key: { index: 2, key: "ABCDEDF" },
+            member: { claimed_device_id: "BOBDEVICE" },
+        });
+        event.makeEncrypted(EventType.RoomMessageEncrypted, {}, "", "");
+        mockClient.emit(ClientEvent.ToDeviceEvent, event);
+
+        expect(receivedKeys).not.toHaveBeenCalled();
+        expect(mockLogger.warn).not.toHaveBeenCalled();
+    });
 
     it("should emit when a key is received in the MSC4143 format", async () => {
         const testEncoded = "ABCDEDF";

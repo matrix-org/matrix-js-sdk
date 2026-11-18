@@ -103,7 +103,12 @@ describe("RTCEncryptionManager", () => {
                 expect.any(String),
                 // It is the first key
                 0,
-                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+                members.map((m) => ({
+                    userId: m.sender,
+                    deviceId: m.deviceId,
+                    membershipTs: m.createdTs(),
+                    isStickyMembership: m.isSticky,
+                })),
             );
             await vi.runOnlyPendingTimersAsync();
             // The key should have been rolled out immediately
@@ -118,6 +123,25 @@ describe("RTCEncryptionManager", () => {
                 },
                 "MOCKSHA<@alice:example.org|@alice:example.org:DEVICE01>",
             );
+        });
+
+        it("Should flag members that use sticky events when distributing keys", async () => {
+            vi.useFakeTimers();
+            const members = [
+                aStateBaseMembership("@bob:example.org", "BOBDEVICE"),
+                anRtcMembership("@carl:example.org", "CARLDEVICE", "CARLMEMBERID", 1000, "rtcIDCARL"),
+            ];
+            getMembershipMock.mockReturnValue(members);
+
+            encryptionManager.join(undefined, [transport]);
+            encryptionManager.onMembershipsUpdate();
+            await vi.runOnlyPendingTimersAsync();
+
+            expect(mockTransport.sendKey).toHaveBeenCalledTimes(1);
+            expect(mockTransport.sendKey).toHaveBeenCalledWith(expect.any(String), 0, [
+                { userId: "@bob:example.org", deviceId: "BOBDEVICE", membershipTs: 1000, isStickyMembership: false },
+                { userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1000, isStickyMembership: true },
+            ]);
         });
 
         it("Should re-distribute keys to members whom callMemberhsip ts has changed", async () => {
@@ -138,6 +162,7 @@ describe("RTCEncryptionManager", () => {
                         userId: "@bob:example.org",
                         deviceId: "BOBDEVICE",
                         membershipTs: 1000,
+                        isStickyMembership: false,
                     },
                 ],
             );
@@ -166,6 +191,7 @@ describe("RTCEncryptionManager", () => {
                         userId: "@bob:example.org",
                         deviceId: "BOBDEVICE",
                         membershipTs: 2000,
+                        isStickyMembership: false,
                     },
                 ],
             );
@@ -191,7 +217,12 @@ describe("RTCEncryptionManager", () => {
                 expect.any(String),
                 // It is the first key
                 0,
-                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+                members.map((m) => ({
+                    userId: m.sender,
+                    deviceId: m.deviceId,
+                    membershipTs: m.createdTs(),
+                    isStickyMembership: m.isSticky,
+                })),
             );
             onEncryptionKeysChanged.mockClear();
             mockTransport.sendKey.mockClear();
@@ -208,7 +239,14 @@ describe("RTCEncryptionManager", () => {
                 // It should not have incremented the key index
                 0,
                 // And send it to the newly joined only
-                [{ userId: "@carl:example.org", deviceId: "CARLDEVICE", membershipTs: 1000 }],
+                [
+                    {
+                        userId: "@carl:example.org",
+                        deviceId: "CARLDEVICE",
+                        membershipTs: 1000,
+                        isStickyMembership: false,
+                    },
+                ],
             );
 
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
@@ -414,7 +452,12 @@ describe("RTCEncryptionManager", () => {
                 expect.any(String),
                 // It is the first key
                 0,
-                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+                members.map((m) => ({
+                    userId: m.sender,
+                    deviceId: m.deviceId,
+                    membershipTs: m.createdTs(),
+                    isStickyMembership: m.isSticky,
+                })),
             );
             // initial rollout
             expect(mockTransport.sendKey).toHaveBeenCalled();
@@ -436,7 +479,12 @@ describe("RTCEncryptionManager", () => {
                 // It should have incremented the key index
                 1,
                 // And send it to the updated members
-                updatedMembers.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+                updatedMembers.map((m) => ({
+                    userId: m.sender,
+                    deviceId: m.deviceId,
+                    membershipTs: m.createdTs(),
+                    isStickyMembership: m.isSticky,
+                })),
             );
 
             expect(onEncryptionKeysChanged).not.toHaveBeenCalled();
@@ -525,7 +573,12 @@ describe("RTCEncryptionManager", () => {
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
                 expect.any(String),
                 1,
-                members.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+                members.map((m) => ({
+                    userId: m.sender,
+                    deviceId: m.deviceId,
+                    membershipTs: m.createdTs(),
+                    isStickyMembership: m.isSticky,
+                })),
             );
 
             await vi.advanceTimersByTimeAsync(5_000);
@@ -595,7 +648,12 @@ describe("RTCEncryptionManager", () => {
             expect(mockTransport.sendKey).toHaveBeenCalledWith(
                 expect.any(String),
                 1,
-                remaining.map((m) => ({ userId: m.sender, deviceId: m.deviceId, membershipTs: m.createdTs() })),
+                remaining.map((m) => ({
+                    userId: m.sender,
+                    deviceId: m.deviceId,
+                    membershipTs: m.createdTs(),
+                    isStickyMembership: m.isSticky,
+                })),
             );
         });
 
@@ -1036,6 +1094,7 @@ describe("RTCEncryptionManager", () => {
                     userId: "@bob:example.org",
                     deviceId: "BOBDEVICE3",
                     membershipTs: 1000,
+                    isStickyMembership: false,
                 },
             ],
         );
