@@ -371,6 +371,11 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
+    [EventType.RTCMembership]:
+        | RtcMembershipData
+        | RtcLeftMembershipData
+        // Left memberships predating `member.membership` only carry the slot ID and the sticky key.
+        | { slot_id: string; msc4354_sticky_key: string };
     [EventType.RTCMembershipStable]: RtcMembershipData | RtcLeftMembershipData;
 }
 
