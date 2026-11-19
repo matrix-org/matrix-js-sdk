@@ -7874,7 +7874,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         let profile: SyncUserProfile;
         try {
-            profile = (await this.http.authedRequest(
+            profile = await this.http.authedRequest<SyncUserProfile>(
                 Method.Get,
                 utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
                 undefined,
@@ -7882,7 +7882,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 {
                     prefix: await this.getExtendedProfileRequestPrefix(),
                 },
-            )) as SyncUserProfile;
+            );
         } catch (e) {
             if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
                 // The key is not set on the profile (or the profile does not exist).

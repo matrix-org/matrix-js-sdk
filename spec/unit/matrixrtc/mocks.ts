@@ -159,7 +159,7 @@ export function makeMockRoom(
 function makeMockRoomState(membershipData: MembershipData[], roomId: string, slotEvent?: MatrixEvent) {
     const events = membershipData.map((m) => mockRTCEvent(m, roomId));
     const keysAndEvents = events.map((e) => {
-        const data = e.getContent() as SessionMembershipData;
+        const data = e.getContent<SessionMembershipData>();
         return [`_${e.sender?.userId}_${data.device_id}`];
     });
 
