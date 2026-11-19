@@ -1251,6 +1251,23 @@ describe("Thread", () => {
             expect(thread.hasCurrentUserParticipated).toBe(true);
         });
 
+        it("is set when the current user sent the thread root", async () => {
+            const client = createClient();
+            vi.spyOn(client, "getUserId").mockReturnValue(myUserId);
+            // The root, as the server returns it before any reply exists: no bundled thread relation.
+            vi.spyOn(client, "fetchRoomEvent").mockImplementation(async (_roomId, eventId) => ({
+                event_id: eventId,
+                room_id: roomId,
+                sender: myUserId,
+                type: EventType.RoomMessage,
+                content: { body: "Thread root" },
+            }));
+
+            const thread = await createThread(client, myUserId, roomId);
+
+            expect(thread.hasCurrentUserParticipated).toBe(true);
+        });
+
         it("is not set when another user replies in the thread", async () => {
             const { thread } = await createThreadWithoutMe();
 

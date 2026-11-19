@@ -839,8 +839,11 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         return this.timelineSet.findEventById(eventId) instanceof MatrixEvent;
     }
 
+    /**
+     * Whether the current user sent the thread root or a reply in it, per the spec's `current_user_participated`.
+     */
     public get hasCurrentUserParticipated(): boolean {
-        return this._currentUserParticipated;
+        return this._currentUserParticipated || this.rootEvent?.getSender() === this.client.getUserId();
     }
 
     public get liveTimeline(): EventTimeline {
