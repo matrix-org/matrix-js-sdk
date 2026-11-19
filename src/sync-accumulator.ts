@@ -63,6 +63,7 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
+    redacts?: string;
 }
 
 export interface IStateEvent extends IRoomEvent {
@@ -329,16 +330,6 @@ function computeStickyExpiresTs(event: (IStickyEvent | IStickyStateEvent) & Even
  */
 function isStickyEvent<T extends IRoomEvent>(event: T): event is T & StickyEventFields {
     return Boolean((event as Partial<IStickyEvent>).msc4354_sticky?.duration_ms);
-}
-
-/**
- * Gets the ID of the event that a redaction redacts, or undefined if the event is not a redaction.
- */
-function getRedactedEventId(event: IRoomEvent): string | undefined {
-    if (event.type !== EventType.RoomRedaction) return undefined;
-    // Room versions before 11 have `redacts` at the top level, later ones in the content.
-    const redacts = (event as IRoomEvent & { redacts?: unknown }).redacts ?? event.content?.redacts;
-    return typeof redacts === "string" ? redacts : undefined;
 }
 
 /**
@@ -662,9 +653,8 @@ export class SyncAccumulator {
             if (isStickyEvent(event)) {
                 newStickyEvents.push(event);
             }
-            const redacts = getRedactedEventId(event);
-            if (redacts) {
-                redactedEventIds.add(redacts);
+            if (event.type === EventType.RoomRedaction && event.redacts) {
+                redactedEventIds.add(event.redacts);
             }
         });
         data.msc4354_sticky?.events?.forEach((e) => {

@@ -1143,14 +1143,11 @@ describe("SyncAccumulator", function () {
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky?.events).toEqual([ev]);
         });
 
-        it.each([
-            ["in the content", (redacts: string) => ({ content: { redacts } })],
-            ["at the top level", (redacts: string) => ({ content: {}, redacts })],
-        ])("should drop sticky events that are redacted %s", (_, redaction) => {
+        it("should drop sticky events that are redacted", () => {
             vi.setSystemTime(0);
             const ev = stickyEvent();
             sa.accumulate(syncSkeleton({ msc4354_sticky: { events: [ev] } }));
-            const redactionEv = { ...msg("test", ""), type: "m.room.redaction", ...redaction(ev.event_id) };
+            const redactionEv = { ...msg("test", ""), type: "m.room.redaction", content: {}, redacts: ev.event_id };
             sa.accumulate(syncSkeleton({ timeline: { events: [redactionEv], prev_batch: "a" } }));
             expect(sa.getJSON().roomsData[Category.Join]["!foo:bar"].msc4354_sticky).toBeUndefined();
         });
