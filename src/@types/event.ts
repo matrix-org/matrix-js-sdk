@@ -166,11 +166,32 @@ export enum EventType {
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events
+
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
     RTCSlot = "org.matrix.msc4143.rtc.slot",
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
     RTCMembership = "org.matrix.msc4143.rtc.member",
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     * @deprecated Use {@link EventType.RTCMembershipStable} instead.
+     */
     RTCMembershipStable = "m.rtc.member",
+    /**
+     * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075).
+     */
     CallNotify = "org.matrix.msc4075.call.notify",
+    /**
+     * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075).
+     */
     RTCNotification = "org.matrix.msc4075.rtc.notification",
+    /**
+     * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075)
+     *  (which has absorbed [MSC4310](https://github.com/matrix-org/matrix-spec-proposals/pull/4310)).
+     */
     RTCDecline = "org.matrix.msc4310.rtc.decline",
 
     // Policy servers
@@ -412,6 +433,7 @@ export interface StateEvents {
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
     [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
+    [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
     [EventType.RTCSlot]: RtcSlotEventContent | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;
