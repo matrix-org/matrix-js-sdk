@@ -1,3 +1,25 @@
+Changes in [45.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v45.1.0) (2026-11-11)
+==================================================================================================
+## Security
+
+* Fixes GHSA-jx97-gwvc-pfxx
+* Includes a fix for GHSA-pqp6-f7wc-6498
+
+## ✨ Features
+
+* [Backport staging] Update matrix-sdk-crypto-wasm to v18.9.2 ([#5687](https://github.com/matrix-org/matrix-js-sdk/pull/5687)). Contributed by @RiotRobot.
+* Switch to 32 bytes of key material for MatrixRTC encryption ([#5649](https://github.com/matrix-org/matrix-js-sdk/pull/5649)). Contributed by @Johennes.
+* MSC4140: schedule delayed events through the dedicated endpoint ([#5556](https://github.com/matrix-org/matrix-js-sdk/pull/5556)). Contributed by @barodeur.
+
+## 🐛 Bug Fixes
+
+* Require sticky duration to be a positive number ([#5636](https://github.com/matrix-org/matrix-js-sdk/pull/5636)). Contributed by @Johennes.
+* MSC4140: read the delayed events capability and recognise `M_DELAY_TOO_LARGE` ([#5564](https://github.com/matrix-org/matrix-js-sdk/pull/5564)). Contributed by @barodeur.
+* Ensure sticky events are spaced at least 1ms apart for the same key ([#5638](https://github.com/matrix-org/matrix-js-sdk/pull/5638)). Contributed by @Johennes.
+* Order events for the sticky map by intended expiry ([#5634](https://github.com/matrix-org/matrix-js-sdk/pull/5634)). Contributed by @Johennes.
+* Fix decryption issues for encrypted sticky events ([#5635](https://github.com/matrix-org/matrix-js-sdk/pull/5635)). Contributed by @Johennes.
+
+
 Changes in [45.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v45.0.0) (2026-10-27)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES

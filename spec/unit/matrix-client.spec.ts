@@ -211,7 +211,6 @@ describe("MatrixClient", function () {
     const RTC_TRANSPORT_RESPONSE: HttpLookup = {
         method: "GET",
         path: "/rtc/transports",
-        prefix: "/_matrix/client/unstable/org.matrix.msc4143",
         data: { rtc_transports: [] },
     };
 
@@ -404,7 +403,7 @@ describe("MatrixClient", function () {
         // set unstableFeatures to a defined state before each test
         unstableFeatures = {
             "org.matrix.msc3440.stable": true,
-            "org.matrix.msc4143": true,
+            "org.matrix.msc4143.stable": true,
         };
 
         makeClient();
@@ -1119,6 +1118,109 @@ describe("MatrixClient", function () {
                 { ...content },
                 txnId,
             );
+        });
+
+        describe("in an encrypted room", () => {
+            const encryptedContent = { algorithm: "m.megolm.v1.aes-sha2", ciphertext: "ciphertext" };
+            let mockRoom: Mocked<Pick<Room, "hasEncryptionStateEvent" | "updatePendingEvent">>;
+            let mockCrypto: Mocked<CryptoBackend>;
+
+            beforeEach(() => {
+                mockRoom = {
+                    hasEncryptionStateEvent: vi.fn().mockReturnValue(true),
+                    updatePendingEvent: vi.fn(),
+                };
+                client.getRoom = (getRoomId) => {
+                    expect(getRoomId).toEqual(roomId);
+                    return mockRoom as unknown as Room;
+                };
+                mockCrypto = {
+                    encryptEvent: vi.fn().mockImplementation(async (event: MatrixEvent) => {
+                        event.makeEncrypted(EventType.RoomMessageEncrypted, encryptedContent, "", "");
+                    }),
+                    stop: vi.fn(),
+                } as unknown as Mocked<CryptoBackend>;
+                client["cryptoBackend"] = mockCrypto;
+            });
+
+            it("encrypts a delayed message event", async () => {
+                const txnId = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.encrypted/${txnId}`,
+                        data: delayData,
+                        expectBody: { delay_ms: 2000, content: encryptedContent },
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        delayMs,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId,
+                    ),
+                ).resolves.toEqual(delayData);
+                expect(httpLookups).toHaveLength(0);
+                expect(mockCrypto.encryptEvent).toHaveBeenCalledTimes(1);
+                expect(mockCrypto.encryptEvent.mock.calls[0][0].getContent()).toEqual(content);
+                // Delayed events are not pending events of the room, so no local echo status is updated.
+                expect(mockRoom.updatePendingEvent).not.toHaveBeenCalled();
+            });
+
+            it("encrypts a sticky delayed event", async () => {
+                unstableFeatures["org.matrix.msc4354"] = true;
+                const txnId = client.makeTxnId();
+                httpLookups = [
+                    {
+                        method: "PUT",
+                        prefix: unstableMSC4140Prefix,
+                        path: `/rooms/${encodeURIComponent(roomId)}/delayed_event/m.room.encrypted/${txnId}`,
+                        data: delayData,
+                        expectBody: {
+                            "delay_ms": 2000,
+                            "org.matrix.msc4354.sticky_duration_ms": 5000,
+                            "content": encryptedContent,
+                        },
+                    },
+                ];
+
+                await expect(
+                    client._unstable_sendStickyDelayedEvent(
+                        roomId,
+                        5000,
+                        delayMs,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        txnId,
+                    ),
+                ).resolves.toEqual(delayData);
+                expect(httpLookups).toHaveLength(0);
+                expect(mockCrypto.encryptEvent).toHaveBeenCalledTimes(1);
+                expect(mockRoom.updatePendingEvent).not.toHaveBeenCalled();
+            });
+
+            it("does not schedule the event when encryption fails", async () => {
+                const error = new Error("encryption failed");
+                mockCrypto.encryptEvent.mockRejectedValue(error);
+                httpLookups = [];
+
+                await expect(
+                    client._unstable_sendDelayedEvent(
+                        roomId,
+                        delayMs,
+                        null,
+                        EventType.RoomMessage,
+                        { ...content },
+                        client.makeTxnId(),
+                    ),
+                ).rejects.toThrow(error);
+            });
         });
 
         async function testThreadRelation(
@@ -4329,18 +4431,21 @@ describe("MatrixClient", function () {
         });
     });
 
-    describe("_unstable_getRTCTransports", () => {
-        it("makes a well-formed request", async () => {
-            unstableFeatures["org.matrix.msc4143"] = true;
+    describe.each([["getRTCTransports" as const], ["_unstable_getRTCTransports" as const]])("%s", (method) => {
+        it.each([
+            ["org.matrix.msc4143", "/_matrix/client/unstable/org.matrix.msc4143", "rtc_transports"],
+            ["org.matrix.msc4143.stable", "/_matrix/client/v1", "transports"],
+        ])("makes a request to %s endpoint", async (feature, prefix, transportsField) => {
+            unstableFeatures = { [feature]: true };
             httpLookups = [
                 {
                     method: "GET",
                     path: `/rtc/transports`,
-                    data: { rtc_transports: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
-                    prefix: "/_matrix/client/unstable/org.matrix.msc4143",
+                    data: { [transportsField]: [{ type: "livekit", extra_field: "foobar" }] satisfies Transport[] },
+                    prefix,
                 },
             ];
-            expect(await client._unstable_getRTCTransports()).toEqual([
+            expect(await client[method]()).toEqual([
                 {
                     type: "livekit",
                     extra_field: "foobar",
@@ -4356,27 +4461,28 @@ describe("MatrixClient", function () {
             expect(httpLookups).toHaveLength(0);
         });
 
-        it.each([{ unstable_features: { "org.matrix.msc4143": false } }, { unstable_features: {} }, {}])(
-            "does not request transports when support is not advertised: %j",
-            async (versionsResponse) => {
-                vi.mocked(client.http.authedRequest)
-                    .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
-                    .mockResolvedValue({ rtc_transports: [] });
+        it.each([
+            { unstable_features: { "org.matrix.msc4143": false, "org.matrix.msc4143.stable": false } },
+            { unstable_features: {} },
+            {},
+        ])("does not request transports when support is not advertised: %j", async (versionsResponse) => {
+            vi.mocked(client.http.authedRequest)
+                .mockResolvedValueOnce({ versions: ["v1.1"], ...versionsResponse })
+                .mockResolvedValue({ rtc_transports: [] });
 
-                await expect(client._unstable_getRTCTransports()).rejects.toMatchObject({
-                    errcode: "M_UNRECOGNIZED",
-                    httpStatus: 404,
-                });
-                expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
-                expect(client.http.authedRequest).toHaveBeenCalledWith(
-                    Method.Get,
-                    "/_matrix/client/versions",
-                    undefined,
-                    undefined,
-                    { prefix: "" },
-                );
-            },
-        );
+            await expect(client.getRTCTransports()).rejects.toMatchObject({
+                errcode: "M_UNRECOGNIZED",
+                httpStatus: 404,
+            });
+            expect(client.http.authedRequest).toHaveBeenCalledTimes(1);
+            expect(client.http.authedRequest).toHaveBeenCalledWith(
+                Method.Get,
+                "/_matrix/client/versions",
+                undefined,
+                undefined,
+                { prefix: "" },
+            );
+        });
 
         it("caches unsupported discovery without requesting transports", async () => {
             vi.mocked(client.http.authedRequest)
@@ -4395,71 +4501,78 @@ describe("MatrixClient", function () {
     });
 
     describe("MSC4195 LiveKit endpoints", () => {
-        describe("_unstable_getLivekitToken", () => {
-            it("makes a well-formed request", async () => {
-                const body = {
-                    url: "wss://livekit.example.com",
-                    room_id: "!room:example.com",
-                    slot_id: "m.call#ROOM",
-                    member_id: "xyzABCDEF10123",
-                } satisfies LivekitGetTokenRequest;
+        describe.each([["getLivekitToken" as const], ["_unstable_getLivekitToken" as const]])("%s", (method) => {
+            const body = {
+                url: "wss://livekit.example.com",
+                room_id: "!room:example.com",
+                slot_id: "m.call#ROOM",
+                member_id: "xyzABCDEF10123",
+            } satisfies LivekitGetTokenRequest;
+
+            it.each([
+                [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                [{}, "/_matrix/client/unstable/io.element.msc4195"],
+            ])("makes a well-formed request when /versions advertises %j", async (features, prefix) => {
+                unstableFeatures = features;
                 httpLookups = [
                     {
                         method: "POST",
                         path: "/rtc/livekit/get_token",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        prefix,
                         expectBody: body,
                         data: { jwt: "thejwt" } satisfies LivekitGetTokenResponse,
                     },
                 ];
-                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+                expect(await client[method](body)).toEqual({ jwt: "thejwt" });
                 expect(httpLookups.length).toEqual(0);
             });
 
-            it("passes on the server name of a remote homeserver", async () => {
-                const body = {
+            it.each([
+                [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                [{}, "/_matrix/client/unstable/io.element.msc4195"],
+            ])("passes on the server name of a remote homeserver", async (features, prefix) => {
+                const remoteBody = {
+                    ...body,
                     url: "wss://livekit.remote.example.com",
-                    room_id: "!room:example.com",
-                    slot_id: "m.call#ROOM",
-                    member_id: "xyzABCDEF10123",
                     server_name: "remote.example.com",
                 } satisfies LivekitGetTokenRequest;
+                unstableFeatures = features;
                 httpLookups = [
                     {
                         method: "POST",
                         path: "/rtc/livekit/get_token",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
-                        expectBody: body,
+                        prefix,
+                        expectBody: remoteBody,
                         data: { jwt: "theremotejwt" } satisfies LivekitGetTokenResponse,
                     },
                 ];
-                expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "theremotejwt" });
+                expect(await client[method](remoteBody)).toEqual({ jwt: "theremotejwt" });
                 expect(httpLookups.length).toEqual(0);
             });
 
-            it("propagates errors from the homeserver", async () => {
+            it.each([
+                [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                [{}, "/_matrix/client/unstable/io.element.msc4195"],
+            ])("propagates errors from the homeserver", async (features, prefix) => {
+                unstableFeatures = features;
                 httpLookups = [
                     {
                         method: "POST",
                         path: "/rtc/livekit/get_token",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
+                        prefix,
                         error: { httpStatus: 400, errcode: "M_INVALID_PARAM" },
                     },
                 ];
-                await expect(
-                    client._unstable_getLivekitToken({
-                        url: "wss://not-an-sfu.example.com",
-                        room_id: "!room:example.com",
-                        slot_id: "m.call#ROOM",
-                        member_id: "xyzABCDEF10123",
-                    }),
-                ).rejects.toThrow(expect.objectContaining({ errcode: "M_INVALID_PARAM" }));
+                await expect(client[method]({ ...body, url: "wss://not-an-sfu.example.com" })).rejects.toThrow(
+                    expect.objectContaining({ errcode: "M_INVALID_PARAM" }),
+                );
                 expect(httpLookups.length).toEqual(0);
             });
         });
 
-        describe("_unstable_delegateDelayedLeave", () => {
-            it("makes a well-formed request", async () => {
+        describe.each([["delegateDelayedLeave" as const], ["_unstable_delegateDelayedLeave" as const]])(
+            "%s",
+            (method) => {
                 const body = {
                     url: "wss://livekit.example.com",
                     room_id: "!room:example.com",
@@ -4467,40 +4580,45 @@ describe("MatrixClient", function () {
                     member_id: "xyzABCDEF10123",
                     delay_id: "1234567890",
                 } satisfies LivekitDelegateDelayedLeaveRequest;
-                httpLookups = [
-                    {
-                        method: "POST",
-                        path: "/rtc/livekit/delegate_delayed_leave",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
-                        expectBody: body,
-                        data: {},
-                    },
-                ];
-                expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
-                expect(httpLookups.length).toEqual(0);
-            });
 
-            it("propagates errors from the homeserver", async () => {
-                httpLookups = [
-                    {
-                        method: "POST",
-                        path: "/rtc/livekit/delegate_delayed_leave",
-                        prefix: "/_matrix/client/unstable/io.element.msc4195",
-                        error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
-                    },
-                ];
-                await expect(
-                    client._unstable_delegateDelayedLeave({
-                        url: "wss://livekit.example.com",
-                        room_id: "!room:example.com",
-                        slot_id: "m.call#ROOM",
-                        member_id: "xyzABCDEF10123",
-                        delay_id: "1234567890",
-                    }),
-                ).rejects.toThrow(expect.objectContaining({ errcode: "M_NOT_FOUND" }));
-                expect(httpLookups.length).toEqual(0);
-            });
-        });
+                it.each([
+                    [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                    [{}, "/_matrix/client/unstable/io.element.msc4195"],
+                ])("makes a well-formed request when /versions advertises %j", async (features, prefix) => {
+                    unstableFeatures = features;
+                    httpLookups = [
+                        {
+                            method: "POST",
+                            path: "/rtc/livekit/delegate_delayed_leave",
+                            prefix,
+                            expectBody: body,
+                            data: {},
+                        },
+                    ];
+                    expect(await client[method](body)).toEqual({});
+                    expect(httpLookups.length).toEqual(0);
+                });
+
+                it.each([
+                    [{ "org.matrix.msc4195.stable": true }, "/_matrix/client/v1"],
+                    [{}, "/_matrix/client/unstable/io.element.msc4195"],
+                ])("propagates errors from the homeserver", async (features, prefix) => {
+                    unstableFeatures = features;
+                    httpLookups = [
+                        {
+                            method: "POST",
+                            path: "/rtc/livekit/delegate_delayed_leave",
+                            prefix,
+                            error: { httpStatus: 404, errcode: "M_NOT_FOUND" },
+                        },
+                    ];
+                    await expect(client[method](body)).rejects.toThrow(
+                        expect.objectContaining({ errcode: "M_NOT_FOUND" }),
+                    );
+                    expect(httpLookups.length).toEqual(0);
+                });
+            },
+        );
     });
 
     describe("Well-known", () => {

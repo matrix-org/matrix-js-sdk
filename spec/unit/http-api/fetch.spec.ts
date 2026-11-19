@@ -446,7 +446,13 @@ describe("FetchHttpApi", () => {
                     it("should emit logout and throw when token refresh fails", async () => {
                         fetchMock.post(authMetadata.token_endpoint, {
                             status: 400,
-                            body: { errcode: "M_UNKNOWN", error: "failed" },
+                            body: {
+                                // These fields mean the error is interpreted as an OAuth error which
+                                // is what would be thrown: the client doesn't log out on general errors.
+                                error: "failed",
+                                error_description: "It didn't work",
+                                error_uri: "http://fail.dummy/dunwork",
+                            },
                         });
                         const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
                         const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
@@ -455,6 +461,26 @@ describe("FetchHttpApi", () => {
                         );
                         expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
                         expect(emitter.emit).toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
+                    });
+
+                    it("should not emit logout but still throw when token refresh fails with a regular MatrixError", async () => {
+                        fetchMock.post(authMetadata.token_endpoint, {
+                            status: 400,
+                            headers: { "Content-Type": "application/json" },
+                            body: {
+                                // A Matrix-style error body rather than an OAuth one, so this is
+                                // a regular MatrixError which should not cause a logout.
+                                errcode: "M_UNKNOWN",
+                                error: "Something went wrong",
+                            },
+                        });
+                        const fetchFn = vi.fn().mockResolvedValue(unknownTokenResponse);
+                        const { api, emitter } = makeOAuthApi(homeserverOnly(fetchFn));
+                        await expect(api.authedRequest(Method.Post, "/account/password")).rejects.toThrow(
+                            new TokenRefreshError(unknownTokenErr),
+                        );
+                        expect(fetchMock).toHaveFetched(authMetadata.token_endpoint);
+                        expect(emitter.emit).not.toHaveBeenCalledWith(HttpApiEvent.SessionLoggedOut, unknownTokenErr);
                     });
 
                     it("should not emit logout but still throw when token refresh fails due to transitive fault", async () => {

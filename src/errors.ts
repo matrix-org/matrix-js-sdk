@@ -77,8 +77,9 @@ export class UnsupportedDelayedEventsEndpointError extends Error {
             | "sendScheduledDelayedEvent"
             | "sendDelayedStateEvent"
             | "getDelayedEvents",
+        options?: ErrorOptions,
     ) {
-        super(message);
+        super(message, options);
         this.name = "UnsupportedDelayedEventsEndpointError";
     }
 }

@@ -538,6 +538,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    /**
+     * Stop any background work owned by this room. Call this when the room is being
+     * discarded; the room should not be used afterwards.
+     */
+    public dispose(): void {
+        this.retention?.dispose();
+    }
+
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
     public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet] | null> {
         if (this.threadTimelineSetsPromise) {

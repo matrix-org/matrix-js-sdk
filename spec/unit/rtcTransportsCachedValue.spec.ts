@@ -27,7 +27,7 @@ describe("RtcTransportsCachedValue", () => {
 
     beforeEach(() => {
         mockClient = {
-            _unstable_getRTCTransports: vi.fn(),
+            getRTCTransports: vi.fn(),
             emit: vi.fn(),
         } as unknown as MockedObject<MatrixClient>;
         rtcTransportsCachedValue = createRtcTransportsCachedValue(mockClient, logger);
@@ -36,7 +36,7 @@ describe("RtcTransportsCachedValue", () => {
     it("should fetch the transport using discovery api", async () => {
         const transport: Transport = { type: "livekit", livekit_service_url: "http://test.com" };
 
-        mockClient._unstable_getRTCTransports.mockResolvedValue([transport]);
+        mockClient.getRTCTransports.mockResolvedValue([transport]);
 
         const result = await rtcTransportsCachedValue.wait();
 
@@ -44,13 +44,13 @@ describe("RtcTransportsCachedValue", () => {
     });
 
     it("should not hammering server if end-point not supported", async () => {
-        mockClient._unstable_getRTCTransports.mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
+        mockClient.getRTCTransports.mockRejectedValue(new MatrixError({ errcode: "M_NOT_FOUND" }, 404));
 
         await rtcTransportsCachedValue.wait().catch(() => {});
         await rtcTransportsCachedValue.wait().catch(() => {});
         await rtcTransportsCachedValue.wait().catch(() => {});
 
-        expect(mockClient._unstable_getRTCTransports).toHaveBeenCalledTimes(1);
+        expect(mockClient.getRTCTransports).toHaveBeenCalledTimes(1);
 
         expect(rtcTransportsCachedValue.get()).toBeUndefined();
     });
@@ -68,7 +68,7 @@ describe("RtcTransportsCachedValue", () => {
             const transport: Transport = { type: "livekit", livekit_service_url: "http://test.com" };
 
             // First no transports, then one
-            mockClient._unstable_getRTCTransports.mockResolvedValueOnce([]).mockResolvedValueOnce([transport]);
+            mockClient.getRTCTransports.mockResolvedValueOnce([]).mockResolvedValueOnce([transport]);
 
             const result = await rtcTransportsCachedValue.wait();
 
