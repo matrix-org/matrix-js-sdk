@@ -325,7 +325,7 @@ describe("CallMembership", () => {
                 getSender: vi.fn().mockReturnValue("@alice:example.org"),
                 getId: vi.fn().mockReturnValue("$eventid"),
                 getContent: vi.fn().mockReturnValue(content),
-                getType: vi.fn().mockReturnValue(EventType.RTCMembership),
+                getType: vi.fn().mockReturnValue(EventType.RTCMembershipStable),
             } as unknown as MatrixEvent;
         }
         const membershipTemplate: RtcMembershipData = {
@@ -336,7 +336,7 @@ describe("CallMembership", () => {
                 "m.call.intent": "audio",
                 "capabilities": ["m.render_audio", "m.render_video"],
             },
-            member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz" },
+            member: { user_id: "@alice:example.org", device_id: "AAAAAAA", id: "xyzHASHxyz", membership: "join" },
             transports: { published: [{ type: "livekit" }], can_subscribe: ["livekit"] },
             msc4354_sticky_key: "abc123",
         };
@@ -413,11 +413,11 @@ describe("CallMembership", () => {
             }).toThrow();
         });
 
-        it("accepts membership without member.membership for compatibility with older events", () => {
-            const { membership: _membership, ...legacyMember } = membershipTemplate.member;
+        it("rejects membership without member.membership", () => {
+            const { membership: _membership, ...memberWithoutMembership } = membershipTemplate.member;
             expect(() => {
-                createCallMembership(makeMockEvent(), { ...membershipTemplate, member: legacyMember });
-            }).not.toThrow();
+                createCallMembership(makeMockEvent(), { ...membershipTemplate, member: memberWithoutMembership });
+            }).toThrow();
         });
 
         it("accepts membership with member.membership join", () => {

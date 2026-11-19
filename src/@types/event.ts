@@ -168,6 +168,7 @@ export enum EventType {
     // MatrixRTC events
     RTCSlot = "org.matrix.msc4143.rtc.slot",
     RTCMembership = "org.matrix.msc4143.rtc.member",
+    RTCMembershipStable = "m.rtc.member",
     CallNotify = "org.matrix.msc4075.call.notify",
     RTCNotification = "org.matrix.msc4075.rtc.notification",
     RTCDecline = "org.matrix.msc4310.rtc.decline",
@@ -370,11 +371,7 @@ export interface TimelineEvents {
     [M_BEACON.name]: MBeaconEventContent;
     [M_POLL_START.name]: PollStartEventContent;
     [M_POLL_END.name]: PollEndEventContent;
-    [EventType.RTCMembership]:
-        | RtcMembershipData
-        | RtcLeftMembershipData
-        // Left memberships predating `member.membership` only carry the slot ID and the sticky key.
-        | { slot_id: string; msc4354_sticky_key: string };
+    [EventType.RTCMembershipStable]: RtcMembershipData | RtcLeftMembershipData;
 }
 
 /**
@@ -410,7 +407,6 @@ export interface StateEvents {
     // MSC3401
     [EventType.GroupCallPrefix]: IGroupCallRoomState;
     [EventType.GroupCallMemberPrefix]: IGroupCallRoomMemberState | SessionMembershipData | EmptyObject;
-    [EventType.RTCMembership]: RtcMembershipData | EmptyObject;
     [EventType.RTCSlot]: RtcSlotEventContent | EmptyObject;
     // MSC3089
     [UNSTABLE_MSC3089_BRANCH.name]: MSC3089EventContent;

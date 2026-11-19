@@ -1453,7 +1453,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             MEMBERSHIP_STICKY_DURATION_MS,
             this.delayedLeaveEventDelayMs,
             null,
-            EventType.RTCMembership,
+            EventType.RTCMembershipStable,
             this.makeMyLeftMembership(),
         );
 
@@ -1464,8 +1464,8 @@ export class StickyEventMembershipManager extends MembershipManager {
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
             null,
-            EventType.RTCMembership,
-            { slot_id: computeSlotId(this.slotDescription), ...myMembership, msc4354_sticky_key: this.memberId },
+            EventType.RTCMembershipStable,
+            { ...(myMembership as RtcMembershipData), msc4354_sticky_key: this.memberId },
         );
     };
 
@@ -1474,7 +1474,7 @@ export class StickyEventMembershipManager extends MembershipManager {
             this.room.roomId,
             MEMBERSHIP_STICKY_DURATION_MS,
             null,
-            EventType.RTCMembership,
+            EventType.RTCMembershipStable,
             this.makeMyLeftMembership(),
         );
 
@@ -1500,29 +1500,17 @@ export class StickyEventMembershipManager extends MembershipManager {
             application: {
                 ...this.applicationData,
                 type: this.slotDescription.application,
-                ...(this.callIntent
-                    ? {
-                          // Include both the stable and the unstable property for compatibility with older clients.
-                          "intent": this.callIntent,
-                          "m.call.intent": toUnstableCallIntent(this.callIntent),
-                      }
-                    : {}),
+                ...(this.callIntent ? { intent: this.callIntent } : {}),
                 ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
             transports: {
-                // Publish LiveKit transports under both the legacy `livekit` and the stable `m.livekit`
-                // type. Clients that only know `livekit` use the first published transport via
-                // CallMembership.getTransport.
-                published: this.publishedTransports.flatMap((t) =>
-                    isUnstableLivekitTransport(t)
-                        ? [
-                              { ...t, type: LEGACY_LIVEKIT_TRANSPORT_TYPE },
-                              { ...t, type: LIVEKIT_TRANSPORT_TYPE },
-                          ]
-                        : [t],
-                ),
-                can_subscribe: [LEGACY_LIVEKIT_TRANSPORT_TYPE, LIVEKIT_TRANSPORT_TYPE],
+                // Publish LiveKit transports under the stable `m.livekit` type only. Callers may still list the
+                // same transport under both the legacy and the stable type, so drop the duplicates this creates.
+                published: this.publishedTransports
+                    .map((t) => (isUnstableLivekitTransport(t) ? { ...t, type: LIVEKIT_TRANSPORT_TYPE } : t))
+                    .filter((t, index, all) => all.findIndex((other) => deepCompare(other, t)) === index),
+                can_subscribe: [LIVEKIT_TRANSPORT_TYPE],
             },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId, membership: "join" },
         };

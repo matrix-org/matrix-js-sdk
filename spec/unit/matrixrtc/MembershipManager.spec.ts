@@ -1825,7 +1825,7 @@ describe("MembershipManager", () => {
                         room.roomId,
                         3600000,
                         null,
-                        "org.matrix.msc4143.rtc.member",
+                        "m.rtc.member",
                         {
                             application: {
                                 "type": "m.call",
@@ -1840,12 +1840,9 @@ describe("MembershipManager", () => {
                             },
                             slot_id: "m.call#ROOM",
                             transports: {
-                                // The transport is published under both types, `livekit` first
-                                published: [
-                                    { type: "livekit", livekit_service_url: focus.livekit_service_url },
-                                    { type: "m.livekit", livekit_service_url: focus.livekit_service_url },
-                                ],
-                                can_subscribe: ["livekit", "m.livekit"],
+                                // The transport is published under the stable type only.
+                                published: [{ type: "m.livekit", livekit_service_url: focus.livekit_service_url }],
+                                can_subscribe: ["m.livekit"],
                             },
                             msc4354_sticky_key: "@alice:example.org:AAAAAAA_m.call",
                         },
@@ -1858,7 +1855,7 @@ describe("MembershipManager", () => {
                         MAX_STICKY_DURATION_MS,
                         8000,
                         null,
-                        "org.matrix.msc4143.rtc.member",
+                        "m.rtc.member",
                         {
                             slot_id: "m.call#ROOM",
                             member: { id: "@alice:example.org:AAAAAAA_m.call", membership: "leave" },
@@ -1868,10 +1865,11 @@ describe("MembershipManager", () => {
                     // ..once
                     expect(client._unstable_sendStickyDelayedEvent).toHaveBeenCalledTimes(1);
                 });
-                it("publishes LiveKit transports under both types and other transports as they are", async () => {
+                it("publishes LiveKit transports under the stable type and other transports as they are", async () => {
                     const otherTransport = { type: "org.example.transport", foo: "bar" };
                     new StickyEventMembershipManager({}, room, client, callSession, "member-id").join([
                         { type: "m.livekit", url: "wss://sfu.example.org" },
+                        { type: "livekit", url: "wss://legacy.example.org" },
                         otherTransport,
                     ]);
                     await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
@@ -1879,43 +1877,49 @@ describe("MembershipManager", () => {
                         .calls[0][4] as RtcMembershipData;
                     expect(eventContent.transports).toStrictEqual({
                         published: [
-                            { type: "livekit", url: "wss://sfu.example.org" },
                             { type: "m.livekit", url: "wss://sfu.example.org" },
+                            { type: "m.livekit", url: "wss://legacy.example.org" },
                             otherTransport,
                         ],
-                        can_subscribe: ["livekit", "m.livekit"],
+                        can_subscribe: ["m.livekit"],
                     });
+                });
+                it("publishes a transport listed under both LiveKit types only once", async () => {
+                    new StickyEventMembershipManager({}, room, client, callSession, "member-id").join([
+                        { type: "livekit", url: "wss://sfu.example.org" },
+                        { type: "m.livekit", url: "wss://sfu.example.org" },
+                    ]);
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                    const eventContent = vi.mocked(client._unstable_sendStickyEvent).mock
+                        .calls[0][4] as RtcMembershipData;
+                    expect(eventContent.transports.published).toStrictEqual([
+                        { type: "m.livekit", url: "wss://sfu.example.org" },
+                    ]);
                 });
             });
             it.each([
-                ["m.audio", "audio"],
+                ["m.audio", "m.audio"],
                 ["video", "m.video"],
-            ])(
-                "publishes the intent %s under both the stable and the unstable key",
-                async (configuredIntent, otherIntent) => {
-                    const memberManager = new StickyEventMembershipManager(
-                        { callIntent: configuredIntent, applicationData: { "m.call.intent": "stray" } },
-                        room,
-                        client,
-                        callSession,
-                        "@alice:example.org:AAAAAAA_m.call",
-                    );
-                    memberManager.join([focus]);
-                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
-                    const [spec, legacy] = configuredIntent.startsWith("m.")
-                        ? [configuredIntent, otherIntent]
-                        : [otherIntent, configuredIntent];
-                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
-                        room.roomId,
-                        3600000,
-                        null,
-                        "org.matrix.msc4143.rtc.member",
-                        expect.objectContaining({
-                            application: { "type": "m.call", "intent": spec, "m.call.intent": legacy },
-                        }),
-                    );
-                },
-            );
+            ])("publishes the intent %s under the stable key only, as %s", async (configuredIntent, stableIntent) => {
+                const memberManager = new StickyEventMembershipManager(
+                    { callIntent: configuredIntent, applicationData: { "m.call.intent": "stray" } },
+                    room,
+                    client,
+                    callSession,
+                    "@alice:example.org:AAAAAAA_m.call",
+                );
+                memberManager.join([focus]);
+                await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
+                    room.roomId,
+                    3600000,
+                    null,
+                    "m.rtc.member",
+                    expect.objectContaining({
+                        application: { type: "m.call", intent: stableIntent },
+                    }),
+                );
+            });
             it("drops intent and capabilities given in applicationData", async () => {
                 const memberManager = new StickyEventMembershipManager(
                     {
@@ -1937,7 +1941,7 @@ describe("MembershipManager", () => {
                     room.roomId,
                     3600000,
                     null,
-                    "org.matrix.msc4143.rtc.member",
+                    "m.rtc.member",
                     expect.objectContaining({
                         application: { "type": "m.call", "org.example.key": "value" },
                     }),
@@ -1965,7 +1969,7 @@ describe("MembershipManager", () => {
                     room.roomId,
                     MAX_STICKY_DURATION_MS,
                     null,
-                    "org.matrix.msc4143.rtc.member",
+                    "m.rtc.member",
                     {
                         slot_id: "m.call#ROOM",
                         member: { id: "@alice:example.org:AAAAAAA_m.call", membership: "leave" },
