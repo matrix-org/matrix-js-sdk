@@ -2,7 +2,13 @@
 
 ## Checklist
 
-- [ ] Tests written for new code (and old code if feasible).
-- [ ] New or updated `public`/`exported` symbols have accurate [TSDoc](https://tsdoc.org/) documentation.
-- [ ] Linter and other CI checks pass.
-- [ ] Sign-off given on the changes (see [CONTRIBUTING.md](https://github.com/matrix-org/matrix-js-sdk/blob/develop/CONTRIBUTING.md)).
+- [ ] I have linked the PR to an issue that describes what needs changing.
+- [ ] I have written tests for new code (and old code if feasible).
+- [ ] I have ensured new or updated `public`/`exported` symbols have accurate [TSDoc](https://tsdoc.org/) documentation.
+- [ ] I have confirmed linter and other CI checks pass.
+- [ ] I have given DCO sign-off on the changes (see [CONTRIBUTING.md](https://github.com/matrix-org/matrix-js-sdk/blob/develop/CONTRIBUTING.md)).
+- [ ] I will no longer force push to this branch
+
+## AI assistance
+
+- [ ] I used AI tools to help create this PR.

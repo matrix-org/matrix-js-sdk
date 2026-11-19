@@ -215,7 +215,6 @@ export class SyncApi {
     private connectionReturnedResolvers?: PromiseWithResolvers<boolean>;
     private notifEvents: MatrixEvent[] = []; // accumulator of sync events in the current sync response
     private failedSyncCount = 0; // Number of consecutive failed /sync requests
-    private storeIsInvalid = false; // flag set if the store needs to be cleared before we can start
     private presence?: SetPresence;
 
     /**
@@ -404,6 +403,14 @@ export class SyncApi {
         return this.client.roomInitialSync(roomId, limit).then((response) => {
             if (this._peekRoom?.roomId !== roomId) {
                 throw new Error("Peeking aborted");
+            }
+
+            // The room may have reached the store some other way while we waited, e.g. /sync returned it because
+            // we are joined to it. Replacing it would leave its listeners on a room the store no longer updates.
+            const existingRoom = client.getRoom(roomId);
+            if (existingRoom) {
+                this.stopPeeking();
+                return existingRoom;
             }
 
             // make sure things are init'd
@@ -845,12 +852,7 @@ export class SyncApi {
             this.syncOpts.logger.error("Error processing cached sync", e);
         }
 
-        // Don't emit a prepared if we've bailed because the store is invalid:
-        // in this case the client will not be usable until stopped & restarted
-        // so this would be useless and misleading.
-        if (!this.storeIsInvalid) {
-            this.updateSyncState(SyncState.Prepared, syncEventData);
-        }
+        this.updateSyncState(SyncState.Prepared, syncEventData);
     }
 
     /**
@@ -1272,7 +1274,7 @@ export class SyncApi {
                 const timelineEvents = this.mapSyncEventsFormat(joinObj.timeline, room, false);
                 const ephemeralEvents = this.mapSyncEventsFormat(joinObj.ephemeral);
                 const accountDataEvents = this.mapSyncEventsFormat(joinObj.account_data);
-                const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky);
+                const stickyEvents = this.mapSyncEventsFormat(joinObj.msc4354_sticky, room);
 
                 // If state_after is present, this is the events that form the state at the end of the timeline block and
                 // regular timeline events do *not* count towards state. If it's not present, then the state is formed by

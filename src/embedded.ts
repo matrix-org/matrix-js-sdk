@@ -38,13 +38,12 @@ import {
     type LivekitGetTokenResponse,
     type Transport,
 } from "./matrixrtc/index.ts";
-import { MatrixEvent, type IEvent, EventStatus } from "./models/event.ts";
+import { MatrixEvent, type IEvent, EventStatus, isValidStickyDuration } from "./models/event.ts";
 import {
     type ISendEventResponse,
     type SendDelayedEventRequestOpts,
     type SendDelayedEventResponse,
     UpdateDelayedEventAction,
-    isSendDelayedEventRequestOpts,
 } from "./@types/requests.ts";
 import { EventType, type StateEvents, type TimelineEvents } from "./@types/event.ts";
 import { logger } from "./logger.ts";
@@ -55,7 +54,6 @@ import {
     type IStartClientOpts,
     type SendToDeviceContentMap,
     type IOpenIDToken,
-    UNSTABLE_MSC4140_DELAYED_EVENTS,
 } from "./client.ts";
 import { SyncApi, SyncState } from "./sync.ts";
 import { SlidingSyncSdk } from "./sliding-sync-sdk.ts";
@@ -421,33 +419,41 @@ export class RoomWidgetClient extends MatrixClient {
         event: MatrixEvent,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse>;
+    /**
+     * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
+     */
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
         delayOpts: SendDelayedEventRequestOpts,
         queryDict?: QueryDict,
-    ): Promise<ISendEventResponse>;
+    ): Promise<SendDelayedEventResponse>;
     protected async encryptAndSendEvent(
         room: Room,
         event: MatrixEvent,
-        delayOptsOrQuery?: SendDelayedEventRequestOpts | QueryDict,
+        delayMs: number,
+        queryDict?: QueryDict,
+    ): Promise<SendDelayedEventResponse>;
+    protected async encryptAndSendEvent(
+        room: Room,
+        event: MatrixEvent,
+        delayOrQueryDict?: number | SendDelayedEventRequestOpts | QueryDict,
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
-        let queryOpts = queryDict;
-        let delayOpts: SendDelayedEventRequestOpts | undefined;
-        if (delayOptsOrQuery && isSendDelayedEventRequestOpts(delayOptsOrQuery)) {
-            delayOpts = delayOptsOrQuery;
-        } else if (!queryOpts) {
-            queryOpts = delayOptsOrQuery;
+        let delayMs: number | undefined;
+        if (this.isDelayMsOrOpts(delayOrQueryDict)) {
+            delayMs = this.getDelayMsFromArg(delayOrQueryDict);
+        } else {
+            queryDict = delayOrQueryDict;
         }
 
-        const stickyDurationMs = queryOpts?.["org.matrix.msc4354.sticky_duration_ms"];
-        if (stickyDurationMs !== undefined && typeof stickyDurationMs !== "number") {
-            throw new Error("Sticky duration must be a number when defined");
+        const stickyDurationMs = queryDict?.["org.matrix.msc4354.sticky_duration_ms"];
+        if (stickyDurationMs !== undefined && !isValidStickyDuration(stickyDurationMs)) {
+            throw new Error("Sticky duration must be a positive integer when defined");
         }
         // This is save since we just checked that above
         // We need the additional as assertion for the EW linter to be happy.
-        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && typeof stickyDurationMs !== "number"`
+        // It is not capable of implying the type based on the throw if `stickyDurationMs !== undefined && !isValidStickyDuration(stickyDurationMs)`
         // above
         const stickyDurationMsAsNumber: number | undefined = stickyDurationMs;
 
@@ -459,17 +465,10 @@ export class RoomWidgetClient extends MatrixClient {
             : event.getContent();
 
         // Delayed event special case.
-        if (delayOpts) {
+        if (delayMs !== undefined) {
             // TODO: updatePendingEvent for delayed events?
             const response = await this.widgetApi
-                .sendRoomEvent(
-                    event.getType(),
-                    content,
-                    room.roomId,
-                    "delay" in delayOpts ? delayOpts.delay : undefined,
-                    "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-                    stickyDurationMsAsNumber,
-                )
+                .sendRoomEvent(event.getType(), content, room.roomId, delayMs, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
             return this.validateSendDelayedEventResponse(response);
         }
@@ -481,7 +480,7 @@ export class RoomWidgetClient extends MatrixClient {
         let response: ISendEventFromWidgetResponseData;
         try {
             response = await this.widgetApi
-                .sendRoomEvent(event.getType(), content, room.roomId, undefined, undefined, stickyDurationMsAsNumber)
+                .sendRoomEvent(event.getType(), content, room.roomId, undefined, stickyDurationMsAsNumber)
                 .catch(timeoutToConnectionError);
         } catch (e) {
             this.updatePendingEventStatus(room, event, EventStatus.NOT_SENT);
@@ -515,33 +514,134 @@ export class RoomWidgetClient extends MatrixClient {
     }
 
     /**
-     * @experimental This currently relies on an unstable MSC (MSC4140).
+     * Sends a delayed timeline event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140).
+     */
+    public override async _unstable_sendDelayedEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K],
+        txnId?: string,
+    ): Promise<SendDelayedEventResponse> {
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
+
+        this.addThreadRelationIfNeeded(content, threadId, roomId);
+        return this.delayedEventRequest("sendDelayedEvent", MatrixCapabilities.MSC4157SendDelayedEvent, () =>
+            this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                delayMs,
+                txnId,
+            }),
+        );
+    }
+
+    /**
+     * Sends a delayed state event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140).
      */
     public async _unstable_sendDelayedStateEvent<K extends keyof StateEvents>(
         roomId: string,
-        delayOpts: SendDelayedEventRequestOpts,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
         eventType: K,
         content: StateEvents[K],
         stateKey = "",
     ): Promise<SendDelayedEventResponse> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
+
+        const response = await this.delayedEventRequest(
+            "sendDelayedStateEvent",
+            MatrixCapabilities.MSC4157SendDelayedEvent,
+            () => this.widgetApi.sendStateEvent(eventType, stateKey, content, roomId, delayMs),
+        );
+        return this.validateSendDelayedEventResponse(response);
+    }
+
+    /**
+     * Runs a delayed event request against the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     */
+    private async delayedEventRequest<T>(
+        clientEndpoint: UnsupportedDelayedEventsEndpointError["clientEndpoint"],
+        capability: MatrixCapabilities,
+        request: () => Promise<T>,
+    ): Promise<T> {
+        if (!this.widgetApi.hasCapability(capability)) {
             throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "sendDelayedStateEvent",
+                `Widget was not granted the capability ${capability}`,
+                clientEndpoint,
             );
         }
+        try {
+            return await request().catch(timeoutToConnectionError);
+        } catch (error) {
+            // Any other host error is passed on as it is. The RTC membership manager retries on transient errors.
+            if (!(error instanceof MatrixError) || error.httpStatus !== 404 || error.errcode !== "M_UNRECOGNIZED") {
+                throw error;
+            }
+            throw new UnsupportedDelayedEventsEndpointError(
+                `The host's homeserver does not support the delayed events API: ${error.message}`,
+                clientEndpoint,
+                { cause: error },
+            );
+        }
+    }
 
-        const response = await this.widgetApi
-            .sendStateEvent(
-                eventType,
-                stateKey,
-                content,
+    /**
+     * Sends a delayed sticky timeline event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability to send delayed
+     *   events or its homeserver doesn't support delayed events.
+     * @throws {@link UnsupportedStickyEventsEndpointError} if the host didn't grant the capability to send sticky events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140) and
+     *   [MSC4354](https://github.com/matrix-org/matrix-spec-proposals/pull/4354).
+     */
+    public override async _unstable_sendStickyDelayedEvent<K extends keyof TimelineEvents>(
+        roomId: string,
+        stickDuration: number,
+        delayMsOrOpts: number | SendDelayedEventRequestOpts,
+        threadId: string | null,
+        eventType: K,
+        content: TimelineEvents[K] & { msc4354_sticky_key?: string },
+        txnId?: string,
+    ): Promise<SendDelayedEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
+        if (!this.widgetApi.hasCapability(MatrixCapabilities.MSC4407SendStickyEvent)) {
+            throw new UnsupportedStickyEventsEndpointError(
+                "Widget was not granted the capability to send sticky events",
+                "sendStickyEvent",
+            );
+        }
+        const delayMs = this.getDelayMsFromArg(delayMsOrOpts);
+
+        this.addThreadRelationIfNeeded(content, threadId, roomId);
+        return this.delayedEventRequest("sendDelayedEvent", MatrixCapabilities.MSC4157SendDelayedEvent, () =>
+            this.sendCompleteEvent({
                 roomId,
-                "delay" in delayOpts ? delayOpts.delay : undefined,
-                "parent_delay_id" in delayOpts ? delayOpts.parent_delay_id : undefined,
-            )
-            .catch(timeoutToConnectionError);
-        return this.validateSendDelayedEventResponse(response);
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                delayMs,
+                txnId,
+            }),
+        );
     }
 
     /**
@@ -565,6 +665,9 @@ export class RoomWidgetClient extends MatrixClient {
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
         if (!this.widgetApi.hasCapability(MatrixCapabilities.MSC4407SendStickyEvent)) {
             throw new UnsupportedStickyEventsEndpointError(
                 "Widget was not granted the capability to send sticky events",
@@ -575,13 +678,15 @@ export class RoomWidgetClient extends MatrixClient {
         this.addThreadRelationIfNeeded(content, threadId, roomId);
         txnId ??= this.makeTxnId();
         try {
-            return await this.sendCompleteEvent({
-                roomId,
-                threadId,
-                eventObject: { type: eventType, content },
-                queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-                txnId,
-            });
+            return await this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, () =>
+                this.sendCompleteEvent({
+                    roomId,
+                    threadId,
+                    eventObject: { type: eventType, content },
+                    queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+                    txnId,
+                }),
+            );
         } catch (error) {
             if (!(error instanceof WidgetApiResponseError) || error.data.matrix_api_error !== undefined) throw error;
 
@@ -606,76 +711,80 @@ export class RoomWidgetClient extends MatrixClient {
     }
 
     /**
-     * @experimental This currently relies on an unstable MSC (MSC4140).
+     * Updates a scheduled delayed event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140).
      * @deprecated Instead use one of:
      * - {@link _unstable_cancelScheduledDelayedEvent}
      * - {@link _unstable_restartScheduledDelayedEvent}
      * - {@link _unstable_sendScheduledDelayedEvent}
      */
     public async _unstable_updateDelayedEvent(delayId: string, action: UpdateDelayedEventAction): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "updateDelayedEvent",
-            );
-        }
-
-        switch (action) {
-            case UpdateDelayedEventAction.Cancel:
-                await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
-                break;
-            case UpdateDelayedEventAction.Restart:
-                await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
-                break;
-            case UpdateDelayedEventAction.Send:
-                await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
-                break;
-        }
+        await this.delayedEventRequest("updateDelayedEvent", MatrixCapabilities.MSC4157UpdateDelayedEvent, async () => {
+            switch (action) {
+                case UpdateDelayedEventAction.Cancel:
+                    await this.widgetApi.cancelScheduledDelayedEvent(delayId);
+                    break;
+                case UpdateDelayedEventAction.Restart:
+                    await this.widgetApi.restartScheduledDelayedEvent(delayId);
+                    break;
+                case UpdateDelayedEventAction.Send:
+                    await this.widgetApi.sendScheduledDelayedEvent(delayId);
+                    break;
+            }
+        });
         return {};
     }
 
     /**
-     * @experimental This currently relies on an unstable MSC (MSC4140).
+     * Cancels a scheduled delayed event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140).
      */
     public async _unstable_cancelScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "cancelScheduledDelayedEvent",
-            );
-        }
-
-        await this.widgetApi.cancelScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        await this.delayedEventRequest(
+            "cancelScheduledDelayedEvent",
+            MatrixCapabilities.MSC4157UpdateDelayedEvent,
+            () => this.widgetApi.cancelScheduledDelayedEvent(delayId),
+        );
         return {};
     }
 
     /**
-     * @experimental This currently relies on an unstable MSC (MSC4140).
+     * Restarts a scheduled delayed event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140).
      */
     public async _unstable_restartScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "restartScheduledDelayedEvent",
-            );
-        }
-
-        await this.widgetApi.restartScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        await this.delayedEventRequest(
+            "restartScheduledDelayedEvent",
+            MatrixCapabilities.MSC4157UpdateDelayedEvent,
+            () => this.widgetApi.restartScheduledDelayedEvent(delayId),
+        );
         return {};
     }
 
     /**
-     * @experimental This currently relies on an unstable MSC (MSC4140).
+     * Triggers the sending of a scheduled delayed event through the widget API.
+     *
+     * @throws {@link UnsupportedDelayedEventsEndpointError} if the host didn't grant the capability or its homeserver
+     *   doesn't support delayed events.
+     * @throws {@link ConnectionError} if the widget API timed out.
+     * @experimental Part of [MSC4140](https://github.com/matrix-org/matrix-spec-proposals/pull/4140).
      */
     public async _unstable_sendScheduledDelayedEvent(delayId: string): Promise<EmptyObject> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
-            throw new UnsupportedDelayedEventsEndpointError(
-                "Server does not support the delayed events API",
-                "sendScheduledDelayedEvent",
-            );
-        }
-
-        await this.widgetApi.sendScheduledDelayedEvent(delayId).catch(timeoutToConnectionError);
+        await this.delayedEventRequest("sendScheduledDelayedEvent", MatrixCapabilities.MSC4157UpdateDelayedEvent, () =>
+            this.widgetApi.sendScheduledDelayedEvent(delayId),
+        );
         return {};
     }
 
@@ -720,12 +829,12 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * Returns a set of configured RTC transports supported by the homeserver.
      *
-     * Overrides the homeserver-side {@link MatrixClient._unstable_getRTCTransports} (MSC4143):
+     * Overrides the homeserver-side {@link MatrixClient.getRTCTransports} (MSC4143):
      * a widget cannot make authenticated homeserver calls itself, so we ask the host over the
      * widget API instead (MSC4515). Requires the `rtcTransports` capability and a host that
      * advertises the `org.matrix.msc4515` API version (otherwise the request throws).
      */
-    public override async _unstable_getRTCTransports(): Promise<Transport[]> {
+    public override async getRTCTransports(): Promise<Transport[]> {
         const { rtc_transports: rtcTransports } = await this.widgetApi
             .getRtcTransports()
             .catch(timeoutToConnectionError);
@@ -735,14 +844,14 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * Requests a token to authenticate against a LiveKit SFU with.
      *
-     * Overrides the homeserver-side {@link MatrixClient._unstable_getLivekitToken} (MSC4195): a widget
+     * Overrides the homeserver-side {@link MatrixClient.getLivekitToken} (MSC4195): a widget
      * cannot make authenticated homeserver calls itself, so we ask the host to make the call on our
      * behalf over the widget API instead (MSC4533). Requires the `rtcLivekitGetToken` capability and a
      * host that advertises the `org.matrix.msc4533` API version (otherwise the request throws).
      *
      * `server_name` defaults to our own homeserver, matching what the endpoint would do server-side.
      */
-    public override async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+    public override async getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
         const serverName = body.server_name ?? this.getDomain();
         if (serverName === null) throw new Error("Cannot determine the server name to request a token from");
         const { jwt } = await this.widgetApi
@@ -754,15 +863,13 @@ export class RoomWidgetClient extends MatrixClient {
     /**
      * Hands over the management of a delayed MatrixRTC leave event to the homeserver.
      *
-     * Overrides the homeserver-side {@link MatrixClient._unstable_delegateDelayedLeave} (MSC4195): a
+     * Overrides the homeserver-side {@link MatrixClient.delegateDelayedLeave} (MSC4195): a
      * widget cannot make authenticated homeserver calls itself, so we ask the host to make the call on
      * our behalf over the widget API instead (MSC4533). Requires the `rtcLivekitDelegateDelayedLeave`
      * capability and a host that advertises the `org.matrix.msc4533` API version (otherwise the request
      * throws).
      */
-    public override async _unstable_delegateDelayedLeave(
-        body: LivekitDelegateDelayedLeaveRequest,
-    ): Promise<EmptyObject> {
+    public override async delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
         await this.widgetApi.delegateRtcLivekitDelayedLeave(body).catch(timeoutToConnectionError);
         return {};
     }

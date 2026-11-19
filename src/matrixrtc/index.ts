@@ -15,11 +15,17 @@ limitations under the License.
 */
 
 export * from "./CallMembership.ts";
+export * from "./CallIntent.ts";
 export * from "./LivekitTransport.ts";
 export * from "./MatrixRTCSession.ts";
 export * from "./MatrixRTCSessionManager.ts";
 export type * from "./types.ts";
-export { type SessionMembershipData, type RtcMembershipData } from "./membershipData/index.ts";
+export {
+    type SessionMembershipData,
+    type RtcMembershipData,
+    type RtcLeftMembershipData,
+    type RtcMembershipStatus,
+} from "./membershipData/index.ts";
 export {
     Status,
     parseCallNotificationContent,

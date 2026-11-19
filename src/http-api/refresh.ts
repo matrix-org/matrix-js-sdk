@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixError, TokenRefreshLogoutError } from "./errors.ts";
+import { TokenRefreshLogoutError } from "./errors.ts";
 import { type AccessTokens, type IHttpOpts, type OAuth2ClientConfig } from "./interface.ts";
 import { sleep } from "../utils.ts";
 import { TokenRefresher } from "../oauth/tokenRefresher.ts";
@@ -38,7 +38,13 @@ const REFRESH_ON_ERROR_IF_TOKEN_EXPIRES_WITHIN_MS = 60 * 1000;
 
 type Opts = Pick<
     IHttpOpts,
-    "onTokenRefresh" | "logger" | "refreshToken" | "accessToken" | "oauth2ClientConfig" | "authMetadataCallback"
+    | "onTokenRefresh"
+    | "logger"
+    | "refreshToken"
+    | "accessToken"
+    | "oauth2ClientConfig"
+    | "authMetadataCallback"
+    | "fetchFn"
 >;
 
 /**
@@ -49,7 +55,15 @@ type Opts = Pick<
  * It will update the {@link Opts} object with new tokens as they are refreshed, and also call the {@link IHttpOpts.onTokenRefresh} callback if provided.
  */
 export class TokenManager {
-    public constructor(private readonly opts: Opts) {}
+    /**
+     * @param opts - the HTTP options, which are updated in place as tokens are refreshed.
+     * @param getAbortSignal - optional callback returning the signal which, when aborted, should abort any
+     *     in-flight request. Called at the start of each such request.
+     */
+    public constructor(
+        private readonly opts: Opts,
+        private readonly getAbortSignal?: () => AbortSignal,
+    ) {}
 
     /**
      * Promise used to block authenticated requests during a token refresh to avoid repeated expected errors.
@@ -162,7 +176,9 @@ export class TokenManager {
                 return TokenRefreshOutcome.Logout;
             }
 
-            const { accessToken, refreshToken, expiry } = await tokenRefresher.refreshTokens(this.opts.refreshToken);
+            const { accessToken, refreshToken, expiry } = await tokenRefresher.refreshTokens(this.opts.refreshToken, {
+                abortSignal: this.getAbortSignal?.(),
+            });
             this.opts.accessToken = accessToken;
             this.opts.refreshToken = refreshToken;
             this.latestTokenRefreshExpiry = expiry;
@@ -171,8 +187,8 @@ export class TokenManager {
             // successfully got new tokens
             return TokenRefreshOutcome.Success;
         } catch (error) {
-            // If we get a TokenError or MatrixError, we should log out, otherwise assume transient
-            if (error instanceof TokenRefreshLogoutError || error instanceof MatrixError) {
+            // A TokenRefreshLogoutError is any error on which we should log out so… do that.
+            if (error instanceof TokenRefreshLogoutError) {
                 this.opts.logger?.error("Failed to refresh token", error);
                 return TokenRefreshOutcome.Logout;
             }
@@ -192,11 +208,14 @@ export class TokenManager {
         const tokenRefresher = await this.ensureTokenRefresher();
         if (!tokenRefresher) return;
 
+        const requestOpts = { abortSignal: this.getAbortSignal?.() };
         await Promise.all(
             [
-                this.opts.accessToken ? tokenRefresher.revokeToken(this.opts.accessToken, "access_token") : undefined,
+                this.opts.accessToken
+                    ? tokenRefresher.revokeToken(this.opts.accessToken, "access_token", requestOpts)
+                    : undefined,
                 this.opts.refreshToken
-                    ? tokenRefresher.revokeToken(this.opts.refreshToken, "refresh_token")
+                    ? tokenRefresher.revokeToken(this.opts.refreshToken, "refresh_token", requestOpts)
                     : undefined,
             ].filter((p): p is Promise<void> => p !== undefined),
         );
@@ -240,10 +259,15 @@ export class TokenManager {
     ): Promise<TokenRefresher> {
         const metadata = await authMetaDataCallback();
 
-        const oauth2 = new OAuth2(metadata, {
-            clientId: config.clientId,
-            deviceId: config.deviceId,
-        });
+        const oauth2 = new OAuth2(
+            metadata,
+            {
+                clientId: config.clientId,
+                deviceId: config.deviceId,
+            },
+            this.opts.logger,
+            { fetchFn: this.opts.fetchFn },
+        );
 
         return new TokenRefresher(oauth2, (tokens) => this.opts.onTokenRefresh?.(tokens));
     }

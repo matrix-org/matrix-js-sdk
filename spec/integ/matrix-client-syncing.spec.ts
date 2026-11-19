@@ -1548,6 +1548,42 @@ describe("MatrixClient syncing", () => {
         });
     });
 
+    describe("msc4354 sticky events", () => {
+        it("should assign the room to events from the sticky section", async () => {
+            // Servers serialise /sync events without a room_id
+            const stickyEvent = {
+                event_id: "$sticky",
+                type: "org.example.any_type",
+                content: { msc4354_sticky_key: "foobar" },
+                msc4354_sticky: { duration_ms: 15000 },
+                sender: otherUserId,
+                origin_server_ts: Date.now(),
+                unsigned: { msc4354_sticky_duration_ttl_ms: 15000 },
+            };
+            httpBackend!.when("GET", "/sync").respond(200, {
+                next_batch: "batch_token",
+                rooms: {
+                    join: {
+                        [roomOne]: {
+                            timeline: {
+                                events: [utils.mkMessage({ room: roomOne, user: otherUserId, msg: "hello" })],
+                            },
+                            msc4354_sticky: { events: [stickyEvent] },
+                        },
+                    },
+                },
+            });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            const room = client!.getRoom(roomOne)!;
+            const event = room._unstable_getKeyedStickyEvent(otherUserId, "org.example.any_type", "foobar");
+            expect(event?.getId()).toBe("$sticky");
+            expect(event?.getRoomId()).toBe(roomOne);
+        });
+    });
+
     describe("timeline", () => {
         beforeEach(() => {
             const syncData = {
@@ -2569,6 +2605,31 @@ describe("MatrixClient syncing", () => {
                 await httpBackend!.flushAllExpected();
             },
         );
+
+        it("should keep a room that reached the store while the peek was in flight", async () => {
+            httpBackend!.when("GET", `/rooms/${encodeURIComponent(roomOne)}/initialSync`).respond(200, {
+                room_id: roomOne,
+                membership: KnownMembership.Leave,
+                messages: { start: "start", end: "end", chunk: [] },
+                state: [],
+            });
+            const onRoom = vi.fn();
+            client!.on(ClientEvent.Room, onRoom);
+
+            const prom = client!.peekInRoom(roomOne);
+            // The room arrives through /sync before the peek's initialSync responds
+            const syncedRoom = new Room(roomOne, client!, selfUserId);
+            client!.store.storeRoom(syncedRoom);
+            await httpBackend!.flush(`/rooms/${encodeURIComponent(roomOne)}/initialSync`, 1);
+            const room = await prom;
+
+            expect(room).toBe(syncedRoom);
+            expect(client!.getRoom(roomOne)).toBe(syncedRoom);
+            expect(onRoom).not.toHaveBeenCalled();
+            // It stops peeking rather than polling /events for the room
+            expect(httpBackend!.requests.some((req) => req.path.includes("/events"))).toBe(false);
+            client!.off(ClientEvent.Room, onRoom);
+        });
     });
 
     describe("user account data", () => {

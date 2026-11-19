@@ -12,7 +12,7 @@ if [ -n "$CONFLICTS" ]; then
         # Merge package.json in a way where we prefer all changes from `develop`
         # except for the `version` field which we take from `master`.
         git show HEAD:package.json > package.ours.json         # develop
-        git show FETCH_HEAD:package.json > package.theirs.json # master
+        git show origin/master:package.json > package.theirs.json # master
 
         jq -s '(.[0].version) as $masterVersion | (reduce .[] as $item ({}; . * $item)) | .version = $masterVersion' package.theirs.json package.ours.json > package.json
         rm package.ours.json package.theirs.json

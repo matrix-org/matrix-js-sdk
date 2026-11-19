@@ -37,6 +37,7 @@ export abstract class CapabilityPoller<ResponseType> extends TypedEventEmitter<
     protected cached?: ResponseType;
     private retryTimeout?: ReturnType<typeof setTimeout>;
     private refreshTimeout?: ReturnType<typeof setInterval>;
+    private stopped = true;
 
     public constructor(
         protected readonly logger: Logger,
@@ -50,6 +51,7 @@ export abstract class CapabilityPoller<ResponseType> extends TypedEventEmitter<
      * Starts periodically fetching the server capabilities.
      */
     public start(): void {
+        this.stopped = false;
         this.poll().then();
     }
 
@@ -57,6 +59,7 @@ export abstract class CapabilityPoller<ResponseType> extends TypedEventEmitter<
      * Stops the service
      */
     public stop(): void {
+        this.stopped = true;
         this.clearTimeouts();
     }
 
@@ -71,10 +74,12 @@ export abstract class CapabilityPoller<ResponseType> extends TypedEventEmitter<
     public abstract fetch(): Promise<ResponseType>;
 
     private poll = async (): Promise<void> => {
+        if (this.stopped) return;
         this.logger.debug("Checking capabilites");
         try {
             const current = this.cached;
             await this.fetch();
+            if (this.stopped) return;
             this.clearTimeouts();
             this.refreshTimeout = globalThis.setTimeout(this.poll, CAPABILITIES_CACHE_MS);
             this.logger.debug(`Fetched new server ${this.name}`);
@@ -82,6 +87,7 @@ export abstract class CapabilityPoller<ResponseType> extends TypedEventEmitter<
                 this.emit("update", this.cached);
             }
         } catch (e) {
+            if (this.stopped) return;
             this.clearTimeouts();
             const howLong = Math.floor(CAPABILITIES_RETRY_MS + Math.random() * 5000);
             this.retryTimeout = globalThis.setTimeout(this.poll, howLong);

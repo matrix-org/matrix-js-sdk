@@ -16,12 +16,30 @@ limitations under the License.
 
 import { MatrixEvent } from "../models/event.ts";
 import { RoomEvent, type Room } from "./room.ts";
-import { RoomStateEvent, type RoomState } from "./room-state.ts";
+import { RoomStateEvent } from "./room-state.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { EventType } from "../@types/event.ts";
 import type { RetentionPolicyService } from "../retentionPolicy.ts";
 import type { IStore } from "../store/index.ts";
 import { ROOM_RETENTION_TYPE, type RoomRetentionContent } from "../@types/retention.ts";
+
+/**
+ * The largest delay `setTimeout` accepts (2^31 - 1 ms, ~24.8 days). Larger values overflow
+ * and cause the callback to fire immediately.
+ */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
+
+/**
+ * Whether a retention policy with the given maximum lifetime keeps an event.
+ *
+ * Only messages expire. Dropping an old state event as it loads would leave it out of the room
+ * state, and the room would show an outdated name, topic or membership. Redactions are kept too,
+ * as the expiry sweep in {@link RoomRetentionPolicy} already did.
+ */
+function isRetainedUnder(ev: MatrixEvent, maxRetention: number | null): boolean {
+    if (!maxRetention || ev.isState() || ev.isRedaction()) return true;
+    return ev.getTs() > Date.now() - maxRetention;
+}
 
 /**
  * Applies https://github.com/matrix-org/matrix-spec-proposals/pull/1763 by checking the current
@@ -35,6 +53,7 @@ export class RoomRetentionPolicy {
     // minRetention is not implemented.
     private maxRetention: number | null = null;
     private retentionTimeout?: ReturnType<typeof setTimeout>;
+    private disposed = false;
     private readonly logger: Logger;
 
     public constructor(
@@ -45,78 +64,116 @@ export class RoomRetentionPolicy {
         this.logger = rootLogger.getChild(`RetentionPolicy ${room.roomId}`);
 
         // Recalculate on room state update.
-        room.on(RoomStateEvent.Events, (event) => {
-            if (
-                event.getStateKey() !== "" ||
-                (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
-            ) {
-                return;
-            }
-            void this.handleRetentionUpdate();
-        });
+        room.on(RoomStateEvent.Events, this.onRoomStateEvent);
 
         // Recalculate our retention whenever the global policy changes.
-        this.retentionService.on("update", () => {
-            this.logger.info("Got global retention policy update!");
-            void this.handleRetentionUpdate();
-        });
-        // Do an initial check on construction.
-        void this.handleRetentionUpdate();
-
-        // Only bind RoomEvent.Timeline once we know we have a retention policy.
+        this.retentionService.on("update", this.onRetentionServiceUpdate);
+        // Do an initial check on construction. This also binds RoomEvent.Timeline if there is a policy.
+        this.handleRetentionUpdate();
     }
 
+    /**
+     * Stop applying the retention policy: cancels any pending expiry check and removes all listeners.
+     * The instance must not be used after this is called.
+     */
+    public dispose(): void {
+        this.disposed = true;
+        this.room.off(RoomStateEvent.Events, this.onRoomStateEvent);
+        this.room.off(RoomEvent.Timeline, this.timelineUpdated);
+        this.retentionService.off("update", this.onRetentionServiceUpdate);
+        clearTimeout(this.retentionTimeout);
+        this.retentionTimeout = undefined;
+    }
+
+    private readonly onRoomStateEvent = (event: MatrixEvent): void => {
+        if (
+            event.getStateKey() !== "" ||
+            (event.getType() !== "org.matrix.msc1763.retention" && event.getType() !== "m.room.retention")
+        ) {
+            return;
+        }
+        this.handleRetentionUpdate();
+    };
+
+    private readonly onRetentionServiceUpdate = (): void => {
+        this.logger.info("Got global retention policy update!");
+        this.handleRetentionUpdate();
+    };
+
+    /**
+     * The effective maximum lifetime of messages in the room, in milliseconds, or `null` when messages
+     * are kept forever.
+     */
     public getMaxLifetime(): number | null {
         return this.maxRetention;
     }
 
+    /**
+     * Whether the room's current retention policy keeps an event. State events and redactions are
+     * always kept: only messages expire.
+     */
     public shouldEventBeRetained(ev: MatrixEvent): boolean {
-        if (!this.maxRetention) {
-            return true;
-        }
-        const expireBefore = Date.now() - this.maxRetention;
-        return ev.getTs() > expireBefore;
+        return isRetainedUnder(ev, this.maxRetention);
     }
 
-    private readonly handleRetentionUpdate = async (): Promise<void> => {
-        let maxRetention: number | null;
+    private readonly handleRetentionUpdate = (): void => {
+        if (this.disposed) return;
+
+        // First store the retention period we currently have.
+        const previousMaxRetention = this.maxRetention;
+
         try {
-            maxRetention = this.recalculateRetention(this.room.currentState);
+            this.maxRetention = this.computeMaxRetention(this.getRoomStatePolicy());
         } catch (err) {
             this.logger.warn("Failed to recalculate retention policy", err);
             return;
         }
 
-        const previousMaxRetention = this.maxRetention;
-        this.maxRetention = maxRetention;
+        // Bind/unbind the Timeline event handler based on whether we should be running retention.
+        // This must not wait: a sync applies the room state and adds the timeline events straight
+        // after, and those events are what schedule the next expiry. Binding later left messages on
+        // screen past their lifetime after a reload, until some other event arrived in the room.
+        if ((previousMaxRetention !== null) !== (this.maxRetention !== null)) {
+            this.logger.info("retention recalculated to be", this.maxRetention);
+            if (this.maxRetention) {
+                this.room.on(RoomEvent.Timeline, this.timelineUpdated);
+            } else {
+                this.room.off(RoomEvent.Timeline, this.timelineUpdated);
+            }
+        }
 
         try {
-            if ((previousMaxRetention !== null) !== (maxRetention !== null)) {
-                this.logger.info("retention recalculated to be", maxRetention);
-                if (maxRetention) {
-                    this.room.on(RoomEvent.Timeline, this.timelineUpdated);
-                } else {
-                    this.room.off(RoomEvent.Timeline, this.timelineUpdated);
-                }
-            }
-            if (maxRetention !== null) this.processTimeline();
+            this.processTimeline();
         } catch (err) {
             this.logger.warn("Failed to update retention policy", err);
         }
-        if (previousMaxRetention !== maxRetention) {
-            this.room.emit(RoomEvent.RetentionChanged, this.room, maxRetention);
+
+        // Emit even if processing the timeline failed, so listeners agree with getMaxLifetime().
+        if (previousMaxRetention !== this.maxRetention) {
+            this.room.emit(RoomEvent.RetentionChanged, this.room, this.maxRetention);
         }
     };
 
-    private readonly recalculateRetention = (roomState: RoomState): number | null => {
-        const unstableEvent = roomState.getStateEvents(ROOM_RETENTION_TYPE.name).find((e) => e.getStateKey() === "");
-        const stableEvent = roomState.getStateEvents(ROOM_RETENTION_TYPE.altName).find((e) => e.getStateKey() === "");
+    /**
+     * The retention policy set in the room state, preferring `m.room.retention` over the unstable type.
+     */
+    private getRoomStatePolicy(): RoomRetentionContent | undefined {
+        const policyEvent =
+            this.room.currentState.getStateEvents(ROOM_RETENTION_TYPE.name, "") ??
+            this.room.currentState.getStateEvents(ROOM_RETENTION_TYPE.altName, "");
+        return policyEvent?.getContent<RoomRetentionContent>();
+    }
 
+    /**
+     * Work out the effective maximum lifetime of messages in the room, in milliseconds, or `null` when
+     * messages are kept forever.
+     *
+     * @param roomStatePolicy - The policy set in the room state, if any.
+     * @throws If the policy's `max_lifetime` is not a non-negative integer.
+     */
+    private computeMaxRetention(roomStatePolicy: RoomRetentionContent | undefined): number | null {
         const serverPolicy = this.retentionService.getCached();
-
         const serverRoomPolicy = serverPolicy?.policies?.[this.room.roomId];
-        const roomStatePolicy =
-            unstableEvent?.getContent<RoomRetentionContent>() ?? stableEvent?.getContent<RoomRetentionContent>();
 
         const content =
             // * if the homeserver defines a specific retention policy for this room, then use this policy as the effective retention policy of the room.
@@ -163,7 +220,7 @@ export class RoomRetentionPolicy {
         }
 
         return maxLifetime;
-    };
+    }
 
     private readonly timelineUpdated = (): void => {
         this.logger.info("timelineUpdated");
@@ -174,22 +231,43 @@ export class RoomRetentionPolicy {
         if (this.retentionTimeout) {
             clearTimeout(this.retentionTimeout);
         }
-        this.retentionTimeout = setTimeout(() => {
-            this.processTimeline();
-            this.retentionTimeout = undefined;
-        }, nextTs);
+        this.retentionTimeout = setTimeout(
+            () => {
+                this.retentionTimeout = undefined;
+                this.processTimeline();
+            },
+            Math.min(nextTs, MAX_TIMEOUT_MS),
+        );
     };
 
+    /**
+     * Every event the room has loaded: all timelines of every timeline set, including the ones
+     * left behind by a permalink jump, and every thread's timelines. Thread replies only live in
+     * their thread's timelines, so looking at the live timeline alone would never expire them.
+     */
+    private getLoadedEvents(): MatrixEvent[] {
+        const timelineSets = [
+            ...this.room.getTimelineSets(),
+            ...this.room.getThreads().map((thread) => thread.timelineSet),
+        ];
+        const events = new Set<MatrixEvent>();
+        for (const timelineSet of timelineSets) {
+            for (const timeline of timelineSet.getTimelines()) {
+                for (const event of timeline.getEvents()) events.add(event);
+            }
+        }
+        return [...events];
+    }
+
     private processTimeline(): void {
-        if (!this.maxRetention) {
+        if (this.disposed || !this.maxRetention) {
             return; // No policy, skip.
         }
         this.logger.info(`Running processTimeline`);
         const expireBefore = Date.now() - this.maxRetention;
-        const events = this.room
-            .getLiveTimeline()
-            .getEvents()
-            .filter((ev) => ev.getStateKey() === undefined && !ev.isRedacted() && ev.getType() !== "m.room.redaction");
+        const events = this.getLoadedEvents().filter(
+            (ev) => ev.getStateKey() === undefined && !ev.isRedacted() && ev.getType() !== "m.room.redaction",
+        );
 
         const expiredEvents = events.filter((ev) => ev.getTs() < expireBefore);
         const [earliestExpiringEvent] = events

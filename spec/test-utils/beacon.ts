@@ -90,37 +90,3 @@ export const makeBeaconEvent = (sender: string, contentProps: Partial<ContentPro
         content: makeBeaconContent(uri, timestamp, beaconInfoId, description),
     });
 };
-
-/**
- * Create a mock geolocation position
- * defaults all required properties
- */
-export const makeGeolocationPosition = ({
-    timestamp,
-    coords,
-}: {
-    timestamp?: number;
-    coords: Partial<GeolocationCoordinates>;
-}): GeolocationPosition => {
-    const { toJSON, ...coordsJSON } = {
-        accuracy: 1,
-        latitude: 54.001927,
-        longitude: -8.253491,
-        altitude: null,
-        altitudeAccuracy: null,
-        heading: null,
-        speed: null,
-        ...coords,
-    };
-    const posJSON = {
-        timestamp: timestamp ?? 1647256791840,
-        coords: {
-            toJSON: () => coordsJSON,
-            ...coordsJSON,
-        },
-    };
-    return {
-        toJSON: () => posJSON,
-        ...posJSON,
-    };
-};

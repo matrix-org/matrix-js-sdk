@@ -44,3 +44,6 @@
 - name: "Z-Skip-Coverage"
   description: "Skip SonarQube coverage for this PR"
   color: "ededed"
+- name: "X-Needs-Iteration"
+  description: "PR needs further work from the author; auto-marked draft after 14 days of inactivity"
+  color: "ff7979"

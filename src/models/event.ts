@@ -215,6 +215,30 @@ export interface IMessageVisibilityHidden {
 const MESSAGE_VISIBLE: IMessageVisibilityVisible = Object.freeze({ visible: true });
 export const MAX_STICKY_DURATION_MS = 3600000;
 
+/**
+ * Check whether a value is a valid sticky duration, i.e. a strictly positive integer.
+ * Values above {@link MAX_STICKY_DURATION_MS} are permitted. Callers should clamp them
+ * separately.
+ * @param value The sticky duration as set by the sender in milliseconds.
+ *
+ * @experimental Part of MSC4354.
+ */
+export function isValidStickyDuration(value: unknown): value is number {
+    return Number.isInteger(value) && (value as number) > 0;
+}
+
+/**
+ * Check whether a value is a valid sticky TTL, i.e. a non-negative integer.
+ * Values above {@link MAX_STICKY_DURATION_MS} are permitted. Callers should clamp them
+ * separately.
+ * @param value The remaining sticky duration computed by the HS on sync (`unsigned`) in milliseconds.
+ *
+ * @experimental Part of MSC4354.
+ */
+export function isValidStickyTtl(value: unknown): value is number {
+    return Number.isInteger(value) && (value as number) >= 0;
+}
+
 export enum MatrixEventEvent {
     /**
      * An event has been decrypted, or we have failed to decrypt it.
@@ -460,7 +484,7 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         this.localTimestamp = age !== undefined ? now - age : (this.getTs() ?? now);
         this.reEmitter = new TypedReEmitter(this);
         if (this.unstableStickyInfo) {
-            if (this.unstableStickyInfo.duration_ttl_ms) {
+            if (this.unstableStickyInfo.duration_ttl_ms !== undefined) {
                 this.unstableStickyExpiresAt = now + this.unstableStickyInfo.duration_ttl_ms;
             } else {
                 // Bound the timestamp so it doesn't come from the future.
@@ -1760,17 +1784,34 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
      * If the event is not a sticky event (or not supported by the server),
      * then this returns `undefined`.
      *
-     * `duration_ms` is safely bounded to a hour.
+     * `duration_ms` and `duration_ttl_ms` are safely bounded to a hour.
      */
     public get unstableStickyInfo(): { duration_ms: number; duration_ttl_ms?: number } | undefined {
-        if (!this.event.msc4354_sticky?.duration_ms) {
+        const durationMs = this.event.msc4354_sticky?.duration_ms;
+        if (!isValidStickyDuration(durationMs)) {
             return undefined;
         }
+        // Ignore a malformed TTL and fall back to calculating the expiry locally.
+        const ttlMs = this.event.unsigned?.msc4354_sticky_duration_ttl_ms;
         return {
-            duration_ms: Math.min(MAX_STICKY_DURATION_MS, this.event.msc4354_sticky.duration_ms),
-            // This is assumed to be bounded server-side.
-            duration_ttl_ms: this.event.unsigned?.msc4354_sticky_duration_ttl_ms,
+            duration_ms: Math.min(MAX_STICKY_DURATION_MS, durationMs),
+            duration_ttl_ms: isValidStickyTtl(ttlMs) ? Math.min(MAX_STICKY_DURATION_MS, ttlMs) : undefined,
         };
+    }
+
+    /**
+     * The expiry timestamp that the sender's homeserver intended for this sticky event, in milliseconds.
+     *
+     * If the event is not a sticky event (or not supported by the server),
+     * then this returns `undefined`.
+     *
+     * @experimental Part of MSC4354.
+     */
+    public get unstableStickyIntendedExpiresAt(): number | undefined {
+        if (!this.unstableStickyInfo) {
+            return undefined;
+        }
+        return this.getTs() + this.event.msc4354_sticky!.duration_ms;
     }
 }
 

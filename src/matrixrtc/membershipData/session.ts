@@ -15,7 +15,7 @@ limitations under the License.
 */
 
 import { type IContent } from "../../matrix.ts";
-import { type RTCCallIntent, type Transport } from "../types.ts";
+import { type RTCCallCapability, type RTCCallIntent, type Transport } from "../types.ts";
 import { MatrixRTCMembershipParseError } from "./common.ts";
 
 /**
@@ -84,8 +84,16 @@ export type SessionMembershipData = {
     /**
      * The intent of the call from the perspective of this user. This may be an audio call, video call or
      * something else.
+     *
+     * This carries the unstable identifiers (`audio`, `video`) and should be read through
+     * {@link CallMembership.intent} which returns the matching stable identifiers.
      */
     "m.call.intent"?: RTCCallIntent;
+
+    /**
+     * The kinds of media this member's device is capable of handling, e.g. audio and/or video.
+     */
+    "capabilities"?: RTCCallCapability[];
 
     /**
      * The id used on the media backend.
@@ -133,10 +141,6 @@ export const checkSessionsMembershipData = (data: IContent): data is SessionMemb
 
     // application specific data (we first need to check if they exist)
     if (data.scope !== undefined && typeof data.scope !== "string") errors.push(prefix + "scope must be string");
-
-    if (data["m.call.intent"] !== undefined && typeof data["m.call.intent"] !== "string") {
-        errors.push(prefix + "m.call.intent must be a string");
-    }
 
     if (errors.length) {
         throw new MatrixRTCMembershipParseError("SessionMembership", errors);

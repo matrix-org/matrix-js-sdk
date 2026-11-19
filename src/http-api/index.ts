@@ -58,78 +58,19 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
             total: 0,
             abortController,
         } as Upload;
-        const uploadResolvers = Promise.withResolvers<UploadResponse>();
+        const { promise, resolve, reject } = Promise.withResolvers<UploadResponse>();
 
         if (globalThis.XMLHttpRequest) {
-            const xhr = new globalThis.XMLHttpRequest();
-
-            const timeoutFn = function (): void {
-                xhr.abort();
-                uploadResolvers.reject(new Error("Timeout"));
-            };
-
-            // set an initial timeout of 30s; we'll advance it each time we get a progress notification
-            let timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
-
-            xhr.onreadystatechange = function (): void {
-                switch (xhr.readyState) {
-                    case globalThis.XMLHttpRequest.DONE:
-                        callbacks.clearTimeout(timeoutTimer);
-                        try {
-                            if (xhr.status === 0) {
-                                throw new DOMException(xhr.statusText, "AbortError"); // mimic fetch API
-                            }
-                            if (!xhr.responseText) {
-                                throw new Error("No response body.");
-                            }
-
-                            if (xhr.status >= 400) {
-                                uploadResolvers.reject(parseErrorResponse(xhr, xhr.responseText));
-                            } else {
-                                uploadResolvers.resolve(JSON.parse(xhr.responseText));
-                            }
-                        } catch (err) {
-                            if ((<Error>err).name === "AbortError") {
-                                uploadResolvers.reject(err);
-                                return;
-                            }
-                            uploadResolvers.reject(new ConnectionError("request failed", <Error>err));
-                        }
-                        break;
-                }
-            };
-
-            xhr.upload.onprogress = (ev: ProgressEvent): void => {
-                callbacks.clearTimeout(timeoutTimer);
-                upload.loaded = ev.loaded;
-                upload.total = ev.total;
-                timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
-                opts.progressHandler?.({
-                    loaded: ev.loaded,
-                    total: ev.total,
-                });
-            };
-
-            const url = this.getUrl("/upload", undefined, MediaPrefix.V3);
-
-            if (includeFilename && fileName) {
-                url.searchParams.set("filename", encodeURIComponent(fileName));
-            }
-
-            if (!this.opts.useAuthorizationHeader && this.opts.accessToken) {
-                url.searchParams.set("access_token", encodeURIComponent(this.opts.accessToken));
-            }
-
-            xhr.open(Method.Post, url.href);
-            if (this.opts.useAuthorizationHeader && this.opts.accessToken) {
-                xhr.setRequestHeader("Authorization", "Bearer " + this.opts.accessToken);
-            }
-            xhr.setRequestHeader("Content-Type", contentType);
-            xhr.send(file);
-
-            abortController.signal.addEventListener("abort", () => {
-                xhr.abort();
-            });
+            this.withTokenRefresh((accessToken) =>
+                this.uploadContentXhr(
+                    file,
+                    upload,
+                    opts,
+                    contentType,
+                    includeFilename ? fileName : undefined,
+                    accessToken,
+                ),
+            ).then(resolve, reject);
         } else {
             const queryParams: QueryDict = {};
             if (includeFilename && fileName) {
@@ -142,19 +83,109 @@ export class MatrixHttpApi<O extends IHttpOpts> extends FetchHttpApi<O> {
                 prefix: MediaPrefix.V3,
                 headers,
                 abortSignal: abortController.signal,
-            }).then(uploadResolvers.resolve, uploadResolvers.reject);
+            }).then(resolve, reject);
         }
 
         // remove the upload from the list on completion
-        upload.promise = uploadResolvers.promise.finally(() => {
+        upload.promise = promise.finally(() => {
             removeElement(this.uploads, (elem) => elem === upload);
         });
         abortController.signal.addEventListener("abort", () => {
             removeElement(this.uploads, (elem) => elem === upload);
-            uploadResolvers.reject(new DOMException("Aborted", "AbortError"));
+            reject(new DOMException("Aborted", "AbortError"));
         });
         this.uploads.push(upload);
         return upload.promise;
+    }
+
+    private uploadContentXhr(
+        file: FileType,
+        upload: Upload,
+        opts: UploadOpts,
+        contentType: string,
+        fileName?: string,
+        accessToken?: string,
+    ): Promise<UploadResponse> {
+        const signal = upload.abortController.signal;
+        if (signal.aborted) {
+            return Promise.reject(new DOMException("Aborted", "AbortError"));
+        }
+
+        const { promise, resolve, reject } = Promise.withResolvers<UploadResponse>();
+        const xhr = new globalThis.XMLHttpRequest();
+
+        const onAbort = (): void => {
+            xhr.abort();
+        };
+
+        const timeoutFn = function (): void {
+            xhr.abort();
+            reject(new Error("Timeout"));
+        };
+
+        // set an initial timeout of 30s; we'll advance it each time we get a progress notification
+        let timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
+
+        xhr.onreadystatechange = function (): void {
+            switch (xhr.readyState) {
+                case globalThis.XMLHttpRequest.DONE:
+                    callbacks.clearTimeout(timeoutTimer);
+                    signal.removeEventListener("abort", onAbort);
+                    try {
+                        if (xhr.status === 0) {
+                            throw new DOMException(xhr.statusText, "AbortError"); // mimic fetch API
+                        }
+                        if (!xhr.responseText) {
+                            throw new Error("No response body.");
+                        }
+
+                        if (xhr.status >= 400) {
+                            reject(parseErrorResponse(xhr, xhr.responseText));
+                        } else {
+                            resolve(JSON.parse(xhr.responseText));
+                        }
+                    } catch (err) {
+                        if ((<Error>err).name === "AbortError") {
+                            reject(err);
+                            return;
+                        }
+                        reject(new ConnectionError("request failed", <Error>err));
+                    }
+                    break;
+            }
+        };
+
+        xhr.upload.onprogress = (ev: ProgressEvent): void => {
+            callbacks.clearTimeout(timeoutTimer);
+            upload.loaded = ev.loaded;
+            upload.total = ev.total;
+            timeoutTimer = callbacks.setTimeout(timeoutFn, 30000);
+            opts.progressHandler?.({
+                loaded: ev.loaded,
+                total: ev.total,
+            });
+        };
+
+        const url = this.getUrl("/upload", undefined, MediaPrefix.V3);
+
+        if (fileName) {
+            url.searchParams.set("filename", encodeURIComponent(fileName));
+        }
+
+        if (!this.opts.useAuthorizationHeader && accessToken) {
+            url.searchParams.set("access_token", encodeURIComponent(accessToken));
+        }
+
+        xhr.open(Method.Post, url.href);
+        if (this.opts.useAuthorizationHeader && accessToken) {
+            xhr.setRequestHeader("Authorization", "Bearer " + accessToken);
+        }
+        xhr.setRequestHeader("Content-Type", contentType);
+        xhr.send(file);
+
+        signal.addEventListener("abort", onAbort);
+
+        return promise;
     }
 
     public cancelUpload(promise: Promise<UploadResponse>): boolean {

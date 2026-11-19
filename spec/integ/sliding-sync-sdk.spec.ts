@@ -47,6 +47,7 @@ import { type SyncApiOptions, SyncState } from "../../src/sync";
 import { type IStoredClientOpts } from "../../src";
 import { logger } from "../../src/logger";
 import { emitPromise } from "../test-utils/test-utils";
+import { flushPromises } from "../test-utils/flushPromises";
 import { KnownMembership } from "../../src/@types/membership";
 import { type SyncCryptoCallbacks } from "../../src/common-crypto/CryptoBackend";
 
@@ -532,6 +533,39 @@ describe("SlidingSyncSdk", () => {
                     // we expect the timeline now to be oldTimeline (so the old events are in fact old)
                     assertTimelineEvents(gotRoom.getLiveTimeline().getEvents(), oldTimeline);
                 });
+
+                // Servers don't necessarily set `initial` when the timeline_limit increases, they set
+                // `expanded_timeline` instead
+                it.each(["expanded_timeline", "unstable_expanded_timeline"])(
+                    "can return history with a larger timeline_limit with %s",
+                    async (flag) => {
+                        const roomId = `!${flag}:localhost`;
+                        const timeline = [
+                            mkOwnStateEvent(EventType.RoomCreate, { creator: selfUserId }),
+                            mkOwnStateEvent(EventType.RoomMember, { membership: KnownMembership.Join }, selfUserId),
+                            mkOwnEvent(EventType.RoomMessage, { body: "old event" }),
+                            mkOwnEvent(EventType.RoomMessage, { body: "latest event" }),
+                        ];
+                        mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                            timeline: timeline.slice(-1),
+                            required_state: [],
+                            name: "Expanded timeline",
+                            initial: true,
+                        });
+                        await emitPromise(client!, ClientEvent.Room);
+                        mockSlidingSync!.emit(SlidingSyncEvent.RoomData, roomId, {
+                            timeline,
+                            required_state: [],
+                            name: "Expanded timeline",
+                            [flag]: true,
+                        });
+                        await flushPromises();
+
+                        const gotRoom = client!.getRoom(roomId);
+                        expect(gotRoom).toBeTruthy();
+                        assertTimelineEvents(gotRoom!.getLiveTimeline().getEvents(), timeline);
+                    },
+                );
             });
         });
     });

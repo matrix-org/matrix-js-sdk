@@ -94,6 +94,9 @@ export interface MSC4186Hero {
     avatar_url?: string;
 }
 
+/**
+ * This badly named interface actually represents MSC4186 room data.
+ */
 export interface MSC3575RoomData {
     name: string;
     required_state: IStateEvent[];
@@ -106,6 +109,15 @@ export interface MSC3575RoomData {
     invite_state?: IStateEvent[];
     initial?: boolean;
     limited?: boolean;
+    /**
+     * Set when the `timeline_limit` for the room has increased, so the timeline may contain older
+     * events which have not been sent before. See "Changing room configs" in MSC4186.
+     */
+    expanded_timeline?: boolean;
+    /**
+     * Unstable prefixed variant of `expanded_timeline`, as currently sent by Synapse.
+     */
+    unstable_expanded_timeline?: boolean;
     is_dm?: boolean;
     prev_batch?: string;
     num_live?: number;

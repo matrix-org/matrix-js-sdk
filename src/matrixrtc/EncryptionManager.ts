@@ -1,6 +1,6 @@
 import { type EncryptionConfig } from "./MatrixRTCSession.ts";
 import { type CallMembership } from "./CallMembership.ts";
-import { type EncryptionKeyMapKey } from "./types.ts";
+import { type Transport, type EncryptionKeyMapKey } from "./types.ts";
 
 /**
  * The string used for the keys in the the encryption key map.
@@ -25,9 +25,11 @@ export interface IEncryptionManager {
      * Joins the encryption manager with the provided configuration.
      *
      * @param joinConfig - The configuration for joining encryption, or undefined
-     * if no specific configuration is provided.
+     * @param publishedTransports - The transports on which we are publishing.
+     *   (Needed to determine which participant identity formats to use, for
+     *   compatibility.)
      */
-    join(joinConfig: EncryptionConfig | undefined): void;
+    join(joinConfig: EncryptionConfig | undefined, publishedTransports: Transport[]): void;
 
     /**
      * Leaves the encryption manager, cleaning up any associated resources.
@@ -52,7 +54,7 @@ export interface IEncryptionManager {
             key: Uint8Array<ArrayBuffer>;
             keyIndex: number;
             membership: CallMembershipIdentityParts;
-            rtcBackendIdentity: string;
+            backendIdentity: string;
         }>
     >;
 }

@@ -31,6 +31,7 @@ import {
     safeSet,
     MapWithDefault,
     globToRegexp,
+    MAX_GLOB_PATTERN_LENGTH,
     escapeRegExp,
     removeHiddenChars,
 } from "../../src/utils";
@@ -84,6 +85,16 @@ describe("utils", function () {
                 "%here": "beer@",
             };
             expect(utils.encodeUri(path, vals)).toEqual("foo/bar/baz/beer%40");
+        });
+    });
+
+    describe("getServerNameFromUserId", () => {
+        it.each([
+            ["@alice:example.org", "example.org"],
+            ["@alice:localhost:8448", "localhost:8448"],
+            ["@alice:[::1]:8448", "[::1]:8448"],
+        ])("extracts the server name from %s", (userId, serverName) => {
+            expect(utils.getServerNameFromUserId(userId)).toEqual(serverName);
         });
     });
 
@@ -739,6 +750,26 @@ describe("utils", function () {
         it("should not explode when given regexes as globs", () => {
             const result = globToRegexp("[FIT-Connect Zustelldienst \\(Testumgebung\\)]");
             expect(result).toMatchInlineSnapshot(`"\\[FIT-Connect Zustelldienst \\\\\\(Testumgebung\\\\\\)\\]"`);
+        });
+
+        it("should collapse runs of wildcards", () => {
+            expect(globToRegexp("a***b")).toEqual("a.*b");
+            expect(globToRegexp("*".repeat(50))).toEqual(".*");
+        });
+
+        it("should return an expression which never matches for an over-long pattern", () => {
+            expect(globToRegexp("a".repeat(MAX_GLOB_PATTERN_LENGTH))).toEqual("a".repeat(MAX_GLOB_PATTERN_LENGTH));
+
+            const regexp = new RegExp("^(" + globToRegexp("a".repeat(MAX_GLOB_PATTERN_LENGTH + 1)) + ")$");
+            expect(regexp.test("a".repeat(MAX_GLOB_PATTERN_LENGTH + 1))).toBe(false);
+        });
+
+        it("should treat ? as matching any single character", () => {
+            const regexp = new RegExp("^(" + globToRegexp("a?b") + ")$");
+            expect(regexp.test("axb")).toBe(true);
+            expect(regexp.test("a.b")).toBe(true);
+            expect(regexp.test("ab")).toBe(false);
+            expect(regexp.test("axxb")).toBe(false);
         });
     });
 
