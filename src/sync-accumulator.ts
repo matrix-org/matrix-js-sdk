@@ -28,7 +28,7 @@ import {
     type IUnsigned,
 } from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
-import { type EventType } from "./@types/event.ts";
+import { EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { ReceiptAccumulator } from "./receipt-accumulator.ts";
 import { type OlmEncryptionInfo } from "./crypto-api/index.ts";
@@ -69,6 +69,7 @@ export interface IRoomEvent extends IMinimalEvent {
     event_id: string;
     sender: string;
     origin_server_ts: number;
+    redacts?: string;
 }
 
 export interface IStateEvent extends IRoomEvent {
@@ -644,36 +645,51 @@ export class SyncAccumulator {
         data["state_after"]?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
+        // Sticky events also arrive in the timeline. Track them alongside the sticky section so that
+        // they survive the timeline being reset or pruned.
+        const newStickyEvents: Array<(IStickyEvent | IStickyStateEvent) & EventTags> = [];
+        const redactedEventIds = new Set<string>();
         data.timeline?.events?.forEach((e, index) => {
             if (!data["state_after"]) {
                 // this nops if 'e' isn't a state event
                 setState(currentData._currentState, e);
             }
+            const event = fromDatabase ? e : tagEvent(e, now);
             // append the event to the timeline. The back-pagination token
             // corresponds to the first event in the timeline
             currentData._timeline.push({
-                event: fromDatabase ? e : tagEvent(e, now),
+                event,
                 token: index === 0 ? (data.timeline.prev_batch ?? null) : null,
             });
+            if (isStickyEvent(event)) {
+                newStickyEvents.push(event);
+            }
+            if (event.type === EventType.RoomRedaction && event.redacts) {
+                redactedEventIds.add(event.redacts);
+            }
+        });
+        data.msc4354_sticky?.events?.forEach((e) => {
+            // Skip malformed events so that the cache agrees with MatrixEvent on what is sticky.
+            if (!isStickyEvent(e)) return;
+            newStickyEvents.push(fromDatabase ? e : tagEvent(e, now));
         });
 
-        // We want this to be fast, so don't worry about duplicate events here. The RoomStickyEventsStore will
-        // process these events into the correct mapped order.
-        if (data.msc4354_sticky?.events) {
-            currentData._stickyEvents = currentData._stickyEvents.concat(
-                data.msc4354_sticky.events
-                    // Skip malformed events so that the cache agrees with MatrixEvent on what is sticky.
-                    .filter((e) => isStickyEvent(e))
-                    .map((e) => {
-                        const event = fromDatabase ? e : tagEvent(e, now);
-                        return { event, expiresTs: computeStickyExpiresTs(event, now) };
-                    }),
-            );
+        if (newStickyEvents.length) {
+            // The server may send the same sticky event in both the timeline and the sticky section,
+            // so skip events that we already track.
+            const knownStickyEventIds = new Set(currentData._stickyEvents.map(({ event }) => event.event_id));
+            for (const event of newStickyEvents) {
+                if (knownStickyEventIds.has(event.event_id)) continue;
+                knownStickyEventIds.add(event.event_id);
+                currentData._stickyEvents.push({ event, expiresTs: computeStickyExpiresTs(event, now) });
+            }
         }
 
-        // Prune out any events in our stores that have since expired. We do this after inserting
+        // Prune out any events in our stores that have since expired or been redacted. We do this after inserting
         // so that events loaded from the database which expired whilst we were offline get dropped, too.
-        currentData._stickyEvents = currentData._stickyEvents.filter(({ expiresTs }) => expiresTs > now);
+        currentData._stickyEvents = currentData._stickyEvents.filter(
+            ({ event, expiresTs }) => expiresTs > now && !redactedEventIds.has(event.event_id),
+        );
 
         // attempt to prune the timeline by jumping between events which have
         // pagination tokens.
@@ -731,11 +747,6 @@ export class SyncAccumulator {
         });
         Object.keys(this.joinRooms).forEach((roomId) => {
             const roomData = this.joinRooms[roomId];
-            // Drop anything that expired since we last accumulated. When not writing to the
-            // database, also turn the stored absolute timestamps back into relative values.
-            const stickyEvents = roomData._stickyEvents
-                .filter(({ expiresTs }) => expiresTs > now)
-                .map(({ event }) => (forDatabase ? event : untagEvent(event, now)));
             const roomJson: IJoinedRoom & {
                 // We track both `state` and `state_after` for downgrade compatibility
                 state: IState;
@@ -752,7 +763,6 @@ export class SyncAccumulator {
                 unread_notifications: roomData._unreadNotifications,
                 unread_thread_notifications: roomData._unreadThreadNotifications,
                 summary: roomData._summary as IRoomSummary,
-                msc4354_sticky: stickyEvents.length ? { events: stickyEvents } : undefined,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -779,6 +789,19 @@ export class SyncAccumulator {
 
                 roomJson.timeline.events.push(forDatabase ? msgData.event : untagEvent(msgData.event, now));
             });
+
+            // Add sticky events, skipping those that are already in the timeline. Drop anything that expired
+            // since we last accumulated. When not writing to the database, also turn the stored absolute
+            // timestamps back into relative values.
+            if (roomData._stickyEvents.length) {
+                const timelineEventIds = new Set(roomJson.timeline.events.map((e) => e.event_id));
+                const stickyEvents = roomData._stickyEvents
+                    .filter(({ event, expiresTs }) => expiresTs > now && !timelineEventIds.has(event.event_id))
+                    .map(({ event }) => (forDatabase ? event : untagEvent(event, now)));
+                if (stickyEvents.length) {
+                    roomJson.msc4354_sticky = { events: stickyEvents };
+                }
+            }
 
             // Add state data: roll back current state to the start of timeline,
             // by "reverse clobbering" from the end of the timeline to the start.
