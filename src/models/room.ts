@@ -141,6 +141,12 @@ export interface ICreateFilterOpts {
     prepopulateTimeline?: boolean;
     useSyncEvents?: boolean;
     pendingEvents?: boolean;
+    /**
+     * Include events from threads in the filtered timeline, as well as those in the main timeline. Useful for
+     * filters such as "all the files in the room". If set, `prepopulateTimeline` is ignored, as the loaded room
+     * timeline does not include thread events.
+     */
+    includeThreadedEvents?: boolean;
 }
 
 export enum RoomEvent {
@@ -2019,12 +2025,17 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
      */
     public getOrCreateFilteredTimelineSet(
         filter: Filter,
-        { prepopulateTimeline = true, useSyncEvents = true, pendingEvents = true }: ICreateFilterOpts = {},
+        {
+            prepopulateTimeline = true,
+            useSyncEvents = true,
+            pendingEvents = true,
+            includeThreadedEvents = false,
+        }: ICreateFilterOpts = {},
     ): EventTimelineSet {
         if (this.filteredTimelineSets[filter.filterId!]) {
             return this.filteredTimelineSets[filter.filterId!];
         }
-        const opts = Object.assign({ filter, pendingEvents }, this.opts);
+        const opts = Object.assign({ filter, pendingEvents, includeThreadedEvents }, this.opts);
         const timelineSet = new EventTimelineSet(this, opts);
         this.reEmitter.reEmit(timelineSet, [RoomEvent.Timeline, RoomEvent.TimelineReset]);
         if (useSyncEvents) {
@@ -2035,8 +2046,10 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         const unfilteredLiveTimeline = this.getLiveTimeline();
         // Not all filter are possible to replicate client-side only
         // When that's the case we do not want to prepopulate from the live timeline
-        // as we would get incorrect results compared to what the server would send back
-        if (prepopulateTimeline) {
+        // as we would get incorrect results compared to what the server would send back.
+        // Likewise if the timeline set includes thread events, as they are not in the live timeline: we would then
+        // paginate backwards from the start of the live timeline, missing the thread events within it.
+        if (prepopulateTimeline && !includeThreadedEvents) {
             // populate up the new timelineSet with filtered events from our live
             // unfiltered timeline.
             //
@@ -2949,11 +2962,11 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         thread?.setEventMetadata(localEvent);
         thread?.timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
 
-        if (shouldLiveInRoom) {
-            for (const timelineSet of this.timelineSets) {
-                // if it's already in the timeline, update the timeline map. If it's not, add it.
-                timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
-            }
+        for (const timelineSet of this.timelineSets) {
+            // Thread events only belong in the timeline sets which include thread events.
+            if (!shouldLiveInRoom && !timelineSet.includeThreadedEvents) continue;
+            // if it's already in the timeline, update the timeline map. If it's not, add it.
+            timelineSet.handleRemoteEcho(localEvent, oldEventId, newEventId);
         }
 
         this.emit(RoomEvent.LocalEchoUpdated, localEvent, this, oldEventId, oldStatus);
@@ -3031,13 +3044,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
             thread?.setEventMetadata(event);
             thread?.timelineSet.replaceEventId(oldEventId, newEventId!);
 
-            if (shouldLiveInRoom) {
-                // if the event was already in the timeline (which will be the case if
-                // opts.pendingEventOrdering==chronological), we need to update the
-                // timeline map.
-                for (const timelineSet of this.timelineSets) {
-                    timelineSet.replaceEventId(oldEventId, newEventId!);
-                }
+            // if the event was already in the timeline (which will be the case if
+            // opts.pendingEventOrdering==chronological), we need to update the
+            // timeline map. Thread events only belong in the timeline sets which include thread events.
+            for (const timelineSet of this.timelineSets) {
+                if (!shouldLiveInRoom && !timelineSet.includeThreadedEvents) continue;
+                timelineSet.replaceEventId(oldEventId, newEventId!);
             }
         } else if (newStatus == EventStatus.CANCELLED) {
             // remove it from the pending event list, or the timeline.
@@ -3176,7 +3188,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
 
             if (shouldLiveInRoom) {
                 this.addLiveEvent(event, options);
-            } else if (!shouldLiveInThread && event.isRelation()) {
+            } else if (shouldLiveInThread) {
+                // Thread events are added to their thread below, but must also be added to any timeline sets which
+                // include thread events. This deliberately bypasses `this.addLiveEvent`, as that would also
+                // synthesize an (unthreaded) read receipt for the event.
+                for (const timelineSet of this.timelineSets) {
+                    if (timelineSet.includeThreadedEvents) timelineSet.addLiveEvent(event, options);
+                }
+            } else if (event.isRelation()) {
                 this.relations.aggregateChildEvent(event);
             }
         }

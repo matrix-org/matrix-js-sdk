@@ -5485,7 +5485,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
-                    timelineSet.addEventsToTimeline(timelineEvents, backwards, false, eventTimeline, token);
+                    // If the timeline set includes thread events, add both the main timeline and thread events,
+                    // keeping them in the order the server returned them.
+                    const eventsToAdd = timelineSet.includeThreadedEvents
+                        ? matrixEvents.filter((ev) => !unknownRelations.includes(ev))
+                        : timelineEvents;
+                    timelineSet.addEventsToTimeline(eventsToAdd, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,

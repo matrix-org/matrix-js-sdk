@@ -43,6 +43,11 @@ interface IOpts {
     // The filter object, if any, for this timelineSet.
     filter?: Filter;
     pendingEvents?: boolean;
+    /**
+     * Set to true for a room timeline set which should contain events from threads as well as those in the main
+     * timeline, such as a timeline set of all the files in the room. Has no effect for thread timeline sets.
+     */
+    includeThreadedEvents?: boolean;
 }
 
 export enum DuplicateStrategy {
@@ -137,6 +142,11 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
     public readonly relations: RelationsContainer;
     private readonly timelineSupport: boolean;
     private readonly displayPendingEvents: boolean;
+    /**
+     * Whether this timeline set contains events from threads as well as those in the main timeline.
+     * @see IOpts.includeThreadedEvents
+     */
+    public readonly includeThreadedEvents: boolean;
     private liveTimeline: EventTimeline;
     private timelines: EventTimeline[];
     private _eventIdToTimeline = new Map<string, EventTimeline>();
@@ -184,6 +194,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         this.timelineSupport = Boolean(opts.timelineSupport);
         this.liveTimeline = new EventTimeline(this);
         this.displayPendingEvents = opts.pendingEvents !== false;
+        this.includeThreadedEvents = !thread && Boolean(opts.includeThreadedEvents);
 
         // just a list - *not* ordered.
         this.timelines = [this.liveTimeline];
@@ -953,7 +964,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * Determine whether a given event can sanely be added to this event timeline set,
      * for timeline sets relating to a thread, only return true for events in the same
      * thread timeline, for timeline sets not relating to a thread only return true
-     * for events which should be shown in the main room timeline.
+     * for events which should be shown in the main room timeline (or in any thread
+     * timeline as well, if {@link EventTimelineSet#includeThreadedEvents} is set).
      * Requires the `room` property to have been set at EventTimelineSet construction time.
      *
      * @param event - the event to check whether it belongs to this timeline set.
@@ -981,6 +993,10 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                     this.room?.roomId
                 } eventId=${event.getId()} threadId=${event.threadRootId}`,
             );
+        }
+
+        if (this.includeThreadedEvents) {
+            return shouldLiveInRoom || shouldLiveInThread;
         }
 
         return shouldLiveInRoom;
