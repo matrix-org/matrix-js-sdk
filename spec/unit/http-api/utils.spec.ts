@@ -34,6 +34,41 @@ vi.unmock("../../../src/http-api/utils");
 describe("timeoutSignal", () => {
     vi.useFakeTimers();
 
+    it("should not keep the Node.js event loop alive", () => {
+        vi.useRealTimers();
+        const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        try {
+            timeoutSignal(3000);
+            timer = setTimeoutSpy.mock.results[0].value;
+            expect(timer!.hasRef()).toBe(false);
+        } finally {
+            clearTimeout(timer);
+            setTimeoutSpy.mockRestore();
+            vi.useFakeTimers();
+        }
+    });
+
+    it("should support browser timers that return a numeric handle", () => {
+        const setTimeoutSpy = vi
+            .spyOn(globalThis, "setTimeout")
+            .mockReturnValue(1 as unknown as ReturnType<typeof setTimeout>);
+
+        try {
+            const signal = timeoutSignal(3000);
+            expect(signal.aborted).toBe(false);
+            expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 3000);
+
+            const onTimeout = setTimeoutSpy.mock.calls[0][0];
+            onTimeout();
+            expect(signal.aborted).toBe(true);
+            expect(signal.reason.name).toBe("AbortError");
+        } finally {
+            setTimeoutSpy.mockRestore();
+        }
+    });
+
     it("should fire abort signal after specified timeout", () => {
         const signal = timeoutSignal(3000);
         const onabort = vi.fn();
