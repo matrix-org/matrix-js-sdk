@@ -28,7 +28,8 @@ import {
     MatrixRTCMembershipParseError,
 } from "./membershipData/index.ts";
 import { EventType } from "../@types/event.ts";
-import { isUnstableLivekitTransport } from "./LivekitTransport.ts";
+import { isUnstableLivekitTransport, selectLivekitTransport } from "./LivekitTransport.ts";
+import { toStableCallIntent, toUnstableCallIntent } from "./CallIntent.ts";
 
 /**
  * The default duration in milliseconds that a membership is considered valid for.
@@ -100,7 +101,7 @@ function getTransports({ kind, data }: MembershipData): Transport[] {
         case MembershipKind.RTC:
             return data.transports.published;
         case MembershipKind.Session:
-            return data.foci_preferred;
+            return data.foci_preferred ?? []; // Validation allows memberships without `foci_preferred`
     }
 }
 
@@ -270,13 +271,40 @@ export class CallMembership {
         return getDeviceId(this.membershipData);
     }
 
-    public get callIntent(): RTCCallIntent | undefined {
-        const intent = this.applicationData["m.call.intent"];
-        if (typeof intent === "string") {
-            return intent;
+    /**
+     * The stable call intent this member advertises, or `undefined` if none.
+     *
+     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
+     */
+    public get intent(): RTCCallIntent | undefined {
+        const { kind, data } = this.membershipData;
+        let intent: unknown;
+        switch (kind) {
+            case MembershipKind.RTC:
+                if (data.application["type"] === "m.call") {
+                    // Prefer the stable key `intent`. Otherwise, fall back to the unstable `m.call.intent`
+                    // sent by older clients which don't know `intent`.
+                    intent = data.application["intent"] ?? data.application["m.call.intent"];
+                }
+                break;
+            case MembershipKind.Session:
+                if (data.application === "m.call") {
+                    intent = data["m.call.intent"];
+                }
+                break;
         }
-        this.logger.warn("RTC membership has invalid m.call.intent");
-        return undefined;
+        // If we have an intent, try to map it to the stable identifiers.
+        return typeof intent === "string" ? toStableCallIntent(intent) : undefined;
+    }
+
+    /**
+     * The unstable call intent this member advertises, or `undefined` if none.
+     *
+     * @experimental Part of [MSC4196](https://github.com/matrix-org/matrix-spec-proposals/pull/4196).
+     * @deprecated Use {@link CallMembership.intent} instead.
+     */
+    public get callIntent(): RTCCallIntent | undefined {
+        return toUnstableCallIntent(this.intent);
     }
 
     public get callCapabilities(): RTCCallCapability[] | undefined {
@@ -411,29 +439,27 @@ export class CallMembership {
     }
 
     /**
-     * ## RTC Membership
-     * Gets the primary transport to use for this RTC membership (m.rtc.member).
-     * This will return the primary transport that is used by this call membership to publish their media.
-     * Directly relates to the `transports.published` field.
+     * Gets the primary transport used by this call membership to publish media.
      *
-     * ## Legacy session membership
-     * In case of a legacy session membership (m.call.member) this will return the first transport of the
-     * `foci_preferred` list. (`multi_sfu` is equivalent to how `m.rtc.member` `transports.published` work).
+     * For RTC membership (m.rtc.member), the transport is computed from the `transports.published` array.
+     * For legacy session membership (m.call.member), in turn, the transport is computed from the `foci_preferred`
+     * array.
+     *
+     * Regardless of the membership kind, the transport is chosen in the following sequence:
+     *
+     * 1. Return the first `m.livekit` transport from the array if there is one.
+     * 2. Otherwise, return the first `livekit` transport from the array if there is one.
+     * 3. Otherwise, return the first element of the array.
      *
      * @param _oldestMembership Deprecated and unused.
      *
-     * @returns The transport this membership uses to publish media or undefined if no transport is available.
+     * @returns The transport this membership uses to publish media.
+     *
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
      */
     public getTransport(_oldestMembership?: CallMembership): Transport | undefined {
-        const { kind, data } = this.membershipData;
-        switch (kind) {
-            case MembershipKind.RTC:
-                return data.transports.published[0];
-            case MembershipKind.Session:
-                return data.foci_preferred[0];
-            default:
-                return undefined;
-        }
+        const transports = getTransports(this.membershipData);
+        return selectLivekitTransport(transports) ?? transports[0];
     }
 
     /**

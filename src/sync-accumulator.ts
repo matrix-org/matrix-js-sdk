@@ -20,7 +20,13 @@ limitations under the License.
 
 import { logger } from "./logger.ts";
 import { deepCopy } from "./utils.ts";
-import { MAX_STICKY_DURATION_MS, type IContent, type IUnsigned } from "./models/event.ts";
+import {
+    isValidStickyDuration,
+    isValidStickyTtl,
+    MAX_STICKY_DURATION_MS,
+    type IContent,
+    type IUnsigned,
+} from "./models/event.ts";
 import { type IRoomSummary } from "./models/room-summary.ts";
 import { EventType } from "./@types/event.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
@@ -98,7 +104,7 @@ export interface IJoinedRoom {
     "summary": IRoomSummary;
     // One of `state` or `state_after` is required.
     "state"?: IState;
-    "org.matrix.msc4222.state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
+    "state_after"?: IState; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
     "msc4354_sticky"?: ISticky; // https://github.com/matrix-org/matrix-spec-proposals/pull/4354
     "timeline": ITimeline;
     "ephemeral": IEphemeral;
@@ -129,10 +135,10 @@ export interface IInvitedRoom {
 
 export interface ILeftRoom {
     // One of `state` or `state_after` is required.
-    "state"?: IState;
-    "org.matrix.msc4222.state_after"?: IState;
-    "timeline": ITimeline;
-    "account_data": IAccountData;
+    state?: IState;
+    state_after?: IState;
+    timeline: ITimeline;
+    account_data: IAccountData;
 }
 
 export interface IKnockedRoom {
@@ -283,7 +289,9 @@ function copyEventForModifyingUnsigned<T extends IRoomEvent>(event: T): T {
  */
 function tagEvent<T extends IRoomEvent>(event: T, now: number): T & EventTags {
     const age = event.unsigned?.age;
-    const stickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
+    const rawStickyTtl = event.unsigned?.msc4354_sticky_duration_ttl_ms;
+    // Ignore a malformed TTL, as MatrixEvent does, so that the expiry falls back to `duration_ms`.
+    const stickyTtl = isValidStickyTtl(rawStickyTtl) ? rawStickyTtl : undefined;
     if (age === undefined && stickyTtl === undefined) return event;
     const copy: T & EventTags = copyEventForModifyingUnsigned(event);
     if (age !== undefined) copy._localTs = now - age;
@@ -326,10 +334,13 @@ function computeStickyExpiresTs(event: (IStickyEvent | IStickyStateEvent) & Even
 }
 
 /**
- * Checks whether an event is a sticky event, using the same test as `MatrixEvent.unstableStickyInfo`.
+ * Checks whether an event is a well-formed sticky event.
  */
 function isStickyEvent<T extends IRoomEvent>(event: T): event is T & StickyEventFields {
-    return Boolean((event as Partial<IStickyEvent>).msc4354_sticky?.duration_ms);
+    const { msc4354_sticky: sticky, content } = event as Partial<IStickyEvent>;
+    if (!isValidStickyDuration(sticky?.duration_ms)) return false;
+    const stickyKey = content?.msc4354_sticky_key;
+    return stickyKey === undefined || typeof stickyKey === "string";
 }
 
 /**
@@ -631,7 +642,7 @@ export class SyncAccumulator {
         data.state?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
-        data["org.matrix.msc4222.state_after"]?.events?.forEach((e) => {
+        data["state_after"]?.events?.forEach((e) => {
             setState(currentData._currentState, e);
         });
         // Sticky events also arrive in the timeline. Track them alongside the sticky section so that
@@ -639,7 +650,7 @@ export class SyncAccumulator {
         const newStickyEvents: Array<(IStickyEvent | IStickyStateEvent) & EventTags> = [];
         const redactedEventIds = new Set<string>();
         data.timeline?.events?.forEach((e, index) => {
-            if (!data["org.matrix.msc4222.state_after"]) {
+            if (!data["state_after"]) {
                 // this nops if 'e' isn't a state event
                 setState(currentData._currentState, e);
             }
@@ -658,6 +669,8 @@ export class SyncAccumulator {
             }
         });
         data.msc4354_sticky?.events?.forEach((e) => {
+            // Skip malformed events so that the cache agrees with MatrixEvent on what is sticky.
+            if (!isStickyEvent(e)) return;
             newStickyEvents.push(fromDatabase ? e : tagEvent(e, now));
         });
 
@@ -736,20 +749,20 @@ export class SyncAccumulator {
             const roomData = this.joinRooms[roomId];
             const roomJson: IJoinedRoom & {
                 // We track both `state` and `state_after` for downgrade compatibility
-                "state": IState;
-                "org.matrix.msc4222.state_after": IState;
+                state: IState;
+                state_after: IState;
             } = {
-                "ephemeral": { events: [] },
-                "account_data": { events: [] },
-                "state": { events: [] },
-                "org.matrix.msc4222.state_after": { events: [] },
-                "timeline": {
+                ephemeral: { events: [] },
+                account_data: { events: [] },
+                state: { events: [] },
+                state_after: { events: [] },
+                timeline: {
                     events: [],
                     prev_batch: null,
                 },
-                "unread_notifications": roomData._unreadNotifications,
-                "unread_thread_notifications": roomData._unreadThreadNotifications,
-                "summary": roomData._summary as IRoomSummary,
+                unread_notifications: roomData._unreadNotifications,
+                unread_thread_notifications: roomData._unreadThreadNotifications,
+                summary: roomData._summary as IRoomSummary,
             };
             // Add account data
             Object.keys(roomData._accountData).forEach((evType) => {
@@ -821,7 +834,7 @@ export class SyncAccumulator {
                     let ev = roomData._currentState[evType][stateKey];
                     // Push to both fields to provide downgrade compatibility in the sync accumulator db
                     // the code will prefer `state_after` if it is present
-                    roomJson["org.matrix.msc4222.state_after"].events.push(ev);
+                    roomJson["state_after"].events.push(ev);
                     // Roll the state back to the value at the start of the timeline if it was changed
                     if (rollBackState[evType] && rollBackState[evType][stateKey]) {
                         ev = rollBackState[evType][stateKey];

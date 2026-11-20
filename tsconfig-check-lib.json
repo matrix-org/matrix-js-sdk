@@ -1,0 +1,14 @@
+{
+    // Type-checks the declaration files emitted into `lib/` by `pnpm build:types`.
+    "compilerOptions": {
+        "target": "es2022",
+        "module": "preserve",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "noEmit": true,
+        "skipLibCheck": false,
+        "lib": ["es2024", "dom", "dom.iterable"],
+        "types": ["node"]
+    },
+    "include": ["./lib/**/*.d.ts"]
+}

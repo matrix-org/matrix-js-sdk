@@ -25,6 +25,7 @@ import {
     type IContent,
     type IDecryptOptions,
     type IEvent,
+    isValidStickyDuration,
     MatrixEvent,
     MatrixEventEvent,
     type MatrixEventHandlerMap,
@@ -214,6 +215,7 @@ import {
 import { M_BEACON_INFO, type MBeaconInfoEventContent } from "./@types/beacon.ts";
 import { NamespacedValue, UnstableValue } from "./NamespacedValue.ts";
 import { ToDeviceMessageQueue } from "./ToDeviceMessageQueue.ts";
+import { StickyEventSendQueue } from "./StickyEventSendQueue.ts";
 import { type ToDeviceBatch, type ToDevicePayload } from "./models/ToDeviceMessage.ts";
 import { IgnoredInvites } from "./models/invites-ignorer.ts";
 import { type UIARequest } from "./@types/uia.ts";
@@ -244,7 +246,12 @@ import { type Capabilities, ServerCapabilities } from "./serverCapabilities.ts";
 import { sha256 } from "./digest.ts";
 import { type ValidatedAuthMetadata, OAuth2Error, isValidAuthMetadata } from "./oauth/index.ts";
 import { type EmptyObject, type XOR } from "./@types/common.ts";
-import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "./errors.ts";
+import {
+    ClientStoppedError,
+    TimeoutError,
+    UnsupportedDelayedEventsEndpointError,
+    UnsupportedStickyEventsEndpointError,
+} from "./errors.ts";
 import {
     type LivekitDelegateDelayedLeaveRequest,
     type LivekitGetTokenRequest,
@@ -588,6 +595,8 @@ export const STABLE_MSC2666_QUERY_MUTUAL_ROOMS = "uk.half-shot.msc2666.query_mut
 
 export const UNSTABLE_MSC4140_DELAYED_EVENTS = "org.matrix.msc4140";
 export const UNSTABLE_MSC4354_STICKY_EVENTS = "org.matrix.msc4354";
+// A query parameter of the regular send endpoints, but a body field of the MSC4140 delayed event endpoint
+const UNSTABLE_MSC4354_STICKY_DURATION = "org.matrix.msc4354.sticky_duration_ms";
 
 export const UNSTABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133";
 export const STABLE_MSC4133_EXTENDED_PROFILES = "uk.tcpip.msc4133.stable";
@@ -784,7 +793,7 @@ export interface IPublicRoomsChunkRoom {
     guest_can_join: boolean;
     num_joined_members: number;
     room_type?: RoomType | string; // Added by MSC3827
-    join_rule?: JoinRule.Knock | JoinRule.Public; // Added by MSC2403
+    join_rule?: JoinRule.Knock | JoinRule.KnockRestricted | JoinRule.Public; // Added by MSC2403 and MSC3787
 }
 
 interface IPublicRoomsResponse {
@@ -1238,6 +1247,7 @@ const SSO_ACTION_PARAM = new UnstableValue("action", "org.matrix.msc3824.action"
  * as it specifies 'sensible' defaults for these modules.
  */
 export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHandlerMap> {
+    /** @deprecated Unused constant */
     public static readonly RESTORE_BACKUP_ERROR_BAD_KEY = "RESTORE_BACKUP_ERROR_BAD_KEY";
 
     private readonly logger: Logger;
@@ -1306,6 +1316,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected isGuestAccount = false;
     protected ongoingScrollbacks: { [roomId: string]: { promise?: Promise<Room>; errorTs?: number } } = {};
     protected notifTimelineSet: EventTimelineSet | null = null;
+    protected readonly stickyEventSendQueue = new StickyEventSendQueue();
 
     /**
      * Legacy crypto store used for migration from the legacy crypto to the rust crypto
@@ -1321,6 +1332,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     protected syncedLeftRooms = false;
     protected clientOpts?: IStoredClientOpts;
     protected canResetTimelineCallback?: ResetTimelineCallback;
+
+    // Set once the server has answered M_UNRECOGNIZED to the MSC4140 delayed event endpoint
+    private useDelayedEventEndpointFallback = false;
 
     public canSupport = new Map<Feature, ServerSupport>();
 
@@ -2279,6 +2293,75 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
     }
 
     /**
+     * Determine whether the user has at least one encrypted room, waiting for the initial sync to
+     * complete first if it has not already done so.
+     *
+     * A room counts as encrypted if the crypto backend considers it encrypted (see
+     * {@link CryptoApi.isEncryptionEnabledInRoom}). This covers rooms whose encryption state event
+     * has been validated, and rooms the crypto store remembers as encrypted (room encryption
+     * cannot be disabled once enabled).
+     *
+     * Intended to let clients tailor warnings about identity resets, since a user with no encrypted
+     * rooms has no encrypted message history to lose.
+     *
+     * Note: when this client was configured to use sliding sync, only the rooms known locally are
+     * considered, which may be a subset of the user's true room list.
+     *
+     * @param timeoutMs - how long to wait for the initial sync, in milliseconds.
+     * @returns Whether the user has at least one encrypted room.
+     * @throws {@link TimeoutError} if the initial sync does not complete within `timeoutMs`. The
+     *     answer is then unknown: callers should treat this as "may have encrypted rooms", not as
+     *     `false`.
+     */
+    public async hasEncryptedRooms(timeoutMs: number): Promise<boolean> {
+        if (!this.isInitialSyncComplete()) {
+            await this.waitForInitialSync(timeoutMs);
+        }
+        for (const room of this.getRooms()) {
+            // Only consider rooms the user has joined, and ignore spaces since they are not
+            // intended for conversations (and most clients don't allow messages in them anyway).
+            if (room.getMyMembership() !== KnownMembership.Join || room.isSpaceRoom()) {
+                continue;
+            }
+            if (await this.cryptoBackend?.isEncryptionEnabledInRoom(room.roomId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Wait for the initial sync to complete.
+     *
+     * @param timeoutMs - how long to wait, in milliseconds.
+     * @throws {@link TimeoutError} if the initial sync does not complete in time.
+     * @throws {@link ClientStoppedError} if the client is stopped before the initial sync completes.
+     */
+    private waitForInitialSync(timeoutMs: number): Promise<void> {
+        return new Promise((resolve, reject) => {
+            const onSync = (state: SyncState): void => {
+                if (state === SyncState.Prepared || state === SyncState.Syncing) {
+                    cleanup();
+                    resolve();
+                } else if (state === SyncState.Stopped) {
+                    // The initial sync can no longer complete.
+                    cleanup();
+                    reject(new ClientStoppedError());
+                }
+            };
+            const timer = setTimeout(() => {
+                cleanup();
+                reject(new TimeoutError("Initial sync did not complete within the given timeout"));
+            }, timeoutMs);
+            const cleanup = (): void => {
+                clearTimeout(timer);
+                this.off(ClientEvent.Sync, onSync);
+            };
+            this.on(ClientEvent.Sync, onSync);
+        });
+    }
+
+    /**
      * Retrieve a user.
      * @param userId - The user ID to retrieve.
      * @returns A user or null if there is no data store or the user does
@@ -2934,8 +3017,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse>;
     /**
-     * Simply sends a delayed event without encrypting it.
-     * TODO: Allow encrypted delayed events, and encrypt them properly
+     * Encrypts the event if necessary, then schedules it as a delayed event.
      * @deprecated Support for {@link SendDelayedEventRequestOpts} has been dropped. Use a numeric delay duration instead.
      * @param delayOpts - Properties of the delay for this event.
      * @returns returns a promise which resolves with the result of the delayed send request
@@ -2947,8 +3029,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
     ): Promise<SendDelayedEventResponse>;
     /**
-     * Simply sends a delayed event without encrypting it.
-     * TODO: Allow encrypted delayed events, and encrypt them properly
+     * Encrypts the event if necessary, then schedules it as a delayed event.
      * @experimental based on MSC4140
      * @param delayMs - A positive non-zero integer of milliseconds the homeserver should wait before sending the event.
      * @returns returns a promise which resolves with the result of the delayed send request
@@ -2966,7 +3047,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         queryDict?: QueryDict,
     ): Promise<ISendEventResponse | SendDelayedEventResponse> {
         if (this.isDelayMsOrOpts(delayOrQueryDict)) {
-            return this.sendEventHttpRequest(event, this.getDelayMsFromArg(delayOrQueryDict), queryDict);
+            // A delayed event has no local echo in the room, so there is no pending event status to update.
+            await this.encryptEventIfNeeded(event, room ?? undefined, false);
+            return this.sendDelayedEventHttpRequest(event, this.getDelayMsFromArg(delayOrQueryDict), queryDict);
         }
         queryDict = delayOrQueryDict;
         try {
@@ -3032,7 +3115,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private async encryptEventIfNeeded(event: MatrixEvent, room?: Room): Promise<void> {
+    /**
+     * Encrypts the event in place if the room requires it.
+     * @param updatePendingStatus - Whether to mark the event as `ENCRYPTING` while it is being encrypted. Pass
+     *     `false` for events that are not pending events of the room, such as delayed events.
+     */
+    private async encryptEventIfNeeded(event: MatrixEvent, room?: Room, updatePendingStatus = true): Promise<void> {
         // If the room is unknown, we cannot encrypt for it
         if (!room) return;
 
@@ -3049,7 +3137,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             throw new Error("This room is configured to use encryption, but your client does not support encryption.");
         }
 
-        this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
+        if (updatePendingStatus) this.updatePendingEventStatus(room, event, EventStatus.ENCRYPTING);
         await this.cryptoBackend.encryptEvent(event, room);
     }
 
@@ -3119,17 +3207,103 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
     }
 
-    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse>;
-    private sendEventHttpRequest(
+    private sendEventHttpRequest(event: MatrixEvent, queryDict?: QueryDict): Promise<ISendEventResponse> {
+        const path = this.getSendEventPath(event);
+        return this.http
+            .authedRequest<ISendEventResponse>(Method.Put, path, queryDict, event.getWireContent())
+            .then((res) => {
+                this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
+                return res;
+            });
+    }
+
+    private sendDelayedEventHttpRequest(
         event: MatrixEvent,
         delayMs: number,
         queryDict?: QueryDict,
-    ): Promise<SendDelayedEventResponse>;
-    private sendEventHttpRequest(
-        event: MatrixEvent,
-        delayMsOrQueryDict?: number | QueryDict,
+    ): Promise<SendDelayedEventResponse> {
+        const legacyPath = this.getSendEventPath(event);
+        return this.scheduleDelayedEvent(
+            {
+                roomId: event.getRoomId()!,
+                eventType: event.getWireType(),
+                txnId: event.getTxnId()!,
+                stateKey: event.isState() ? event.getStateKey() : undefined,
+                content: event.getWireContent(),
+            },
+            delayMs,
+            legacyPath,
+            queryDict,
+        );
+    }
+
+    /**
+     * Schedules a delayed event through the dedicated MSC4140 endpoint.
+     *
+     * Servers implementing an older version of MSC4140 only accept the delay as a query parameter of the
+     * regular send endpoints, and nothing in `/versions` tells the two apart. When the dedicated endpoint is
+     * unrecognised, this falls back to `legacyPath` and remembers to do so for the lifetime of this client.
+     *
+     * @param legacyPath - the regular send endpoint for this event, used for the fallback.
+     * @param queryDict - query parameters to send on either endpoint. On the dedicated endpoint, the MSC4354
+     *     sticky duration is moved to the request body instead.
+     * @throws `Error` if the event is a state event and `queryDict` has an MSC4354 sticky duration, as
+     *     MSC4354 does not allow sticky state events.
+     */
+    private async scheduleDelayedEvent(
+        event: { roomId: string; eventType: string; txnId: string; stateKey?: string; content: IContent },
+        delayMs: number,
+        legacyPath: string,
         queryDict?: QueryDict,
-    ): Promise<ISendEventResponse | SendDelayedEventResponse> {
+        requestOpts: IRequestOpts = {},
+    ): Promise<SendDelayedEventResponse> {
+        if (event.stateKey !== undefined && queryDict?.[UNSTABLE_MSC4354_STICKY_DURATION] !== undefined) {
+            throw new Error("A delayed state event cannot have a sticky duration");
+        }
+        if (!this.useDelayedEventEndpointFallback) {
+            const path = utils.encodeUri("/rooms/$roomId/delayed_event/$eventType/$txnId", {
+                $roomId: event.roomId,
+                $eventType: event.eventType,
+                $txnId: event.txnId,
+            });
+            const { [UNSTABLE_MSC4354_STICKY_DURATION]: stickyDuration, ...otherQuery } = queryDict ?? {};
+            const body: Body = {
+                delay_ms: delayMs,
+                content: event.content,
+            };
+            if (event.stateKey !== undefined) {
+                body.state_key = event.stateKey;
+            }
+            if (stickyDuration !== undefined) {
+                body[UNSTABLE_MSC4354_STICKY_DURATION] = stickyDuration;
+            }
+            try {
+                return await this.http.authedRequest<SendDelayedEventResponse>(Method.Put, path, otherQuery, body, {
+                    ...requestOpts,
+                    prefix: `${ClientPrefix.Unstable}/${UNSTABLE_MSC4140_DELAYED_EVENTS}`,
+                });
+            } catch (e) {
+                if (!(e instanceof MatrixError && e.errcode === "M_UNRECOGNIZED")) {
+                    throw e;
+                }
+                this.logger.debug("Server does not recognise the delayed event endpoint, using query parameters");
+                this.useDelayedEventEndpointFallback = true;
+            }
+        }
+
+        return await this.http.authedRequest<SendDelayedEventResponse>(
+            Method.Put,
+            legacyPath,
+            { [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMs, ...queryDict },
+            event.content,
+            requestOpts,
+        );
+    }
+
+    /**
+     * Returns the path to PUT the given event to, assigning the event a transaction ID if it has none.
+     */
+    private getSendEventPath(event: MatrixEvent): string {
         let txnId = event.getTxnId();
         if (!txnId) {
             txnId = this.makeTxnId();
@@ -3139,43 +3313,26 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         const pathParams = {
             $roomId: event.getRoomId()!,
             $eventType: event.getWireType(),
-            $stateKey: event.getStateKey()!,
             $txnId: txnId,
         };
-
-        let path: string;
 
         if (event.isState()) {
             let pathTemplate = "/rooms/$roomId/state/$eventType";
             if (event.getStateKey() && event.getStateKey()!.length > 0) {
                 pathTemplate = "/rooms/$roomId/state/$eventType/$stateKey";
             }
-            path = utils.encodeUri(pathTemplate, pathParams);
+            return utils.encodeUri(pathTemplate, {
+                $stateKey: event.getStateKey()!,
+                ...pathParams,
+            });
         } else if (event.isRedaction() && event.event.redacts) {
             const pathTemplate = `/rooms/$roomId/redact/$redactsEventId/$txnId`;
-            path = utils.encodeUri(pathTemplate, {
+            return utils.encodeUri(pathTemplate, {
                 $redactsEventId: event.event.redacts,
                 ...pathParams,
             });
         } else {
-            path = utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
-        }
-
-        const content = event.getWireContent();
-        if (typeof delayMsOrQueryDict === "number") {
-            return this.http.authedRequest<SendDelayedEventResponse>(
-                Method.Put,
-                path,
-                { [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMsOrQueryDict, ...queryDict },
-                content,
-            );
-        } else {
-            return this.http
-                .authedRequest<ISendEventResponse>(Method.Put, path, delayMsOrQueryDict, content)
-                .then((res) => {
-                    this.logger.debug(`Event sent to ${event.getRoomId()} with event id ${res.event_id}`);
-                    return res;
-                });
+            return utils.encodeUri("/rooms/$roomId/send/$eventType/$txnId", pathParams);
         }
     }
 
@@ -3572,6 +3729,9 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<SendDelayedEventResponse> {
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
+        }
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
                 "Server does not support the delayed events API",
@@ -3591,7 +3751,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             roomId,
             threadId,
             eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
+            queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
             delayMs,
             txnId,
         });
@@ -3612,6 +3772,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: StateEvents[K],
         stateKey = "",
         opts: IRequestOpts = {},
+        txnId?: string,
     ): Promise<SendDelayedEventResponse> {
         if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4140_DELAYED_EVENTS))) {
             throw new UnsupportedDelayedEventsEndpointError(
@@ -3630,11 +3791,11 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         if (stateKey !== undefined) {
             path = utils.encodeUri(path + "/$stateKey", pathParams);
         }
-        return this.http.authedRequest(
-            Method.Put,
+        return this.scheduleDelayedEvent(
+            { roomId, eventType, txnId: txnId || this.makeTxnId(), stateKey, content },
+            delayMs,
             path,
-            { [`${UNSTABLE_MSC4140_DELAYED_EVENTS}.delay`]: delayMs },
-            content as Body,
+            undefined,
             opts,
         );
     }
@@ -3655,20 +3816,27 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         content: TimelineEvents[K] & { msc4354_sticky_key?: string },
         txnId?: string,
     ): Promise<ISendEventResponse> {
-        if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
-            throw new UnsupportedStickyEventsEndpointError(
-                "Server does not support the sticky events",
-                "sendStickyEvent",
-            );
+        if (!isValidStickyDuration(stickDuration)) {
+            throw new Error("Sticky duration must be a positive integer");
         }
+        // Claim our place in the send order before anything asynchronous, so that concurrent calls go out in the
+        // order they were made. The server support check can take a different number of ticks per call.
+        return this.stickyEventSendQueue.enqueue(roomId, eventType, content.msc4354_sticky_key, async () => {
+            if (!(await this.doesServerSupportUnstableFeature(UNSTABLE_MSC4354_STICKY_EVENTS))) {
+                throw new UnsupportedStickyEventsEndpointError(
+                    "Server does not support the sticky events",
+                    "sendStickyEvent",
+                );
+            }
 
-        this.addThreadRelationIfNeeded(content, threadId, roomId);
-        return this.sendCompleteEvent({
-            roomId,
-            threadId,
-            eventObject: { type: eventType, content },
-            queryDict: { "org.matrix.msc4354.sticky_duration_ms": stickDuration },
-            txnId,
+            this.addThreadRelationIfNeeded(content, threadId, roomId);
+            return this.sendCompleteEvent({
+                roomId,
+                threadId,
+                eventObject: { type: eventType, content },
+                queryDict: { [UNSTABLE_MSC4354_STICKY_DURATION]: stickDuration },
+                txnId,
+            });
         });
     }
 
@@ -4351,6 +4519,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         });
         const response = await this.http.authedRequest<EmptyObject>(Method.Post, path);
         if (deleteRoom) {
+            this.store.getRoom(roomId)?.dispose();
             this.store.removeRoom(roomId);
             this.emit(ClientEvent.DeleteRoom, roomId);
         }
@@ -6356,21 +6525,39 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
     /**
      * Returns a set of configured RTC transports supported by the homeserver.
-     * Requires the homeserver to advertise `org.matrix.msc4143` in `/versions`.
+     * Requires the homeserver to advertise `org.matrix.msc4143` or
+     * `org.matrix.msc4143.stable` in `/versions`.
      * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
      */
-    public async _unstable_getRTCTransports(): Promise<Transport[]> {
-        if (!(await this.doesServerSupportUnstableFeature("org.matrix.msc4143"))) {
+    public async getRTCTransports(): Promise<Transport[]> {
+        if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143.stable")) {
+            return (
+                await this.http.authedRequest<{
+                    transports: Transport[];
+                }>(Method.Get, "/rtc/transports", undefined, undefined, { prefix: ClientPrefix.V1 })
+            ).transports;
+        } else if (await this.doesServerSupportUnstableFeature("org.matrix.msc4143")) {
+            return (
+                await this.http.authedRequest<{
+                    rtc_transports: Transport[];
+                }>(Method.Get, "/rtc/transports", undefined, undefined, {
+                    prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
+                })
+            ).rtc_transports;
+        } else {
             throw new MatrixError({ errcode: "M_UNRECOGNIZED", error: "Server does not support RTC transports" }, 404);
         }
+    }
 
-        return (
-            await this.http.authedRequest<{
-                rtc_transports: Transport[];
-            }>(Method.Get, "/rtc/transports", undefined, undefined, {
-                prefix: `${ClientPrefix.Unstable}/org.matrix.msc4143`,
-            })
-        ).rtc_transports;
+    /**
+     * Returns a set of configured RTC transports supported by the homeserver.
+     * Requires the homeserver to advertise `org.matrix.msc4143` or
+     * `org.matrix.msc4143.stable` in `/versions`.
+     * @throws A M_UNRECOGNIZED error if not supported by the homeserver.
+     * @deprecated Use {@link getRTCTransports} instead.
+     */
+    public async _unstable_getRTCTransports(): Promise<Transport[]> {
+        return this.getRTCTransports();
     }
 
     /**
@@ -6387,16 +6574,35 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
      * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
      * of the answering server's SFUs.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
      */
-    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
-        // There is no /versions flag to check for support, so we just have to attempt a request.
+    public async getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        // There is no unstable /versions flag so we always attempt to hit the unstable endpoint when falling back.
+        const prefix = (await this.doesServerSupportUnstableFeature("org.matrix.msc4195.stable"))
+            ? ClientPrefix.V1
+            : `${ClientPrefix.Unstable}/io.element.msc4195`;
         return await this.http.authedRequest<LivekitGetTokenResponse>(
             Method.Post,
             "/rtc/livekit/get_token",
             undefined,
             body,
-            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+            { prefix },
         );
+    }
+
+    /**
+     * Requests a token to authenticate against a LiveKit SFU with (MSC4195).
+     *
+     * @param body - The details of the `m.rtc.member` event to obtain a token for, and the SFU to obtain it from.
+     * @returns The JWT to authenticate with when connecting to the SFU.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_FORBIDDEN error if we (or, when
+     * federating, our homeserver) are not joined to the room, or a M_INVALID_PARAM error if `url` is not one
+     * of the answering server's SFUs.
+     * @deprecated Use {@link getLivekitToken} instead.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+     */
+    public async _unstable_getLivekitToken(body: LivekitGetTokenRequest): Promise<LivekitGetTokenResponse> {
+        return this.getLivekitToken(body);
     }
 
     /**
@@ -6413,16 +6619,34 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      * we are connected to.
      * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
      * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
      */
-    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
-        // There is no /versions flag to check for support, so we just have to attempt a request.
+    public async delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        // There is no unstable /versions flag so we always attempt to hit the unstable endpoint when falling back.
+        const prefix = (await this.doesServerSupportUnstableFeature("org.matrix.msc4195.stable"))
+            ? ClientPrefix.V1
+            : `${ClientPrefix.Unstable}/io.element.msc4195`;
         return await this.http.authedRequest<EmptyObject>(
             Method.Post,
             "/rtc/livekit/delegate_delayed_leave",
             undefined,
             body,
-            { prefix: `${ClientPrefix.Unstable}/io.element.msc4195` },
+            { prefix },
         );
+    }
+
+    /**
+     * Hands over the management of a delayed MatrixRTC leave event to the homeserver (MSC4195).
+     *
+     * @param body - The details of the `m.rtc.member` event and the delayed leave event to delegate, and the SFU
+     * we are connected to.
+     * @throws A M_NOT_FOUND error if not supported by the homeserver, a M_BAD_JSON error if the delayed
+     * event's timeout is below one hour, or a M_INVALID_PARAM error if `url` is not one of the homeserver's SFUs.
+     * @deprecated Use {@link delegateDelayedLeave} instead.
+     * @experimental Part of [MSC4195](https://github.com/matrix-org/matrix-spec-proposals/pull/4195).
+     */
+    public async _unstable_delegateDelayedLeave(body: LivekitDelegateDelayedLeaveRequest): Promise<EmptyObject> {
+        return this.delegateDelayedLeave(body);
     }
 
     /**
@@ -7650,7 +7874,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         let profile: SyncUserProfile;
         try {
-            profile = (await this.http.authedRequest(
+            profile = await this.http.authedRequest<SyncUserProfile>(
                 Method.Get,
                 utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
                 undefined,
@@ -7658,7 +7882,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 {
                     prefix: await this.getExtendedProfileRequestPrefix(),
                 },
-            )) as SyncUserProfile;
+            );
         } catch (e) {
             if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
                 // The key is not set on the profile (or the profile does not exist).

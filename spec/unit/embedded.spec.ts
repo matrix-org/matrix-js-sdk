@@ -54,7 +54,7 @@ import { sleep } from "../../src/utils";
 import { SlidingSync } from "../../src/sliding-sync";
 import { logger } from "../../src/logger";
 import { ConnectionError } from "../../src/http-api/errors";
-import { UnsupportedStickyEventsEndpointError } from "../../src/errors";
+import { UnsupportedDelayedEventsEndpointError, UnsupportedStickyEventsEndpointError } from "../../src/errors";
 import { flushPromises } from "../test-utils/flushPromises";
 import { RoomStickyEventsEvent, type RoomStickyEventsMap } from "../../src/models/room-sticky-events";
 
@@ -136,9 +136,11 @@ declare module "../../src/types" {
 describe("RoomWidgetClient", () => {
     let widgetApi: MockedObject<WidgetApi>;
     let client: MatrixClient;
+    const fetchFn = vi.fn<typeof fetch>();
 
     beforeEach(() => {
         widgetApi = new MockWidgetApi([UnstableApiVersion.MSC2762_UPDATE_STATE]) as unknown as MockedObject<WidgetApi>;
+        fetchFn.mockReset().mockRejectedValue(new TypeError("fetch failed"));
     });
 
     afterEach(() => {
@@ -156,7 +158,7 @@ describe("RoomWidgetClient", () => {
             widgetApi,
             capabilities,
             "!1:example.org",
-            { baseUrl, userId },
+            { baseUrl, userId, fetchFn },
             sendContentLoaded,
         );
         expect(widgetApi.start).toHaveBeenCalled(); // needs to have been called early in order to not miss messages
@@ -410,19 +412,14 @@ describe("RoomWidgetClient", () => {
         const delayMs = 2000;
         const delayOpts = { delay: delayMs };
 
-        describe("when supported", () => {
-            const doesServerSupportUnstableFeatureMock = vi.fn((feature) =>
-                Promise.resolve(feature === "org.matrix.msc4140"),
-            );
+        // The widget must not query feature support from the homeserver directly as it may not
+        // be able to reach it from its own origin.
+        afterEach(() => {
+            // eslint-disable-next-line vitest/no-standalone-expect
+            expect(fetchFn).not.toHaveBeenCalled();
+        });
 
-            beforeAll(() => {
-                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
-            });
-
-            afterAll(() => {
-                doesServerSupportUnstableFeatureMock.mockReset();
-            });
-
+        describe("when the host accepts", () => {
             it.each([delayMs, delayOpts])("sends delayed message events", async (delayMsOrOpts) => {
                 await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
@@ -590,28 +587,16 @@ describe("RoomWidgetClient", () => {
             });
         });
 
-        describe("when unsupported", () => {
-            const doesServerSupportUnstableFeatureMock = vi.fn().mockResolvedValue(false);
+        describe("when the host did not grant the capability", () => {
+            it("fails to send delayed events as unsupported", async () => {
+                await makeClient({ sendDelayedEvents: true, sendEvent: ["org.matrix.rageshake_request"] });
+                widgetApi.hasCapability.mockReturnValue(false);
 
-            beforeAll(() => {
-                MatrixClient.prototype.doesServerSupportUnstableFeature = doesServerSupportUnstableFeatureMock;
-            });
-
-            afterAll(() => {
-                doesServerSupportUnstableFeatureMock.mockReset();
-            });
-
-            it("fails to send delayed message events", async () => {
-                await makeClient({ sendEvent: ["org.matrix.rageshake_request"] });
                 await expect(
                     client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
                         request_id: 123,
                     }),
-                ).rejects.toThrow("Server does not support");
-            });
-
-            it("fails to send delayed state events", async () => {
-                await makeClient({ sendState: [{ eventType: "org.example.foo", stateKey: "bar" }] });
+                ).rejects.toThrow(UnsupportedDelayedEventsEndpointError);
                 await expect(
                     client._unstable_sendDelayedStateEvent(
                         "!1:example.org",
@@ -620,27 +605,190 @@ describe("RoomWidgetClient", () => {
                         { hello: "world" },
                         "bar",
                     ),
-                ).rejects.toThrow("Server does not support");
+                ).rejects.toThrow(UnsupportedDelayedEventsEndpointError);
+                expect(widgetApi.hasCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157SendDelayedEvent);
+                expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
+                expect(widgetApi.sendStateEvent).not.toHaveBeenCalled();
             });
 
-            it("fails to update delayed state events", async () => {
-                await makeClient({});
-                for (const action of [
-                    UpdateDelayedEventAction.Cancel,
-                    UpdateDelayedEventAction.Restart,
-                    UpdateDelayedEventAction.Send,
-                ]) {
-                    await expect(client._unstable_updateDelayedEvent("id", action)).rejects.toThrow(
-                        "Server does not support",
-                    );
-                }
+            it("fails to update delayed events as unsupported", async () => {
+                await makeClient({ updateDelayedEvents: true });
+                widgetApi.hasCapability.mockReturnValue(false);
+
+                await expect(
+                    client._unstable_updateDelayedEvent("id", UpdateDelayedEventAction.Cancel),
+                ).rejects.toThrow(UnsupportedDelayedEventsEndpointError);
                 for (const updateDelayedEvent of [
                     client._unstable_cancelScheduledDelayedEvent,
                     client._unstable_restartScheduledDelayedEvent,
                     client._unstable_sendScheduledDelayedEvent,
                 ]) {
-                    await expect(updateDelayedEvent.call(client, "id")).rejects.toThrow("Server does not support");
+                    await expect(updateDelayedEvent.call(client, "id")).rejects.toThrow(
+                        UnsupportedDelayedEventsEndpointError,
+                    );
                 }
+                expect(widgetApi.hasCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4157UpdateDelayedEvent);
+                expect(widgetApi.cancelScheduledDelayedEvent).not.toHaveBeenCalled();
+                expect(widgetApi.restartScheduledDelayedEvent).not.toHaveBeenCalled();
+                expect(widgetApi.sendScheduledDelayedEvent).not.toHaveBeenCalled();
+            });
+        });
+
+        describe("when the host answers with an error", () => {
+            const sendDelayedEvent = (): Promise<unknown> =>
+                client._unstable_sendDelayedEvent("!1:example.org", 2000, null, "org.matrix.rageshake_request", {
+                    request_id: 123,
+                });
+            const sendDelayedStateEvent = (): Promise<unknown> =>
+                client._unstable_sendDelayedStateEvent(
+                    "!1:example.org",
+                    2000,
+                    "org.example.foo",
+                    { hello: "world" },
+                    "bar",
+                );
+            /**
+             * Starts a client whose host answers every request with an error, delivered the way the widget's
+             * transport delivers it. The client wraps the transport on creation, so the error is set up before
+             * and the widget API methods are routed through the wrapper after.
+             */
+            const hostError = async (data: WidgetApiResponseError["data"]): Promise<void> => {
+                const error = new WidgetApiResponseError("Error sending event", data);
+                vi.mocked(widgetApi.transport.send).mockRejectedValue(error);
+                await makeClient({
+                    sendDelayedEvents: true,
+                    updateDelayedEvents: true,
+                    sendEvent: ["org.matrix.rageshake_request"],
+                    sendState: [{ eventType: "org.example.foo", stateKey: "bar" }],
+                });
+                for (const method of [
+                    widgetApi.sendRoomEvent,
+                    widgetApi.sendStateEvent,
+                    widgetApi.cancelScheduledDelayedEvent,
+                    widgetApi.restartScheduledDelayedEvent,
+                    widgetApi.sendScheduledDelayedEvent,
+                ]) {
+                    method.mockImplementation(widgetApi.transport.send as any);
+                }
+            };
+            const matrixApiError = (errcode: string, httpStatus: number): WidgetApiResponseError["data"] => ({
+                matrix_api_error: {
+                    http_status: httpStatus,
+                    http_headers: {},
+                    url: "http://example.org",
+                    response: { errcode, error: errcode },
+                },
+            });
+
+            it("reports a homeserver without the delayed events API as unsupported", async () => {
+                // Synapse answers an unknown route with a 404 M_UNRECOGNIZED
+                await hostError(matrixApiError("M_UNRECOGNIZED", 404));
+
+                for (const [request, clientEndpoint] of [
+                    [sendDelayedEvent, "sendDelayedEvent"],
+                    [sendDelayedStateEvent, "sendDelayedStateEvent"],
+                    [
+                        () => client._unstable_updateDelayedEvent("id", UpdateDelayedEventAction.Cancel),
+                        "updateDelayedEvent",
+                    ],
+                    [() => client._unstable_cancelScheduledDelayedEvent("id"), "cancelScheduledDelayedEvent"],
+                    [() => client._unstable_restartScheduledDelayedEvent("id"), "restartScheduledDelayedEvent"],
+                    [() => client._unstable_sendScheduledDelayedEvent("id"), "sendScheduledDelayedEvent"],
+                ] as const) {
+                    const promise = request();
+                    await expect(promise).rejects.toThrow(UnsupportedDelayedEventsEndpointError);
+                    await expect(promise).rejects.toMatchObject({
+                        clientEndpoint,
+                        cause: expect.any(MatrixError),
+                    });
+                }
+            });
+
+            it("passes on any other error from the homeserver as a MatrixError", async () => {
+                // The membership manager decides what to retry, so nothing may be reported as unsupported:
+                // that would make it give up on delayed events for good
+                await hostError(matrixApiError("M_FORBIDDEN", 403));
+
+                const promise = sendDelayedStateEvent();
+                await expect(promise).rejects.toBeInstanceOf(MatrixError);
+                await expect(promise).rejects.toMatchObject({ errcode: "M_FORBIDDEN", httpStatus: 403 });
+                await expect(client._unstable_cancelScheduledDelayedEvent("id")).rejects.toBeInstanceOf(MatrixError);
+            });
+
+            it("passes on a host error without Matrix API error details as it is", async () => {
+                // The host only attaches Matrix API error details to errors from the homeserver; its own
+                // failures, e.g. a connection error, arrive without them and may well be transient
+                await hostError({});
+
+                await expect(sendDelayedEvent()).rejects.toBeInstanceOf(WidgetApiResponseError);
+                await expect(client._unstable_restartScheduledDelayedEvent("id")).rejects.toBeInstanceOf(
+                    WidgetApiResponseError,
+                );
+            });
+
+            it("reports a widget API timeout as a connection error", async () => {
+                await makeClient({ updateDelayedEvents: true });
+                widgetApi.restartScheduledDelayedEvent.mockRejectedValue(new Error("Request timed out"));
+
+                await expect(client._unstable_restartScheduledDelayedEvent("id")).rejects.toThrow(ConnectionError);
+            });
+        });
+
+        describe("sticky delayed events", () => {
+            const sendStickyDelayedEvent = (): Promise<unknown> =>
+                client._unstable_sendStickyDelayedEvent(
+                    "!1:example.org",
+                    1000,
+                    delayMs,
+                    null,
+                    "org.matrix.rageshake_request",
+                    { request_id: 123, msc4354_sticky_key: "key" },
+                );
+
+            it("sends sticky delayed events", async () => {
+                await makeClient({
+                    sendDelayedEvents: true,
+                    sendSticky: true,
+                    sendEvent: ["org.matrix.rageshake_request"],
+                });
+                widgetApi.sendRoomEvent.mockResolvedValue({ room_id: "!1:example.org", delay_id: "id" });
+
+                await expect(sendStickyDelayedEvent()).resolves.toEqual({ delay_id: "id" });
+                expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
+                    "org.matrix.rageshake_request",
+                    { request_id: 123, msc4354_sticky_key: "key" },
+                    "!1:example.org",
+                    delayMs,
+                    1000,
+                );
+            });
+
+            it("fails as unsupported without the capability to send delayed events", async () => {
+                await makeClient({
+                    sendDelayedEvents: true,
+                    sendSticky: true,
+                    sendEvent: ["org.matrix.rageshake_request"],
+                });
+                widgetApi.hasCapability.mockImplementation(
+                    (capability) => capability !== MatrixCapabilities.MSC4157SendDelayedEvent,
+                );
+
+                await expect(sendStickyDelayedEvent()).rejects.toThrow(UnsupportedDelayedEventsEndpointError);
+                expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
+            });
+
+            it("fails as unsupported without the capability to send sticky events", async () => {
+                await makeClient({
+                    sendDelayedEvents: true,
+                    sendSticky: true,
+                    sendEvent: ["org.matrix.rageshake_request"],
+                });
+                widgetApi.hasCapability.mockImplementation(
+                    (capability) => capability !== MatrixCapabilities.MSC4407SendStickyEvent,
+                );
+
+                await expect(sendStickyDelayedEvent()).rejects.toThrow(UnsupportedStickyEventsEndpointError);
+                expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
             });
         });
     });
@@ -914,6 +1062,17 @@ describe("RoomWidgetClient", () => {
                 // The host's capability grant is what matters for a widget, not the homeserver's feature list.
                 expect(widgetApi.hasCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
                 expect(doesServerSupportUnstableFeatureMock).not.toHaveBeenCalled();
+            });
+
+            it.each([0, -1000, 1.5])("rejects a sticky duration of %s", async (duration) => {
+                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await expect(
+                    client._unstable_sendStickyEvent("!1:example.org", duration, null, EventType.RTCMembership, {
+                        slot_id: "m.call#ROOM",
+                        msc4354_sticky_key: "test",
+                    }),
+                ).rejects.toThrow("Sticky duration must be a positive integer");
+                expect(widgetApi.sendRoomEvent).not.toHaveBeenCalled();
             });
 
             it("receives (adds, updates, then removes when redacted)", async () => {
@@ -1314,7 +1473,7 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcTransports.mockResolvedValue({ rtc_transports: [transport] });
 
             await makeClient({ rtcTransports: true });
-            expect(await client._unstable_getRTCTransports()).toEqual([transport]);
+            expect(await client.getRTCTransports()).toEqual([transport]);
             expect(widgetApi.getRtcTransports).toHaveBeenCalled();
         });
 
@@ -1323,14 +1482,14 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcTransports.mockRejectedValue(error);
 
             await makeClient({ rtcTransports: true });
-            await expect(client._unstable_getRTCTransports()).rejects.toThrow(error);
+            await expect(client.getRTCTransports()).rejects.toThrow(error);
         });
 
         it("maps a widget timeout to a ConnectionError", async () => {
             widgetApi.getRtcTransports.mockRejectedValue(new Error("Request timed out"));
 
             await makeClient({ rtcTransports: true });
-            await expect(client._unstable_getRTCTransports()).rejects.toThrow(ConnectionError);
+            await expect(client.getRTCTransports()).rejects.toThrow(ConnectionError);
         });
     });
 
@@ -1356,7 +1515,7 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            expect(await client._unstable_getLivekitToken({ ...body, server_name: "remote.example.org" })).toEqual({
+            expect(await client.getLivekitToken({ ...body, server_name: "remote.example.org" })).toEqual({
                 jwt: "thejwt",
             });
             expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "remote.example.org" });
@@ -1366,13 +1525,13 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcLivekitToken.mockResolvedValue({ jwt: "thejwt" });
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            expect(await client._unstable_getLivekitToken(body)).toEqual({ jwt: "thejwt" });
+            expect(await client.getLivekitToken(body)).toEqual({ jwt: "thejwt" });
             expect(widgetApi.getRtcLivekitToken).toHaveBeenCalledWith({ ...body, server_name: "example.org" });
         });
 
         it("throws if the server name cannot be determined", async () => {
             await makeClient({ rtcLivekitGetToken: true });
-            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow("server name");
+            await expect(client.getLivekitToken(body)).rejects.toThrow("server name");
             expect(widgetApi.getRtcLivekitToken).not.toHaveBeenCalled();
         });
 
@@ -1381,14 +1540,14 @@ describe("RoomWidgetClient", () => {
             widgetApi.getRtcLivekitToken.mockRejectedValue(error);
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(error);
+            await expect(client.getLivekitToken(body)).rejects.toThrow(error);
         });
 
         it("maps a widget timeout to a ConnectionError", async () => {
             widgetApi.getRtcLivekitToken.mockRejectedValue(new Error("Request timed out"));
 
             await makeClient({ rtcLivekitGetToken: true }, undefined, "@alice:example.org");
-            await expect(client._unstable_getLivekitToken(body)).rejects.toThrow(ConnectionError);
+            await expect(client.getLivekitToken(body)).rejects.toThrow(ConnectionError);
         });
     });
 
@@ -1417,7 +1576,7 @@ describe("RoomWidgetClient", () => {
 
         it("delegates the delayed leave event via the host", async () => {
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            expect(await client._unstable_delegateDelayedLeave(body)).toEqual({});
+            expect(await client.delegateDelayedLeave(body)).toEqual({});
             expect(widgetApi.delegateRtcLivekitDelayedLeave).toHaveBeenCalledWith(body);
         });
 
@@ -1426,14 +1585,14 @@ describe("RoomWidgetClient", () => {
             widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(error);
 
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(error);
+            await expect(client.delegateDelayedLeave(body)).rejects.toThrow(error);
         });
 
         it("maps a widget timeout to a ConnectionError", async () => {
             widgetApi.delegateRtcLivekitDelayedLeave.mockRejectedValue(new Error("Request timed out"));
 
             await makeClient({ rtcLivekitDelegateDelayedLeave: true });
-            await expect(client._unstable_delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
+            await expect(client.delegateDelayedLeave(body)).rejects.toThrow(ConnectionError);
         });
     });
 

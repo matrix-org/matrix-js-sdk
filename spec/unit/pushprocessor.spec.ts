@@ -29,6 +29,7 @@ import {
 } from "../../src";
 import { mockClientMethodsUser } from "../test-utils/client";
 import { logger } from "../../src/logger.ts";
+import { MAX_GLOB_PATTERN_LENGTH } from "../../src/utils.ts";
 
 const msc3914RoomCallRule: IPushRule = {
     rule_id: ".org.matrix.msc3914.rule.room.call",
@@ -274,6 +275,20 @@ describe("NotificationService", function () {
         expect(actions.tweaks.highlight).toEqual(true);
     });
 
+    it("should match a single character with the ? wildcard", function () {
+        const rule: IPushRule = {
+            rule_id: "rule1",
+            actions: [],
+            conditions: [{ kind: ConditionKind.EventMatch, key: "content.body", pattern: "h?llo" }],
+            default: false,
+            enabled: true,
+        };
+        testEvent.event.content!.body = "hello there";
+        expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(true);
+        testEvent.event.content!.body = "hllo there";
+        expect(pushProcessor.ruleMatchesEvent(rule, testEvent)).toBe(false);
+    });
+
     it("should not bing on room server ACL changes", function () {
         testEvent = utils.mkEvent({
             type: EventType.RoomServerAcl,
@@ -298,6 +313,51 @@ describe("NotificationService", function () {
         testEvent.event.content!.body = { foo: "bar" };
         const actions = pushProcessor.actionsForEvent(testEvent);
         expect(actions.tweaks.highlight).toEqual(false);
+    });
+
+    describe("event_match glob patterns", () => {
+        const matches = (key: string, pattern: string, value: string): boolean => {
+            const event = utils.mkEvent({
+                type: "m.room.message",
+                room: testRoomId,
+                user: "@alfred:localhost",
+                event: true,
+                content: {
+                    body: key === "content.body" ? value : "",
+                    msgtype: "m.text",
+                    value: key === "content.value" ? value : undefined,
+                },
+            });
+
+            return pushProcessor.ruleMatchesEvent(
+                {
+                    rule_id: "glob-rule",
+                    actions: [],
+                    conditions: [{ kind: ConditionKind.EventMatch, key, pattern }],
+                    default: false,
+                    enabled: true,
+                },
+                event,
+            );
+        };
+
+        it.each([
+            ["requires word boundaries in a message body", "content.body", "he", "the", false],
+            ["accepts word boundaries in a message body", "content.body", "he", "the he!", true],
+            ["does not substring-match a non-body property", "content.value", "foo", "prefix foo suffix", false],
+        ])("%s", (_, key, pattern, value, expected) => {
+            expect(matches(key, pattern, value)).toBe(expected);
+        });
+
+        it("does not evaluate an over-long pattern", () => {
+            const overLongPattern = "a".repeat(MAX_GLOB_PATTERN_LENGTH + 1);
+            expect(matches("content.body", overLongPattern, overLongPattern)).toBe(false);
+        });
+
+        it("handles an alternating-wildcard near-match without regex backtracking", () => {
+            const pattern = "a*".repeat(20) + "b";
+            expect(matches("content.body", pattern, "a".repeat(48) + "c")).toBe(false);
+        });
     });
 
     it("a rule with no conditions matches every event.", function () {

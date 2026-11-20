@@ -515,7 +515,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
     }
 
     private generateRandomKey(): Uint8Array<ArrayBuffer> {
-        const key = new Uint8Array(16);
+        const key = new Uint8Array(32);
         globalThis.crypto.getRandomValues(key);
         return key;
     }

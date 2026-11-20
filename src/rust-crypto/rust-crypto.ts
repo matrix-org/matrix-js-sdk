@@ -101,6 +101,7 @@ import { keyFromAuthData } from "../common-crypto/key-passphrase.ts";
 import { type UIAuthCallback } from "../interactive-auth.ts";
 import { getHttpUriForMxc } from "../content-repo.ts";
 import { type RoomState } from "../matrix.ts";
+import { type SecretsBundleJson } from "../@types/secrets-bundle.ts";
 
 const ALL_VERIFICATION_METHODS = [
     VerificationMethod.Sas,
@@ -676,6 +677,29 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     }
 
     /**
+     * Mark the given device as locally blocked.
+     *
+     * Implementation of {@link CryptoApi#setDeviceBlocked}.
+     */
+    public async setDeviceBlocked(userId: string, deviceId: string, blocked = true): Promise<void> {
+        const device: RustSdkCryptoJs.Device | undefined = await this.olmMachine.getDevice(
+            new RustSdkCryptoJs.UserId(userId),
+            new RustSdkCryptoJs.DeviceId(deviceId),
+        );
+
+        if (!device) {
+            throw new Error(`Unknown device ${userId}|${deviceId}`);
+        }
+        try {
+            await device.setLocalTrust(
+                blocked ? RustSdkCryptoJs.LocalTrust.BlackListed : RustSdkCryptoJs.LocalTrust.Unset,
+            );
+        } finally {
+            device.free();
+        }
+    }
+
+    /**
      * Blindly cross-sign one of our other devices.
      *
      * Implementation of {@link CryptoApi#crossSignDevice}.
@@ -714,6 +738,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
                 signedByOwner: device.isCrossSignedByOwner(),
                 crossSigningVerified: device.isCrossSigningTrusted(),
                 localVerified: device.isLocallyTrusted(),
+                blocked: device.isBlacklisted(),
                 trustCrossSignedDevices: this._trustCrossSignedDevices,
             });
         } finally {
@@ -1537,7 +1562,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      */
     public async exportSecretsBundle(): ReturnType<NonNullable<CryptoApi["exportSecretsBundle"]>> {
         const secretsBundle = await this.getOlmMachineOrThrow().exportSecretsBundle();
-        const secrets = secretsBundle.to_json();
+        const secrets = secretsBundle.to_json() as SecretsBundleJson;
         secretsBundle.free();
         return secrets;
     }

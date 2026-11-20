@@ -18,12 +18,10 @@ import { type Logger } from "../logger.ts";
 import { type MatrixClient, ClientEvent } from "../client.ts";
 import { TypedEventEmitter } from "../models/typed-event-emitter.ts";
 import { type Room } from "../models/room.ts";
-import { RoomStateEvent } from "../models/room-state.ts";
-import { type MatrixEvent } from "../models/event.ts";
-import { MatrixRTCSession } from "./MatrixRTCSession.ts";
-import { EventType } from "../@types/event.ts";
+import { MatrixRTCSession, MatrixRTCSessionEvent, type MatrixRTCSessionEventHandlerMap } from "./MatrixRTCSession.ts";
 import { type RtcSlotEventContent, type SlotDescription } from "./types.ts";
 import { computeSlotId } from "./utils.ts";
+import { type CallMembership } from "./CallMembership.ts";
 
 export enum MatrixRTCSessionManagerEvents {
     // A member has joined the MatrixRTC session, creating an active session in a room where there wasn't previously
@@ -53,6 +51,12 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
     // longer the correct session object for the room.
     private roomSessions = new Map<string, MatrixRTCSession>();
 
+    // Our MembershipsChanged listener on each session in `roomSessions`, so that we can remove it again.
+    private sessionListeners = new Map<
+        MatrixRTCSession,
+        MatrixRTCSessionEventHandlerMap[MatrixRTCSessionEvent.MembershipsChanged]
+    >();
+
     private readonly logger: Logger;
 
     public constructor(
@@ -68,26 +72,20 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
         // We shouldn't need to null-check here, but matrix-client.spec.ts mocks getRooms
         // returning nothing, and breaks tests if you change it to return an empty array :'(
         for (const room of this.client.getRooms() ?? []) {
-            const session = MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription);
-            if (session.memberships.length > 0) {
-                this.roomSessions.set(room.roomId, session);
-            }
+            this.getRoomSession(room);
         }
 
         this.client.on(ClientEvent.Room, this.onRoom);
-        this.client.on(ClientEvent.Event, this.onEvent);
-        this.client.on(RoomStateEvent.Events, this.onRoomState);
+        this.client.on(ClientEvent.DeleteRoom, this.onDeleteRoom);
     }
 
     public stop(): void {
-        for (const sess of this.roomSessions.values()) {
-            void sess.stop();
+        for (const roomId of this.roomSessions.keys()) {
+            this.removeRoomSession(roomId);
         }
-        this.roomSessions.clear();
 
         this.client.off(ClientEvent.Room, this.onRoom);
-        this.client.off(ClientEvent.Event, this.onEvent);
-        this.client.off(RoomStateEvent.Events, this.onRoomState);
+        this.client.off(ClientEvent.DeleteRoom, this.onDeleteRoom);
     }
 
     /**
@@ -122,68 +120,59 @@ export class MatrixRTCSessionManager extends TypedEventEmitter<MatrixRTCSessionM
      * if no members are currently participating
      */
     public getRoomSession(room: Room): MatrixRTCSession {
-        if (!this.roomSessions.has(room.roomId)) {
-            this.roomSessions.set(
-                room.roomId,
-                MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription),
-            );
+        let session = this.roomSessions.get(room.roomId);
+        if (!session) {
+            session = MatrixRTCSession.sessionForSlot(this.client, room, this.slotDescription);
+            this.roomSessions.set(room.roomId, session);
+            // A session starts with no memberships and keeps them up to date itself (its first calculation is
+            // still pending at this point), so every 0 <-> N change in its memberships reaches this listener.
+            const listener = this.onMembershipsChanged.bind(this, room.roomId, session);
+            this.sessionListeners.set(session, listener);
+            session.on(MatrixRTCSessionEvent.MembershipsChanged, listener);
         }
 
-        return this.roomSessions.get(room.roomId)!;
+        return session;
     }
 
-    private onRoom = (room: Room): void => {
-        void this.refreshRoom(room);
+    private readonly onRoom = (room: Room): void => {
+        this.getRoomSession(room);
     };
 
-    private readonly onEvent = (event: MatrixEvent): void => {
-        if (!event.unstableStickyExpiresAt) return; // Not sticky, not interested.
-
-        if (event.getType() !== EventType.RTCMembership) return;
-
-        const room = this.client.getRoom(event.getRoomId());
-        if (!room) return;
-
-        void this.refreshRoom(room);
-    };
-
-    private readonly onRoomState = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.GroupCallMemberPrefix && event.getType() !== EventType.RTCSlot) {
-            return;
+    private readonly onDeleteRoom = (roomId: string): void => {
+        const session = this.roomSessions.get(roomId);
+        if (!session) return;
+        this.removeRoomSession(roomId);
+        // We emit SessionStarted exactly when a session's memberships go from empty to non-empty,
+        // so a session with members is one we have reported as started: tell consumers it's over.
+        if (session.memberships.length > 0) {
+            this.logger.trace(`Session ended for ${roomId} (room deleted)`);
+            this.emit(MatrixRTCSessionManagerEvents.SessionEnded, roomId, session);
         }
-        const room = this.client.getRoom(event.getRoomId());
-        if (!room) {
-            this.logger.error(`Got room state event for unknown room ${event.getRoomId()}!`);
-            return;
-        }
-
-        void this.refreshRoom(room);
     };
 
-    private async refreshRoom(room: Room): Promise<void> {
-        const isNewSession = !this.roomSessions.has(room.roomId);
-        const session = this.getRoomSession(room);
+    private removeRoomSession(roomId: string): void {
+        const session = this.roomSessions.get(roomId);
+        if (!session) return;
+        // Remove our listener first, so we don't emit anything for a calculation still in progress.
+        const listener = this.sessionListeners.get(session);
+        if (listener) session.off(MatrixRTCSessionEvent.MembershipsChanged, listener);
+        this.sessionListeners.delete(session);
+        this.roomSessions.delete(roomId);
+        void session.stop();
+    }
 
-        const wasActiveAndKnown = session.memberships.length > 0 && !isNewSession;
-        // This needs to be here and the event listener cannot be setup in the MatrixRTCSession,
-        // because we need the update to happen between:
-        // wasActiveAndKnown = session.memberships.length > 0 and
-        // nowActive = session.memberships.length
-        // Alternatively we would need to setup some event emission when the RTC session ended.
-        // TODO we want to add the emission en session end. This makes the responsibility of the session manager more clear.
-
-        await session.ensureRecalculateSessionMembers().catch((error) => {
-            this.logger.error(`Error updating RTC session members for ${room.roomId}: ${error}`);
-        });
-
-        const nowActive = session.memberships.length > 0;
-
-        if (wasActiveAndKnown && !nowActive) {
-            this.logger.trace(`Session ended for ${room.roomId} (${session.memberships.length} members)`);
-            this.emit(MatrixRTCSessionManagerEvents.SessionEnded, room.roomId, this.roomSessions.get(room.roomId)!);
-        } else if (!wasActiveAndKnown && nowActive) {
-            this.logger.trace(`Session started for ${room.roomId} (${session.memberships.length} members)`);
-            this.emit(MatrixRTCSessionManagerEvents.SessionStarted, room.roomId, this.roomSessions.get(room.roomId)!);
+    private onMembershipsChanged(
+        roomId: string,
+        session: MatrixRTCSession,
+        oldMemberships: CallMembership[],
+        newMemberships: CallMembership[],
+    ): void {
+        if (oldMemberships.length > 0 && newMemberships.length === 0) {
+            this.logger.trace(`Session ended for ${roomId}`);
+            this.emit(MatrixRTCSessionManagerEvents.SessionEnded, roomId, session);
+        } else if (oldMemberships.length === 0 && newMemberships.length > 0) {
+            this.logger.trace(`Session started for ${roomId} (${newMemberships.length} members)`);
+            this.emit(MatrixRTCSessionManagerEvents.SessionStarted, roomId, session);
         }
     }
 }

@@ -601,16 +601,6 @@ export function makeMockGroupCallStateEvent(
     } as unknown as MatrixEvent;
 }
 
-export function makeMockGroupCallMemberStateEvent(roomId: string, groupCallId: string): MatrixEvent {
-    return {
-        getType: vi.fn().mockReturnValue(EventType.GroupCallMemberPrefix),
-        getRoomId: vi.fn().mockReturnValue(roomId),
-        getTs: vi.fn().mockReturnValue(0),
-        getContent: vi.fn().mockReturnValue({}),
-        getStateKey: vi.fn().mockReturnValue(groupCallId),
-    } as unknown as MatrixEvent;
-}
-
 export const REMOTE_SFU_DESCRIPTION =
     "v=0\n" +
     "o=- 3242942315779688438 1678878001 IN IP4 0.0.0.0\n" +
@@ -771,33 +761,6 @@ export const groupCallParticipantsFourOtherDevices = new Map([
             ],
             [
                 "deviceId4",
-                {
-                    sessionId: "1",
-                    screensharing: false,
-                },
-            ],
-        ]),
-    ],
-]);
-
-export const groupCallParticipantsOneOtherDevice = new Map([
-    [
-        new RoomMember("roomId1", "thisMember"),
-        new Map([
-            [
-                "deviceId0",
-                {
-                    sessionId: "0",
-                    screensharing: false,
-                },
-            ],
-        ]),
-    ],
-    [
-        new RoomMember("roomId1", "opponentMember"),
-        new Map([
-            [
-                "deviceId1",
                 {
                     sessionId: "1",
                     screensharing: false,

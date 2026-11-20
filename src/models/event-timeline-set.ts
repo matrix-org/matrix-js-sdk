@@ -726,6 +726,14 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      *
      * Will fire "Room.timeline" for each event added.
      *
+     * @param event - the event to insert
+     * @param timeline - the timeline to insert it into
+     * @param roomState - the room state to use for the event's metadata
+     * @param addToState - whether to apply the event to the room state
+     * @param liveEvent - true if this is a new event (e.g. from sync), as opposed to
+     *    one we fetched to fill in the timeline. Only new events inserted into the
+     *    live timeline are reported to listeners as live.
+     *
      * @internal
      *
      * @remarks
@@ -736,6 +744,7 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         timeline: EventTimeline,
         roomState: RoomState,
         addToState: boolean,
+        liveEvent = false,
     ): void {
         if (timeline.getTimelineSet() !== this) {
             throw new Error(`EventTimelineSet.insertEventIntoTimeline: Timeline=${timeline.toString()} does not belong " +
@@ -800,10 +809,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
 
         const data: IRoomTimelineData = {
             timeline: timeline,
-            // The purpose of this method is inserting events in the middle of the
-            // timeline, so the events are, by definition, not live (whether or not
-            // we're adding them to the live timeline).
-            liveEvent: false,
+            // Events we fetched to fill in the timeline are not live, even when we
+            // add them to the live timeline (we don't want notifications for them).
+            // New events are live wherever they land in the live timeline: listeners
+            // that follow its end (e.g. a TimelineWindow) need to know it has grown,
+            // or they lose track of this event and the ones that arrive after it.
+            liveEvent: liveEvent && timeline === this.liveTimeline,
         };
         this.emit(RoomEvent.Timeline, event, this.room, false, false, data);
     }

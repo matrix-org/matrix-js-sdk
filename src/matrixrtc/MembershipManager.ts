@@ -22,6 +22,7 @@ import type { MatrixClient } from "../client.ts";
 import { ConnectionError, HTTPError, MatrixError } from "../http-api/errors.ts";
 import { type Logger, logger as rootLogger } from "../logger.ts";
 import { type Room } from "../models/room.ts";
+import { type Capabilities } from "../serverCapabilities.ts";
 import { type CallMembership, DEFAULT_EXPIRE_DURATION } from "./CallMembership.ts";
 import {
     type Transport,
@@ -46,7 +47,21 @@ import {
     type SessionMembershipData,
 } from "./membershipData/index.ts";
 import { computeSlotId } from "./utils.ts";
+import {
+    isUnstableLivekitTransport,
+    LEGACY_LIVEKIT_TRANSPORT_TYPE,
+    LIVEKIT_TRANSPORT_TYPE,
+} from "./LivekitTransport.ts";
 import { deepCompare } from "../utils.ts";
+import { toStableCallIntent, toUnstableCallIntent } from "./CallIntent.ts";
+
+/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself regardless of the application type. */
+const GLOBALLY_RESERVED_APPLICATION_DATA_KEYS: readonly string[] = ["type"];
+
+/** Keys of {@link SessionConfig.applicationData} which the SDK writes itself for a given application type. */
+const PER_APP_RESERVED_APPLICATION_DATA_KEYS: ReadonlyMap<string, readonly string[]> = new Map([
+    ["m.call", ["intent", "m.call.intent", "capabilities"]],
+]);
 
 /* MembershipActionTypes:
 On Join:  ───────────────────┐   ┌───────────────(1)───────────┐
@@ -98,6 +113,7 @@ On Leave: ─────────  STOP ALL ABOVE
  * of time.
  */
 const MEMBERSHIP_STICKY_DURATION_MS = 60 * 60 * 1000; // 60 minutes
+const CAPABILITIES_UNREACHABLE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * The different types of actions the MembershipManager can take.
@@ -192,6 +208,8 @@ type MembershipManagerClient = Pick<
     MatrixClient,
     | "getUserId"
     | "getDeviceId"
+    | "fetchCapabilities"
+    | "getCachedCapabilities"
     | "sendStateEvent"
     | "_unstable_sendDelayedStateEvent"
     | "_unstable_updateDelayedEvent"
@@ -219,7 +237,15 @@ export class MembershipManager
 {
     private activated = false;
     private readonly logger: Logger;
+
+    /**
+     * The intent of the call from the perspective of this user. This may be an audio call, video call or
+     * something else.
+     *
+     * This carries the stable identifiers (`m.audio`, `m.video`)
+     */
     protected callIntent: RTCCallIntent | undefined;
+
     protected callCapabilities: RTCCallCapability[] | undefined;
     protected applicationData: Record<string, unknown> | undefined;
 
@@ -330,10 +356,11 @@ export class MembershipManager
         if (!this.activated || !this.ownMembership) {
             throw Error("You cannot update your intent before joining the call");
         }
-        if (this.ownMembership.callIntent === callIntent) {
+        const intent = toStableCallIntent(callIntent);
+        if (this.ownMembership.intent === intent) {
             return; // No-op
         }
-        this.callIntent = callIntent;
+        this.callIntent = intent;
         // Kick off a new membership event as a result.
         await this.sendJoinEvent();
     }
@@ -342,11 +369,30 @@ export class MembershipManager
         if (!this.activated || !this.ownMembership) {
             throw Error("You cannot update your application data before joining the call");
         }
-        if (deepCompare(this.applicationData ?? {}, applicationData)) {
+        const sanitized = this.stripReservedApplicationData(applicationData);
+        if (deepCompare(this.applicationData ?? {}, sanitized)) {
             return; // No-op
         }
-        this.applicationData = applicationData;
+        this.applicationData = sanitized;
         await this.sendJoinEvent();
+    }
+
+    /** Drops the keys the SDK writes itself from an application data record. */
+    private stripReservedApplicationData(
+        applicationData: Record<string, unknown> | undefined,
+    ): Record<string, unknown> | undefined {
+        if (applicationData === undefined) return undefined;
+        const reserved = [
+            ...GLOBALLY_RESERVED_APPLICATION_DATA_KEYS,
+            ...(PER_APP_RESERVED_APPLICATION_DATA_KEYS.get(this.slotDescription.application) ?? []),
+        ].filter((key) => applicationData[key] !== undefined);
+        if (reserved.length === 0) return applicationData;
+        this.logger.warn(
+            `Ignoring reserved keys in applicationData: ${reserved.join(", ")}. Use the dedicated join options instead.`,
+        );
+        const sanitized = { ...applicationData };
+        for (const key of reserved) delete sanitized[key];
+        return sanitized;
     }
 
     /**
@@ -373,9 +419,9 @@ export class MembershipManager
         // we keep it as a string for now for backwards compatibility.
         this.stateKey = this.makeMembershipStateKey(userId, deviceId);
         this.state = MembershipManager.defaultState;
-        this.callIntent = joinConfig?.callIntent;
+        this.callIntent = toStableCallIntent(joinConfig?.callIntent);
         this.callCapabilities = joinConfig?.callCapabilities;
-        this.applicationData = joinConfig?.applicationData;
+        this.applicationData = this.stripReservedApplicationData(joinConfig?.applicationData);
         this.scheduler = new ActionScheduler((type): Promise<ActionUpdate> => {
             if (this.oldStatus) {
                 // we put this at the beginning of the actions scheduler loop handle callback since it is a loop this
@@ -426,6 +472,8 @@ export class MembershipManager
 
     // Config:
     private delayedLeaveEventDelayMsOverride?: number;
+    // Set once fetching the server capabilities failed (widget mode), so we do not try again on every retry.
+    private capabilitiesUnreachableUntil = 0;
 
     private get networkErrorRetryMs(): number {
         return this.joinConfig?.networkErrorRetryMs ?? 3_000;
@@ -529,12 +577,21 @@ export class MembershipManager
         // or during a call if the state event canceled our delayed event or caused by an unexpected error that removed our delayed event.
         // (Another client could have canceled it, the homeserver might have removed/lost it due to a restart, ...)
         // In the `then` and `catch` block we treat both cases differently. "if (this.state.hasMemberStateEvent) {} else {}"
+
+        // Clamp the delay to the advertised maximum before the first attempt, so that the server never has to reject it.
+        // The capabilities are not available in widget mode. In that case we rely on the error handling below.
+        if (!this.applyDelayedEventsCapability(this.client.getCachedCapabilities())) {
+            this.logger.info("Not using delayed event because the server capabilities say they are disabled");
+            if (this.state.hasMemberStateEvent) return {};
+            return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
+        }
         return await this.clientSendDelayedDisconnectMembership()
             .then((response) => {
                 this.state.expectedServerDelayLeaveTs = Date.now() + this.delayedLeaveEventDelayMs;
                 this.setAndEmitProbablyLeft(false);
                 // On success we reset retries and set delayId.
                 this.resetRateLimitCounter(MembershipActionType.SendDelayedEvent);
+                this.capabilitiesUnreachableUntil = 0;
                 this.setAndEmitDelayId(response.delay_id);
                 if (this.state.hasMemberStateEvent) {
                     // This action was scheduled because the previous delayed event was cancelled
@@ -548,9 +605,9 @@ export class MembershipManager
                     return createInsertActionUpdate(MembershipActionType.SendJoinEvent);
                 }
             })
-            .catch((e) => {
+            .catch(async (e) => {
                 const repeatActionType = MembershipActionType.SendDelayedEvent;
-                if (this.manageMaxDelayExceededSituation(e)) {
+                if (await this.manageMaxDelayExceededSituation(e)) {
                     return createInsertActionUpdate(repeatActionType);
                 }
                 const update = this.actionUpdateFromErrors(e, repeatActionType, "_unstable_sendDelayedStateEvent");
@@ -560,8 +617,9 @@ export class MembershipManager
                     // This action was scheduled because the previous delayed event was cancelled
                     // due to lack of https://github.com/element-hq/synapse/pull/17810
 
-                    // Don't do any other delayed event work if its not supported.
-                    if (this.isUnsupportedDelayedEndpoint(e)) return {};
+                    // Don't do any other delayed event work if its not supported,
+                    // or if we gave up on finding a delay that the server accepts.
+                    if (this.isUnsupportedDelayedEndpoint(e) || this.isDelayTooLargeError(e)) return {};
                     throw Error("Could not send delayed event, even though delayed events are supported. " + e);
                 } else {
                     // This action was scheduled because we are in the process of joining
@@ -1035,10 +1093,16 @@ export class MembershipManager
             // assign those values to the media participant for those versions.
             "membershipID": `${this.userId}:${this.deviceId}`,
             expires,
-            "m.call.intent": this.callIntent,
+            // Only include the unstable intent property on legacy state events.
+            "m.call.intent": toUnstableCallIntent(this.callIntent),
             ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             "focus_active": { type: "livekit", focus_selection: "multi_sfu" } as const,
-            "foci_preferred": this.publishedTransports,
+            // Always publish LiveKit transports under the legacy `livekit` type. Clients that only know `livekit` use the
+            // first preferred focus via CallMembership.getTransport. Ruma-based clients that only know `livekit` fail to
+            // parse the whole membership if it contains `m.livekit`.
+            "foci_preferred": this.publishedTransports.map((t) =>
+                isUnstableLivekitTransport(t) ? { ...t, type: LEGACY_LIVEKIT_TRANSPORT_TYPE } : t,
+            ),
             ...(ownMembership !== undefined ? { created_ts: ownMembership.createdTs() } : undefined),
         };
     }
@@ -1079,19 +1143,89 @@ export class MembershipManager
     }
 
     /**
+     * Check if the server rejected the delay of a delayed event for exceeding its maximum
+     * @param error the error causing this handler check/execution
+     * @returns true if its a delay too large error
+     */
+    private isDelayTooLargeError(error: unknown): boolean {
+        return (
+            error instanceof MatrixError &&
+            (error.errcode === "M_DELAY_TOO_LARGE" || error.errcode === "ORG.MATRIX.MSC4140_DELAY_TOO_LARGE")
+        );
+    }
+
+    /**
+     * Apply the limits of the delayed events capability ([MSC4140](https://github.com/matrix-org/matrix-spec-proposals/blob/main/proposals/4140-delayed-events-futures.md))
+     * by clamping the delay of the delayed leave event to the advertised maximum.
+     * @param capabilities the homeserver capabilities, or undefined if they are not known.
+     * @returns false if the capabilities do not advertise delayed events or say that they are disabled, true
+     * otherwise (also if the capabilities are not known).
+     */
+    private applyDelayedEventsCapability(capabilities: Capabilities | undefined): boolean {
+        if (!capabilities) return true;
+        const capability = capabilities["m.delayed_events"] ?? capabilities["org.matrix.msc4140.delayed_events"];
+        if (!capability) return false;
+        // A `0` in either field means that delayed events are disabled.
+        if (capability.max_delay_ms === 0 || capability.max_scheduled === 0) return false;
+
+        const maxDelayAllowed = capability.max_delay_ms;
+        if (this.delayedLeaveEventDelayMs > maxDelayAllowed) {
+            this.logger.info(`Clamping the delayed leave event delay to the server maximum of ${maxDelayAllowed}ms`);
+            this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
+        }
+        return true;
+    }
+
+    /**
      * Check if this is a DelayExceeded timeout and update the TimeoutOverride for the next try
      * @param error the error causing this handler check/execution
      * @returns true if its a delay exceeded error and we updated the local TimeoutOverride
      */
-    private manageMaxDelayExceededSituation(error: unknown): boolean {
-        if (
-            error instanceof MatrixError &&
-            error.errcode === "M_UNKNOWN" &&
-            error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED"
-        ) {
+    private async manageMaxDelayExceededSituation(error: unknown): Promise<boolean> {
+        if (!(error instanceof MatrixError)) return false;
+
+        if (error.errcode === "M_UNKNOWN" && error.data["org.matrix.msc4140.errcode"] === "M_MAX_DELAY_EXCEEDED") {
+            // Error format of Synapse before 1.157.0, which carries the limit.
+            // TODO: Remove this branch once Synapse before 1.157.0 is no longer deployed (to revisit from 2026-11-18).
             const maxDelayAllowed = error.data["org.matrix.msc4140.max_delay"];
             if (typeof maxDelayAllowed === "number" && this.delayedLeaveEventDelayMs > maxDelayAllowed) {
                 this.delayedLeaveEventDelayMsOverride = maxDelayAllowed;
+            }
+            this.logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
+            return true;
+        }
+
+        if (this.isDelayTooLargeError(error)) {
+            // The error does not carry the limit. It is advertised in the capabilities.
+            const previousDelay = this.delayedLeaveEventDelayMs;
+            let capabilities: Capabilities | undefined;
+            if (Date.now() >= this.capabilitiesUnreachableUntil) {
+                try {
+                    capabilities = await this.client.fetchCapabilities();
+                } catch (e) {
+                    // This is expected in widget mode where the client cannot talk to the homeserver.
+                    // TODO: Get the delayed events capability through the widget API instead, and remove the halving
+                    // fallback below.
+                    this.logger.info("Could not get the server capabilities to read the maximum delay:", e);
+                    if (
+                        e instanceof HTTPError &&
+                        e.httpStatus !== undefined &&
+                        e.httpStatus >= 400 &&
+                        e.httpStatus < 500 &&
+                        e.httpStatus !== 429
+                    ) {
+                        this.capabilitiesUnreachableUntil = Date.now() + CAPABILITIES_UNREACHABLE_DURATION_MS;
+                    }
+                }
+            }
+            if (!this.applyDelayedEventsCapability(capabilities)) return false;
+
+            if (this.delayedLeaveEventDelayMs >= previousDelay) {
+                // We do not know the limit (or it is not the one the server enforces): halve the delay until the server
+                // accepts it. We give up once the event would time out before we get to restart it.
+                const halvedDelay = Math.floor(previousDelay / 2);
+                if (halvedDelay <= this.delayedLeaveEventRestartMs) return false;
+                this.delayedLeaveEventDelayMsOverride = halvedDelay;
             }
             this.logger.warn("Retry sending delayed disconnection event due to server timeout limitations:", error);
             return true;
@@ -1366,11 +1500,30 @@ export class StickyEventMembershipManager extends MembershipManager {
             application: {
                 ...this.applicationData,
                 type: this.slotDescription.application,
-                ...(this.callIntent ? { "m.call.intent": this.callIntent } : {}),
+                ...(this.callIntent
+                    ? {
+                          // Include both the stable and the unstable property for compatibility with older clients.
+                          "intent": this.callIntent,
+                          "m.call.intent": toUnstableCallIntent(this.callIntent),
+                      }
+                    : {}),
                 ...(this.callCapabilities !== undefined ? { capabilities: this.callCapabilities } : {}),
             },
             slot_id: computeSlotId(this.slotDescription),
-            transports: { published: this.publishedTransports, can_subscribe: ["livekit"] },
+            transports: {
+                // Publish LiveKit transports under both the legacy `livekit` and the stable `m.livekit`
+                // type. Clients that only know `livekit` use the first published transport via
+                // CallMembership.getTransport.
+                published: this.publishedTransports.flatMap((t) =>
+                    isUnstableLivekitTransport(t)
+                        ? [
+                              { ...t, type: LEGACY_LIVEKIT_TRANSPORT_TYPE },
+                              { ...t, type: LIVEKIT_TRANSPORT_TYPE },
+                          ]
+                        : [t],
+                ),
+                can_subscribe: [LEGACY_LIVEKIT_TRANSPORT_TYPE, LIVEKIT_TRANSPORT_TYPE],
+            },
             member: { device_id: this.deviceId, user_id: this.userId, id: this.memberId, membership: "join" },
         };
     }

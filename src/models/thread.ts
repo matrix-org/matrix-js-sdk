@@ -359,9 +359,13 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
      * the right place based on timestamp. (We should be using Sync Order but we
      * don't have it.)
      *
+     * @param event - the event to insert
+     * @param liveEvent - true if this is a new event (e.g. from sync) rather than
+     *    one we fetched, so that it is reported to listeners as live.
+     *
      * @internal
      */
-    public insertEventIntoTimeline(event: MatrixEvent): void {
+    public insertEventIntoTimeline(event: MatrixEvent, liveEvent = false): void {
         const eventId = event.getId();
         if (!eventId) {
             return;
@@ -370,7 +374,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
         if (this.findEventById(eventId)) {
             return;
         }
-        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false);
+        this.timelineSet.insertEventIntoTimeline(event, this.liveTimeline, this.roomState, false, liveEvent);
     }
 
     public addEvents(events: MatrixEvent[], toStartOfTimeline: boolean): void {
@@ -440,8 +444,8 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 // We think this event might be out of order, because isNewestReply
                 // is false (otherwise we would have gone into the earlier if
                 // clause), so try to insert it in the right place based on
-                // timestamp.
-                this.insertEventIntoTimeline(event);
+                // timestamp. It is still a new event, so report it as live.
+                this.insertEventIntoTimeline(event, true);
             }
         }
 
@@ -532,7 +536,7 @@ export class Thread extends ReadReceipt<ThreadEmittedEvents, ThreadEventHandlerM
                 this.client.canSupport.get(Feature.RelationsRecursion) ?? ServerSupport.Unsupported;
 
             if (recursionSupport === ServerSupport.Unsupported) {
-                this.insertEventIntoTimeline(event);
+                this.insertEventIntoTimeline(event, !toStartOfTimeline);
             } else {
                 this.addEventToTimeline(event, toStartOfTimeline);
             }

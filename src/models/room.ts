@@ -538,6 +538,14 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
         }
     }
 
+    /**
+     * Stop any background work owned by this room. Call this when the room is being
+     * discarded; the room should not be used afterwards.
+     */
+    public dispose(): void {
+        this.retention?.dispose();
+    }
+
     private threadTimelineSetsPromise: Promise<[EventTimelineSet, EventTimelineSet]> | null = null;
     public async createThreadsTimelineSets(): Promise<[EventTimelineSet, EventTimelineSet] | null> {
         if (this.threadTimelineSetsPromise) {
@@ -3495,6 +3503,12 @@ export class Room extends ReadReceipt<RoomEmittedEvents, RoomEventHandlerMap> {
     public _unstable_addStickyEvents(events: MatrixEvent[]): ReturnType<RoomStickyEventsStore["addStickyEvents"]> {
         // ALWAYS filter out any events that are past retention
         events = events.filter((e) => this.retention?.shouldEventBeRetained(e) ?? true);
+
+        // Sticky events must be decrypted before they can be filed under their type and sticky key.
+        // Timeline events are mapped without decryption, so kick it off here.
+        for (const event of events) {
+            void this.client.decryptEventIfNeeded(event);
+        }
 
         return this.stickyEvents.addStickyEvents(events);
     }

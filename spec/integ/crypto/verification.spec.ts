@@ -1719,7 +1719,7 @@ function sha256(commitmentStr: string): string {
 }
 
 function encodeUnpaddedBase64(uint8Array: ArrayLike<number>): string {
-    return Buffer.from(uint8Array).toString("base64").replace(/=+$/g, "");
+    return Buffer.from(uint8Array).toString("base64").replace(/[=]+$/g, "");
 }
 
 /** build an m.key.verification.request to-device message originating from the dummy device */

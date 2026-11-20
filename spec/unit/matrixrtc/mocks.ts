@@ -17,7 +17,7 @@ limitations under the License.
 import { EventEmitter } from "node:stream";
 import { type Mocked, type MockedObject } from "vitest";
 
-import { EventType, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
+import { EventType, MatrixError, type Room, RoomEvent, type MatrixClient, MatrixEvent } from "../../../src";
 import { CallMembership } from "../../../src/matrixrtc";
 import { secureRandomString } from "../../../src/randomstring";
 import {
@@ -88,6 +88,8 @@ export type MockClient = MockedObject<
         MatrixClient,
         | "getUserId"
         | "getDeviceId"
+        | "fetchCapabilities"
+        | "getCachedCapabilities"
         | "sendEvent"
         | "sendStateEvent"
         | "_unstable_sendDelayedStateEvent"
@@ -108,6 +110,11 @@ export function makeMockClient(userId: string, deviceId: string): MockClient {
     return {
         getDeviceId: vi.fn(() => deviceId),
         getUserId: vi.fn(() => userId),
+        // By default the capabilities are not reachable, as it is the case in widget mode.
+        fetchCapabilities: vi
+            .fn()
+            .mockRejectedValue(new MatrixError({ errcode: "M_MISSING_TOKEN", error: "Missing access token" }, 401)),
+        getCachedCapabilities: vi.fn(() => undefined),
         sendEvent: vi.fn(),
         sendStateEvent: vi.fn(),
         cancelPendingEvent: vi.fn(),
@@ -152,7 +159,7 @@ export function makeMockRoom(
 function makeMockRoomState(membershipData: MembershipData[], roomId: string, slotEvent?: MatrixEvent) {
     const events = membershipData.map((m) => mockRTCEvent(m, roomId));
     const keysAndEvents = events.map((e) => {
-        const data = e.getContent() as SessionMembershipData;
+        const data = e.getContent<SessionMembershipData>();
         return [`_${e.sender?.userId}_${data.device_id}`];
     });
 
@@ -271,11 +278,4 @@ export function mockCallMembership(
     vi.mocked(ev.getContent).mockReturnValue(membershipData);
     const data = CallMembership.membershipDataFromMatrixEvent(ev);
     return new CallMembership(ev, data, backendIdentities, "(deprecated)");
-}
-
-export function makeKey(id: number, key: string): { key: string; index: number } {
-    return {
-        key: key,
-        index: id,
-    };
 }
