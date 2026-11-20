@@ -251,7 +251,7 @@ describe("MatrixClient event send ordering", () => {
         sendA.resolve(new Response(JSON.stringify({ event_id: "$A" }), { status: 200 }));
         await flush();
         expect(sentBodies).toEqual(["C"]);
-        expect(client["queuedEventCancellers"].size).toBe(0);
+        expect(client["queuedEventCancelResolvers"].size).toBe(0);
     });
 
     it("can cancel an event whilst it is being encrypted at the head of the queue", async () => {
