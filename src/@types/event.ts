@@ -173,11 +173,11 @@ export enum EventType {
     RTCSlot = "org.matrix.msc4143.rtc.slot",
     /**
      * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     * @deprecated Use {@link EventType.RTCMembershipStable} instead.
      */
     RTCMembership = "org.matrix.msc4143.rtc.member",
     /**
      * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
-     * @deprecated Use {@link EventType.RTCMembershipStable} instead.
      */
     RTCMembershipStable = "m.rtc.member",
     /**
