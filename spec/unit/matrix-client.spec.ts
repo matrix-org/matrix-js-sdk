@@ -787,7 +787,7 @@ describe("MatrixClient", function () {
         function send(stickyKey?: string, extraContent: object = {}): Promise<ISendEventResponse> {
             const content: any = { ...extraContent };
             if (stickyKey !== undefined) content.msc4354_sticky_key = stickyKey;
-            return client._unstable_sendStickyEvent(roomId, 60000, null, EventType.RTCMembership, content);
+            return client._unstable_sendStickyEvent(roomId, 60000, null, EventType.RTCMembershipStable, content);
         }
 
         it("keeps the call order even if the server support check for the first call takes longer", async () => {

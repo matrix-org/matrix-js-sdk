@@ -430,7 +430,7 @@ async function checkCallNotificationReceivingRules(
  */
 function* ownMembershipEvents(room: RTCNotificationValidationContext["room"], userId: string): Iterable<MatrixEvent> {
     for (const stickyEvent of room._unstable_getStickyEvents()) {
-        if (stickyEvent.getType() === EventType.RTCMembership && stickyEvent.getSender() === userId) {
+        if (stickyEvent.getType() === EventType.RTCMembershipStable && stickyEvent.getSender() === userId) {
             yield stickyEvent;
         }
     }

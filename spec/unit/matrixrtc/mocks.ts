@@ -258,7 +258,7 @@ export function mockRTCEvent(
 ): MatrixEvent {
     return {
         ...makeMockEvent(
-            stickyDuration !== undefined ? EventType.RTCMembership : EventType.GroupCallMemberPrefix,
+            stickyDuration !== undefined ? EventType.RTCMembershipStable : EventType.GroupCallMemberPrefix,
             sender,
             roomId,
             membershipData,
