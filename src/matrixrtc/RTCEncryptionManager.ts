@@ -394,6 +394,7 @@ export class RTCEncryptionManager implements IEncryptionManager {
                     userId: membership.sender,
                     deviceId: membership.deviceId,
                     membershipTs: membership.createdTs(),
+                    isStickyMembership: membership.isSticky,
                 };
             });
 
