@@ -1075,6 +1075,38 @@ describe("MatrixClient event timelines", function () {
                 httpBackend.flushAllExpected(),
             ]);
         });
+
+        it.each([
+            [true, [THREAD_ROOT, EVENTS[1], THREAD_REPLY, EVENTS[2]]],
+            [false, [THREAD_ROOT, EVENTS[1], EVENTS[2]]],
+        ])(
+            "should only add thread events to a filtered timeline set if it includes threaded events (%s)",
+            async (includeThreadedEvents, expectedEvents) => {
+                const room = client.getRoom(roomId)!;
+                const filter = Filter.fromJson(userId, `filter-${includeThreadedEvents}`, {});
+                const timelineSet = room.getOrCreateFilteredTimelineSet(filter, {
+                    includeThreadedEvents,
+                    prepopulateTimeline: false,
+                });
+                const tl = timelineSet.getLiveTimeline();
+                tl.setPaginationToken("start_token0", Direction.Backward);
+
+                httpBackend.when("GET", "/rooms/!foo%3Abar/messages").respond(200, () => ({
+                    // newest first, as we are paginating backwards
+                    chunk: [EVENTS[2], THREAD_REPLY, EVENTS[1], THREAD_ROOT],
+                    start: "start_token0",
+                    end: "start_token1",
+                }));
+
+                const [success] = await Promise.all([
+                    client.paginateEventTimeline(tl, { backwards: true }),
+                    httpBackend.flushAllExpected(),
+                ]);
+
+                expect(success).toBeTruthy();
+                expect(tl.getEvents().map((ev) => ev.getId())).toEqual(expectedEvents.map((ev) => ev.event_id));
+            },
+        );
     });
 
     it("should ensure thread events are ordered correctly", async () => {
