@@ -1,7 +1,7 @@
 // This file had a function whose name is all caps, which displeases eslint
 /* eslint new-cap: "off" */
 
-import { MatrixError } from "../../src/http-api";
+import { ConnectionError, HTTPError, MatrixError } from "../../src/http-api";
 import { MatrixScheduler } from "../../src/scheduler";
 import * as utils from "../test-utils/test-utils";
 import { type MatrixEvent } from "../../src";
@@ -148,6 +148,43 @@ describe("MatrixScheduler", function () {
         await expect(queuedA).rejects.toThrow("Testerror");
         await expect(queuedB).rejects.toThrow("Testerror");
         expect(procCount).toEqual(1);
+    });
+
+    it("should not drop the next event if the event being processed is removed from the queue", async () => {
+        queueFn = () => "yep";
+        const deferA = Promise.withResolvers<Record<string, boolean>>();
+        const processed: MatrixEvent[] = [];
+        scheduler.setProcessFunction(async (ev) => {
+            processed.push(ev);
+            return ev === eventA ? deferA.promise : { b: true };
+        });
+
+        void scheduler.queueEvent(eventA);
+        const queuedB = scheduler.queueEvent(eventB);
+        await Promise.resolve();
+        expect(processed).toEqual([eventA]);
+
+        expect(scheduler.removeEventFromQueue(eventA)).toBe(true);
+        deferA.resolve({ a: true });
+
+        await expect(queuedB).resolves.toEqual({ b: true });
+        expect(processed).toEqual([eventA, eventB]);
+    });
+
+    it("should not give up on the queue if an event which was removed whilst being processed fails", async () => {
+        retryFn = () => -1;
+        queueFn = () => "yep";
+        const deferA = Promise.withResolvers<Record<string, boolean>>();
+        scheduler.setProcessFunction(async (ev) => (ev === eventA ? deferA.promise : { b: true }));
+
+        void scheduler.queueEvent(eventA);
+        const queuedB = scheduler.queueEvent(eventB);
+        await Promise.resolve();
+
+        scheduler.removeEventFromQueue(eventA);
+        deferA.reject(new Error("Testerror"));
+
+        await expect(queuedB).resolves.toEqual({ b: true });
     });
 
     it("should treat each queue separately", async () => {
@@ -325,7 +362,7 @@ describe("MatrixScheduler", function () {
 
     describe("QUEUE_MESSAGES", function () {
         it("should queue m.room.message events only", function () {
-            expect(MatrixScheduler.QUEUE_MESSAGES(eventA)).toEqual("message");
+            expect(MatrixScheduler.QUEUE_MESSAGES(eventA)).toEqual(`message:${roomId}`);
             expect(
                 MatrixScheduler.QUEUE_MESSAGES(
                     utils.mkMembership({
@@ -336,6 +373,13 @@ describe("MatrixScheduler", function () {
                     }),
                 ),
             ).toEqual(null);
+        });
+
+        it("should queue events in different rooms separately", function () {
+            const eventInOtherRoom = utils.mkMessage({ user: "@alice:bar", room: "!other:bar", event: true });
+            expect(MatrixScheduler.QUEUE_MESSAGES(eventInOtherRoom)).not.toEqual(
+                MatrixScheduler.QUEUE_MESSAGES(eventA),
+            );
         });
     });
 
@@ -363,6 +407,37 @@ describe("MatrixScheduler", function () {
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(eventA, 2, error)).toEqual(4000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(eventA, 3, error)).toEqual(8000);
             expect(MatrixScheduler.RETRY_BACKOFF_RATELIMIT(eventA, 4, error)).toEqual(16000);
+        });
+    });
+
+    describe("RETRY_BACKOFF_RATELIMIT_AND_CONNECTION_ERRORS", function () {
+        const retry = MatrixScheduler.RETRY_BACKOFF_RATELIMIT_AND_CONNECTION_ERRORS;
+
+        it("should be the default retry algorithm", function () {
+            expect(new MatrixScheduler().retryAlgorithm).toBe(retry);
+        });
+
+        it("should retry connection errors with exponential backoff", function () {
+            const error = new ConnectionError("fetch failed");
+            expect(retry(eventA, 1, error as unknown as MatrixError)).toEqual(2000);
+            expect(retry(eventA, 2, error as unknown as MatrixError)).toEqual(4000);
+            expect(retry(eventA, 4, error as unknown as MatrixError)).toEqual(16000);
+            expect(retry(eventA, 5, error as unknown as MatrixError)).toEqual(-1);
+        });
+
+        it("should retry server errors and rate limiting", function () {
+            expect(retry(eventA, 1, new HTTPError("Bad Gateway", 502) as MatrixError)).toEqual(2000);
+            expect(
+                retry(eventA, 1, new MatrixError({ errcode: "M_LIMIT_EXCEEDED", retry_after_ms: 5000 }, 429)),
+            ).toEqual(5000);
+        });
+
+        it("should not retry client errors", function () {
+            expect(retry(eventA, 1, new MatrixError({ errcode: "M_FORBIDDEN" }, 403))).toEqual(-1);
+        });
+
+        it("should not retry errors which did not come from the network", function () {
+            expect(retry(eventA, 1, new Error("Failed to encrypt") as MatrixError)).toEqual(-1);
         });
     });
 });

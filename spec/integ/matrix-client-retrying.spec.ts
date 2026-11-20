@@ -86,8 +86,9 @@ describe("MatrixClient retrying", function () {
         const ev1 = tl[0];
         const ev2 = tl[1];
 
+        // the second message is queued immediately behind the first, before either is encrypted (if necessary)
         expect(ev1.status).toEqual(EventStatus.SENDING);
-        expect(ev2.status).toEqual(EventStatus.SENDING);
+        expect(ev2.status).toEqual(EventStatus.QUEUED);
 
         // the first message should get sent, and the second should get queued
         httpBackend!
