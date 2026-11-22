@@ -34,6 +34,9 @@ import { type QueryDict, sleep } from "../../../src/utils";
 import { type Logger } from "../../../src/logger";
 import { makeDelegatedAuthMetadata } from "../../test-utils/auth";
 
+// setupTests mocks `timeoutSignal` due to hanging timers
+vi.unmock("../../../src/http-api/utils");
+
 function makeTokenResponse(
     accessToken: string,
     refreshToken?: string,
@@ -112,6 +115,58 @@ describe("FetchHttpApi", () => {
 
         api.abort();
         expect(fetchFn.mock.calls[2][1]?.signal?.aborted).toBeTruthy();
+    });
+
+    it.each([
+        ["localTimeoutMs", "json", true, {}],
+        ["abortSignal", "json", true, {}],
+        ["api.abort()", "json", true, {}],
+        ["api.abort()", "blob", true, { rawResponseBody: true }],
+        ["api.abort()", "text", true, { json: false }],
+        ["api.abort()", "text", false, {}],
+    ] as const)("should abort stalled body read on %s (%s, ok=%s)", async (source, reader, ok, extraOpts) => {
+        const bodyStarted = Promise.withResolvers<void>();
+        const fetchFn: MockedFunction<Window["fetch"]> = vi
+            .fn()
+            .mockResolvedValueOnce({
+                ok,
+                [reader]: () => {
+                    bodyStarted.resolve();
+                    return new Promise((_resolve, reject) => {
+                        fetchFn.mock.calls[0][1]?.signal?.addEventListener("abort", () =>
+                            reject(new DOMException("Aborted", "AbortError")),
+                        );
+                    });
+                },
+            })
+            .mockResolvedValueOnce({ ok: true, json: vi.fn().mockResolvedValue({}) });
+        const api = new FetchHttpApi(new TypedEventEmitter<any, any>(), { baseUrl, prefix, fetchFn, onlyData: true });
+        const caller = new AbortController();
+        if (source === "localTimeoutMs") vi.useFakeTimers();
+
+        const stalled = api.request(Method.Get, "/foo", undefined, undefined, {
+            ...extraOpts,
+            localTimeoutMs: source === "localTimeoutMs" ? 1000 : undefined,
+            abortSignal: source === "abortSignal" ? caller.signal : undefined,
+        });
+        stalled.catch(() => {});
+        await bodyStarted.promise;
+
+        if (source === "localTimeoutMs") await vi.advanceTimersByTimeAsync(1000);
+        else if (source === "abortSignal") caller.abort();
+        else api.abort();
+
+        expect(fetchFn.mock.calls[0][1]?.signal?.aborted).toBe(true);
+        await expect(stalled).rejects.toMatchObject({ name: "AbortError" });
+
+        if (source === "localTimeoutMs") {
+            // Once the body has been read, abort listeners should be removed.
+            const after = new AbortController();
+            await api.request(Method.Get, "/bar", undefined, undefined, { abortSignal: after.signal });
+            after.abort();
+            api.abort();
+            expect(fetchFn.mock.calls[1][1]?.signal?.aborted).toBe(false);
+        }
     });
 
     it("should fall back to global fetch if fetchFn not provided", () => {
