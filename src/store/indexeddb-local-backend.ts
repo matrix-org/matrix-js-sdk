@@ -420,60 +420,66 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             return this.syncToDatabasePromise;
         }
         userTuples.unshift(...this.pendingUserPresenceData);
-        this.syncToDatabasePromise = this.doSyncToDatabase(userTuples);
-        return this.syncToDatabasePromise;
+        // Clear after assignment so a synchronous throw before the first await
+        // does not leave a rejected promise stuck here.
+        const promise = this.doSyncToDatabase(userTuples).finally(() => {
+            if (this.syncToDatabasePromise === promise) {
+                this.syncToDatabasePromise = undefined;
+            }
+        });
+        this.syncToDatabasePromise = promise;
+        return promise;
     }
 
     private async doSyncToDatabase(userTuples: UserTuple[]): Promise<void> {
+        const syncData = this.syncAccumulator.getJSON(true);
+        // Persist in a single transaction so a failed save writes nothing
+        // and leaves the previously saved sync consistent.
+        const txn = this.db!.transaction(["users", "accountData", "sync"], "readwrite");
         try {
-            const syncData = this.syncAccumulator.getJSON(true);
-            await Promise.all([
-                this.persistUserPresenceEvents(userTuples),
-                this.persistAccountData(syncData.accountData),
-                this.persistSyncData(syncData.nextBatch, syncData.roomsData),
-            ]);
-        } finally {
-            this.syncToDatabasePromise = undefined;
+            this.persistUserPresenceEvents(txn, userTuples);
+            this.persistAccountData(txn, syncData.accountData);
+            this.persistSyncData(txn, syncData.nextBatch, syncData.roomsData);
+        } catch (e) {
+            // Abort so earlier queued writes in this transaction do not commit.
+            try {
+                txn.abort();
+            } catch {
+                // Transaction may already be aborted or inactive.
+            }
+            throw e;
         }
+        await txnAsPromise(txn);
+        logger.log("Persisted sync data up to", syncData.nextBatch);
     }
 
     /**
      * Persist rooms /sync data along with the next batch token.
+     * @param txn - The transaction of the save.
      * @param nextBatch - The next_batch /sync value.
      * @param roomsData - The 'rooms' /sync data from a SyncAccumulator
-     * @returns Promise which resolves if the data was persisted.
      */
-    private persistSyncData(nextBatch: string, roomsData: ISyncResponse["rooms"]): Promise<void> {
+    private persistSyncData(txn: IDBTransaction, nextBatch: string, roomsData: ISyncResponse["rooms"]): void {
         logger.log("Persisting sync data up to", nextBatch);
-        return promiseTry<void>(() => {
-            const txn = this.db!.transaction(["sync"], "readwrite");
-            const store = txn.objectStore("sync");
-            store.put({
-                clobber: "-", // constant key so will always clobber
-                nextBatch,
-                roomsData,
-            }); // put == UPSERT
-            return txnAsPromise(txn).then(() => {
-                logger.log("Persisted sync data up to", nextBatch);
-            });
-        });
+        const store = txn.objectStore("sync");
+        store.put({
+            clobber: "-", // constant key so will always clobber
+            nextBatch,
+            roomsData,
+        }); // put == UPSERT
     }
 
     /**
      * Persist a list of account data events. Events with the same 'type' will
      * be replaced.
+     * @param txn - The transaction of the save.
      * @param accountData - An array of raw user-scoped account data events
-     * @returns Promise which resolves if the events were persisted.
      */
-    private persistAccountData(accountData: IMinimalEvent[]): Promise<void> {
-        return promiseTry<void>(() => {
-            const txn = this.db!.transaction(["accountData"], "readwrite");
-            const store = txn.objectStore("accountData");
-            for (const event of accountData) {
-                store.put(event); // put == UPSERT
-            }
-            return txnAsPromise(txn).then();
-        });
+    private persistAccountData(txn: IDBTransaction, accountData: IMinimalEvent[]): void {
+        const store = txn.objectStore("accountData");
+        for (const event of accountData) {
+            store.put(event); // put == UPSERT
+        }
     }
 
     /**
@@ -481,21 +487,17 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * Users with the same 'userId' will be replaced.
      * Presence events should be the event in its raw form (not the Event
      * object)
+     * @param txn - The transaction of the save.
      * @param tuples - An array of [userid, event] tuples
-     * @returns Promise which resolves if the users were persisted.
      */
-    private persistUserPresenceEvents(tuples: UserTuple[]): Promise<void> {
-        return promiseTry<void>(() => {
-            const txn = this.db!.transaction(["users"], "readwrite");
-            const store = txn.objectStore("users");
-            for (const tuple of tuples) {
-                store.put({
-                    userId: tuple[0],
-                    event: tuple[1],
-                }); // put == UPSERT
-            }
-            return txnAsPromise(txn).then();
-        });
+    private persistUserPresenceEvents(txn: IDBTransaction, tuples: UserTuple[]): void {
+        const store = txn.objectStore("users");
+        for (const tuple of tuples) {
+            store.put({
+                userId: tuple[0],
+                event: tuple[1],
+            }); // put == UPSERT
+        }
     }
 
     /**
@@ -637,7 +639,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         try {
             this.syncAccumulator.removeEventsFromRoom(roomId, eventIds);
             const syncData = this.syncAccumulator.getJSON(true);
-            await this.persistSyncData(syncData.nextBatch, syncData.roomsData);
+            const txn = this.db!.transaction(["sync"], "readwrite");
+            this.persistSyncData(txn, syncData.nextBatch, syncData.roomsData);
+            await txnAsPromise(txn);
+            logger.log("Persisted sync data up to", syncData.nextBatch);
         } finally {
             this.syncToDatabasePromise = undefined;
         }
