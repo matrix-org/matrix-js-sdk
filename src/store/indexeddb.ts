@@ -206,18 +206,22 @@ export class IndexedDBStore extends MemoryStore {
      * Delete all data from this store.
      * @returns Promise which resolves if the data was deleted from the database.
      */
-    public deleteAllData = this.degradable((): Promise<void> => {
-        super.deleteAllData();
-        return this.backend.clearDatabase().then(
-            () => {
-                logger.log("Deleted indexeddb data.");
-            },
-            (err) => {
-                logger.error(`Failed to delete indexeddb data: ${err}`);
-                throw err;
-            },
-        );
-    }, null);
+    public deleteAllData = this.degradable(
+        (): Promise<void> => {
+            super.deleteAllData();
+            return this.backend.clearDatabase().then(
+                () => {
+                    logger.log("Deleted indexeddb data.");
+                },
+                (err) => {
+                    logger.error(`Failed to delete indexeddb data: ${err}`);
+                    throw err;
+                },
+            );
+        },
+        null,
+        false,
+    );
 
     /**
      * Whether this store would like to save its data
@@ -263,7 +267,11 @@ export class IndexedDBStore extends MemoryStore {
             this.userModifiedMap[u.userId] = u.getLastModifiedTime();
         }
 
-        return this.backend.syncToDatabase(userTuples);
+        return this.backend.syncToDatabase(userTuples).catch((e) => {
+            // These users were not saved after all.
+            for (const [userId] of userTuples) delete this.userModifiedMap[userId];
+            throw e;
+        });
     }, null);
 
     public setSyncData = this.degradable((syncData: ISyncResponse): Promise<void> => {
@@ -314,16 +322,19 @@ export class IndexedDBStore extends MemoryStore {
      * watch for failures after initial store startup, including `QuotaExceededError` as
      * free disk space changes, etc.
      *
-     * When IndexedDB fails via any of these paths, we degrade this back to a `MemoryStore`
-     * in place so that the current operation and all future ones are in-memory only.
+     * Transient transaction aborts and a closing or closed connection fall back to memory
+     * without clearing the database. Other failures degrade back to a `MemoryStore` and
+     * clear the database.
      *
      * @param func - The degradable work to do.
      * @param fallback - The method name for fallback.
+     * @param keepOnAbort - Whether recoverable abort/closing errors keep the database instead of degrading.
      * @returns A wrapped member function.
      */
     private degradable<A extends Array<any>, F extends keyof MemoryStore | null, R = void>(
         func: DegradableFn<A, R>,
         fallback: F,
+        keepOnAbort = true,
     ): DegradableFn<A, F extends string ? R : void> {
         const fallbackFn = fallback ? (super[fallback] as (...args: A) => Promise<R>) : null;
 
@@ -331,6 +342,13 @@ export class IndexedDBStore extends MemoryStore {
             try {
                 return await func.call(this, ...args);
             } catch (e) {
+                if (keepOnAbort && isRecoverableError(e)) {
+                    logger.warn("IndexedDBStore operation failed; keeping its data", e);
+                    if (fallbackFn) {
+                        return fallbackFn.call(this, ...args);
+                    }
+                    return;
+                }
                 logger.error("IndexedDBStore failure, degrading to MemoryStore", e);
                 this.emitter.emit("degraded", e as Error);
                 try {
@@ -415,6 +433,17 @@ export class IndexedDBStore extends MemoryStore {
  */
 function pendingEventsKey(roomId: string): string {
     return `mx_pending_events_${roomId}`;
+}
+
+function getErrorName(e: unknown): unknown {
+    const err = e as { name?: unknown; cause?: unknown } | null;
+    if (err?.name && err.name !== "Error") return err.name;
+    return (err?.cause as { name?: unknown } | null)?.name ?? err?.name;
+}
+
+function isRecoverableError(e: unknown): boolean {
+    const name = getErrorName(e);
+    return name === "AbortError" || name === "UnknownError" || name === "InvalidStateError";
 }
 
 type DegradableFn<A extends Array<any>, T> = (...args: A) => Promise<T>;

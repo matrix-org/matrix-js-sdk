@@ -91,8 +91,7 @@ describe("LocalIndexedDBStoreBackend", () => {
                 return this.name === "accountData" ? this.add(args[0]) : realPut.apply(this, args);
             });
             await backend.setSyncData(syncResp("failed", [{ type: "m.direct", content: { v: 2 } }]));
-            // txnAsPromise rejects with txn.error, which is null for a bubbled request error.
-            await expect(backend.syncToDatabase([offline])).rejects.toBeNull();
+            await expect(backend.syncToDatabase([offline])).rejects.toMatchObject({ name: "ConstraintError" });
 
             const { sync, presence } = await readPersisted();
             expect(sync).toMatchObject({ nextBatch: "saved", accountData: [{ type: "m.direct", content: { v: 1 } }] });
@@ -120,6 +119,21 @@ describe("LocalIndexedDBStoreBackend", () => {
             const after = await readPersisted();
             expect(after.sync?.nextBatch).toBe("thrown");
             expect(after.presence).toEqual([offline]);
+        });
+
+        it("rejects when committing transaction aborts without an error event", async () => {
+            await backend.setSyncData(syncResp("saved"));
+            await backend.syncToDatabase([]);
+
+            const realPut = IDBObjectStore.prototype.put;
+            vi.spyOn(IDBObjectStore.prototype, "put").mockImplementationOnce(function (this: IDBObjectStore, ...args) {
+                const req = realPut.apply(this, args);
+                req.addEventListener("success", () => this.transaction.abort());
+                return req;
+            });
+            await backend.setSyncData(syncResp("aborted"));
+            await expect(backend.syncToDatabase([])).rejects.toMatchObject({ name: "AbortError" });
+            expect((await readPersisted()).sync?.nextBatch).toBe("saved");
         });
     });
 });

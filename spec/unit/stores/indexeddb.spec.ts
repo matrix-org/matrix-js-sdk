@@ -19,12 +19,14 @@ limitations under the License.
  */
 
 import "fake-indexeddb/auto";
-import { IDBFactory } from "fake-indexeddb";
+import { forceCloseDatabase, IDBFactory } from "fake-indexeddb";
 
-import { IndexedDBStore, type IStateEventWithRoomId, MemoryStore, User, UserEvent } from "../../../src";
+import { IndexedDBStore, type IStateEventWithRoomId, MatrixEvent, MemoryStore, User, UserEvent } from "../../../src";
+import type { ISyncResponse } from "../../../src/sync-accumulator";
 import { emitPromise } from "../../test-utils/test-utils";
 import { LocalIndexedDBStoreBackend } from "../../../src/store/indexeddb-local-backend";
 import { RemoteIndexedDBStoreBackend } from "../../../src/store/indexeddb-remote-backend";
+import { IndexedDBStoreWorker } from "../../../src/store/indexeddb-store-worker";
 
 describe("IndexedDBStore", () => {
     afterEach(() => {
@@ -63,13 +65,9 @@ describe("IndexedDBStore", () => {
         await store.setOutOfBandMembers(roomId, [member1]);
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(1);
 
-        // Simulate a broken IDB
+        // Simulate a broken IDB (non-recoverable error)
         (store.backend as LocalIndexedDBStoreBackend)["db"]!.transaction = (): IDBTransaction => {
-            const err = new Error(
-                "Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
-            );
-            err.name = "InvalidStateError";
-            throw err;
+            throw new TypeError("Failed to execute 'transaction' on 'IDBDatabase'");
         };
 
         expect(await store.getOutOfBandMembers(roomId)).toHaveLength(1);
@@ -396,5 +394,214 @@ describe("IndexedDBStore", () => {
         await store.startup();
         await store.destroy();
         expect(terminate).toHaveBeenCalled();
+    });
+
+    describe("aborted and closed-connection saves", () => {
+        let idb: IDBFactory;
+        const stores: IndexedDBStore[] = [];
+        const member: IStateEventWithRoomId = {
+            room_id: roomId,
+            event_id: "$ev1",
+            sender: "@alice:example.org",
+            state_key: "@alice:example.org",
+            type: "m.room.member",
+            origin_server_ts: 123,
+            content: {},
+        };
+        const syncResp = (nextBatch: string): ISyncResponse => ({
+            next_batch: nextBatch,
+            rooms: { join: {}, invite: {}, leave: {}, knock: {} },
+            account_data: { events: [] },
+        });
+        const forceClose = (db: IDBDatabase) => (forceCloseDatabase as unknown as (d: IDBDatabase) => void)(db);
+        const abortOnce = (proto: any, method: string, afterSuccess = false, errorName?: string) => {
+            const orig = proto[method];
+            vi.spyOn(proto, method).mockImplementationOnce(function (this: any, ...args: any[]) {
+                const req: IDBRequest = orig.apply(this, args);
+                const txn: IDBTransaction = this.transaction ?? this.objectStore.transaction;
+                if (afterSuccess) {
+                    req.addEventListener("success", () => {
+                        txn.abort();
+                        if (errorName) Object.defineProperty(txn, "error", { value: new DOMException("", errorName) });
+                    });
+                } else {
+                    txn.abort();
+                }
+                return req;
+            });
+        };
+
+        beforeEach(() => {
+            idb = new IDBFactory();
+        });
+        afterEach(async () => {
+            vi.restoreAllMocks();
+            await Promise.all(stores.splice(0).map((s) => s.destroy()));
+        });
+
+        const startStore = async (dbName = "aborted-save-test", factory: IDBFactory = idb) => {
+            const store = new IndexedDBStore({ indexedDB: factory, dbName });
+            store.setUserCreator((userId: string) => new User(userId));
+            stores.push(store);
+            await store.startup();
+            return store;
+        };
+        const savedStore = async () => {
+            const store = await startStore();
+            await store.setSyncData(syncResp("saved"));
+            await store.save(true);
+            return store;
+        };
+        const persistedToken = async () => (await startStore()).getSavedSyncToken();
+
+        it("should keep saved sync and retry presence when a save aborts", async () => {
+            const store = await savedStore();
+            const degraded = vi.fn();
+            store.on("degraded", degraded);
+
+            const user = new User("@bob:example.org");
+            user.setPresenceEvent(
+                new MatrixEvent({ type: "m.presence", sender: user.userId, content: { presence: "online" } }),
+            );
+            store.storeUser(user);
+
+            abortOnce(IDBObjectStore.prototype, "put", true, "UnknownError");
+            await store.setSyncData(syncResp("aborted"));
+            await store.save(true);
+
+            expect(degraded).not.toHaveBeenCalled();
+            expect(await persistedToken()).toBe("saved");
+
+            await store.save(true);
+            const reader = await startStore();
+            expect(await reader.getSavedSyncToken()).toBe("aborted");
+            expect(reader.getUser(user.userId)?.events.presence?.getContent()).toEqual({ presence: "online" });
+        });
+
+        it("should keep saved sync when reads, client options, or clearOutOfBandMembers abort", async () => {
+            const writer = await savedStore();
+            await writer.setOutOfBandMembers(roomId, [member]);
+            await writer.storeClientOptions({ lazyLoadMembers: true });
+
+            const store = await startStore();
+            const degraded = vi.fn();
+            store.on("degraded", degraded);
+
+            abortOnce(IDBIndex.prototype, "openCursor");
+            expect(await store.getOutOfBandMembers(roomId)).toBeNull();
+            abortOnce(IDBObjectStore.prototype, "openCursor");
+            expect(await store.getClientOptions()).toBeUndefined();
+            abortOnce(IDBObjectStore.prototype, "delete");
+            await store.clearOutOfBandMembers(roomId);
+            abortOnce(IDBObjectStore.prototype, "put", true);
+            await store.storeClientOptions({ lazyLoadMembers: false });
+
+            expect(degraded).not.toHaveBeenCalled();
+            expect(await persistedToken()).toBe("saved");
+        });
+
+        it("should keep saved sync when getClientOptions aborts in worker mode", async () => {
+            const dbName = "worker-abort-test";
+            const writer = await startStore(dbName, indexedDB);
+            await writer.setSyncData(syncResp("saved"));
+            await writer.save(true);
+            await writer.storeClientOptions({ lazyLoadMembers: true });
+
+            const mockWorker = {
+                onmessage: undefined as ((ev: MessageEvent) => void) | undefined,
+                postMessage: (data: unknown) => storeWorker.onMessage({ data } as MessageEvent),
+                terminate: vi.fn(),
+            };
+            const storeWorker = new IndexedDBStoreWorker((data) => {
+                queueMicrotask(() => mockWorker.onmessage?.({ data } as MessageEvent));
+            });
+            const store = new IndexedDBStore({
+                indexedDB,
+                dbName,
+                workerFactory: () => mockWorker as unknown as Worker,
+            });
+            store.setUserCreator((userId: string) => new User(userId));
+            stores.push(store);
+            await store.startup();
+
+            const degraded = vi.fn();
+            store.on("degraded", degraded);
+
+            abortOnce(IDBObjectStore.prototype, "openCursor");
+            expect(await store.getClientOptions()).toBeUndefined();
+            expect(degraded).not.toHaveBeenCalled();
+
+            const reader = await startStore(dbName, indexedDB);
+            expect(await reader.getSavedSyncToken()).toBe("saved");
+            await reader.deleteAllData();
+        });
+
+        it("should keep saved sync across closing, close and versionchange, and still degrade on deleteAllData", async () => {
+            const writer = await savedStore();
+            await writer.setOutOfBandMembers(roomId, [member]);
+
+            const store = await startStore();
+            const degraded = vi.fn();
+            store.on("degraded", degraded);
+
+            // Pending txn leaves connection closing before the async close event fires.
+            const db = (store.backend as LocalIndexedDBStoreBackend)["db"]!;
+            const closed = emitPromise(store["emitter"], "closed");
+            db.transaction(["sync"], "readonly");
+            forceClose(db);
+
+            await store.save(true);
+            expect(await store.getOutOfBandMembers(roomId)).toBeNull();
+            await closed;
+
+            expect((await store.getSavedSync())?.nextBatch).toBe("saved");
+            expect(await store.getSavedSyncToken()).toBe("saved");
+            expect(await store.isNewlyCreated()).toBe(false);
+            await store.setSyncData(syncResp("after-close"));
+            await store.save(true);
+
+            const vStore = await startStore();
+            vStore.on("degraded", degraded);
+            (vStore.backend as LocalIndexedDBStoreBackend)["db"]!.onversionchange!({} as IDBVersionChangeEvent);
+            await vStore.save(true);
+
+            expect(degraded).not.toHaveBeenCalled();
+            expect(await persistedToken()).toBe("saved");
+
+            // Explicit deletion still degrades and retries on a recoverable error.
+            const clearSpy = vi
+                .spyOn(store.backend, "clearDatabase")
+                .mockRejectedValueOnce(new DOMException("", "AbortError"));
+            await store.deleteAllData();
+            expect(degraded).toHaveBeenCalledTimes(1);
+            expect(clearSpy).toHaveBeenCalledTimes(2);
+            expect(await persistedToken()).toBeUndefined();
+        });
+
+        it("should reconnect and persist when startup() is retried after close", async () => {
+            await savedStore();
+            const store = new IndexedDBStore({ indexedDB: idb, dbName: "aborted-save-test" });
+            store.setUserCreator((userId: string) => new User(userId));
+            stores.push(store);
+            const degraded = vi.fn();
+            store.on("degraded", degraded);
+
+            const closed = emitPromise(store["emitter"], "closed");
+            const realGetPresence = store.backend.getUserPresenceEvents.bind(store.backend);
+            vi.spyOn(store.backend, "getUserPresenceEvents").mockImplementationOnce(() => {
+                forceClose((store.backend as LocalIndexedDBStoreBackend)["db"]!);
+                return realGetPresence();
+            });
+            await expect(store.startup()).rejects.toBeDefined();
+            await closed;
+
+            await store.save(true);
+            expect(degraded).not.toHaveBeenCalled();
+
+            await store.startup();
+            await store.setSyncData(syncResp("after-retry"));
+            await store.save(true);
+            expect(await persistedToken()).toBe("after-retry");
+        });
     });
 });

@@ -95,8 +95,14 @@ function txnAsPromise(txn: IDBTransaction): Promise<Event> {
         txn.oncomplete = function (event): void {
             resolve(event);
         };
-        txn.onerror = function (): void {
-            reject(txn.error);
+        // A failed request reports here before the transaction has an error of its own.
+        txn.onerror = function (event): void {
+            reject(txn.error ?? (event.target as IDBRequest | null)?.error);
+        };
+        // A transaction aborted by the browser (e.g. when WebKit suspends the app
+        // or closes the connection while committing) fires only `abort`.
+        txn.onabort = function (): void {
+            reject(txn.error ?? new DOMException("Transaction aborted", "AbortError"));
         };
     });
 }
@@ -115,7 +121,7 @@ function reqAsEventPromise(req: IDBRequest): Promise<Event> {
 function reqAsPromise(req: IDBRequest): Promise<IDBRequest> {
     return new Promise((resolve, reject) => {
         req.onsuccess = (): void => resolve(req);
-        req.onerror = (err): void => reject(err);
+        req.onerror = (err): void => reject(req.error ?? err);
     });
 }
 
@@ -197,11 +203,9 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
             this.db.onversionchange = (): void => {
                 this.db?.close(); // this does not call onclose
                 this.disconnected = true;
-                this.db = undefined;
             };
             this.db.onclose = (): void => {
                 this.disconnected = true;
-                this.db = undefined;
                 onClose?.();
             };
 
@@ -274,7 +278,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 cursor.continue();
             };
             request.onerror = (err): void => {
-                reject(err);
+                reject(request.error ?? err);
             };
         }).then((events) => {
             logger.log(`LL: got ${events?.length} membershipEvents from storage for room ${roomId} ...`);
