@@ -284,6 +284,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         version: string,
     ): Promise<void> {
         await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, version);
+        if (this.stopped) return;
         // Emit an event that we have a new backup decryption key, so that the sdk can start
         // importing keys from backup if needed.
         this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
@@ -653,6 +654,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a KeyBackupCreationInfo - All information related to the backup.
      */
     public async setupKeyBackup(signObject: (authData: AuthData) => Promise<void>): Promise<KeyBackupCreationInfo> {
+        if (this.stopped) throw new ClientStoppedError();
         // Wait for any active call to `checkKeyBackupAndEnable` to complete, to avoid racing with it
         if (this.keyBackupCheckInProgress) {
             await this.keyBackupCheckInProgress;
@@ -660,6 +662,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
         // Clean up any existing backup
         await this.deleteAllKeyBackupVersions();
+        if (this.stopped) throw new ClientStoppedError();
 
         const randomKey = RustSdkCryptoJs.BackupDecryptionKey.createRandomKey();
         const pubKey = randomKey.megolmV1PublicKey;
@@ -667,6 +670,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const authData = { public_key: pubKey.publicKeyBase64 };
 
         await signObject(authData);
+        if (this.stopped) throw new ClientStoppedError();
 
         const backupData: NewKeyBackupInfo = {
             algorithm: pubKey.algorithm,
@@ -682,6 +686,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 prefix: ClientPrefix.V3,
             },
         );
+        // Stopping between the creation POST and saving the key leaves the new backup on the server without a saved key.
+        if (this.stopped) throw new ClientStoppedError();
 
         // This backup was just created and signed locally, so use the creation response to make up a full
         // `KeyBackupInfo` struct representing the new backup, instead of doing another discovery/trust check.
@@ -697,8 +703,14 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         // enable the created backup first so listeners observe the new version.
         this.serverBackupInfo = backupInfo;
         this.checkedForBackup = true;
-        await this.enableOrSwitchKeyBackup(backupInfo, await this.getActiveBackupVersion());
+        const activeVersion = await this.getActiveBackupVersion();
+        if (this.stopped) throw new ClientStoppedError();
+
+        await this.enableOrSwitchKeyBackup(backupInfo, activeVersion);
+        if (this.stopped) throw new ClientStoppedError();
+
         await this.saveBackupDecryptionKey(randomKey, res.version);
+        if (this.stopped) throw new ClientStoppedError();
 
         return {
             version: res.version,
@@ -714,10 +726,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Will call the API to delete active backup until there is no more present.
      */
     public async deleteAllKeyBackupVersions(): Promise<void> {
+        if (this.stopped) throw new ClientStoppedError();
         // there could be several backup versions. Delete all to be safe.
         let current = (await this.requestKeyBackupVersion())?.version ?? null;
         while (current != null) {
+            if (this.stopped) throw new ClientStoppedError();
             await this.deleteKeyBackupVersion(current);
+            if (this.stopped) throw new ClientStoppedError();
             current = (await this.requestKeyBackupVersion())?.version ?? null;
         }
 
@@ -730,11 +745,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param version - The backup version to delete.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
+        if (this.stopped) throw new ClientStoppedError();
         this.logger.debug(`deleteKeyBackupVersion v:${version}`);
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
             prefix: ClientPrefix.V3,
         });
+        if (this.stopped) throw new ClientStoppedError();
         // If the backup we are deleting is the active one, we need to disable the key backup and to have the local properties reset
         if (this.activeBackupVersion === version) {
             this.serverBackupInfo = null;

@@ -293,4 +293,68 @@ describe("Upload keys to backup", () => {
         expect(mockOlmMachine.disableBackup).not.toHaveBeenCalled();
         expect(fetchMock.callHistory.calls("path:/_matrix/client/v3/room_keys/version")).toHaveLength(1);
     });
+
+    it("should abort setupKeyBackup before deleting if stopped during version lookup", async () => {
+        const res = Promise.withResolvers<KeyBackupInfo>();
+        const started = Promise.withResolvers<void>();
+        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", () => {
+            started.resolve();
+            return res.promise;
+        });
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", { status: 404, body: { errcode: "M_NOT_FOUND" } });
+        fetchMock.delete("express:/_matrix/client/v3/room_keys/version/:version", {});
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "2" });
+
+        const setup = rustBackupManager.setupKeyBackup(async () => {});
+        await started.promise;
+        rustBackupManager.stop();
+        res.resolve(testData.SIGNED_BACKUP_DATA);
+
+        await expect(setup).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(fetchMock.callHistory.calls("express:/_matrix/client/v3/room_keys/version/:version")).toHaveLength(0);
+    });
+
+    it("should abort setupKeyBackup before OlmMachine calls if stopped during creation POST", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", { status: 404, body: { errcode: "M_NOT_FOUND" } });
+        const post = Promise.withResolvers<{ version: string }>();
+        const started = Promise.withResolvers<void>();
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", () => {
+            started.resolve();
+            return post.promise;
+        });
+
+        const setup = rustBackupManager.setupKeyBackup(async () => {});
+        await started.promise;
+        rustBackupManager.stop();
+        post.resolve({ version: "42" });
+
+        await expect(setup).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(mockOlmMachine.isBackupEnabled).not.toHaveBeenCalled();
+        expect(mockOlmMachine.saveBackupDecryptionKey).not.toHaveBeenCalled();
+    });
+
+    it("should abort setupKeyBackup before saving key if stopped during version switch", async () => {
+        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        mockOlmMachine.isBackupEnabled.mockResolvedValueOnce(false);
+        mockOlmMachine.backupRoomKeys.mockResolvedValue(undefined);
+        await rustBackupManager.checkKeyBackupAndEnable(false);
+
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", { status: 404, body: { errcode: "M_NOT_FOUND" } });
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "42" });
+        mockOlmMachine.isBackupEnabled.mockResolvedValue(true);
+        const disable = Promise.withResolvers<void>();
+        const started = Promise.withResolvers<void>();
+        mockOlmMachine.disableBackup.mockImplementation(() => {
+            started.resolve();
+            return disable.promise;
+        });
+
+        const setup = rustBackupManager.setupKeyBackup(async () => {});
+        await started.promise;
+        rustBackupManager.stop();
+        disable.resolve();
+
+        await expect(setup).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(mockOlmMachine.saveBackupDecryptionKey).not.toHaveBeenCalled();
+    });
 });
