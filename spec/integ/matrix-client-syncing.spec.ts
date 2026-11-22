@@ -568,6 +568,28 @@ describe("MatrixClient syncing", () => {
             expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledTimes(1);
             expect(client!.getRoom(roomOne)).toBeTruthy();
         });
+
+        it("should skip malformed to-device messages", async () => {
+            const toDeviceEvent = { type: "org.example.test", sender: otherUserId, content: {} };
+            const cryptoCallbacks = {
+                processSyncChanges: vi.fn().mockResolvedValue([]),
+                onSyncCompleted: vi.fn(),
+                stop: vi.fn(),
+            };
+            // @ts-ignore private field
+            client!.cryptoBackend = cryptoCallbacks;
+            httpBackend!.when("GET", "/sync").respond(200, {
+                ...syncData,
+                to_device: { events: [null, "not an event", [], toDeviceEvent] },
+            });
+
+            client!.startClient();
+            await Promise.all([httpBackend!.flushAllExpected(), awaitSyncEvent()]);
+
+            expect(cryptoCallbacks.processSyncChanges).toHaveBeenCalledWith(
+                expect.objectContaining({ toDeviceEvents: [toDeviceEvent] }),
+            );
+        });
     });
 
     describe("resolving invites to profile info", () => {
