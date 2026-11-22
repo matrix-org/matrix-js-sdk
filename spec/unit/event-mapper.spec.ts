@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { MatrixClient, MatrixEvent, MatrixEventEvent, type MatrixScheduler, Room } from "../../src";
+import { MatrixClient, MatrixEvent, MatrixEventEvent, type MatrixScheduler, RelationType, Room } from "../../src";
 import { eventMapperFor } from "../../src/event-mapper";
 import { type IStore } from "../../src/store";
 
@@ -181,5 +181,31 @@ describe("eventMapperFor", function () {
         expect(evListener.mock.calls[0][0]).toEqual(event2);
 
         expect(event1).not.toBe(event2); // the event wasn't added to a room so de-duplication wouldn't occur
+    });
+
+    it("should ignore a bundled m.replace edit from a different sender", () => {
+        const decryptSpy = vi.spyOn(client, "decryptEventIfNeeded").mockResolvedValue();
+        const event = eventMapperFor(client, { preventReEmit: true, decrypt: true })({
+            type: "m.room.encrypted",
+            room_id: "!room:example.org",
+            sender: "@alice:example.org",
+            event_id: "$orig",
+            origin_server_ts: 1000,
+            content: { ciphertext: "orig" },
+            unsigned: {
+                "m.relations": {
+                    [RelationType.Replace]: {
+                        type: "m.room.encrypted",
+                        room_id: "!room:example.org",
+                        sender: "@bob:example.org",
+                        event_id: "$edit",
+                        origin_server_ts: 2000,
+                        content: { ciphertext: "edit" },
+                    },
+                },
+            },
+        });
+        expect(event.replacingEvent()).toBeNull();
+        expect(decryptSpy).toHaveBeenCalledTimes(1);
     });
 });

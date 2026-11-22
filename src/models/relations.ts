@@ -108,7 +108,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
         } else if (this.relationType === RelationType.Replace) {
-            await this.updateTargetEventReplacement();
+            await this.updateTargetEventReplacementForEvent(event);
         }
 
         event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -133,7 +133,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             this.removeAnnotationFromAggregation(event);
         } else if (this.relationType === RelationType.Replace) {
-            await this.updateTargetEventReplacement();
+            await this.updateTargetEventReplacementForEvent(event);
         }
 
         this.emit(RelationsEvent.Remove, event);
@@ -243,7 +243,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             // Remove the redacted annotation from aggregation by key
             this.removeAnnotationFromAggregation(redactedEvent);
         } else if (this.relationType === RelationType.Replace) {
-            await this.updateTargetEventReplacement();
+            await this.updateTargetEventReplacementForEvent(redactedEvent);
         }
 
         redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -304,13 +304,18 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             return null;
         }
 
+        const targetSender = this.targetEvent.getSender();
+        if (!targetSender) {
+            return null;
+        }
+
         // the all-knowning server tells us that the event at some point had
         // this timestamp for its replacement, so any following replacement should definitely not be less
         const replaceRelation = this.targetEvent.getServerAggregatedRelation<IAggregatedRelation>(RelationType.Replace);
         const minTs = replaceRelation?.origin_server_ts;
 
         const lastReplacement = this.getRelations().reduce<MatrixEvent | null>((last, event) => {
-            if (event.getSender() !== this.targetEvent!.getSender()) {
+            if (event.getSender() !== targetSender) {
                 return last;
             }
             if (minTs && minTs > event.getTs()) {
@@ -346,6 +351,15 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         }
 
         this.maybeEmitCreated();
+    }
+
+    private updateTargetEventReplacementForEvent(event: MatrixEvent): Promise<void> {
+        const targetSender = this.targetEvent?.getSender();
+        if (targetSender && event.getSender() === targetSender) {
+            return this.updateTargetEventReplacement();
+        }
+        // Preserve the async boundary of updateTargetEventReplacement for downstream listeners.
+        return Promise.resolve();
     }
 
     /**
