@@ -278,7 +278,7 @@ export class PerSessionKeyBackupDownloader {
         this.downloadLoopRunning = true;
 
         try {
-            while (this.queuedRequests.length > 0) {
+            while (!this.stopped && this.queuedRequests.length > 0) {
                 // we just peek the first one without removing it, so if a new request for same key comes in while we're
                 // processing this one, it won't queue another request.
                 const request = this.queuedRequests[0];
@@ -395,6 +395,7 @@ export class PerSessionKeyBackupDownloader {
         const sessionsToImport: Record<string, KeyBackupSession> = { [sessionInfo.megolmSessionId]: data };
 
         const keys = await configuration.decryptor.decryptSessions(sessionsToImport);
+        if (this.stopped) return;
         for (const k of keys) {
             k.room_id = sessionInfo.roomId;
         }
@@ -410,6 +411,10 @@ export class PerSessionKeyBackupDownloader {
      * @returns The backup configuration to use or null if there is a configuration problem.
      */
     private async getOrCreateBackupConfiguration(): Promise<Configuration | null> {
+        if (this.stopped) {
+            return null;
+        }
+
         if (this.configuration) {
             return this.configuration;
         }
@@ -427,9 +432,19 @@ export class PerSessionKeyBackupDownloader {
             return await this.currentBackupVersionCheck;
         }
 
-        this.currentBackupVersionCheck = this.internalCheckFromServer();
+        this.currentBackupVersionCheck = this.runBackupVersionCheck();
+        return await this.currentBackupVersionCheck;
+    }
+
+    private async runBackupVersionCheck(): Promise<Configuration | null> {
         try {
-            return await this.currentBackupVersionCheck;
+            return await this.internalCheckFromServer();
+        } catch (e) {
+            if (this.stopped) {
+                this.logger.debug("Backup configuration check aborted by stop", e);
+                return null;
+            }
+            throw e;
         } finally {
             this.currentBackupVersionCheck = null;
         }
@@ -440,10 +455,13 @@ export class PerSessionKeyBackupDownloader {
         try {
             currentServerVersion = await this.backupManager.getServerBackupInfo();
         } catch (e) {
+            if (this.stopped) return null;
             this.logger.debug(`Backup: error while checking server version: ${e}`);
             this.hasConfigurationProblem = true;
             return null;
         }
+        // If stopped while waiting for the server, stop before calling a closed OlmMachine.
+        if (this.stopped) return null;
         this.logger.debug(`Got current backup version from server: ${currentServerVersion?.version}`);
 
         if (currentServerVersion?.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
@@ -459,6 +477,7 @@ export class PerSessionKeyBackupDownloader {
         }
 
         const activeVersion = await this.backupManager.getActiveBackupVersion();
+        if (this.stopped) return null;
         if (activeVersion == null || currentServerVersion.version != activeVersion) {
             // Either the current backup version on server side is not trusted, or it is out of sync with the active version on the client side.
             this.logger.info(
@@ -469,6 +488,7 @@ export class PerSessionKeyBackupDownloader {
         }
 
         const backupKeys = await this.getBackupDecryptionKey();
+        if (this.stopped) return null;
         if (!backupKeys?.decryptionKey) {
             this.logger.debug(`Not checking key backup for session (no decryption key)`);
             this.hasConfigurationProblem = true;

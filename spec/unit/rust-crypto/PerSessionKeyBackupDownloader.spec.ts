@@ -38,7 +38,7 @@ import {
 } from "../../../src";
 import * as testData from "../../test-utils/crypto-test-data";
 import { type BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
-import { type KeyBackupSession } from "../../../src/crypto-api/keybackup";
+import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 describe("PerSessionKeyBackupDownloader", () => {
@@ -292,6 +292,61 @@ describe("PerSessionKeyBackupDownloader", () => {
             expect(
                 fetchMock.callHistory.calls(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`).length,
             ).toStrictEqual(1);
+        });
+
+        it("should stop configuration check before calling OlmMachine after stop", async () => {
+            const info = Promise.withResolvers<KeyBackupInfo | null>();
+            const started = Promise.withResolvers<void>();
+            mockRustBackupManager.getServerBackupInfo.mockImplementation(() => {
+                started.resolve();
+                return info.promise;
+            });
+
+            downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
+            await started.promise;
+            downloader.stop();
+            info.resolve(TestData.SIGNED_BACKUP_DATA);
+            await vi.runAllTimersAsync();
+
+            expect(mockRustBackupManager.getActiveBackupVersion).not.toHaveBeenCalled();
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
+        });
+
+        it("should resolve status-triggered configuration check to null if rejected after stop", async () => {
+            const version = Promise.withResolvers<string | null>();
+            const started = Promise.withResolvers<void>();
+            mockRustBackupManager.getActiveBackupVersion.mockImplementation(() => {
+                started.resolve();
+                return version.promise;
+            });
+            // @ts-ignore access to private method
+            const getConfigSpy = vi.spyOn(downloader, "getOrCreateBackupConfiguration");
+
+            mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
+            await started.promise;
+            downloader.stop();
+            version.reject(new Error("null pointer passed to rust"));
+
+            await expect(getConfigSpy.mock.results[0].value).resolves.toBeNull();
+            expect(mockOlmMachine.getBackupKeys).not.toHaveBeenCalled();
+        });
+
+        it("should not import keys if stopped during decryptSessions", async () => {
+            fetchMock.get("express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId", mockCipherKey);
+            const decrypt = Promise.withResolvers<IMegolmSessionData[]>();
+            const started = Promise.withResolvers<void>();
+            mockBackupDecryptor.decryptSessions.mockImplementation(() => {
+                started.resolve();
+                return decrypt.promise;
+            });
+
+            downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
+            await started.promise;
+            downloader.stop();
+            decrypt.resolve([mockClearSession("sessionA0")]);
+            await vi.runAllTimersAsync();
+
+            expect(mockRustBackupManager.importBackedUpRoomKeys).not.toHaveBeenCalled();
         });
     });
 

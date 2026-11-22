@@ -42,6 +42,7 @@ import {
     ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
 import { type IMegolmSessionData } from "../@types/crypto.ts";
+import { ClientStoppedError } from "../errors.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -136,11 +137,21 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * Determine if a key backup can be trusted.
      *
      * @param info - key backup info dict from {@link CryptoApi.getKeyBackupInfo}.
+     * @throws {@link ClientStoppedError} if {@link stop} has been called.
      */
     public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
         const signatureVerification: SignatureVerification = await this.olmMachine.verifyBackup(info);
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
 
         const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
         const decryptionKey = backupKeys?.decryptionKey;
         const backupMatchesSavedPrivateKey =
             !!decryptionKey && this.backupInfoMatchesBackupDecryptionKey(info, decryptionKey);
@@ -157,17 +168,37 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      *   `false`, and we have already done a check, `null` is returned rather than the actual info on the key backup.
      */
     public checkKeyBackupAndEnable(force: boolean): Promise<KeyBackupCheck | null> {
+        if (this.stopped) {
+            return Promise.reject(new ClientStoppedError());
+        }
         if (!force && this.checkedForBackup) {
             return Promise.resolve(null);
         }
 
         // make sure there is only one check going on at a time
         if (!this.keyBackupCheckInProgress) {
-            this.keyBackupCheckInProgress = this.doCheckKeyBackup().finally(() => {
-                this.keyBackupCheckInProgress = null;
-            });
+            this.keyBackupCheckInProgress = this.startKeyBackupCheck();
         }
         return this.keyBackupCheckInProgress;
+    }
+
+    /**
+     * Start a shared key backup check promise, clearing {@link keyBackupCheckInProgress} on completion
+     * and rejecting with {@link ClientStoppedError} if aborted by {@link stop}.
+     */
+    private async startKeyBackupCheck(backupInfo?: KeyBackupInfo | null): Promise<KeyBackupCheck | null> {
+        try {
+            const result = await this.doCheckKeyBackup(backupInfo);
+            if (this.stopped) throw new ClientStoppedError();
+            return result;
+        } catch (e) {
+            if (this.stopped) {
+                throw e instanceof ClientStoppedError ? e : new ClientStoppedError();
+            }
+            throw e;
+        } finally {
+            this.keyBackupCheckInProgress = null;
+        }
     }
 
     /**
@@ -190,6 +221,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             this.logger.warn("handleBackupSecretReceived: Error checking for latest key backup", e);
             return false;
         }
+        // If stopped while waiting for the server, leave the secret unhandled instead of calling a closed OlmMachine.
+        if (this.stopped) return false;
 
         if (!latestBackupInfo?.version) {
             // There is no server-side key backup.
@@ -221,20 +254,25 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 `handleBackupSecretReceived: Valid decryption key for the current server-side backup version (${latestBackupInfo.version}) received`,
             );
             await this.saveBackupDecryptionKey(backupDecryptionKey, latestBackupInfo.version);
+            if (this.stopped) return false;
 
             // Check if backup upload should be enabled (e.g. the encryption key matches the decryption key),
             // and enable it if so.
             if (this.keyBackupCheckInProgress) {
                 this.logger.debug("handleBackupSecretReceived: waiting for ongoing keybackup check to complete");
                 await this.keyBackupCheckInProgress;
+                if (this.stopped) return false;
             }
             this.logger.debug("handleBackupSecretReceived: checking if we can enable keybackup upload");
-            this.keyBackupCheckInProgress = this.doCheckKeyBackup(latestBackupInfo).finally(() => {
-                this.keyBackupCheckInProgress = null;
-            });
+            this.keyBackupCheckInProgress = this.startKeyBackupCheck(latestBackupInfo);
             await this.keyBackupCheckInProgress;
-            return true;
+            // Returning false when stopped keeps the secret in the inbox for the next start.
+            return !this.stopped;
         } catch (e) {
+            if (this.stopped && e instanceof ClientStoppedError) {
+                this.logger.debug("handleBackupSecretReceived: key backup check aborted by stop", e);
+                return false;
+            }
             this.logger.warn("handleBackupSecretReceived: Unable to validate backup decryption key", e);
         }
 
@@ -327,14 +365,18 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 backupInfo = await this.requestKeyBackupVersion();
             }
         } catch (e) {
+            if (this.stopped) throw new ClientStoppedError();
             this.logger.warn("Error checking for active key backup", e);
             this.serverBackupInfo = undefined;
             return null;
         }
+        // If stopped while waiting for the server, stop before calling a closed OlmMachine.
+        if (this.stopped) throw new ClientStoppedError();
         this.checkedForBackup = true;
         this.serverBackupInfo = backupInfo;
 
         const activeVersion = await this.getActiveBackupVersion();
+        if (this.stopped) throw new ClientStoppedError();
 
         if (!backupInfo) {
             if (activeVersion !== null) {
@@ -343,10 +385,12 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             } else {
                 this.logger.debug("No key backup present on server: not enabling key backup");
             }
+            if (this.stopped) throw new ClientStoppedError();
             return null;
         }
 
         const trustInfo = await this.isKeyBackupTrusted(backupInfo);
+        if (this.stopped) throw new ClientStoppedError();
 
         // Per the spec, we should enable key upload if either (a) the backup is signed by a trusted key, or
         // (b) the public key matches the private decryption key that we have received from 4S.
@@ -360,6 +404,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         } else {
             await this.enableOrSwitchKeyBackup(backupInfo, activeVersion);
         }
+        if (this.stopped) throw new ClientStoppedError();
         return { backupInfo, trustInfo };
     }
 
@@ -382,6 +427,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             // This will remove any pending backup request, remove the backup upload key from the OlmMachine and reset
             // the backup state of each room key we have.
             await this.disableKeyBackup();
+            if (this.stopped) return;
             // Enabling will now trigger re-upload of all the keys
             await this.enableKeyBackup(backupInfo);
         } else {
@@ -402,6 +448,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             (backupInfo.auth_data as Curve25519AuthData).public_key,
             backupInfo.version,
         );
+        if (this.stopped) return;
         this.activeBackupVersion = backupInfo.version;
 
         this.emit(CryptoEvent.KeyBackupStatus, true);
@@ -422,6 +469,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
 
     private async disableKeyBackup(): Promise<void> {
         await this.olmMachine.disableBackup();
+        if (this.stopped) return;
         this.activeBackupVersion = null;
         this.emit(CryptoEvent.KeyBackupStatus, false);
     }
@@ -513,6 +561,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                         remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
                     }
                 } catch (err) {
+                    // If stopped while waiting for the server, stop before calling a closed OlmMachine.
+                    if (this.stopped) break;
                     numFailures++;
                     logger.error("Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
@@ -528,7 +578,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             // There was an active backup and we are out of sync with the server
                             // force a check server side
                             this.backupKeysLoopRunning = false;
-                            this.checkKeyBackupAndEnable(true);
+                            void this.checkKeyBackupAndEnable(true).catch((e) => {
+                                if (this.stopped && e instanceof ClientStoppedError) {
+                                    logger.debug("Key backup check aborted by stop", e);
+                                    return;
+                                }
+                                logger.error("Error checking key backup", e);
+                            });
                             return;
                         } else if (err.isRateLimitError()) {
                             // wait for that and then continue?

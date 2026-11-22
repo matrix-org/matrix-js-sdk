@@ -2,8 +2,15 @@ import fetchMock from "@fetch-mock/vitest";
 import * as RustSdkCryptoJs from "@matrix-org/matrix-sdk-crypto-wasm";
 import { type Mocked } from "vitest";
 
-import { type HttpApiEvent, type HttpApiEventHandlerMap, MatrixHttpApi, TypedEventEmitter } from "../../../src";
-import { CryptoEvent, type KeyBackupSession } from "../../../src/crypto-api/index.ts";
+import {
+    ClientStoppedError,
+    type HttpApiEvent,
+    type HttpApiEventHandlerMap,
+    MatrixError,
+    MatrixHttpApi,
+    TypedEventEmitter,
+} from "../../../src";
+import { CryptoEvent, type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/index.ts";
 import { type OutgoingRequestProcessor } from "../../../src/rust-crypto/OutgoingRequestProcessor";
 import * as testData from "../../test-utils/crypto-test-data";
 import * as TestData from "../../test-utils/crypto-test-data";
@@ -54,6 +61,7 @@ describe("Upload keys to backup", () => {
             backupRoomKeys: vi.fn(),
             isBackupEnabled: vi.fn().mockResolvedValue(true),
             enableBackupV1: vi.fn(),
+            disableBackup: vi.fn(),
             saveBackupDecryptionKey: vi.fn(),
             verifyBackup: vi.fn().mockResolvedValue({
                 trusted: vi.fn().mockResolvedValue(true),
@@ -182,5 +190,107 @@ describe("Upload keys to backup", () => {
         });
         expect(mockOlmMachine.enableBackupV1).toHaveBeenCalledWith(expect.any(String), "42");
         expect(mockOlmMachine.saveBackupDecryptionKey).toHaveBeenCalledWith(expect.anything(), "42");
+    });
+
+    it("should reject backup check and abort setupKeyBackup if stopped while checking", async () => {
+        const res = Promise.withResolvers<KeyBackupInfo>();
+        const started = Promise.withResolvers<void>();
+        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", () => {
+            started.resolve();
+            return res.promise;
+        });
+        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", { status: 404, body: { errcode: "M_NOT_FOUND" } });
+        fetchMock.delete("express:/_matrix/client/v3/room_keys/version/:version", {});
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "2" });
+
+        const check = rustBackupManager.checkKeyBackupAndEnable(false);
+        await started.promise;
+        const setup = rustBackupManager.setupKeyBackup(async () => {});
+        rustBackupManager.stop();
+        res.resolve(testData.SIGNED_BACKUP_DATA);
+
+        await expect(check).rejects.toBeInstanceOf(ClientStoppedError);
+        await expect(setup).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(mockOlmMachine.isBackupEnabled).not.toHaveBeenCalled();
+        expect(fetchMock.callHistory.calls("express:/_matrix/client/v3/room_keys/version/:version")).toHaveLength(0);
+    });
+
+    it("should reject backup check if stopped right after doCheckKeyBackup resolves", async () => {
+        const doCheck = Promise.withResolvers<null>();
+        vi.spyOn(rustBackupManager as any, "doCheckKeyBackup").mockReturnValue(doCheck.promise);
+        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", { status: 404, body: { errcode: "M_NOT_FOUND" } });
+        fetchMock.delete("express:/_matrix/client/v3/room_keys/version/:version", {});
+        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "2" });
+
+        const check = rustBackupManager.checkKeyBackupAndEnable(false);
+        const setup = rustBackupManager.setupKeyBackup(async () => {});
+        // Resolve and stop synchronously before startKeyBackupCheck resumes.
+        doCheck.resolve(null);
+        rustBackupManager.stop();
+
+        await expect(check).rejects.toBeInstanceOf(ClientStoppedError);
+        await expect(setup).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(fetchMock.callHistory.calls("express:/_matrix/client/v3/room_keys/version/:version")).toHaveLength(0);
+    });
+
+    it("should reject isKeyBackupTrusted without calling getBackupKeys after stop", async () => {
+        const verify = Promise.withResolvers<RustSdkCryptoJs.SignatureVerification>();
+        const started = Promise.withResolvers<void>();
+        mockOlmMachine.verifyBackup.mockImplementation(() => {
+            started.resolve();
+            return verify.promise;
+        });
+
+        const trust = rustBackupManager.isKeyBackupTrusted(testData.SIGNED_BACKUP_DATA);
+        await started.promise;
+        rustBackupManager.stop();
+        verify.resolve({ trusted: vi.fn().mockReturnValue(true) } as unknown as RustSdkCryptoJs.SignatureVerification);
+
+        await expect(trust).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(mockOlmMachine.getBackupKeys).not.toHaveBeenCalled();
+    });
+
+    it("should reject concurrent checkKeyBackupAndEnable if stopped during secret-triggered check", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        mockOlmMachine.isBackupEnabled.mockResolvedValue(false);
+        const verify = Promise.withResolvers<RustSdkCryptoJs.SignatureVerification>();
+        const started = Promise.withResolvers<void>();
+        mockOlmMachine.verifyBackup.mockImplementation(() => {
+            started.resolve();
+            return verify.promise;
+        });
+
+        const handled = rustBackupManager.handleBackupSecretReceived(testData.BACKUP_DECRYPTION_KEY_BASE64);
+        await started.promise;
+        const check = rustBackupManager.checkKeyBackupAndEnable(true);
+        rustBackupManager.stop();
+        verify.reject(new Error("null pointer passed to rust"));
+
+        await expect(check).rejects.toBeInstanceOf(ClientStoppedError);
+        await expect(handled).resolves.toBe(false);
+    });
+
+    it("should stop backupKeysLoop on upload error after stop", async () => {
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
+        mockOlmMachine.isBackupEnabled.mockResolvedValue(false);
+        mockOlmMachine.backupRoomKeys.mockResolvedValueOnce(mockBackupRequest(1)).mockResolvedValue(undefined);
+        const upload = Promise.withResolvers<void>();
+        const started = Promise.withResolvers<void>();
+        outgoingRequestProcessor.makeOutgoingRequest.mockImplementation(() => {
+            started.resolve();
+            return upload.promise;
+        });
+
+        await rustBackupManager.checkKeyBackupAndEnable(false);
+        await vi.advanceTimersByTimeAsync(10_000);
+        await started.promise;
+        rustBackupManager.stop();
+        upload.reject(new MatrixError({ errcode: "M_WRONG_ROOM_KEYS_VERSION" }, 403));
+        await vi.runAllTimersAsync();
+
+        expect(mockOlmMachine.disableBackup).not.toHaveBeenCalled();
+        expect(fetchMock.callHistory.calls("path:/_matrix/client/v3/room_keys/version")).toHaveLength(1);
     });
 });

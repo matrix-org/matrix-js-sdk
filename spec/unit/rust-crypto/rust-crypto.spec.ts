@@ -34,6 +34,7 @@ import { RustCrypto } from "../../../src/rust-crypto/rust-crypto";
 import { initRustCrypto } from "../../../src/rust-crypto";
 import {
     type AccountDataEvents,
+    ClientStoppedError,
     DebugLogger,
     type Device,
     DeviceVerification,
@@ -68,6 +69,7 @@ import {
     EventShieldReason,
     type ImportRoomKeysOpts,
     type KeyBackupCheck,
+    type KeyBackupInfo,
     type NewKeyBackupInfo,
     type VerificationRequest,
 } from "../../../src/crypto-api";
@@ -100,8 +102,10 @@ describe("initRustCrypto", () => {
         return {
             registerRoomKeyUpdatedCallback: vi.fn(),
             registerUserIdentityUpdatedCallback: vi.fn(),
+            close: vi.fn(),
             getSecretsFromInbox: vi.fn().mockResolvedValue([]),
             deleteSecretsFromInbox: vi.fn(),
+            saveBackupDecryptionKey: vi.fn(),
             registerReceiveSecretCallback: vi.fn(),
             registerDevicesUpdatedCallback: vi.fn(),
             registerRoomKeysWithheldCallback: vi.fn(),
@@ -244,6 +248,73 @@ describe("initRustCrypto", () => {
         });
 
         expect(testOlmMachine.getSecretsFromInbox).toHaveBeenCalledWith("m.megolm_backup.v1");
+    });
+
+    function makeRustCrypto(olm: Mocked<OlmMachine>, secretStorage = {} as ServerSideSecretStorage): RustCrypto {
+        return new RustCrypto(
+            new DebugLogger(debug("test")),
+            olm,
+            makeMatrixHttpApi(),
+            TEST_USER,
+            TEST_DEVICE_ID,
+            secretStorage,
+            {},
+        );
+    }
+
+    it("should leave backup secrets in inbox and skip inbox reads after stop", async () => {
+        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", {
+            status: 404,
+            body: { errcode: "M_NOT_FOUND" },
+        });
+        const olm = makeTestOlmMachine();
+        olm.getSecretsFromInbox.mockResolvedValue(new Set([testData.BACKUP_DECRYPTION_KEY_BASE64, "other"]));
+        const crypto = makeRustCrypto(olm);
+        await crypto.checkKeyBackupAndEnable();
+
+        const res = Promise.withResolvers<KeyBackupInfo>();
+        const requested = Promise.withResolvers<void>();
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
+            requested.resolve();
+            return res.promise;
+        });
+
+        const check = crypto.checkSecrets("m.megolm_backup.v1");
+        await requested.promise;
+        crypto.stop();
+        res.resolve(testData.SIGNED_BACKUP_DATA);
+        await check;
+        await crypto.checkSecrets("m.megolm_backup.v1");
+
+        expect(olm.getSecretsFromInbox).toHaveBeenCalledTimes(1);
+        expect(olm.saveBackupDecryptionKey).not.toHaveBeenCalled();
+        expect(olm.deleteSecretsFromInbox).not.toHaveBeenCalled();
+        expect(fetchMock.callHistory.calls("path:/_matrix/client/v3/room_keys/version")).toHaveLength(2);
+    });
+
+    it("should abort disableKeyStorage without destructive calls if stopped during backup check", async () => {
+        const res = Promise.withResolvers<KeyBackupInfo>();
+        const requested = Promise.withResolvers<void>();
+        fetchMock.get("path:/_matrix/client/v3/room_keys/version", () => {
+            requested.resolve();
+            return res.promise;
+        });
+        fetchMock.delete("express:/_matrix/client/v3/room_keys/version/:version", {});
+        const secretStorage = {
+            store: vi.fn().mockResolvedValue(undefined),
+            getDefaultKeyId: vi.fn().mockResolvedValue("key1"),
+            setDefaultKeyId: vi.fn().mockResolvedValue(undefined),
+        } as unknown as ServerSideSecretStorage;
+        const crypto = makeRustCrypto(makeTestOlmMachine(), secretStorage);
+        await requested.promise;
+
+        const disable = crypto.disableKeyStorage();
+        crypto.stop();
+        res.resolve(testData.SIGNED_BACKUP_DATA);
+
+        await expect(disable).rejects.toBeInstanceOf(ClientStoppedError);
+        expect(fetchMock.callHistory.calls("express:/_matrix/client/v3/room_keys/version/:version")).toHaveLength(0);
+        expect(secretStorage.store).not.toHaveBeenCalled();
     });
 
     it("should initialize without waiting for pending room key bundles", async () => {

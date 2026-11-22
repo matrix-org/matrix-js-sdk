@@ -228,7 +228,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         // Check and start in background the key backup connection
-        this.checkKeyBackupAndEnable();
+        void this.checkKeyBackupAndEnable().catch((e) => {
+            if (this.stopped && e instanceof ClientStoppedError) {
+                this.logger.debug("Key backup check aborted by stop", e);
+                return;
+            }
+            this.logger.error("Error checking key backup", e);
+        });
     }
 
     /**
@@ -2092,7 +2098,15 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         // So, re-check the key backup status and enable it if available.
         if (userId.toString() === this.userId) {
             this.emit(CryptoEvent.KeysChanged, {});
-            await this.checkKeyBackupAndEnable();
+            try {
+                await this.checkKeyBackupAndEnable();
+            } catch (e) {
+                if (this.stopped && e instanceof ClientStoppedError) {
+                    this.logger.debug("Key backup check aborted by stop", e);
+                    return;
+                }
+                throw e;
+            }
         }
     }
 
@@ -2143,8 +2157,10 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param name - The name of the secret received.
      */
     public async checkSecrets(name: string): Promise<void> {
+        if (this.stopped) return;
         const pendingValues: Set<string> = await this.olmMachine.getSecretsFromInbox(name);
         for (const value of pendingValues) {
+            if (this.stopped) return;
             if (await this.handleSecretReceived(name, value)) {
                 // If we have a valid secret for that name there is no point of processing the other secrets values.
                 // It's probably the same secret shared by another device.
@@ -2152,6 +2168,8 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
             }
         }
 
+        // If stopped during the check, leave the secrets in the inbox for the next start.
+        if (this.stopped) return;
         // Important to call this after handling the secrets as good hygiene.
         await this.olmMachine.deleteSecretsFromInbox(name);
     }
