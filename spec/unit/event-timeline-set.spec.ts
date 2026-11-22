@@ -573,4 +573,82 @@ describe("EventTimelineSet", () => {
             expect(eventTimelineSet.getLiveTimeline().getEvents()).not.toContain(roomFilteredEvent);
         });
     });
+
+    describe("timeline neighbour cycles", () => {
+        let timelineSet: EventTimelineSet;
+        const mkEvent = () => utils.mkMessage({ room: roomId, user: userA, event: true });
+        const addSegment = (event = mkEvent()): EventTimeline => {
+            const tl = timelineSet.getLiveTimeline();
+            timelineSet.addEventsToTimeline([event], true, false, tl, null);
+            timelineSet.resetLiveTimeline("back", "fwd");
+            return tl;
+        };
+
+        beforeEach(() => {
+            timelineSet = new EventTimelineSet(room, { timelineSupport: true }, client);
+        });
+
+        it.each([
+            ["back-paginating", true, EventTimeline.BACKWARDS, EventTimeline.FORWARDS],
+            ["forward-paginating", false, EventTimeline.FORWARDS, EventTimeline.BACKWARDS],
+        ] as const)(
+            "should not join timelines into a cycle when %s",
+            (_label, toStartOfTimeline, direction, inverseDirection) => {
+                // Use one-sided links so each reachability guard is exercised independently.
+                const e1 = mkEvent();
+                const start1 = addSegment();
+                const target1 = addSegment(e1);
+                target1.setNeighbouringTimeline(start1, direction);
+
+                timelineSet.addEventsToTimeline([e1], toStartOfTimeline, false, start1, null);
+                expect(start1.getNeighbouringTimeline(direction)).toBeNull();
+                expect(target1.getNeighbouringTimeline(inverseDirection)).toBeNull();
+
+                const e2 = mkEvent();
+                const start2 = addSegment();
+                const target2 = addSegment(e2);
+                start2.setNeighbouringTimeline(target2, inverseDirection);
+
+                timelineSet.addEventsToTimeline([e2], toStartOfTimeline, false, start2, null);
+                expect(start2.getNeighbouringTimeline(direction)).toBeNull();
+                expect(target2.getNeighbouringTimeline(inverseDirection)).toBeNull();
+            },
+        );
+
+        it("should skip a join that conflicts with an existing neighbour and keep the rest of the page", () => {
+            const [e1, eBefore, eAfter, eOther] = [mkEvent(), mkEvent(), mkEvent(), mkEvent()];
+            const older = addSegment(e1);
+            const newer = addSegment();
+            older.setNeighbouringTimeline(newer, EventTimeline.FORWARDS);
+            const other = addSegment(eOther);
+
+            timelineSet.addEventsToTimeline([eBefore, e1, eAfter], true, false, other, "tok");
+
+            expect(other.getNeighbouringTimeline(EventTimeline.BACKWARDS)).toBeNull();
+            expect(other.getEvents()).toEqual([eAfter, eBefore, eOther]);
+            expect(other.getPaginationToken(EventTimeline.BACKWARDS)).toBe("tok");
+        });
+
+        it.each([EventTimeline.FORWARDS, EventTimeline.BACKWARDS])(
+            "should terminate compareEventOrdering on an existing %s timeline cycle",
+            (direction) => {
+                const [e1, eLive] = [mkEvent(), mkEvent()];
+                const first = addSegment(e1);
+                const second = addSegment();
+                timelineSet.addLiveEvent(eLive, { addToState: false });
+                first.setNeighbouringTimeline(second, direction);
+                second.setNeighbouringTimeline(first, direction);
+
+                // Fail fast instead of hanging if cycle detection regresses.
+                let reads = 0;
+                const orig = first.getNeighbouringTimeline.bind(first);
+                vi.spyOn(first, "getNeighbouringTimeline").mockImplementation((dir) => {
+                    if (++reads > 100) throw new Error("walked a timeline cycle");
+                    return orig(dir);
+                });
+
+                expect(timelineSet.compareEventOrdering(e1.getId()!, eLive.getId()!)).toBeNull();
+            },
+        );
+    });
 });
