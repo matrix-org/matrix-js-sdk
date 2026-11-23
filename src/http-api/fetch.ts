@@ -310,47 +310,50 @@ export class FetchHttpApi<O extends IHttpOpts> {
         // when there is no Authorization header.
         const cacheMode = "Authorization" in headers ? undefined : "no-cache";
 
-        let res: Response;
-        const start = Date.now();
+        // Keep abort listeners attached until the response body has been read.
         try {
-            res = await this.fetch(url, {
-                signal,
-                method,
-                body: data,
-                headers,
-                mode: "cors",
-                redirect: "follow",
-                referrer: "",
-                referrerPolicy: "no-referrer",
-                cache: cacheMode,
-                credentials: "omit", // we send credentials via headers
-                keepalive: keepAlive,
-                priority: opts.priority,
-            });
+            let res: Response;
+            const start = Date.now();
+            try {
+                res = await this.fetch(url, {
+                    signal,
+                    method,
+                    body: data,
+                    headers,
+                    mode: "cors",
+                    redirect: "follow",
+                    referrer: "",
+                    referrerPolicy: "no-referrer",
+                    cache: cacheMode,
+                    credentials: "omit", // we send credentials via headers
+                    keepalive: keepAlive,
+                    priority: opts.priority,
+                });
 
-            this.opts.logger?.debug(
-                `FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`,
-            );
-        } catch (e) {
-            this.opts.logger?.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
-            if ((<Error>e).name === "AbortError") {
-                throw e;
+                this.opts.logger?.debug(
+                    `FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${res.status}]`,
+                );
+            } catch (e) {
+                this.opts.logger?.debug(`FetchHttpApi: <-- ${method} ${urlForLogs} [${Date.now() - start}ms ${e}]`);
+                if ((<Error>e).name === "AbortError") {
+                    throw e;
+                }
+                throw new ConnectionError("fetch failed", <Error>e);
             }
-            throw new ConnectionError("fetch failed", <Error>e);
+
+            if (!res.ok) {
+                throw parseErrorResponse(res, await res.text());
+            }
+
+            if (opts.rawResponseBody) {
+                return (await res.blob()) as T;
+            } else if (jsonResponse) {
+                return await res.json();
+            } else {
+                return (await res.text()) as T;
+            }
         } finally {
             cleanup();
-        }
-
-        if (!res.ok) {
-            throw parseErrorResponse(res, await res.text());
-        }
-
-        if (opts.rawResponseBody) {
-            return (await res.blob()) as T;
-        } else if (jsonResponse) {
-            return await res.json();
-        } else {
-            return (await res.text()) as T;
         }
     }
 
