@@ -108,7 +108,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             this.addAnnotationToAggregation(event);
         } else if (this.relationType === RelationType.Replace) {
-            await this.updateTargetEventReplacementForEvent(event);
+            await this.updateTargetEventReplacement(event);
         }
 
         event.on(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -133,7 +133,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         if (this.relationType === RelationType.Annotation) {
             this.removeAnnotationFromAggregation(event);
         } else if (this.relationType === RelationType.Replace) {
-            await this.updateTargetEventReplacementForEvent(event);
+            await this.updateTargetEventReplacement(event);
         }
 
         this.emit(RelationsEvent.Remove, event);
@@ -243,7 +243,7 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
             // Remove the redacted annotation from aggregation by key
             this.removeAnnotationFromAggregation(redactedEvent);
         } else if (this.relationType === RelationType.Replace) {
-            await this.updateTargetEventReplacementForEvent(redactedEvent);
+            await this.updateTargetEventReplacement(redactedEvent);
         }
 
         redactedEvent.removeListener(MatrixEventEvent.BeforeRedaction, this.onBeforeRedaction);
@@ -353,24 +353,22 @@ export class Relations extends TypedEventEmitter<RelationsEvent, EventHandlerMap
         this.maybeEmitCreated();
     }
 
-    private updateTargetEventReplacementForEvent(event: MatrixEvent): Promise<void> {
-        const targetSender = this.targetEvent?.getSender();
-        if (targetSender && event.getSender() === targetSender) {
-            return this.updateTargetEventReplacement();
-        }
-        // Preserve the async boundary of updateTargetEventReplacement for downstream listeners.
-        return Promise.resolve();
-    }
-
     /**
      * Updates the target event with the latest replacement.
      *
      * Multiple replacement updates can be triggered concurrently (for example
      * while edits are still being decrypted). A monotonic update counter guards
      * against older async resolutions overriding newer replacement selections.
+     *
+     * @param edit - the edit that was added or redacted, if any. Only the target's sender
+     * can edit it, so an edit from anyone else leaves the replacement as it is.
      */
-    private async updateTargetEventReplacement(): Promise<void> {
+    private async updateTargetEventReplacement(edit?: MatrixEvent): Promise<void> {
         if (!this.targetEvent || this.targetEvent.isState()) {
+            return;
+        }
+        const sender = this.targetEvent.getSender();
+        if (edit && (!sender || edit.getSender() !== sender)) {
             return;
         }
 
