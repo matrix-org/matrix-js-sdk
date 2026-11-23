@@ -6,7 +6,10 @@
         "sourceMap": true,
         "noEmit": false,
         "outDir": "./lib",
-        "rootDir": "src"
+        "rootDir": "src",
+        // Override and remove `vitest/globals`, since the library build should
+        // not depend on test-only types.
+        "types": ["node"]
     },
     "exclude": ["./spec/**/*.ts"]
 }
