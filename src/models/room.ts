@@ -86,8 +86,9 @@ import { RoomRetentionPolicy } from "./room-retention.ts";
 // room versions which are considered okay for people to run without being asked
 // to upgrade (ie: "stable"). Eventually, we should remove these when all homeservers
 // return an m.room_versions capability.
-export const KNOWN_SAFE_ROOM_VERSION = "10";
-const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10"];
+// TODO: This should be removed once https://github.com/matrix-org/matrix-spec-proposals/pull/4582 is merged.
+export const KNOWN_SAFE_ROOM_VERSION = "12";
+const SAFE_ROOM_VERSIONS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
 interface IOpts {
     /**
