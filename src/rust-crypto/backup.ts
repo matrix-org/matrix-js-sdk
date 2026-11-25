@@ -529,7 +529,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                         remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
                     }
                 } catch (err) {
-                    if (this.stopped || err instanceof ClientStoppedError) break;
+                    if (this.stopped) break;
                     numFailures++;
                     logger.error("Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
@@ -634,6 +634,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const authData = { public_key: pubKey.publicKeyBase64 };
 
         await signObject(authData);
+        // No OlmMachine call before this request, so check explicitly to avoid creating a backup after stop.
         if (this.stopped) throw new ClientStoppedError();
 
         const backupData: NewKeyBackupInfo = {
@@ -698,6 +699,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param version - The backup version to delete.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
+        // No OlmMachine call before this request, so check explicitly to avoid deleting a backup after stop.
         if (this.stopped) throw new ClientStoppedError();
         this.logger.debug(`deleteKeyBackupVersion v:${version}`);
         const path = encodeUri("/room_keys/version/$version", { $version: version });

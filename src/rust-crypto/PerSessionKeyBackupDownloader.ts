@@ -333,7 +333,6 @@ export class PerSessionKeyBackupDownloader {
                     // now remove the request from the queue as we've processed it.
                     this.queuedRequests.shift();
                 } catch (err) {
-                    if (err instanceof ClientStoppedError) return;
                     if (err instanceof KeyDownloadError) {
                         switch (err.code) {
                             case KeyDownloadErrorCode.MISSING_DECRYPTION_KEY:
