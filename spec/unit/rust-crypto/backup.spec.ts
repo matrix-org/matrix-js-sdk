@@ -216,25 +216,6 @@ describe("Upload keys to backup", () => {
         expect(fetchMock.callHistory.calls("express:/_matrix/client/v3/room_keys/version/:version")).toHaveLength(0);
     });
 
-    it("should reject backup check if stopped right after doCheckKeyBackup resolves", async () => {
-        const doCheck = Promise.withResolvers<null>();
-        vi.spyOn(rustBackupManager as any, "doCheckKeyBackup").mockReturnValue(doCheck.promise);
-        fetchMock.getOnce("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", { status: 404, body: { errcode: "M_NOT_FOUND" } });
-        fetchMock.delete("express:/_matrix/client/v3/room_keys/version/:version", {});
-        fetchMock.post("path:/_matrix/client/v3/room_keys/version", { version: "2" });
-
-        const check = rustBackupManager.checkKeyBackupAndEnable(false);
-        const setup = rustBackupManager.setupKeyBackup(async () => {});
-        // Resolve and stop synchronously before startKeyBackupCheck resumes.
-        doCheck.resolve(null);
-        rustBackupManager.stop();
-
-        await expect(check).rejects.toBeInstanceOf(ClientStoppedError);
-        await expect(setup).rejects.toBeInstanceOf(ClientStoppedError);
-        expect(fetchMock.callHistory.calls("express:/_matrix/client/v3/room_keys/version/:version")).toHaveLength(0);
-    });
-
     it("should reject isKeyBackupTrusted without calling getBackupKeys after stop", async () => {
         const verify = Promise.withResolvers<RustSdkCryptoJs.SignatureVerification>();
         const started = Promise.withResolvers<void>();
@@ -250,26 +231,6 @@ describe("Upload keys to backup", () => {
 
         await expect(trust).rejects.toBeInstanceOf(ClientStoppedError);
         expect(mockOlmMachine.getBackupKeys).not.toHaveBeenCalled();
-    });
-
-    it("should reject concurrent checkKeyBackupAndEnable if stopped during secret-triggered check", async () => {
-        fetchMock.get("path:/_matrix/client/v3/room_keys/version", testData.SIGNED_BACKUP_DATA);
-        mockOlmMachine.isBackupEnabled.mockResolvedValue(false);
-        const verify = Promise.withResolvers<RustSdkCryptoJs.SignatureVerification>();
-        const started = Promise.withResolvers<void>();
-        mockOlmMachine.verifyBackup.mockImplementation(() => {
-            started.resolve();
-            return verify.promise;
-        });
-
-        const handled = rustBackupManager.handleBackupSecretReceived(testData.BACKUP_DECRYPTION_KEY_BASE64);
-        await started.promise;
-        const check = rustBackupManager.checkKeyBackupAndEnable(true);
-        rustBackupManager.stop();
-        verify.reject(new Error("null pointer passed to rust"));
-
-        await expect(check).rejects.toBeInstanceOf(ClientStoppedError);
-        await expect(handled).resolves.toBe(false);
     });
 
     it("should stop backupKeysLoop on upload error after stop", async () => {

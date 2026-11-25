@@ -24,6 +24,7 @@ import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method }
 import { type RustBackupManager } from "./backup.ts";
 import { encodeUri, sleep } from "../utils.ts";
 import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { ClientStoppedError } from "../errors.ts";
 
 // The minimum time to wait between two retries in case of errors. To avoid hammering the server.
 const KEY_BACKUP_BACKOFF = 5000; // ms
@@ -191,6 +192,20 @@ export class PerSessionKeyBackupDownloader {
     }
 
     /**
+     * Return the OlmMachine only if {@link PerSessionKeyBackupDownloader#stop} has not been called.
+     *
+     * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
+     *
+     * @throws ClientStoppedError if {@link PerSessionKeyBackupDownloader#stop} has been called.
+     */
+    private getOlmMachineOrThrow(): OlmMachine {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
+        return this.olmMachine;
+    }
+
+    /**
      * Called when the backup status changes (CryptoEvents)
      * This will trigger a check of the backup configuration.
      */
@@ -198,12 +213,20 @@ export class PerSessionKeyBackupDownloader {
         // we want to force check configuration, so we clear the current one.
         this.hasConfigurationProblem = false;
         this.configuration = null;
-        this.getOrCreateBackupConfiguration().then((configuration) => {
-            if (configuration) {
-                // restart the download loop if it was stopped
-                this.downloadKeysLoop();
-            }
-        });
+        void this.getOrCreateBackupConfiguration()
+            .then((configuration) => {
+                if (configuration) {
+                    // restart the download loop if it was stopped
+                    this.downloadKeysLoop();
+                }
+            })
+            .catch((e) => {
+                if (e instanceof ClientStoppedError) {
+                    this.logger.debug("Backup configuration check aborted by stop", e);
+                } else {
+                    this.logger.error("Error checking key backup configuration", e);
+                }
+            });
     };
 
     /** Returns true if the megolm session is already queued for download. */
@@ -239,8 +262,9 @@ export class PerSessionKeyBackupDownloader {
     }
 
     private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
+        const olmMachine = this.getOlmMachineOrThrow();
         try {
-            return await this.olmMachine.getBackupKeys();
+            return await olmMachine.getBackupKeys();
         } catch {
             return null;
         }
@@ -300,6 +324,7 @@ export class PerSessionKeyBackupDownloader {
                     try {
                         await this.decryptAndImport(request, result, configuration);
                     } catch (e) {
+                        if (e instanceof ClientStoppedError) return;
                         this.logger.error(
                             `Error while decrypting and importing key backup for session ${request.megolmSessionId}`,
                             e,
@@ -308,6 +333,7 @@ export class PerSessionKeyBackupDownloader {
                     // now remove the request from the queue as we've processed it.
                     this.queuedRequests.shift();
                 } catch (err) {
+                    if (err instanceof ClientStoppedError) return;
                     if (err instanceof KeyDownloadError) {
                         switch (err.code) {
                             case KeyDownloadErrorCode.MISSING_DECRYPTION_KEY:
@@ -395,7 +421,6 @@ export class PerSessionKeyBackupDownloader {
         const sessionsToImport: Record<string, KeyBackupSession> = { [sessionInfo.megolmSessionId]: data };
 
         const keys = await configuration.decryptor.decryptSessions(sessionsToImport);
-        if (this.stopped) return;
         for (const k of keys) {
             k.room_id = sessionInfo.roomId;
         }
@@ -411,10 +436,6 @@ export class PerSessionKeyBackupDownloader {
      * @returns The backup configuration to use or null if there is a configuration problem.
      */
     private async getOrCreateBackupConfiguration(): Promise<Configuration | null> {
-        if (this.stopped) {
-            return null;
-        }
-
         if (this.configuration) {
             return this.configuration;
         }
@@ -432,19 +453,9 @@ export class PerSessionKeyBackupDownloader {
             return await this.currentBackupVersionCheck;
         }
 
-        this.currentBackupVersionCheck = this.runBackupVersionCheck();
-        return await this.currentBackupVersionCheck;
-    }
-
-    private async runBackupVersionCheck(): Promise<Configuration | null> {
+        this.currentBackupVersionCheck = this.internalCheckFromServer();
         try {
-            return await this.internalCheckFromServer();
-        } catch (e) {
-            if (this.stopped) {
-                this.logger.debug("Backup configuration check aborted by stop", e);
-                return null;
-            }
-            throw e;
+            return await this.currentBackupVersionCheck;
         } finally {
             this.currentBackupVersionCheck = null;
         }
@@ -455,13 +466,11 @@ export class PerSessionKeyBackupDownloader {
         try {
             currentServerVersion = await this.backupManager.getServerBackupInfo();
         } catch (e) {
-            if (this.stopped) return null;
+            if (e instanceof ClientStoppedError) throw e;
             this.logger.debug(`Backup: error while checking server version: ${e}`);
             this.hasConfigurationProblem = true;
             return null;
         }
-        // If stopped while waiting for the server, stop before calling a closed OlmMachine.
-        if (this.stopped) return null;
         this.logger.debug(`Got current backup version from server: ${currentServerVersion?.version}`);
 
         if (currentServerVersion?.algorithm != "m.megolm_backup.v1.curve25519-aes-sha2") {
@@ -477,7 +486,6 @@ export class PerSessionKeyBackupDownloader {
         }
 
         const activeVersion = await this.backupManager.getActiveBackupVersion();
-        if (this.stopped) return null;
         if (activeVersion == null || currentServerVersion.version != activeVersion) {
             // Either the current backup version on server side is not trusted, or it is out of sync with the active version on the client side.
             this.logger.info(
@@ -488,7 +496,6 @@ export class PerSessionKeyBackupDownloader {
         }
 
         const backupKeys = await this.getBackupDecryptionKey();
-        if (this.stopped) return null;
         if (!backupKeys?.decryptionKey) {
             this.logger.debug(`Not checking key backup for session (no decryption key)`);
             this.hasConfigurationProblem = true;
