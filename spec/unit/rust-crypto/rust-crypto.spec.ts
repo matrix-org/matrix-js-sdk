@@ -283,8 +283,8 @@ describe("initRustCrypto", () => {
         await requested.promise;
         crypto.stop();
         res.resolve(testData.SIGNED_BACKUP_DATA);
-        await check;
-        await crypto.checkSecrets("m.megolm_backup.v1");
+        await expect(check).rejects.toBeInstanceOf(ClientStoppedError);
+        await expect(crypto.checkSecrets("m.megolm_backup.v1")).rejects.toBeInstanceOf(ClientStoppedError);
 
         expect(olm.getSecretsFromInbox).toHaveBeenCalledTimes(1);
         expect(olm.saveBackupDecryptionKey).not.toHaveBeenCalled();
