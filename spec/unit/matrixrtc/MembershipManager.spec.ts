@@ -1670,7 +1670,10 @@ describe("MembershipManager", () => {
             );
         });
 
-        it("can adjust the intent", async () => {
+        it.each([
+            ["video", "video"],
+            ["m.video", "video"],
+        ])("can adjust the intent to %s, writing %s to the state event", async (newIntent, written) => {
             const manager = new MembershipManager({}, room, client, callSession);
             manager.join([]);
             expect(manager.isActivated()).toEqual(true);
@@ -1679,23 +1682,27 @@ describe("MembershipManager", () => {
                 room.roomId,
             );
             await manager.onRTCSessionMemberUpdate([membership]);
-            await manager.updateCallIntent("video");
+            await manager.updateCallIntent(newIntent);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(2);
             const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as SessionMembershipData;
             expect(eventContent["created_ts"]).toEqual(membership.createdTs());
-            expect(eventContent["m.call.intent"]).toEqual("video");
+            expect(eventContent["m.call.intent"]).toEqual(written);
         });
 
-        it("does nothing if the intent doesn't change", async () => {
-            const manager = new MembershipManager({ callIntent: "video" }, room, client, callSession);
+        it.each([
+            ["video", "video"],
+            ["m.video", "video"],
+            ["video", "m.video"],
+            ["m.video", "m.video"],
+        ])("does nothing if the intent %s doesn't change from %s", async (newIntent, configuredIntent) => {
+            const manager = new MembershipManager({ callIntent: configuredIntent }, room, client, callSession);
             manager.join([]);
-            expect(manager.isActivated()).toEqual(true);
             const membership = mockCallMembership(
                 { ...sessionMembershipTemplate, "user_id": client.getUserId()!, "m.call.intent": "video" },
                 room.roomId,
             );
             await manager.onRTCSessionMemberUpdate([membership]);
-            await manager.updateCallIntent("video");
+            await manager.updateCallIntent(newIntent);
             expect(client.sendStateEvent).toHaveBeenCalledTimes(0);
         });
     });
@@ -1744,6 +1751,45 @@ describe("MembershipManager", () => {
             const overridden = vi.mocked(client.sendStateEvent).mock.calls[2][2] as SessionMembershipData;
             expect(overridden.application).toBe("m.call");
             expect(overridden.device_id).toBe("AAAAAAA");
+        });
+
+        it("drops the keys the SDK writes itself from the data", async () => {
+            const manager = new MembershipManager(
+                {
+                    applicationData: {
+                        "org.example.key": "initial",
+                        "type": "m.not.a.call",
+                        "intent": "m.video",
+                        "m.call.intent": "video",
+                        "capabilities": ["m.render_audio"],
+                    },
+                },
+                room,
+                client,
+                callSession,
+            );
+            const sent = waitForMockCall(client.sendStateEvent);
+            manager.join([]);
+            await sent;
+            const eventContent = vi.mocked(client.sendStateEvent).mock.calls[0][2] as Record<string, unknown>;
+            expect(eventContent["org.example.key"]).toBe("initial");
+            expect(eventContent["application"]).toBe("m.call");
+            expect(eventContent["intent"]).toBeUndefined();
+            expect(eventContent["m.call.intent"]).toBeUndefined();
+            expect(eventContent["capabilities"]).toBeUndefined();
+
+            const membership = mockCallMembership(
+                {
+                    ...sessionMembershipTemplate,
+                    "user_id": client.getUserId()!,
+                    "org.example.key": "initial",
+                } as SessionMembershipData & { user_id: string },
+                room.roomId,
+            );
+            await manager.onRTCSessionMemberUpdate([membership]);
+            // Reserved keys are dropped before comparing, so this is a no-op
+            await manager.updateApplicationData({ "org.example.key": "initial", "m.call.intent": "audio" });
+            expect(client.sendStateEvent).toHaveBeenCalledTimes(1);
         });
     });
 
@@ -1840,6 +1886,62 @@ describe("MembershipManager", () => {
                         can_subscribe: ["livekit", "m.livekit"],
                     });
                 });
+            });
+            it.each([
+                ["m.audio", "audio"],
+                ["video", "m.video"],
+            ])(
+                "publishes the intent %s under both the stable and the unstable key",
+                async (configuredIntent, otherIntent) => {
+                    const memberManager = new StickyEventMembershipManager(
+                        { callIntent: configuredIntent, applicationData: { "m.call.intent": "stray" } },
+                        room,
+                        client,
+                        callSession,
+                        "@alice:example.org:AAAAAAA_m.call",
+                    );
+                    memberManager.join([focus]);
+                    await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                    const [spec, legacy] = configuredIntent.startsWith("m.")
+                        ? [configuredIntent, otherIntent]
+                        : [otherIntent, configuredIntent];
+                    expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
+                        room.roomId,
+                        3600000,
+                        null,
+                        "org.matrix.msc4143.rtc.member",
+                        expect.objectContaining({
+                            application: { "type": "m.call", "intent": spec, "m.call.intent": legacy },
+                        }),
+                    );
+                },
+            );
+            it("drops intent and capabilities given in applicationData", async () => {
+                const memberManager = new StickyEventMembershipManager(
+                    {
+                        applicationData: {
+                            "org.example.key": "value",
+                            "intent": "m.video",
+                            "m.call.intent": "video",
+                            "capabilities": ["m.render_audio"],
+                        },
+                    },
+                    room,
+                    client,
+                    callSession,
+                    "@alice:example.org:AAAAAAA_m.call",
+                );
+                memberManager.join([focus]);
+                await waitForMockCall(client._unstable_sendStickyEvent, Promise.resolve({ event_id: "id" }));
+                expect(client._unstable_sendStickyEvent).toHaveBeenCalledWith(
+                    room.roomId,
+                    3600000,
+                    null,
+                    "org.matrix.msc4143.rtc.member",
+                    expect.objectContaining({
+                        application: { "type": "m.call", "org.example.key": "value" },
+                    }),
+                );
             });
             it("sends a leave event with member.membership leave when the scheduled delayed leave is gone", async () => {
                 const memberManager = new StickyEventMembershipManager(

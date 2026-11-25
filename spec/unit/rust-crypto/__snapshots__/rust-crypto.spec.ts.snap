@@ -4,7 +4,6 @@ exports[`RustCrypto > importing and exporting room keys > should import and expo
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
-  "m.shared_history": true,
   "room_id": "!room:id",
   "sender_claimed_keys": {
     "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0",
@@ -12,6 +11,7 @@ exports[`RustCrypto > importing and exporting room keys > should import and expo
   "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
   "session_id": "FYOoKQSwe4d9jhTZ/LQCZFJINjPEqZ7Or4Z08reP92M",
   "session_key": "AQAAAABZ0jXQOprFfXe41tIFmAtHxflJp4O2hM/vzQQpOazOCFeWSoW5P3Z9Q+voU3eXehMwyP8/hm/Q8xLP6/PmJdy+71se/17kdFwcDGgLxBWfa4ODM9zlI4EjKbNqmiii5loJ7rBhA/XXaw80m0hfU6zTDX/KrO55J0Pt4vJ0LDa3LBWDqCkEsHuHfY4U2fy0AmRSSDYzxKmezq+GdPK3j/dj",
+  "shared_history": true,
 }
 `;
 
@@ -19,7 +19,6 @@ exports[`RustCrypto > importing and exporting room keys > should import and expo
 {
   "algorithm": "m.megolm.v1.aes-sha2",
   "forwarding_curve25519_key_chain": [],
-  "m.shared_history": true,
   "room_id": "!room:id",
   "sender_claimed_keys": {
     "ed25519": "QdgHgdpDgihgovpPzUiThXur1fbErTFh7paFvNKSgN0",
@@ -27,5 +26,6 @@ exports[`RustCrypto > importing and exporting room keys > should import and expo
   "sender_key": "WimPd2udAU/1S/+YBpPbmr9L+0H5H+BnAVHSwDxlPGc",
   "session_id": "FYOoKQSwe4d9jhTZ/LQCZFJINjPEqZ7Or4Z08reP92M",
   "session_key": "AQAAAABZ0jXQOprFfXe41tIFmAtHxflJp4O2hM/vzQQpOazOCFeWSoW5P3Z9Q+voU3eXehMwyP8/hm/Q8xLP6/PmJdy+71se/17kdFwcDGgLxBWfa4ODM9zlI4EjKbNqmiii5loJ7rBhA/XXaw80m0hfU6zTDX/KrO55J0Pt4vJ0LDa3LBWDqCkEsHuHfY4U2fy0AmRSSDYzxKmezq+GdPK3j/dj",
+  "shared_history": true,
 }
 `;

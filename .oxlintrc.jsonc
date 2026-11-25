@@ -142,6 +142,7 @@
         "typescript/use-unknown-in-catch-callback-variable": "off",
         "typescript/no-invalid-void-type": "off", // https://github.com/oxc-project/oxc/issues/20280
         "typescript/no-unsafe-enum-comparison": "off",
+        "typescript/no-unsafe-enum-assignment": "off",
         "typescript/no-unnecessary-type-conversion": "off",
         "no-param-reassign": "off",
         "typescript/no-explicit-any": "off",

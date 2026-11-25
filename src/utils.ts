@@ -378,13 +378,24 @@ export function escapeRegExp(string: string): string {
 }
 
 /**
+ * Longest glob pattern we will compile. Patterns come from untrusted data (push rules, remote policy
+ * list events) and compile to backtracking wildcards, so an unbounded one is a DoS vector.
+ * 255 bytes is the spec's maximum length for
+ * {@link https://spec.matrix.org/v1.18/appendices/#user-identifiers | user IDs} and
+ * {@link https://spec.matrix.org/v1.18/appendices/#room-aliases | room aliases}.
+ */
+export const MAX_GLOB_PATTERN_LENGTH = 255;
+
+/**
  * Converts Matrix glob-style string to a regular expression
- * https://spec.matrix.org/v1.7/appendices/#glob-style-matching
- * @param glob - Matrix glob-style string
- * @returns regular expression
+ * https://spec.matrix.org/v1.18/appendices/#glob-style-matching
+ * @param glob - Matrix glob-style string, at most {@link MAX_GLOB_PATTERN_LENGTH} characters
+ * @returns regular expression, or one which never matches if the pattern was too long
  */
 export function globToRegexp(glob: string): string {
-    return escapeRegExp(glob).replace(/\\\*/g, ".*").replace(/\?/g, ".");
+    if (glob.length > MAX_GLOB_PATTERN_LENGTH) return "[^\\s\\S]"; // valid in RegExp and RE2, but never matches
+    // `**` is equivalent to `*`; collapsing runs stops an all-wildcard pattern expanding into one `.*` per character
+    return escapeRegExp(glob.replace(/\*+/g, "*")).replace(/\\\*/g, ".*").replace(/\\\?/g, ".");
 }
 
 export function ensureNoTrailingSlash(url: string): string;

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { RE2JS } from "re2js";
+
 import { deepCompare, escapeRegExp, globToRegexp, isNullOrUndefined } from "./utils.ts";
 import { type Logger } from "./logger.ts";
 import { type MatrixClient } from "./client.ts";
@@ -322,6 +324,9 @@ export class PushProcessor {
      * Create a RegExp object for the given glob pattern with a single capture group around the pattern itself, caching the result.
      * No cache invalidation is present currently,
      * as this will be inherently bounded to the size of the user's own push rules.
+     *
+     * @deprecated Do not use this to evaluate untrusted push rule data: the resulting RegExp can
+     * backtrack catastrophically.
      * @param pattern - the glob pattern to convert to a RegExp
      * @param alignToWordBoundary - whether to align the pattern to word boundaries,
      *     as specified for `content.body` matches, will use lookaround assertions to ensure the match only includes the pattern
@@ -338,6 +343,26 @@ export class PushProcessor {
             );
         }
         return PushProcessor.cachedGlobToRegex[cacheKey];
+    }
+
+    /**
+     * Create a linear-time RE2 matcher for the given glob pattern, caching the result.
+     * Push rule patterns are homeserver-controlled, so they must not be compiled to a backtracking RegExp.
+     * @param pattern - the glob pattern
+     * @param alignToWordBoundary - whether to align the pattern to word boundaries, as specified for `content.body` matches
+     */
+    private static getPushRuleGlobRe2(pattern: string, alignToWordBoundary: boolean): RE2JS {
+        // RE2 has no lookaround, but consuming the boundary characters is equivalent for a boolean test.
+        const [prefix, suffix] = alignToWordBoundary ? ["(?:^|\\W)", "(?:\\W|$)"] : ["^", "$"];
+        const cacheKey = `${alignToWordBoundary}-${pattern}`;
+
+        if (!PushProcessor.cachedGlobToRe2[cacheKey]) {
+            PushProcessor.cachedGlobToRe2[cacheKey] = RE2JS.compile(
+                prefix + "(" + globToRegexp(pattern) + ")" + suffix,
+                RE2JS.CASE_INSENSITIVE,
+            );
+        }
+        return PushProcessor.cachedGlobToRe2[cacheKey];
     }
 
     /**
@@ -388,6 +413,7 @@ export class PushProcessor {
     }
 
     private static cachedGlobToRegex: Record<string, RegExp> = {}; // $glob: RegExp
+    private static cachedGlobToRe2: Record<string, RE2JS> = {}; // $glob: RE2JS
 
     private matchingRuleFromKindSet(ev: MatrixEvent, kindset: PushRuleSet): IAnnotatedPushRule | null {
         for (const kind of RULEKINDS_IN_ORDER) {
@@ -601,8 +627,7 @@ export class PushProcessor {
 
         // Align to word boundary on `content.body` matches, whole string otherwise
         // https://spec.matrix.org/v1.13/client-server-api/#conditions-1
-        const regex = PushProcessor.getPushRuleGlobRegex(cond.pattern, cond.key === "content.body");
-        return !!val.match(regex);
+        return PushProcessor.getPushRuleGlobRe2(cond.pattern, cond.key === "content.body").test(val);
     }
 
     /**

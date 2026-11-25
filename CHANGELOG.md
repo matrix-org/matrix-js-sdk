@@ -1,3 +1,47 @@
+Changes in [45.2.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v45.2.0) (2026-11-24)
+==================================================================================================
+## ✨ Features
+
+* Add stable support for /delegate-delayed-leave ([#5699](https://github.com/matrix-org/matrix-js-sdk/pull/5699)). Contributed by @Johennes.
+* Add support for stable /rtc/get\_token endpoint ([#5700](https://github.com/matrix-org/matrix-js-sdk/pull/5700)). Contributed by @Johennes.
+* Add knock restricted support ([#5662](https://github.com/matrix-org/matrix-js-sdk/pull/5662)). Contributed by @florianduros.
+* Support the stable /rtc/transports endpoint ([#5679](https://github.com/matrix-org/matrix-js-sdk/pull/5679)). Contributed by @robintown.
+* Expose method to pre-load Rust Crypto WASM asset ([#5673](https://github.com/matrix-org/matrix-js-sdk/pull/5673)). Contributed by @t3chguy.
+* Add support for m.livekit RTC transport type ([#5650](https://github.com/matrix-org/matrix-js-sdk/pull/5650)). Contributed by @Johennes.
+
+## 🐛 Bug Fixes
+
+* Improvements to message retention ([#5696](https://github.com/matrix-org/matrix-js-sdk/pull/5696)). Contributed by @langleyd.
+* Encrypt delayed events if needed ([#5682](https://github.com/matrix-org/matrix-js-sdk/pull/5682)). Contributed by @Johennes.
+* Improve timeout handling when using message retention. ([#5691](https://github.com/matrix-org/matrix-js-sdk/pull/5691)). Contributed by @Half-Shot.
+* Don't log out on any Matrix error when refreshing token ([#5612](https://github.com/matrix-org/matrix-js-sdk/pull/5612)). Contributed by @dbkr.
+* MatrixRTC: Ensure we wait for membership to be calculated for sessions ([#5666](https://github.com/matrix-org/matrix-js-sdk/pull/5666)). Contributed by @Half-Shot.
+* Fix new thread replies sometimes not appearing until the thread is reopened ([#5652](https://github.com/matrix-org/matrix-js-sdk/pull/5652)). Contributed by @lowtide-lab.
+* Handle token refresh in XHR uploads ([#5663](https://github.com/matrix-org/matrix-js-sdk/pull/5663)). Contributed by @t3chguy.
+
+
+Changes in [45.1.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v45.1.0) (2026-11-11)
+==================================================================================================
+## Security
+
+* Fixes GHSA-jx97-gwvc-pfxx
+* Includes a fix for GHSA-pqp6-f7wc-6498
+
+## ✨ Features
+
+* [Backport staging] Update matrix-sdk-crypto-wasm to v18.9.2 ([#5687](https://github.com/matrix-org/matrix-js-sdk/pull/5687)). Contributed by @RiotRobot.
+* Switch to 32 bytes of key material for MatrixRTC encryption ([#5649](https://github.com/matrix-org/matrix-js-sdk/pull/5649)). Contributed by @Johennes.
+* MSC4140: schedule delayed events through the dedicated endpoint ([#5556](https://github.com/matrix-org/matrix-js-sdk/pull/5556)). Contributed by @barodeur.
+
+## 🐛 Bug Fixes
+
+* Require sticky duration to be a positive number ([#5636](https://github.com/matrix-org/matrix-js-sdk/pull/5636)). Contributed by @Johennes.
+* MSC4140: read the delayed events capability and recognise `M_DELAY_TOO_LARGE` ([#5564](https://github.com/matrix-org/matrix-js-sdk/pull/5564)). Contributed by @barodeur.
+* Ensure sticky events are spaced at least 1ms apart for the same key ([#5638](https://github.com/matrix-org/matrix-js-sdk/pull/5638)). Contributed by @Johennes.
+* Order events for the sticky map by intended expiry ([#5634](https://github.com/matrix-org/matrix-js-sdk/pull/5634)). Contributed by @Johennes.
+* Fix decryption issues for encrypted sticky events ([#5635](https://github.com/matrix-org/matrix-js-sdk/pull/5635)). Contributed by @Johennes.
+
+
 Changes in [45.0.0](https://github.com/matrix-org/matrix-js-sdk/releases/tag/v45.0.0) (2026-10-27)
 ==================================================================================================
 ## 🚨 BREAKING CHANGES
