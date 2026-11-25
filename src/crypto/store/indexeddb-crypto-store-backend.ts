@@ -35,6 +35,12 @@ import { type CrossSigningKeyInfo } from "../../crypto-api/index.ts";
 
 const PROFILE_TRANSACTIONS = false;
 
+// Chromium defaults IndexedDB transactions to relaxed durability, under which
+// an unclean shutdown can persist a record whose large-value blob file never
+// reached disk, leaving the store permanently unreadable
+// (https://github.com/element-hq/element-web/issues/27969).
+const STRICT_DURABILITY: IDBTransactionOptions = { durability: "strict" };
+
 /**
  * Implementation of a CryptoStore which is backed by an existing
  * IndexedDB connection. Generally you want IndexedDBCryptoStore
@@ -478,7 +484,7 @@ export class Backend implements CryptoStore {
 
     public async markSessionsNeedingBackup(sessions: ISession[], txn?: IDBTransaction): Promise<void> {
         if (!txn) {
-            txn = this.db.transaction("sessions_needing_backup", "readwrite");
+            txn = this.db.transaction("sessions_needing_backup", "readwrite", STRICT_DURABILITY);
         }
         const objectStore = txn.objectStore("sessions_needing_backup");
         await Promise.all(
@@ -509,7 +515,7 @@ export class Backend implements CryptoStore {
             description = `${mode} crypto store transaction ${txnId} in ${stores}`;
             log.debug(`Starting ${description}`);
         }
-        const txn = this.db.transaction(stores, mode);
+        const txn = this.db.transaction(stores, mode, STRICT_DURABILITY);
         const promise = promiseifyTxn(txn);
         const result = func(txn);
         if (PROFILE_TRANSACTIONS) {

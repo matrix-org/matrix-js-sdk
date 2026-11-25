@@ -23,6 +23,12 @@ import { type ISavedSync } from "./index.ts";
 import { type IIndexedDBBackend, type UserTuple } from "./indexeddb-backend.ts";
 import { type IndexedToDeviceBatch, type ToDeviceBatchWithTxnId } from "../models/ToDeviceMessage.ts";
 
+// Chromium defaults IndexedDB transactions to relaxed durability, under which
+// an unclean shutdown can persist a record whose large-value blob file never
+// reached disk, leaving the store permanently unreadable
+// (https://github.com/element-hq/element-web/issues/27969).
+const STRICT_DURABILITY: IDBTransactionOptions = { durability: "strict" };
+
 type DbMigration = (db: IDBDatabase) => void;
 const DB_MIGRATIONS: DbMigration[] = [
     (db): void => {
@@ -290,7 +296,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      */
     public async setOutOfBandMembers(roomId: string, membershipEvents: IStateEventWithRoomId[]): Promise<void> {
         logger.log(`LL: backend about to store ${membershipEvents.length} members for ${roomId}`);
-        const tx = this.db!.transaction(["oob_membership_events"], "readwrite");
+        const tx = this.db!.transaction(["oob_membership_events"], "readwrite", STRICT_DURABILITY);
         const store = tx.objectStore("oob_membership_events");
         membershipEvents.forEach((e) => {
             store.put(e);
@@ -330,7 +336,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         );
         const [minStateKey, maxStateKey] = await Promise.all([minStateKeyProm, maxStateKeyProm]);
 
-        const writeTx = this.db!.transaction(["oob_membership_events"], "readwrite");
+        const writeTx = this.db!.transaction(["oob_membership_events"], "readwrite", STRICT_DURABILITY);
         const writeStore = writeTx.objectStore("oob_membership_events");
         const membersKeyRange = IDBKeyRange.bound([roomId, minStateKey], [roomId, maxStateKey]);
 
@@ -435,7 +441,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         const syncData = this.syncAccumulator.getJSON(true);
         // Persist in a single transaction so a failed save writes nothing
         // and leaves the previously saved sync consistent.
-        const txn = this.db!.transaction(["users", "accountData", "sync"], "readwrite");
+        const txn = this.db!.transaction(["users", "accountData", "sync"], "readwrite", STRICT_DURABILITY);
         try {
             this.persistUserPresenceEvents(txn, userTuples);
             this.persistAccountData(txn, syncData.accountData);
@@ -566,7 +572,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async storeClientOptions(options: IStoredClientOpts): Promise<void> {
-        const txn = this.db!.transaction(["client_options"], "readwrite");
+        const txn = this.db!.transaction(["client_options"], "readwrite", STRICT_DURABILITY);
         const store = txn.objectStore("client_options");
         store.put({
             clobber: "-", // constant key so will always clobber
@@ -576,7 +582,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async saveToDeviceBatches(batches: ToDeviceBatchWithTxnId[]): Promise<void> {
-        const txn = this.db!.transaction(["to_device_queue"], "readwrite");
+        const txn = this.db!.transaction(["to_device_queue"], "readwrite", STRICT_DURABILITY);
         const store = txn.objectStore("to_device_queue");
         for (const batch of batches) {
             store.add(batch);
@@ -601,7 +607,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async removeToDeviceBatch(id: number): Promise<void> {
-        const txn = this.db!.transaction(["to_device_queue"], "readwrite");
+        const txn = this.db!.transaction(["to_device_queue"], "readwrite", STRICT_DURABILITY);
         const store = txn.objectStore("to_device_queue");
         store.delete(id);
         await txnAsPromise(txn);
@@ -618,7 +624,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async storeUserProfiles(userProfiles: Map<string, SyncUserProfile>): Promise<void> {
-        const txn = this.db!.transaction(["user_profile"], "readwrite");
+        const txn = this.db!.transaction(["user_profile"], "readwrite", STRICT_DURABILITY);
         const store = txn.objectStore("user_profile");
         for (const [userId, profile] of userProfiles.entries()) {
             store.put({ profile, userId });
@@ -627,7 +633,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
     }
 
     public async removeUserProfiles(userIds: string[]): Promise<void> {
-        const txn = this.db!.transaction(["user_profile"], "readwrite");
+        const txn = this.db!.transaction(["user_profile"], "readwrite", STRICT_DURABILITY);
         const store = txn.objectStore("user_profile");
         for (const userId of userIds) {
             store.delete([userId]);
@@ -639,7 +645,7 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
         try {
             this.syncAccumulator.removeEventsFromRoom(roomId, eventIds);
             const syncData = this.syncAccumulator.getJSON(true);
-            const txn = this.db!.transaction(["sync"], "readwrite");
+            const txn = this.db!.transaction(["sync"], "readwrite", STRICT_DURABILITY);
             this.persistSyncData(txn, syncData.nextBatch, syncData.roomsData);
             await txnAsPromise(txn);
             logger.log("Persisted sync data up to", syncData.nextBatch);
