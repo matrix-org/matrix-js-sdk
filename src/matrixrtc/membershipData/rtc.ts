@@ -40,12 +40,7 @@ export interface RtcMembershipData {
         user_id: string;
         device_id: string;
         id: string;
-        /**
-         * The intended membership status.
-         *
-         * Optional and defaulting to "join" for backwards compatibility.
-         */
-        membership?: "join";
+        membership: "join";
     };
     application: RtcSlotApplicationContent;
     transports: {
@@ -124,9 +119,7 @@ export const checkRtcMembershipData = (data: IContent, sender: string): data is 
             errors.push(prefix + "member.device_id must be string");
         }
         if (typeof data.member.id !== "string") errors.push(prefix + "member.id must be string");
-        // Events predating `member.membership` omit it and are treated as joined. Anything other than `join`
-        // (including `leave`) does not describe a joined membership and is rejected.
-        if (data.member.membership !== undefined && data.member.membership !== "join") {
+        if (data.member.membership !== "join") {
             errors.push(prefix + "member.membership must be join");
         }
     }
