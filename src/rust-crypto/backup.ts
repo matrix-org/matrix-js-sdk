@@ -529,7 +529,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                         remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
                     }
                 } catch (err) {
-                    if (this.stopped || err instanceof ClientStoppedError) break;
+                    if (this.stopped) break;
                     numFailures++;
                     logger.error("Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
