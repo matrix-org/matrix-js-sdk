@@ -161,6 +161,10 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
      * @returns Promise which resolves if successfully connected.
      */
     public connect(onClose?: () => void): Promise<void> {
+        return this.connectInternal(onClose, true);
+    }
+
+    private connectInternal(onClose: (() => void) | undefined, clearOnLoadFailure: boolean): Promise<void> {
         if (!this.disconnected) {
             logger.log(`LocalIndexedDBStoreBackend.connect: already connected or connecting`);
             return Promise.resolve();
@@ -205,7 +209,20 @@ export class LocalIndexedDBStoreBackend implements IIndexedDBBackend {
                 onClose?.();
             };
 
-            await this.init();
+            try {
+                await this.init();
+            } catch (e) {
+                if (!clearOnLoadFailure) throw e;
+                // The database opened but its contents could not be read, e.g. Chromium's
+                // `NotReadableError` when a large value's blob file has gone missing. Such a
+                // record fails the same way on every load, so falling back to MemoryStore
+                // would never repair it. The store is only a cache: clear it and start afresh.
+                logger.warn("LocalIndexedDBStoreBackend: failed to load data, clearing the database and retrying", e);
+                await this.clearDatabase();
+                this.db = undefined;
+                this.disconnected = true;
+                return this.connectInternal(onClose, false);
+            }
         });
     }
 
