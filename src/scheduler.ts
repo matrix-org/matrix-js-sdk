@@ -22,7 +22,7 @@ import { logger } from "./logger.ts";
 import { type MatrixEvent } from "./models/event.ts";
 import { EventType } from "./@types/event.ts";
 import { removeElement } from "./utils.ts";
-import { calculateRetryBackoff, type MatrixError } from "./http-api/index.ts";
+import { calculateRetryBackoff, ConnectionError, HTTPError, type MatrixError } from "./http-api/index.ts";
 import { type ISendEventResponse } from "./@types/requests.ts";
 
 const DEBUG = false; // set true to enable console logging.
@@ -51,15 +51,40 @@ export class MatrixScheduler<T = ISendEventResponse> {
     }
 
     /**
-     * Queues `m.room.message` events and lets other events continue
-     * concurrently.
+     * Default retry algorithm for the matrix scheduler. Retries events up to 4 times with exponential backoff,
+     * including on connection errors, so that a flaky network connection does not cause the event (and all the
+     * events queued behind it) to fail to send.
+     *
+     * Errors which did not come from the network (for example, a failure to encrypt the event) are not retried.
+     *
+     * @param attempts - Number of attempts that have been made, including the one that just failed (ie. starting at 1)
+     * @see retryAlgorithm
+     */
+    public static RETRY_BACKOFF_RATELIMIT_AND_CONNECTION_ERRORS(
+        event: MatrixEvent | null,
+        attempts: number,
+        err: MatrixError,
+    ): number {
+        // Despite the type, `err` may be any error, as it is whatever the process function rejected with.
+        const error: unknown = err;
+        if (!(error instanceof HTTPError) && !(error instanceof ConnectionError)) {
+            return -1;
+        }
+        return calculateRetryBackoff(err, attempts, true);
+    }
+
+    /**
+     * Queues `m.room.message` events, as well as events that associate with another event, per room,
+     * and lets other events continue concurrently.
      * @see queueAlgorithm
      */
     public static QUEUE_MESSAGES(event: MatrixEvent): string | null {
         // enqueue messages or events that associate with another event (redactions and relations)
         if (event.getType() === EventType.RoomMessage || event.hasAssociation()) {
-            // put these events in the 'message' queue.
-            return "message";
+            // Put these events in a per-room 'message' queue. Events only need to be ordered relative to other
+            // events in the same room, and this stops a slow (e.g. encrypting) or failing event in one room from
+            // holding up events in other rooms.
+            return `message:${event.getRoomId()}`;
         }
         // allow all other events continue concurrently.
         return null;
@@ -80,7 +105,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
      * with a way of processing events.
      * @param retryAlgorithm - Optional. The retry
      * algorithm to apply when determining when to try to send an event again.
-     * Defaults to {@link MatrixScheduler.RETRY_BACKOFF_RATELIMIT}.
+     * Defaults to {@link MatrixScheduler.RETRY_BACKOFF_RATELIMIT_AND_CONNECTION_ERRORS}.
      * @param queueAlgorithm - Optional. The queuing
      * algorithm to apply when determining which events should be sent before the
      * given event. Defaults to {@link MatrixScheduler.QUEUE_MESSAGES}.
@@ -99,7 +124,7 @@ export class MatrixScheduler<T = ISendEventResponse> {
          * `-1`, the event will be marked as
          * {@link EventStatus.NOT_SENT} and will not be retried.
          */
-        public readonly retryAlgorithm = MatrixScheduler.RETRY_BACKOFF_RATELIMIT,
+        public readonly retryAlgorithm = MatrixScheduler.RETRY_BACKOFF_RATELIMIT_AND_CONNECTION_ERRORS,
         /**
          * The queuing algorithm to apply to events. This function must be idempotent as
          * it may be called multiple times with the same event. All queues created are
@@ -137,6 +162,10 @@ export class MatrixScheduler<T = ISendEventResponse> {
     /**
      * Remove this event from the queue. The event is equal to another event if they
      * have the same ID returned from event.getId().
+     *
+     * The event may be removed even if it is currently being processed: in that case, the outcome of processing it
+     * will not affect the rest of the queue. The promise returned by {@link queueEvent} for a removed event is not
+     * settled by the scheduler.
      * @param event - The event to remove.
      * @returns True if this event was removed.
      */
@@ -233,14 +262,22 @@ export class MatrixScheduler<T = ISendEventResponse> {
             })
             .then(
                 (res) => {
-                    // remove this from the queue
-                    this.removeNextEvent(queueName);
+                    // remove this from the queue. Note that it is not necessarily at the head of the queue (or even still
+                    // in the queue), as it may have been removed via removeEventFromQueue whilst it was being processed.
+                    this.removeEntry(queueName, obj);
                     debuglog("Queue '%s' sent event %s", queueName, obj.event.getId());
                     obj.resolvers.resolve(res);
                     // keep processing
                     this.processQueue(queueName);
                 },
                 (err) => {
+                    if (!this.queues[queueName]?.includes(obj)) {
+                        // The event was removed from the queue whilst it was being processed, so its failure should not
+                        // affect the rest of the queue: just move on to the next event.
+                        debuglog("Queue '%s' event %s failed after removal", queueName, obj.event.getId());
+                        this.processQueue(queueName);
+                        return;
+                    }
                     obj.attempts += 1;
                     // ask the retry algorithm when/if we should try again
                     const waitTimeMs = this.retryAlgorithm(obj.event, obj.attempts, err);
@@ -287,6 +324,12 @@ export class MatrixScheduler<T = ISendEventResponse> {
             return undefined;
         }
         return queue[0];
+    }
+
+    private removeEntry(queueName: string, entry: IQueueEntry<T>): void {
+        const queue = this.queues[queueName];
+        if (!Array.isArray(queue)) return;
+        removeElement(queue, (element) => element === entry);
     }
 
     private removeNextEvent(queueName: string): IQueueEntry<T> | undefined {
