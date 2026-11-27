@@ -1479,7 +1479,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         const userSignatures = sigs.get(this.userId) || {};
 
         const canonalizedJson = anotherjson.stringify(obj);
-        const signatures: RustSdkCryptoJs.Signatures = await this.olmMachine.sign(canonalizedJson);
+        const signatures: RustSdkCryptoJs.Signatures = await this.getOlmMachineOrThrow().sign(canonalizedJson);
 
         const map = JSON.parse(signatures.asJSON());
 
@@ -2277,7 +2277,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
     public async pushSecretToVerifiedDevices(name: string): Promise<void> {
         const logger = new LogSpan(this.logger, "pushSecretToVerifiedDevices");
         await this.keyClaimManager.ensureSessionsForUsers(logger, [new RustSdkCryptoJs.UserId(this.userId)]);
-        await this.olmMachine.pushSecretToVerifiedDevices(name);
+        await this.getOlmMachineOrThrow().pushSecretToVerifiedDevices(name);
         this.outgoingRequestsManager.doProcessOutgoingRequests().catch((e) => {
             logger.warn("pushSecretToVerifiedDevices: Error processing outgoing requests", e);
         });

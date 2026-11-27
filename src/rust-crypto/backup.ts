@@ -634,6 +634,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         const authData = { public_key: pubKey.publicKeyBase64 };
 
         await signObject(authData);
+        // No OlmMachine call before this request, so check explicitly to avoid creating a backup after stop.
+        if (this.stopped) throw new ClientStoppedError();
 
         const backupData: NewKeyBackupInfo = {
             algorithm: pubKey.algorithm,
@@ -697,6 +699,8 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param version - The backup version to delete.
      */
     public async deleteKeyBackupVersion(version: string): Promise<void> {
+        // No OlmMachine call before this request, so check explicitly to avoid deleting a backup after stop.
+        if (this.stopped) throw new ClientStoppedError();
         this.logger.debug(`deleteKeyBackupVersion v:${version}`);
         const path = encodeUri("/room_keys/version/$version", { $version: version });
         await this.http.authedRequest<void>(Method.Delete, path, undefined, undefined, {
