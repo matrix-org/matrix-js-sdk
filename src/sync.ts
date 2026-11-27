@@ -65,6 +65,7 @@ import { type IEventsResponse } from "./@types/requests.ts";
 import { UNREAD_THREAD_NOTIFICATIONS } from "./@types/sync.ts";
 import { Feature, ServerSupport } from "./feature.ts";
 import { KnownMembership } from "./@types/membership.ts";
+import { isRecord } from "./@types/type-guards.ts";
 
 // /sync requests allow you to set a timeout= but the request may continue
 // beyond that and wedge forever, so we need to track how long we are willing
@@ -2000,15 +2001,15 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
  * Pass the encryption-relevant parts of a sync response to the crypto layer, and dispatch the resulting to-device
  * messages on the client.
  *
- * `changes.toDeviceEvents` is first filtered with {@link noUnsafeEventProps}. If crypto is not enabled, the to-device
- * messages are dispatched as received.
+ * Entries in `changes.toDeviceEvents` which are not objects are skipped, and the rest are filtered with
+ * {@link noUnsafeEventProps}. If crypto is not enabled, the to-device messages are dispatched as received.
  */
 export async function processSyncCryptoChanges(
     client: MatrixClient,
     cryptoCallbacks: SyncCryptoCallbacks | undefined,
     changes: SyncCryptoChanges,
 ): Promise<void> {
-    const toDeviceEvents = changes.toDeviceEvents.filter(noUnsafeEventProps);
+    const toDeviceEvents = changes.toDeviceEvents.filter((event) => isRecord(event) && noUnsafeEventProps(event));
 
     let receivedToDeviceMessages: ReceivedToDeviceMessage[];
     if (cryptoCallbacks) {
