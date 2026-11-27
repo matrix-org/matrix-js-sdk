@@ -167,6 +167,9 @@ export class ToDeviceKeyTransport
             // This is not part of the widget API spec. Since as of now there are only two implementations:
             // Rust SDK + JS-SDK, and the JS-SDK does support to-device sending, we can assume that
             // this is a widget driver issue error message.
+            //
+            // This can only be resolved once Element Call stops relying on widgets. See
+            // https://github.com/element-hq/element-call/issues/4468 for further details.
             if ((msg.includes("unknown variant") && msg.includes("send_to_device")) || msg.includes("not supported")) {
                 throw new NotSupportedError("The widget driver does not support to-device encryption");
             }

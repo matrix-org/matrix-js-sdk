@@ -90,6 +90,9 @@ export interface RTCEncryptionKeyToDeviceEventContent {
          *
          * Not part of the MSC but still required for now because the widget API does not expose encryption
          * metadata. Therefore, it would be impossible to determine the sending device otherwise.
+         *
+         * This can only be resolved once Element Call stops relying on widgets. See
+         * https://github.com/element-hq/element-call/issues/4468 for further details.
          */
         claimed_device_id: string;
     };
