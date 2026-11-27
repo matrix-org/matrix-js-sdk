@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-import { EventTimeline, type IAddEventOptions } from "./event-timeline.ts";
+import { type Direction, EventTimeline, type IAddEventOptions } from "./event-timeline.ts";
 import { type MatrixEvent } from "./event.ts";
 import { logger } from "../logger.ts";
 import { type Room, RoomEvent } from "./room.ts";
@@ -137,6 +137,31 @@ export type EventTimelineSetHandlerMap = {
         resetAllTimelines: boolean,
     ) => void;
 };
+
+/**
+ * Whether walking neighbours from `from` in `direction` reaches `to`.
+ * Uses Brent's cycle detection so the walk is allocation-free and stops on a cycle.
+ */
+function canReachTimeline(from: EventTimeline, to: EventTimeline, direction: Direction): boolean {
+    let power = 1;
+    let steps = 0;
+    let tortoise: EventTimeline = from;
+    for (let hare: EventTimeline | null = from; hare; hare = hare.getNeighbouringTimeline(direction)) {
+        if (hare === to) {
+            return true;
+        }
+        if (steps > 0 && hare === tortoise) {
+            return false;
+        }
+        if (steps === power) {
+            tortoise = hare;
+            power *= 2;
+            steps = 0;
+        }
+        steps++;
+    }
+    return false;
+}
 
 export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTimelineSetHandlerMap> {
     public readonly relations: RelationsContainer;
@@ -483,9 +508,12 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // The important thing to note in the above is what happened when we
         // already knew about a given event:
         //
-        //   - if it was appropriate, we joined up the timelines (steps 3, 5).
-        //   - in any case, we started adding further events to the timeline which
-        //       contained the event we knew about (steps 3, 5, 6).
+        //   - if it was appropriate, we joined up the timelines (steps 3, 5) and
+        //       started adding further events to the timeline which contained the
+        //       event we knew about (steps 3, 5, 6).
+        //   - if joining was refused (e.g. it would splice the live timeline,
+        //       conflict with an existing neighbour, or form a cycle), we keep
+        //       processing the rest of the page on the current timeline.
         //
         //
         // So much for adding events to the timeline. But what do we want to do
@@ -583,6 +611,31 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
                             ")",
                     );
                 }
+                continue; // abort splicing - try next event
+            }
+
+            // setNeighbouringTimeline throws if existingTimeline already has a neighbour on
+            // this side, which would leave a one-way link and drop the rest of the page.
+            if (existingTimeline.getNeighbouringTimeline(inverseDirection)) {
+                logger.warn(
+                    "Refusing to join timeline " +
+                        timeline +
+                        " to " +
+                        existingTimeline +
+                        " as that already has a neighbouring timeline",
+                );
+                continue; // abort splicing - try next event
+            }
+
+            // Refuse to join if the timelines are already reachable either way (links may be
+            // one-sided), which would form a cycle.
+            if (
+                canReachTimeline(existingTimeline, timeline, direction) ||
+                canReachTimeline(timeline, existingTimeline, inverseDirection)
+            ) {
+                logger.warn(
+                    "Refusing to join timeline " + timeline + " to " + existingTimeline + " as that would form a cycle",
+                );
                 continue; // abort splicing - try next event
             }
 
@@ -889,7 +942,8 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
      * @returns -1 if eventId1 precedes eventId2, and +1 eventId1 succeeds
      * eventId2. 0 if they are the same event; null if we can't tell (either
      * because we don't know about one of the events, or because they are in
-     * separate timelines which don't join up).
+     * separate timelines which don't join up). If timelines already form a cycle,
+     * each walk stops on the cycle rather than looping forever.
      */
     public compareEventOrdering(eventId1: string, eventId2: string): number | null {
         if (eventId1 == eventId2) {
@@ -937,23 +991,15 @@ export class EventTimelineSet extends TypedEventEmitter<EmittedEvents, EventTime
         // linkedlist to see which comes first.
 
         // first work forwards from timeline1
-        let tl: EventTimeline | null = timeline1;
-        while (tl) {
-            if (tl === timeline2) {
-                // timeline1 is before timeline2
-                return -1;
-            }
-            tl = tl.getNeighbouringTimeline(EventTimeline.FORWARDS);
+        if (canReachTimeline(timeline1, timeline2, EventTimeline.FORWARDS)) {
+            // timeline1 is before timeline2
+            return -1;
         }
 
         // now try backwards from timeline1
-        tl = timeline1;
-        while (tl) {
-            if (tl === timeline2) {
-                // timeline2 is before timeline1
-                return 1;
-            }
-            tl = tl.getNeighbouringTimeline(EventTimeline.BACKWARDS);
+        if (canReachTimeline(timeline1, timeline2, EventTimeline.BACKWARDS)) {
+            // timeline2 is before timeline1
+            return 1;
         }
 
         // the timelines are not contiguous.
