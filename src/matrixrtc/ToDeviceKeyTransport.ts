@@ -23,6 +23,7 @@ import {
     type EncryptionKeysToDeviceEventContent,
     type ParticipantDeviceInfo,
     type RTCEncryptionKeyMediaKey,
+    type RTCEncryptionKeyToDeviceEventContent,
     type Statistics,
 } from "./types.ts";
 import { ClientEvent, type MatrixClient } from "../client.ts";
@@ -36,6 +37,12 @@ import { type CallMembershipIdentityParts } from "./EncryptionManager.ts";
 interface ReceivedKey {
     mediaKey: RTCEncryptionKeyMediaKey;
     memberId?: string;
+    deviceId: string;
+}
+
+/** A device that a key event is sent to. */
+interface ToDeviceTarget {
+    userId: string;
     deviceId: string;
 }
 
@@ -88,12 +95,26 @@ export class ToDeviceKeyTransport
         this.client.off(ClientEvent.ToDeviceEvent, this.onToDeviceEvent);
     }
 
+    /**
+     * Sends the key to the given members, excluding ourselves.
+     *
+     * Members that use sticky events receive the stable {@link EventType.RTCEncryptionKey} event. Members that
+     * use state events receive the legacy {@link EventType.CallEncryptionKeysPrefix} event.
+     */
     public async sendKey(keyBase64Encoded: string, index: number, members: ParticipantDeviceInfo[]): Promise<void> {
-        const mediaKey = {
+        const mediaKey: RTCEncryptionKeyMediaKey = {
             index: index,
             key: keyBase64Encoded,
         };
-        const content: EncryptionKeysToDeviceEventContent = {
+        const stableContent: RTCEncryptionKeyToDeviceEventContent = {
+            room_id: this.roomId,
+            member_id: this.membership.memberId,
+            media_key: mediaKey,
+            member: {
+                claimed_device_id: this.membership.deviceId,
+            },
+        };
+        const legacyContent: EncryptionKeysToDeviceEventContent = {
             room_id: this.roomId,
             member_id: this.membership.memberId,
             media_key: mediaKey,
@@ -106,38 +127,54 @@ export class ToDeviceKeyTransport
             },
         };
 
-        const targets = members
-            .map((member) => {
-                return {
-                    userId: member.userId,
-                    deviceId: member.deviceId,
-                };
-            })
+        const stableTargets: ToDeviceTarget[] = [];
+        const legacyTargets: ToDeviceTarget[] = [];
+        for (const member of members) {
             // filter out me
-            .filter(
-                (member) => !(member.userId == this.membership.userId && member.deviceId == this.membership.deviceId),
-            );
-
-        if (targets.length > 0) {
-            await this.client
-                .encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, targets, content)
-                .catch((error: WidgetApiResponseError) => {
-                    const msg: string = error.message;
-                    // This is not ideal. We would want to have a custom error type for unsupported actions.
-                    // This is not part of the widget API spec. Since as of now there are only two implementations:
-                    // Rust SDK + JS-SDK, and the JS-SDK does support to-device sending, we can assume that
-                    // this is a widget driver issue error message.
-                    if (
-                        (msg.includes("unknown variant") && msg.includes("send_to_device")) ||
-                        msg.includes("not supported")
-                    ) {
-                        throw new NotSupportedError("The widget driver does not support to-device encryption");
-                    }
-                });
-            this.statistics.counters.roomEventEncryptionKeysSent += 1;
-        } else {
-            this.logger.warn("No targets found for sending key");
+            if (member.userId == this.membership.userId && member.deviceId == this.membership.deviceId) continue;
+            const target = { userId: member.userId, deviceId: member.deviceId };
+            if (member.isStickyMembership) {
+                stableTargets.push(target);
+            } else {
+                legacyTargets.push(target);
+            }
         }
+
+        if (stableTargets.length === 0 && legacyTargets.length === 0) {
+            this.logger.warn("No targets found for sending key");
+            return;
+        }
+
+        const sends: Promise<void>[] = [];
+        if (legacyTargets.length > 0) {
+            sends.push(this.encryptAndSendToDevice(EventType.CallEncryptionKeysPrefix, legacyTargets, legacyContent));
+        }
+        if (stableTargets.length > 0) {
+            sends.push(this.encryptAndSendToDevice(EventType.RTCEncryptionKey, stableTargets, stableContent));
+        }
+        await Promise.all(sends);
+        this.statistics.counters.roomEventEncryptionKeysSent += 1;
+    }
+
+    private async encryptAndSendToDevice(
+        eventType: EventType.CallEncryptionKeysPrefix | EventType.RTCEncryptionKey,
+        targets: ToDeviceTarget[],
+        content: RTCEncryptionKeyToDeviceEventContent | EncryptionKeysToDeviceEventContent,
+    ): Promise<void> {
+        await this.client.encryptAndSendToDevice(eventType, targets, content).catch((error: WidgetApiResponseError) => {
+            const msg: string = error.message;
+            // This is not ideal. We would want to have a custom error type for unsupported actions.
+            // This is not part of the widget API spec. Since as of now there are only two implementations:
+            // Rust SDK + JS-SDK, and the JS-SDK does support to-device sending, we can assume that
+            // this is a widget driver issue error message.
+            //
+            // This can only be resolved once Element Call stops relying on widgets. See
+            // https://github.com/element-hq/element-call/issues/4468 for further details.
+            if ((msg.includes("unknown variant") && msg.includes("send_to_device")) || msg.includes("not supported")) {
+                throw new NotSupportedError("The widget driver does not support to-device encryption");
+            }
+            this.logger.warn(`Failed to send ${eventType} to ${targets.length} target(s): ${msg}`);
+        });
     }
 
     private receiveCallKeyEvent(fromUser: string, { mediaKey, memberId, deviceId }: ReceivedKey): void {
@@ -160,7 +197,8 @@ export class ToDeviceKeyTransport
     }
 
     private onToDeviceEvent = (event: MatrixEvent): void => {
-        if (event.getType() !== EventType.CallEncryptionKeysPrefix) {
+        const eventType = event.getType();
+        if (eventType !== EventType.RTCEncryptionKey && eventType !== EventType.CallEncryptionKeysPrefix) {
             // Ignore this is not a call encryption event
             return;
         }
@@ -183,6 +221,7 @@ export class ToDeviceKeyTransport
 
     /** Validates a received key event and extracts the key information from it. */
     private getValidEventContent(event: MatrixEvent): ReceivedKey | undefined {
+        const isStable = event.getType() === EventType.RTCEncryptionKey;
         const content = event.getContent<Partial<EncryptionKeysToDeviceEventContent>>();
         const roomId = content.room_id;
         if (!roomId) {
@@ -195,15 +234,21 @@ export class ToDeviceKeyTransport
             return;
         }
 
-        // Prefer `media_key` and fall back to the deprecated `keys` property for backwards compatibility.
-        const mediaKey = parseMediaKey(content.media_key) ?? parseMediaKey(content.keys);
+        // The stable event only carries `media_key`. For the legacy event, prefer `media_key` and fall back to
+        // the deprecated `keys` property for backwards compatibility.
+        const mediaKey = parseMediaKey(content.media_key) ?? (isStable ? undefined : parseMediaKey(content.keys));
         if (!mediaKey) {
             this.logger.warn("Malformed Event: Missing media key");
             return;
         }
 
-        // Prefer `member_id` and fall back to the deprecated `member.id` property for backwards compatibility.
-        const memberId = content.member_id ?? content.member?.id;
+        // The stable event requires `member_id`. For the legacy event, prefer `member_id` and fall back to the
+        // deprecated `member.id` property for backwards compatibility.
+        const memberId = content.member_id ?? (isStable ? undefined : content.member?.id);
+        if (isStable && memberId === undefined) {
+            this.logger.warn("Malformed Event: Missing member id");
+            return;
+        }
         if (memberId !== undefined && typeof memberId !== "string") {
             this.logger.warn("Malformed Event: Invalid member id");
             return;

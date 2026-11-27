@@ -378,6 +378,15 @@ export class CallMembership {
         return getMemberId(this.membershipData, this.matrixEventData.sender);
     }
 
+    /**
+     * Whether this membership is based on a sticky event rather than a legacy state event.
+     *
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
+    public get isSticky(): boolean {
+        return this.membershipData.kind === MembershipKind.RTC;
+    }
+
     public createdTs(): number {
         const { kind, data } = this.membershipData;
         switch (kind) {

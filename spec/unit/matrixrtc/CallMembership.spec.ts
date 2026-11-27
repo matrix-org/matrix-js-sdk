@@ -190,6 +190,9 @@ describe("CallMembership", () => {
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
             });
+            it("is not a sticky membership", () => {
+                expect(membership.isSticky).toBe(false);
+            });
             it("returns correct call intent", () => {
                 expect(membership.intent).toBe("m.audio");
                 expect(membership.callIntent).toBe("audio");
@@ -527,6 +530,9 @@ describe("CallMembership", () => {
             });
             it("returns correct deviceId", () => {
                 expect(membership.deviceId).toBe("AAAAAAA");
+            });
+            it("is a sticky membership", () => {
+                expect(membership.isSticky).toBe(true);
             });
             it("returns correct call intent", () => {
                 expect(membership.intent).toBe("m.audio");

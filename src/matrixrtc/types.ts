@@ -32,12 +32,15 @@ export interface EncryptionKeyEntry {
 }
 
 /**
- * The mxID, deviceId and membership timestamp of a RTC session participant.
+ * Information on a participant.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export type ParticipantDeviceInfo = {
     userId: string;
     deviceId: string;
     membershipTs: number;
+    isStickyMembership?: boolean;
 };
 
 /**
@@ -70,8 +73,33 @@ export interface EncryptionKeysEventContent {
 }
 
 /**
- * The content of an `m.rtc.encryption_key` to-device event (sent with the unstable type
- * {@link EventType.CallEncryptionKeysPrefix}).
+ * The content of an `m.rtc.encryption_key` to-device event.
+ *
+ * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+ */
+export interface RTCEncryptionKeyToDeviceEventContent {
+    /** The ID of the room that the slot is located in. */
+    room_id: string;
+    /** The `member.id` value of the sender's `m.rtc.member` event. */
+    member_id: string;
+    /** The key material. */
+    media_key: RTCEncryptionKeyMediaKey;
+    member: {
+        /**
+         * The device ID the sender claims to have sent their membership event from.
+         *
+         * Not part of the MSC but still required for now because the widget API does not expose encryption
+         * metadata. Therefore, it would be impossible to determine the sending device otherwise.
+         *
+         * This can only be resolved once Element Call stops relying on widgets. See
+         * https://github.com/element-hq/element-call/issues/4468 for further details.
+         */
+        claimed_device_id: string;
+    };
+}
+
+/**
+ * The content of an `io.element.call.encryption_keys` to-device event.
  *
  * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */

@@ -181,6 +181,10 @@ export enum EventType {
      */
     RTCMembershipStable = "m.rtc.member",
     /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
+    RTCEncryptionKey = "m.rtc.encryption_key",
+    /**
      * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075).
      */
     CallNotify = "org.matrix.msc4075.call.notify",
