@@ -101,6 +101,14 @@ export class RoomRetentionPolicy {
     };
 
     /**
+     * The effective maximum lifetime of messages in the room, in milliseconds, or `null` when messages
+     * are kept forever.
+     */
+    public getMaxLifetime(): number | null {
+        return this.maxRetention;
+    }
+
+    /**
      * Whether the room's current retention policy keeps an event. State events and redactions are
      * always kept: only messages expire.
      */
@@ -111,8 +119,8 @@ export class RoomRetentionPolicy {
     private readonly handleRetentionUpdate = (): void => {
         if (this.disposed) return;
 
-        // First store if we currently have a retention period.
-        const hadRetentionPeriod = this.maxRetention !== null;
+        // First store the retention period we currently have.
+        const previousMaxRetention = this.maxRetention;
 
         try {
             this.maxRetention = this.computeMaxRetention(this.getRoomStatePolicy());
@@ -125,7 +133,7 @@ export class RoomRetentionPolicy {
         // This must not wait: a sync applies the room state and adds the timeline events straight
         // after, and those events are what schedule the next expiry. Binding later left messages on
         // screen past their lifetime after a reload, until some other event arrived in the room.
-        if (hadRetentionPeriod !== (this.maxRetention !== null)) {
+        if ((previousMaxRetention !== null) !== (this.maxRetention !== null)) {
             this.logger.info("retention recalculated to be", this.maxRetention);
             if (this.maxRetention) {
                 this.room.on(RoomEvent.Timeline, this.timelineUpdated);
@@ -134,7 +142,16 @@ export class RoomRetentionPolicy {
             }
         }
 
-        this.processTimeline();
+        try {
+            this.processTimeline();
+        } catch (err) {
+            this.logger.warn("Failed to update retention policy", err);
+        }
+
+        // Emit even if processing the timeline failed, so listeners agree with getMaxLifetime().
+        if (previousMaxRetention !== this.maxRetention) {
+            this.room.emit(RoomEvent.RetentionChanged, this.room, this.maxRetention);
+        }
     };
 
     /**

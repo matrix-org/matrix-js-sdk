@@ -1965,6 +1965,7 @@ export function _createAndReEmitRoom(client: MatrixClient, roomId: string, opts:
         RoomEvent.Redaction,
         RoomEvent.RedactionCancelled,
         RoomEvent.Receipt,
+        RoomEvent.RetentionChanged,
         RoomEvent.Tags,
         RoomEvent.LocalEchoUpdated,
         RoomEvent.AccountData,
