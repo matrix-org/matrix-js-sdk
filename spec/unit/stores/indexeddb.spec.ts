@@ -136,6 +136,49 @@ describe("IndexedDBStore", () => {
         await expect(() => promise).rejects.toThrow("selectQuery failed for client_options");
     });
 
+    it("should clear the database and start afresh if the stored data cannot be read", async () => {
+        const indexedDB = new IDBFactory();
+        const dbName = "unreadable";
+
+        // 1. Create a store with some saved sync data
+        const firstStore = new IndexedDBStore({ indexedDB, dbName, localStorage });
+        await firstStore.startup();
+        await firstStore.setSyncData({ next_batch: "batch1", rooms: {} } as any);
+        await firstStore.save(true);
+        await firstStore.destroy();
+
+        // 2. Make the saved sync data unreadable, as Chromium does when a large value's blob file is missing
+        const loadSyncData = vi
+            .spyOn(LocalIndexedDBStoreBackend.prototype as any, "loadSyncData")
+            .mockRejectedValueOnce(new Error("selectQuery failed for sync"));
+        onTestFinished(() => loadSyncData.mockRestore());
+
+        // 3. Startup should succeed on a fresh database instead of failing every time
+        const store = new IndexedDBStore({ indexedDB, dbName, localStorage });
+        await store.startup();
+        expect(loadSyncData).toHaveBeenCalledTimes(2);
+        expect(store.backend).toBeInstanceOf(LocalIndexedDBStoreBackend);
+        expect(await store.getSavedSync()).toBeNull();
+        expect(await store.isNewlyCreated()).toBe(true);
+
+        // 4. The fresh database is usable
+        await store.setSyncData({ next_batch: "batch2", rooms: {} } as any);
+        await store.save(true);
+        expect(await store.getSavedSyncToken()).toBe("batch2");
+    });
+
+    it("should fail startup if the stored data still cannot be read after clearing", async () => {
+        const indexedDB = new IDBFactory();
+        const loadSyncData = vi
+            .spyOn(LocalIndexedDBStoreBackend.prototype as any, "loadSyncData")
+            .mockRejectedValue(new Error("selectQuery failed for sync"));
+        onTestFinished(() => loadSyncData.mockRestore());
+
+        const store = new IndexedDBStore({ indexedDB, dbName: "always-unreadable", localStorage });
+        await expect(store.startup()).rejects.toThrow("selectQuery failed for sync");
+        expect(loadSyncData).toHaveBeenCalledTimes(2);
+    });
+
     it("Should load presence events on startup", async () => {
         // 1. Create idb database
         const indexedDB = new IDBFactory();

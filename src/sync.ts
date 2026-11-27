@@ -167,13 +167,13 @@ export enum SetPresence {
 }
 
 interface ISyncParams {
-    "filter"?: string;
-    "timeout": number;
-    "since"?: string;
-    "full_state"?: boolean;
-    "set_presence"?: SetPresence;
-    "_cacheBuster"?: string | number; // not part of the API itself
-    "org.matrix.msc4222.use_state_after"?: boolean; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
+    filter?: string;
+    timeout: number;
+    since?: string;
+    full_state?: boolean;
+    set_presence?: SetPresence;
+    _cacheBuster?: string | number; // not part of the API itself
+    use_state_after?: boolean; // https://github.com/matrix-org/matrix-spec-proposals/pull/4222
 }
 
 type WrappedRoom<T> = T & {
@@ -334,9 +334,9 @@ export class SyncApi {
         );
 
         const qps: ISyncParams = {
-            "timeout": 0, // don't want to block since this is a single isolated req
-            "filter": filterId,
-            "org.matrix.msc4222.use_state_after": true,
+            timeout: 0, // don't want to block since this is a single isolated req
+            filter: filterId,
+            use_state_after: true,
         };
 
         const data = await client.http.authedRequest<ISyncResponse>(Method.Get, "/sync", qps as any, undefined, {
@@ -974,7 +974,7 @@ export class SyncApi {
         const qps: ISyncParams = {
             filter,
             timeout,
-            "org.matrix.msc4222.use_state_after": true,
+            use_state_after: true,
         };
 
         if (this.opts.disablePresence) {
@@ -1266,7 +1266,7 @@ export class SyncApi {
             joinRooms.map(async (joinObj) => {
                 const room = joinObj.room;
                 const stateEvents = this.mapSyncEventsFormat(joinObj.state, room);
-                const stateAfterEvents = this.mapSyncEventsFormat(joinObj["org.matrix.msc4222.state_after"], room);
+                const stateAfterEvents = this.mapSyncEventsFormat(joinObj["state_after"], room);
                 // Prevent events from being decrypted ahead of time
                 // this helps large account to speed up faster
                 // room::decryptCriticalEvent is in charge of decrypting all the events
@@ -1280,7 +1280,7 @@ export class SyncApi {
                 // regular timeline events do *not* count towards state. If it's not present, then the state is formed by
                 // the state events plus the timeline events. Note mapSyncEventsFormat returns an empty array if the field
                 // is absent so we explicitly check the field on the original object.
-                const eventsFormingFinalState = joinObj["org.matrix.msc4222.state_after"]
+                const eventsFormingFinalState = joinObj["state_after"]
                     ? stateAfterEvents
                     : stateEvents.concat(timelineEvents);
 
@@ -1430,7 +1430,7 @@ export class SyncApi {
                 }
 
                 try {
-                    if ("org.matrix.msc4222.state_after" in joinObj) {
+                    if ("state_after" in joinObj) {
                         await this.injectRoomEvents(
                             room,
                             undefined,
@@ -1493,7 +1493,7 @@ export class SyncApi {
                 // all state events are emitted by "state_after"
                 // all state events in the timeline are either duplicates or are outdated and should be ignored
                 const filteredTimelineEvents =
-                    "org.matrix.msc4222.state_after" in joinObj
+                    "state_after" in joinObj
                         ? timelineEvents.filter((timelineEvent) => !timelineEvent.isState())
                         : timelineEvents;
                 filteredTimelineEvents.forEach(emitEvent);
@@ -1784,13 +1784,10 @@ export class SyncApi {
         stateAfterEvents?: MatrixEvent[];
     }> {
         const stateEvents = this.mapSyncEventsFormat(wrappedRoom.state, wrappedRoom.room);
-        const stateAfterEvents = this.mapSyncEventsFormat(
-            wrappedRoom["org.matrix.msc4222.state_after"],
-            wrappedRoom.room,
-        );
+        const stateAfterEvents = this.mapSyncEventsFormat(wrappedRoom["state_after"], wrappedRoom.room);
         const timelineEvents = this.mapSyncEventsFormat(wrappedRoom.timeline, wrappedRoom.room);
 
-        if ("org.matrix.msc4222.state_after" in wrappedRoom) {
+        if ("state_after" in wrappedRoom) {
             await this.injectRoomEvents(wrappedRoom.room, undefined, stateAfterEvents, timelineEvents);
         } else {
             await this.injectRoomEvents(wrappedRoom.room, stateEvents, undefined, timelineEvents);

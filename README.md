@@ -346,7 +346,7 @@ After calling `initRustCrypto`, you can obtain a reference to the [`CryptoApi`](
 
 ## Secret storage
 
-You should normally set up [secret storage](https://spec.matrix.org/v1.12/client-server-api/#secret-storage) before using the end-to-end encryption. To do this, call [`CryptoApi.bootstrapSecretStorage`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapSecretStorage).
+You should normally set up [secret storage](https://spec.matrix.org/v1.12/client-server-api/#secret-storage) before using the end-to-end encryption. To do this, call [`CryptoApi.bootstrapSecretStorage`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoApi.html#bootstrapSecretStorage).
 `bootstrapSecretStorage` can be called unconditionally: it will only set up the secret storage if it is not already set up (unless you use the `setupNewSecretStorage` parameter).
 
 ```javascript
@@ -370,14 +370,14 @@ matrixClient.getCrypto().bootstrapSecretStorage({
 ```
 
 The example above will create a new secret storage key if secret storage was not previously set up.
-The secret storage data will be encrypted using the secret storage key returned in [`createSecretStorageKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CreateSecretStorageOpts.html#createSecretStorageKey).
+The secret storage data will be encrypted using the secret storage key returned in [`createSecretStorageKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CreateSecretStorageOpts.html#createSecretStorageKey).
 
-We recommend that you prompt the user to re-enter this key when [`CryptoCallbacks.getSecretStorageKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoCallbacks.html#getSecretStorageKey) is called (when the secret storage access is needed).
+We recommend that you prompt the user to re-enter this key when [`CryptoCallbacks.getSecretStorageKey`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoCallbacks.html#getSecretStorageKey) is called (when the secret storage access is needed).
 
 ## Set up cross-signing
 
 To set up cross-signing to verify devices and other users, call
-[`CryptoApi.bootstrapCrossSigning`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#bootstrapCrossSigning):
+[`CryptoApi.bootstrapCrossSigning`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoApi.html#bootstrapCrossSigning):
 
 ```javascript
 matrixClient.getCrypto().bootstrapCrossSigning({
@@ -387,7 +387,7 @@ matrixClient.getCrypto().bootstrapCrossSigning({
 });
 ```
 
-The [`authUploadDeviceSigningKeys`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.BootstrapCrossSigningOpts.html#authUploadDeviceSigningKeys)
+The [`authUploadDeviceSigningKeys`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.BootstrapCrossSigningOpts.html#authUploadDeviceSigningKeys)
 callback is required in order to upload newly-generated public cross-signing keys to the server.
 
 ## Key backup
@@ -409,9 +409,9 @@ Once the cross-signing is set up on one of your devices, you can verify another 
 
 1. Use `CryptoApi.bootstrapCrossSigning`.
 
-    `bootstrapCrossSigning` will call the [CryptoCallbacks.getSecretStorageKey](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoCallbacks.html#getSecretStorageKey) callback. The device is verified with the private cross-signing keys fetched from the secret storage.
+    `bootstrapCrossSigning` will call the [CryptoCallbacks.getSecretStorageKey](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoCallbacks.html#getSecretStorageKey) callback. The device is verified with the private cross-signing keys fetched from the secret storage.
 
-2. Request an interactive verification against existing devices, by calling [CryptoApi.requestOwnUserVerification](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html#requestOwnUserVerification).
+2. Request an interactive verification against existing devices, by calling [CryptoApi.requestOwnUserVerification](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoApi.html#requestOwnUserVerification).
 
 ## Migrating from the legacy crypto stack to Rust crypto
 
@@ -435,7 +435,7 @@ const matrixClient = sdk.createClient({
 await matrixClient.initRustCrypto();
 ```
 
-To follow the migration progress, you can listen to the [`CryptoEvent.LegacyCryptoStoreMigrationProgress`](https://matrix-org.github.io/matrix-js-sdk/enums/crypto_api.CryptoEvent.html#LegacyCryptoStoreMigrationProgress) event:
+To follow the migration progress, you can listen to the [`CryptoEvent.LegacyCryptoStoreMigrationProgress`](https://matrix-org.github.io/matrix-js-sdk/enums/crypto-api.CryptoEvent.html#LegacyCryptoStoreMigrationProgress) event:
 
 ```javascript
 // When progress === total === -1, the migration is finished.
@@ -444,7 +444,7 @@ matrixClient.on(CryptoEvent.LegacyCryptoStoreMigrationProgress, (progress, total
 });
 ```
 
-The Rust crypto stack is not supported in a lot of deprecated methods of [`MatrixClient`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html). If you use them, you should migrate to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto_api.CryptoApi.html). Also, the legacy `MatrixClient.crypto` object is not available any more: you should use `MatrixClient.getCrypto()` instead.
+The Rust crypto stack is not supported in a lot of deprecated methods of [`MatrixClient`](https://matrix-org.github.io/matrix-js-sdk/classes/matrix.MatrixClient.html). If you use them, you should migrate to the [`CryptoApi`](https://matrix-org.github.io/matrix-js-sdk/interfaces/crypto-api.CryptoApi.html). Also, the legacy `MatrixClient.crypto` object is not available any more: you should use `MatrixClient.getCrypto()` instead.
 
 # Contributing
 

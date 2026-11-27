@@ -4372,6 +4372,113 @@ describe("Room", function () {
             expect(filteredEvents).toHaveLength(1);
             expect(filteredEvents[0].getContent().body).toEqual("ev2");
         });
+
+        describe("includeThreadedEvents", () => {
+            const mkFilesFilter = (filterId: string) =>
+                Filter.fromJson(room.client.getUserId(), filterId, {
+                    room: { timeline: { contains_url: true, types: [EventType.RoomMessage] } },
+                });
+
+            const fileContent = (body: string) => ({ msgtype: "m.file", body, url: `mxc://server/${body}` });
+
+            const mkFile = (body: string) =>
+                utils.mkEvent(
+                    { event: true, type: EventType.RoomMessage, user: userA, room: roomId, content: fileContent(body) },
+                    room.client,
+                );
+
+            const mkThreadFile = (root: MatrixEvent, body: string) =>
+                utils.mkEvent(
+                    {
+                        event: true,
+                        type: EventType.RoomMessage,
+                        user: userA,
+                        room: roomId,
+                        content: {
+                            ...fileContent(body),
+                            "m.relates_to": { event_id: root.getId()!, rel_type: THREAD_RELATION_TYPE.name },
+                        },
+                    },
+                    room.client,
+                );
+
+            const bodies = (timelineSet: EventTimelineSet) =>
+                timelineSet
+                    .getLiveTimeline()
+                    .getEvents()
+                    .map((ev) => ev.getContent().body);
+
+            beforeEach(() => {
+                room.client.supportsThreads = () => true;
+            });
+
+            it("should add live thread events to a timeline set which includes threaded events", async () => {
+                const filesSet = room.getOrCreateFilteredTimelineSet(mkFilesFilter("files"), {
+                    includeThreadedEvents: true,
+                });
+                const mainFilesSet = room.getOrCreateFilteredTimelineSet(mkFilesFilter("main-files"));
+
+                const root = mkFile("root");
+                await room.addLiveEvents(
+                    [root, mkThreadFile(root, "thread-file"), mkThreadResponse(root), mkFile("main-file")],
+                    { addToState: false },
+                );
+
+                // the thread response without a file is filtered out
+                expect(bodies(filesSet)).toEqual(["root", "thread-file", "main-file"]);
+                expect(bodies(mainFilesSet)).toEqual(["root", "main-file"]);
+                // the thread still gets its events
+                expect(room.getThread(root.getId()!)?.events.map((ev) => ev.getContent().body)).toContain(
+                    "thread-file",
+                );
+            });
+
+            it("should not prepopulate a timeline set which includes threaded events", async () => {
+                await room.addLiveEvents([mkFile("main-file")], { addToState: false });
+                room.getLiveTimeline().setPaginationToken("live_token", Direction.Forward);
+
+                const filesSet = room.getOrCreateFilteredTimelineSet(mkFilesFilter("files"), {
+                    prepopulateTimeline: true,
+                    includeThreadedEvents: true,
+                });
+
+                expect(bodies(filesSet)).toEqual([]);
+                // paginates backwards from the live end of the room, so that thread events are not missed
+                expect(filesSet.getLiveTimeline().getPaginationToken(Direction.Backward)).toEqual("live_token");
+            });
+
+            it.each([PendingEventOrdering.Detached, PendingEventOrdering.Chronological])(
+                "should add the remote echo of our own thread event (%s pending event ordering)",
+                async (pendingEventOrdering) => {
+                    room = new Room(roomId, room.client, userA, { pendingEventOrdering });
+                    const filesSet = room.getOrCreateFilteredTimelineSet(mkFilesFilter("files"), {
+                        includeThreadedEvents: true,
+                    });
+                    const mainFilesSet = room.getOrCreateFilteredTimelineSet(mkFilesFilter("main-files"));
+
+                    const root = mkFile("root");
+                    await room.addLiveEvents([root], { addToState: false });
+
+                    const txnId = "txn1";
+                    const remoteEvent = mkThreadFile(root, "thread-file");
+                    const localEvent = new MatrixEvent({
+                        ...remoteEvent.event,
+                        event_id: "~" + roomId + ":" + txnId,
+                    });
+                    localEvent.setTxnId(txnId);
+                    localEvent.setStatus(EventStatus.SENDING);
+                    room.addPendingEvent(localEvent, txnId);
+                    room.updatePendingEvent(localEvent, EventStatus.SENT, remoteEvent.getId());
+
+                    remoteEvent.event.unsigned = { transaction_id: txnId };
+                    await room.addLiveEvents([remoteEvent], { addToState: false });
+
+                    expect(bodies(filesSet)).toEqual(["root", "thread-file"]);
+                    expect(filesSet.findEventById(remoteEvent.getId()!)).toBe(localEvent);
+                    expect(bodies(mainFilesSet)).toEqual(["root"]);
+                },
+            );
+        });
     });
 
     it("saves and retrieves the bump stamp", () => {

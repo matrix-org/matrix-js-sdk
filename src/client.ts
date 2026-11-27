@@ -1359,6 +1359,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
      */
     private eventsBeingEncrypted = new Set<string>();
 
+    /**
+     * Callbacks to settle the promise returned by `sendEvent` (or `resendEvent`) for events which are in the
+     * scheduler's queue, keyed by event ID. Called when an event is cancelled via `cancelPendingEvent`.
+     */
+    private readonly queuedEventCancelResolvers = new Map<string, () => void>();
+
     private useE2eForGroupCall = true;
     private toDeviceMessageQueue: ToDeviceMessageQueue;
     public livekitServiceURL?: string;
@@ -1430,17 +1436,17 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         this.scheduler = opts.scheduler;
         if (this.scheduler) {
             this.scheduler.setProcessFunction(async (eventToSend: MatrixEvent) => {
+                // The event may have been cancelled whilst the scheduler was waiting to retry it.
+                if (eventToSend.status === EventStatus.CANCELLED) return {} as ISendEventResponse;
+
                 const room = this.getRoom(eventToSend.getRoomId());
                 if (eventToSend.status !== EventStatus.SENDING) {
                     this.updatePendingEventStatus(room, eventToSend, EventStatus.SENDING);
                 }
-                const res = await this.sendEventHttpRequest(eventToSend);
-                if (room) {
-                    // ensure we update pending event before the next scheduler run so that any listeners to event id
-                    // updates on the synchronous event emitter get a chance to run first.
-                    room.updatePendingEvent(eventToSend, EventStatus.SENT, res.event_id);
-                }
-                return res;
+                // Events are encrypted once they reach the head of the queue, rather than before being queued, so
+                // that if encrypting or sending an event fails then the events queued after it cannot overtake it.
+                const res = await this.encryptAndSendEventHttpRequest(room, eventToSend);
+                return res ?? ({} as ISendEventResponse);
             });
         }
 
@@ -2663,9 +2669,14 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         // not be sent.
         if (event.status === EventStatus.ENCRYPTING) {
             this.eventsBeingEncrypted.delete(event.getId()!);
-        } else if (this.scheduler && event.status === EventStatus.QUEUED) {
-            // tell the scheduler to forget about it, if it's queued
-            this.scheduler.removeEventFromQueue(event);
+        }
+
+        // Tell the scheduler to forget about it, if it's queued. This includes events which are being encrypted at the
+        // head of the queue, or are waiting to be retried after failing to be encrypted, so that the scheduler can move
+        // on to the next event.
+        if (event.status === EventStatus.QUEUED || event.status === EventStatus.ENCRYPTING) {
+            this.scheduler?.removeEventFromQueue(event);
+            this.queuedEventCancelResolvers.get(event.getId()!)?.();
         }
 
         // then tell the room about the change of state, which will remove it
@@ -3053,50 +3064,32 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         queryDict = delayOrQueryDict;
         try {
-            let cancelled: boolean;
-            this.eventsBeingEncrypted.add(event.getId()!);
-            try {
-                await this.encryptEventIfNeeded(event, room ?? undefined);
-            } finally {
-                cancelled = !this.eventsBeingEncrypted.delete(event.getId()!);
-            }
-
-            if (cancelled) {
-                // cancelled via MatrixClient::cancelPendingEvent
-                return {} as ISendEventResponse;
-            }
-
-            // encryptEventIfNeeded may have updated the status from SENDING to ENCRYPTING. If so, we need
-            // to put it back.
-            if (event.status === EventStatus.ENCRYPTING) {
-                this.updatePendingEventStatus(room, event, EventStatus.SENDING);
-            }
-
-            let promise: Promise<ISendEventResponse> | null = null;
-            if (this.scheduler) {
-                // if this returns a promise then the scheduler has control now and will
-                // resolve/reject when it is done. Internally, the scheduler will invoke
-                // processFn which is set to this._sendEventHttpRequest so the same code
-                // path is executed regardless.
-                promise = this.scheduler.queueEvent(event);
-                if (promise && this.scheduler.getQueueForEvent(event)!.length > 1) {
-                    // event is processed FIFO so if the length is 2 or more we know
-                    // this event is stuck behind an earlier event.
-                    this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
+            // If this returns a promise then the scheduler has control now and will resolve/reject when it is done.
+            // The event must be queued *before* it is encrypted (which is asynchronous, and may fail), so that events
+            // are sent in the order they were queued. Internally, the scheduler will invoke the process function set in
+            // the constructor, which encrypts and sends the event via `encryptAndSendEventHttpRequest`.
+            const queuedPromise = this.scheduler?.queueEvent(event);
+            if (queuedPromise) {
+                // If the event is cancelled (via MatrixClient::cancelPendingEvent) whilst it is in the queue, the
+                // scheduler will not settle its promise, so we resolve it ourselves.
+                // Note that the ID must be captured now, as it is replaced with the remote ID once the event is sent.
+                const localEventId = event.getId()!;
+                const cancelled = Promise.withResolvers<ISendEventResponse>();
+                this.queuedEventCancelResolvers.set(localEventId, () => cancelled.resolve({} as ISendEventResponse));
+                try {
+                    if (this.scheduler!.getQueueForEvent(event)!.length > 1) {
+                        // event is processed FIFO so if the length is 2 or more we know
+                        // this event is stuck behind an earlier event.
+                        this.updatePendingEventStatus(room, event, EventStatus.QUEUED);
+                    }
+                    return await Promise.race([queuedPromise, cancelled.promise]);
+                } finally {
+                    this.queuedEventCancelResolvers.delete(localEventId);
                 }
             }
 
-            if (!promise) {
-                promise = this.sendEventHttpRequest(event, queryDict);
-                if (room) {
-                    promise = promise.then((res) => {
-                        room.updatePendingEvent(event, EventStatus.SENT, res["event_id"]);
-                        return res;
-                    });
-                }
-            }
-
-            return await promise;
+            const res = await this.encryptAndSendEventHttpRequest(room, event, queryDict);
+            return res ?? ({} as ISendEventResponse);
         } catch (err) {
             this.logger.error("Error sending event", err);
             try {
@@ -3113,6 +3106,43 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
             }
             throw err;
         }
+    }
+
+    /**
+     * Encrypts the event if necessary, sends it, and marks the pending event as sent.
+     *
+     * @returns the result of the send request, or `null` if the event was cancelled (via
+     *     {@link MatrixClient#cancelPendingEvent}) whilst it was being encrypted.
+     */
+    private async encryptAndSendEventHttpRequest(
+        room: Room | null,
+        event: MatrixEvent,
+        queryDict?: QueryDict,
+    ): Promise<ISendEventResponse | null> {
+        let cancelled: boolean;
+        this.eventsBeingEncrypted.add(event.getId()!);
+        try {
+            await this.encryptEventIfNeeded(event, room ?? undefined);
+        } finally {
+            cancelled = !this.eventsBeingEncrypted.delete(event.getId()!);
+        }
+
+        if (cancelled) {
+            // cancelled via MatrixClient::cancelPendingEvent
+            return null;
+        }
+
+        // encryptEventIfNeeded may have updated the status from SENDING to ENCRYPTING. If so, we need
+        // to put it back.
+        if (event.status === EventStatus.ENCRYPTING) {
+            this.updatePendingEventStatus(room, event, EventStatus.SENDING);
+        }
+
+        const res = await this.sendEventHttpRequest(event, queryDict);
+        // ensure we update pending event before the next scheduler run so that any listeners to event id
+        // updates on the synchronous event emitter get a chance to run first.
+        room?.updatePendingEvent(event, EventStatus.SENT, res.event_id);
+        return res;
     }
 
     /**
@@ -5485,7 +5515,12 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
 
                     const timelineSet = eventTimeline.getTimelineSet();
                     const [timelineEvents, , unknownRelations] = room.partitionThreadedEvents(matrixEvents);
-                    timelineSet.addEventsToTimeline(timelineEvents, backwards, false, eventTimeline, token);
+                    // If the timeline set includes thread events, add both the main timeline and thread events,
+                    // keeping them in the order the server returned them.
+                    const eventsToAdd = timelineSet.includeThreadedEvents
+                        ? matrixEvents.filter((ev) => !unknownRelations.includes(ev))
+                        : timelineEvents;
+                    timelineSet.addEventsToTimeline(eventsToAdd, backwards, false, eventTimeline, token);
                     this.processAggregatedTimelineEvents(room, timelineEvents);
                     this.processThreadRoots(
                         room,
@@ -7874,7 +7909,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
         }
         let profile: SyncUserProfile;
         try {
-            profile = (await this.http.authedRequest(
+            profile = await this.http.authedRequest<SyncUserProfile>(
                 Method.Get,
                 utils.encodeUri("/profile/$userId/$key", { $userId: userId, $key: key }),
                 undefined,
@@ -7882,7 +7917,7 @@ export class MatrixClient extends TypedEventEmitter<EmittedEvents, ClientEventHa
                 {
                     prefix: await this.getExtendedProfileRequestPrefix(),
                 },
-            )) as SyncUserProfile;
+            );
         } catch (e) {
             if (e instanceof MatrixError && e.httpStatus === 404 && e.errcode === "M_NOT_FOUND") {
                 // The key is not set on the profile (or the profile does not exist).

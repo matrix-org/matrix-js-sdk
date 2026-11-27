@@ -489,6 +489,21 @@ describe("EventTimelineSet", () => {
             expect(eventTimelineSet.canContain(event)).toBeFalsy();
         });
 
+        it("should return true if the timeline set includes threaded events and the event is a thread response", () => {
+            const eventTimelineSet = new EventTimelineSet(room, { includeThreadedEvents: true }, client);
+            const event = mkThreadResponse(replyEvent);
+            expect(eventTimelineSet.includeThreadedEvents).toBe(true);
+            expect(eventTimelineSet.canContain(event)).toBeTruthy();
+            expect(eventTimelineSet.canContain(messageEvent)).toBeTruthy();
+        });
+
+        it("should ignore includeThreadedEvents for a thread timeline set", () => {
+            const eventTimelineSet = new EventTimelineSet(room, { includeThreadedEvents: true }, client, thread);
+            const event = mkThreadResponse(replyEvent);
+            expect(eventTimelineSet.includeThreadedEvents).toBe(false);
+            expect(eventTimelineSet.canContain(event)).toBeFalsy();
+        });
+
         it("should return true if the timeline set is not for a thread and the event is a thread root", () => {
             const thread = new Thread(messageEvent.getId()!, messageEvent, { room, client });
             const eventTimelineSet = new EventTimelineSet(room, {}, client);

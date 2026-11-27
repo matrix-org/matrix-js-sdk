@@ -20,13 +20,13 @@ import {
     type RendezvousFailureListener,
 } from "./RendezvousFailureReason.ts";
 import { type DeviceAccessTokenResponse, type ValidatedAuthMetadata } from "../oauth/index.ts";
-import type { SecretsBundleJson } from "../@types/matrix-sdk-crypto-wasm.d.ts";
+import type { SecretsBundleJson } from "../@types/secrets-bundle.ts";
 
 /**
  * The secrets bundle shared from the existing device to the new device.
  * @experimental Note that this is UNSTABLE and may have breaking changes without notice.
  */
-export type { SecretsBundleJson as SignInWithQRSecrets } from "../@types/matrix-sdk-crypto-wasm.d.ts";
+export type { SecretsBundleJson as SignInWithQRSecrets } from "../@types/secrets-bundle.ts";
 
 /**
  * Common interface for the sign in with QR + OAuth2 flows, e.g. the 2024 and 2025 versions of

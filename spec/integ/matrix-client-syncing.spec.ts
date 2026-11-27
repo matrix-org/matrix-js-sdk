@@ -1441,7 +1441,7 @@ describe("MatrixClient syncing", () => {
 
         describe("msc4222", () => {
             const roomOneSyncOne = {
-                "timeline": {
+                timeline: {
                     events: [
                         utils.mkMessage({
                             room: roomOne,
@@ -1450,7 +1450,7 @@ describe("MatrixClient syncing", () => {
                         }),
                     ],
                 },
-                "org.matrix.msc4222.state_after": {
+                state_after: {
                     events: [
                         utils.mkEvent({
                             type: "m.room.name",
@@ -1480,7 +1480,7 @@ describe("MatrixClient syncing", () => {
                 },
             };
             const roomOneSyncTwo = {
-                "org.matrix.msc4222.state_after": {
+                state_after: {
                     events: [
                         utils.mkEvent({
                             type: "m.room.topic",
@@ -1490,7 +1490,7 @@ describe("MatrixClient syncing", () => {
                         }),
                     ],
                 },
-                "state": {
+                state: {
                     events: [
                         utils.mkEvent({
                             type: "m.room.name",
@@ -2494,7 +2494,7 @@ describe("MatrixClient syncing", () => {
                     rooms: {
                         leave: {
                             [roomOne]: {
-                                "org.matrix.msc4222.state_after": {
+                                state_after: {
                                     events: [
                                         utils.mkEvent({
                                             type: "m.room.topic",
@@ -2504,7 +2504,7 @@ describe("MatrixClient syncing", () => {
                                         }),
                                     ],
                                 },
-                                "state": {
+                                state: {
                                     events: [
                                         utils.mkEvent({
                                             type: "m.room.name",

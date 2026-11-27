@@ -166,11 +166,36 @@ export enum EventType {
     GroupCallMemberPrefix = "org.matrix.msc3401.call.member",
 
     // MatrixRTC events
+
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
     RTCSlot = "org.matrix.msc4143.rtc.slot",
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     * @deprecated Use {@link EventType.RTCMembershipStable} instead.
+     */
     RTCMembership = "org.matrix.msc4143.rtc.member",
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
+    RTCMembershipStable = "m.rtc.member",
+    /**
+     * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
+     */
     RTCEncryptionKey = "m.rtc.encryption_key",
+    /**
+     * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075).
+     */
     CallNotify = "org.matrix.msc4075.call.notify",
+    /**
+     * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075).
+     */
     RTCNotification = "org.matrix.msc4075.rtc.notification",
+    /**
+     * @experimental Part of [MSC4075](https://github.com/matrix-org/matrix-spec-proposals/pull/4075)
+     *  (which has absorbed [MSC4310](https://github.com/matrix-org/matrix-spec-proposals/pull/4310)).
+     */
     RTCDecline = "org.matrix.msc4310.rtc.decline",
 
     // Policy servers
@@ -376,6 +401,7 @@ export interface TimelineEvents {
         | RtcLeftMembershipData
         // Left memberships predating `member.membership` only carry the slot ID and the sticky key.
         | { slot_id: string; msc4354_sticky_key: string };
+    [EventType.RTCMembershipStable]: RtcMembershipData | RtcLeftMembershipData;
 }
 
 /**

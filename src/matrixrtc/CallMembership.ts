@@ -121,7 +121,7 @@ export class CallMembership {
         if (sender === undefined) throw new Error("matrixEvent is missing sender field");
         try {
             // Event types are strictly checked here.
-            if (evType === EventType.RTCMembership && checkRtcMembershipData(data, sender)) {
+            if (evType === EventType.RTCMembershipStable && checkRtcMembershipData(data, sender)) {
                 return { kind: MembershipKind.RTC, data };
             } else if (evType === EventType.GroupCallMemberPrefix && checkSessionsMembershipData(data)) {
                 return { kind: MembershipKind.Session, data };
