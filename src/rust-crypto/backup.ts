@@ -42,6 +42,7 @@ import {
     ImportRoomKeyStage,
 } from "../crypto-api/index.ts";
 import { type IMegolmSessionData } from "../@types/crypto.ts";
+import { ClientStoppedError } from "../errors.ts";
 
 /** Authentification of the backup info, depends on algorithm */
 type AuthData = KeyBackupInfo["auth_data"];
@@ -110,10 +111,24 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     /**
+     * Return the OlmMachine only if {@link RustBackupManager#stop} has not been called.
+     *
+     * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
+     *
+     * @throws ClientStoppedError if {@link RustBackupManager#stop} has been called.
+     */
+    private getOlmMachineOrThrow(): OlmMachine {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
+        return this.olmMachine;
+    }
+
+    /**
      * Get the backup version we are currently backing up to, if any
      */
     public async getActiveBackupVersion(): Promise<string | null> {
-        if (!(await this.olmMachine.isBackupEnabled())) return null;
+        if (!(await this.getOlmMachineOrThrow().isBackupEnabled())) return null;
         return this.activeBackupVersion;
     }
 
@@ -138,9 +153,9 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param info - key backup info dict from {@link CryptoApi.getKeyBackupInfo}.
      */
     public async isKeyBackupTrusted(info: KeyBackupInfo): Promise<BackupTrustInfo> {
-        const signatureVerification: SignatureVerification = await this.olmMachine.verifyBackup(info);
+        const signatureVerification: SignatureVerification = await this.getOlmMachineOrThrow().verifyBackup(info);
 
-        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.olmMachine.getBackupKeys();
+        const backupKeys: RustSdkCryptoJs.BackupKeys = await this.getOlmMachineOrThrow().getBackupKeys();
         const decryptionKey = backupKeys?.decryptionKey;
         const backupMatchesSavedPrivateKey =
             !!decryptionKey && this.backupInfoMatchesBackupDecryptionKey(info, decryptionKey);
@@ -235,6 +250,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             await this.keyBackupCheckInProgress;
             return true;
         } catch (e) {
+            if (e instanceof ClientStoppedError) throw e;
             this.logger.warn("handleBackupSecretReceived: Unable to validate backup decryption key", e);
         }
 
@@ -245,7 +261,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
         backupDecryptionKey: RustSdkCryptoJs.BackupDecryptionKey,
         version: string,
     ): Promise<void> {
-        await this.olmMachine.saveBackupDecryptionKey(backupDecryptionKey, version);
+        await this.getOlmMachineOrThrow().saveBackupDecryptionKey(backupDecryptionKey, version);
         // Emit an event that we have a new backup decryption key, so that the sdk can start
         // importing keys from backup if needed.
         this.emit(CryptoEvent.KeyBackupDecryptionKeyCached, version);
@@ -271,7 +287,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @returns a promise which resolves once the keys have been imported
      */
     public async importRoomKeysAsJson(jsonKeys: string, opts?: ImportRoomKeysOpts): Promise<void> {
-        await this.olmMachine.importExportedRoomKeys(jsonKeys, (progress: bigint, total: bigint): void => {
+        await this.getOlmMachineOrThrow().importExportedRoomKeys(jsonKeys, (progress: bigint, total: bigint): void => {
             const importOpt: ImportRoomKeyProgressData = {
                 total: Number(total),
                 successes: Number(progress),
@@ -298,7 +314,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
             }
             keysByRoom.get(roomId)!.set(key.session_id, key);
         }
-        await this.olmMachine.importBackedUpRoomKeys(
+        await this.getOlmMachineOrThrow().importBackedUpRoomKeys(
             keysByRoom,
             (progress: bigint, total: bigint, failures: bigint): void => {
                 const importOpt: ImportRoomKeyProgressData = {
@@ -398,7 +414,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     private async enableKeyBackup(backupInfo: KeyBackupInfo): Promise<void> {
         // we know for certain it must be a Curve25519 key, because we have verified it and only Curve25519
         // keys can be verified.
-        await this.olmMachine.enableBackupV1(
+        await this.getOlmMachineOrThrow().enableBackupV1(
             (backupInfo.auth_data as Curve25519AuthData).public_key,
             backupInfo.version,
         );
@@ -421,7 +437,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
     }
 
     private async disableKeyBackup(): Promise<void> {
-        await this.olmMachine.disableBackup();
+        await this.getOlmMachineOrThrow().disableBackup();
         this.activeBackupVersion = null;
         this.emit(CryptoEvent.KeyBackupStatus, false);
     }
@@ -456,7 +472,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                 // Get a batch of room keys to upload
                 let request;
                 try {
-                    request = await this.olmMachine.backupRoomKeys();
+                    request = await this.getOlmMachineOrThrow().backupRoomKeys();
                     if (request) {
                         logger.debug("Got keys to back up from crypto-sdk");
                     } else {
@@ -495,7 +511,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                     // We don't call it on the first loop because there could be only a few keys to upload, and we don't want to wait for the count.
                     if (!isFirstIteration && remainingToUploadCount === null) {
                         try {
-                            const keyCount = await this.olmMachine.roomKeyCounts();
+                            const keyCount = await this.getOlmMachineOrThrow().roomKeyCounts();
                             remainingToUploadCount = keyCount.total - keyCount.backedUp;
                         } catch (err) {
                             logger.error("Failed to get key counts from rust crypto-sdk", err);
@@ -513,6 +529,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                         remainingToUploadCount = Math.max(remainingToUploadCount - keysCountInBatch, 0);
                     }
                 } catch (err) {
+                    if (this.stopped) break;
                     numFailures++;
                     logger.error("Error processing backup request for rust crypto-sdk", err);
                     if (err instanceof MatrixError) {
@@ -528,7 +545,13 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
                             // There was an active backup and we are out of sync with the server
                             // force a check server side
                             this.backupKeysLoopRunning = false;
-                            this.checkKeyBackupAndEnable(true);
+                            void this.checkKeyBackupAndEnable(true).catch((e) => {
+                                if (e instanceof ClientStoppedError) {
+                                    logger.debug("Key backup check aborted by stop", e);
+                                } else {
+                                    logger.error("Error checking key backup", e);
+                                }
+                            });
                             return;
                         } else if (err.isRateLimitError()) {
                             // wait for that and then continue?
@@ -718,7 +741,7 @@ export class RustBackupManager extends TypedEventEmitter<RustBackupCryptoEvents,
      * @param roomId - The room in question.
      */
     public async downloadLatestRoomKeyBackup(roomId: string): Promise<void> {
-        const { backupVersion, decryptionKey } = await this.olmMachine.getBackupKeys();
+        const { backupVersion, decryptionKey } = await this.getOlmMachineOrThrow().getBackupKeys();
         if (!backupVersion || !decryptionKey) {
             this.logger.warn(
                 `downloadLatestRoomKeyBackup: Could not download backup (backupVersion=${backupVersion}, hasDecryptionKey=${!!decryptionKey})`,

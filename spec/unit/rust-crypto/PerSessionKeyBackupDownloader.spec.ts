@@ -38,7 +38,7 @@ import {
 } from "../../../src";
 import * as testData from "../../test-utils/crypto-test-data";
 import { type BackupDecryptor } from "../../../src/common-crypto/CryptoBackend";
-import { type KeyBackupSession } from "../../../src/crypto-api/keybackup";
+import { type KeyBackupInfo, type KeyBackupSession } from "../../../src/crypto-api/keybackup";
 import { CryptoEvent } from "../../../src/crypto-api/index.ts";
 
 describe("PerSessionKeyBackupDownloader", () => {
@@ -292,6 +292,42 @@ describe("PerSessionKeyBackupDownloader", () => {
             expect(
                 fetchMock.callHistory.calls(`express:/_matrix/client/v3/room_keys/keys/:roomId/:sessionId`).length,
             ).toStrictEqual(1);
+        });
+
+        it("should stop configuration check before calling OlmMachine after stop", async () => {
+            const info = Promise.withResolvers<KeyBackupInfo | null>();
+            const started = Promise.withResolvers<void>();
+            mockRustBackupManager.getServerBackupInfo.mockImplementation(() => {
+                started.resolve();
+                return info.promise;
+            });
+
+            downloader.onDecryptionKeyMissingError("!roomA", "sessionA0");
+            await started.promise;
+            downloader.stop();
+            info.resolve(TestData.SIGNED_BACKUP_DATA);
+            await vi.runAllTimersAsync();
+
+            expect(mockOlmMachine.getBackupKeys).not.toHaveBeenCalled();
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
+        });
+
+        it("should handle status-triggered configuration check abort on stop without unhandled rejection", async () => {
+            const version = Promise.withResolvers<string | null>();
+            const started = Promise.withResolvers<void>();
+            mockRustBackupManager.getActiveBackupVersion.mockImplementation(() => {
+                started.resolve();
+                return version.promise;
+            });
+
+            mockEmitter.emit(CryptoEvent.KeyBackupStatus, true);
+            await started.promise;
+            downloader.stop();
+            version.resolve(TestData.SIGNED_BACKUP_DATA.version);
+            await vi.runAllTimersAsync();
+
+            expect(mockOlmMachine.getBackupKeys).not.toHaveBeenCalled();
+            expect(downloader.isKeyBackupDownloadConfigured()).toBe(false);
         });
     });
 

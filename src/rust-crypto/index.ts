@@ -28,6 +28,7 @@ import {
     migrateRoomSettingsFromLegacyCrypto,
 } from "./libolm_migration.ts";
 import { type CryptoCallbacks } from "../crypto-api/index.ts";
+import { ClientStoppedError } from "../errors.ts";
 
 /**
  * The arguments used to initialise RustCrypto, passed in to initRustCrypto.
@@ -239,15 +240,24 @@ async function initOlmMachine(
     );
     olmMachine.registerDevicesUpdatedCallback((userIds: string[]) => rustCrypto.onDevicesUpdated(userIds));
 
+    const checkSecrets = (name: string): Promise<void> =>
+        rustCrypto.checkSecrets(name).catch((e) => {
+            if (e instanceof ClientStoppedError) {
+                logger.debug("Secret check aborted by stop", e);
+            } else {
+                logger.error("Error checking secrets", e);
+            }
+        });
+
     // Check if there are any key backup secrets pending processing. There may be multiple secrets to process if several devices have gossiped them.
     // The `registerReceiveSecretCallback` function will only be triggered for new secrets. If the client is restarted before processing them, the secrets will need to be manually handled.
-    void rustCrypto.checkSecrets("m.megolm_backup.v1");
+    void checkSecrets("m.megolm_backup.v1");
 
     // Register a callback to be notified when a new secret is received, as for now only the key backup secret is supported (the cross signing secrets are handled automatically by the OlmMachine)
     olmMachine.registerReceiveSecretCallback((name: string, _value: string) =>
         // Instead of directly checking the secret value, we poll the inbox to get all values for that secret type.
         // Once we have all the values, we can safely clear the secret inbox.
-        rustCrypto.checkSecrets(name),
+        checkSecrets(name),
     );
 
     // Tell the OlmMachine to think about its outgoing requests before we hand control back to the application.
