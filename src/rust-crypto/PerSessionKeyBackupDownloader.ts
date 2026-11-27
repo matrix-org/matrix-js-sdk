@@ -24,6 +24,7 @@ import { ClientPrefix, type IHttpOpts, MatrixError, type MatrixHttpApi, Method }
 import { type RustBackupManager } from "./backup.ts";
 import { encodeUri, sleep } from "../utils.ts";
 import { type BackupDecryptor } from "../common-crypto/CryptoBackend.ts";
+import { ClientStoppedError } from "../errors.ts";
 
 // The minimum time to wait between two retries in case of errors. To avoid hammering the server.
 const KEY_BACKUP_BACKOFF = 5000; // ms
@@ -191,6 +192,20 @@ export class PerSessionKeyBackupDownloader {
     }
 
     /**
+     * Return the OlmMachine only if {@link PerSessionKeyBackupDownloader#stop} has not been called.
+     *
+     * This allows us to better handle race conditions where the client is stopped before or during a crypto API call.
+     *
+     * @throws ClientStoppedError if {@link PerSessionKeyBackupDownloader#stop} has been called.
+     */
+    private getOlmMachineOrThrow(): OlmMachine {
+        if (this.stopped) {
+            throw new ClientStoppedError();
+        }
+        return this.olmMachine;
+    }
+
+    /**
      * Called when the backup status changes (CryptoEvents)
      * This will trigger a check of the backup configuration.
      */
@@ -198,12 +213,20 @@ export class PerSessionKeyBackupDownloader {
         // we want to force check configuration, so we clear the current one.
         this.hasConfigurationProblem = false;
         this.configuration = null;
-        this.getOrCreateBackupConfiguration().then((configuration) => {
-            if (configuration) {
-                // restart the download loop if it was stopped
-                this.downloadKeysLoop();
-            }
-        });
+        void this.getOrCreateBackupConfiguration()
+            .then((configuration) => {
+                if (configuration) {
+                    // restart the download loop if it was stopped
+                    this.downloadKeysLoop();
+                }
+            })
+            .catch((e) => {
+                if (e instanceof ClientStoppedError) {
+                    this.logger.debug("Backup configuration check aborted by stop", e);
+                } else {
+                    this.logger.error("Error checking key backup configuration", e);
+                }
+            });
     };
 
     /** Returns true if the megolm session is already queued for download. */
@@ -239,8 +262,9 @@ export class PerSessionKeyBackupDownloader {
     }
 
     private async getBackupDecryptionKey(): Promise<RustSdkCryptoJs.BackupKeys | null> {
+        const olmMachine = this.getOlmMachineOrThrow();
         try {
-            return await this.olmMachine.getBackupKeys();
+            return await olmMachine.getBackupKeys();
         } catch {
             return null;
         }
@@ -278,7 +302,7 @@ export class PerSessionKeyBackupDownloader {
         this.downloadLoopRunning = true;
 
         try {
-            while (this.queuedRequests.length > 0) {
+            while (!this.stopped && this.queuedRequests.length > 0) {
                 // we just peek the first one without removing it, so if a new request for same key comes in while we're
                 // processing this one, it won't queue another request.
                 const request = this.queuedRequests[0];
@@ -300,6 +324,7 @@ export class PerSessionKeyBackupDownloader {
                     try {
                         await this.decryptAndImport(request, result, configuration);
                     } catch (e) {
+                        if (e instanceof ClientStoppedError) return;
                         this.logger.error(
                             `Error while decrypting and importing key backup for session ${request.megolmSessionId}`,
                             e,
@@ -440,6 +465,7 @@ export class PerSessionKeyBackupDownloader {
         try {
             currentServerVersion = await this.backupManager.getServerBackupInfo();
         } catch (e) {
+            if (e instanceof ClientStoppedError) throw e;
             this.logger.debug(`Backup: error while checking server version: ${e}`);
             this.hasConfigurationProblem = true;
             return null;

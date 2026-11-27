@@ -228,7 +228,13 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         );
 
         // Check and start in background the key backup connection
-        this.checkKeyBackupAndEnable();
+        void this.checkKeyBackupAndEnable().catch((e) => {
+            if (e instanceof ClientStoppedError) {
+                this.logger.debug("Key backup check aborted by stop", e);
+            } else {
+                this.logger.error("Error checking key backup", e);
+            }
+        });
     }
 
     /**
@@ -2143,7 +2149,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
      * @param name - The name of the secret received.
      */
     public async checkSecrets(name: string): Promise<void> {
-        const pendingValues: Set<string> = await this.olmMachine.getSecretsFromInbox(name);
+        const pendingValues: Set<string> = await this.getOlmMachineOrThrow().getSecretsFromInbox(name);
         for (const value of pendingValues) {
             if (await this.handleSecretReceived(name, value)) {
                 // If we have a valid secret for that name there is no point of processing the other secrets values.
@@ -2153,7 +2159,7 @@ export class RustCrypto extends TypedEventEmitter<RustCryptoEvents, CryptoEventH
         }
 
         // Important to call this after handling the secrets as good hygiene.
-        await this.olmMachine.deleteSecretsFromInbox(name);
+        await this.getOlmMachineOrThrow().deleteSecretsFromInbox(name);
     }
 
     /**
