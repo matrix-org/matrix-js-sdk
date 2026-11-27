@@ -152,13 +152,14 @@ export class IndexedDBStoreWorker {
             },
             (err) => {
                 logger.error("Error running command: " + msg.command, err);
+                const causeName = (err?.cause as { name?: unknown } | null)?.name;
                 this.postMessage.call(null, {
                     command: "cmd_fail",
                     seq: msg.seq,
                     // Just send a string because Error objects aren't cloneable
                     error: {
                         message: err.message,
-                        name: err.name,
+                        name: err.name && err.name !== "Error" ? err.name : (causeName ?? err.name),
                     },
                 });
             },
