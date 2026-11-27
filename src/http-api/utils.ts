@@ -30,9 +30,12 @@ import {
 // Ponyfill for https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal/timeout
 export function timeoutSignal(ms: number): AbortSignal {
     const controller = new AbortController();
-    setTimeout(() => {
+    const timer = setTimeout(() => {
         controller.abort();
     }, ms);
+
+    // Node.js timers must not keep an otherwise idle process alive. Browser timers return a number.
+    if (typeof timer !== "number") timer.unref();
 
     return controller.signal;
 }
