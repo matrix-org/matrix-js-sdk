@@ -863,7 +863,7 @@ export class MatrixRTCSession extends TypedEventEmitter<
     ): void => {
         if (
             [...added, ...removed, ...updated.flatMap((v) => [v.current, v.previous])].some(
-                (e) => e.getType() === EventType.RTCMembership,
+                (e) => e.getType() === EventType.RTCMembershipStable,
             )
         ) {
             void this.ensureRecalculateSessionMembers();
@@ -1047,7 +1047,9 @@ function collectMembersEvents(
     let callMemberEvents: MatrixEvent[] = [];
     if (listenForStickyEvents && !isSlotClosed(room, slotDescription)) {
         // prefill with sticky events
-        callMemberEvents = [...room._unstable_getStickyEvents()].filter((e) => e.getType() === EventType.RTCMembership);
+        callMemberEvents = [...room._unstable_getStickyEvents()].filter(
+            (e) => e.getType() === EventType.RTCMembershipStable,
+        );
     }
     if (listenForMemberStateEvents) {
         const roomState = room.getLiveTimeline().getState(EventTimeline.FORWARDS);

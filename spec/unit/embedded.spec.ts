@@ -1043,18 +1043,19 @@ describe("RoomWidgetClient", () => {
             });
 
             it("sends", async () => {
-                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await makeClient({ sendEvent: [EventType.RTCMembershipStable], sendSticky: true });
                 expect(widgetApi.requestCapabilityForRoomTimeline).toHaveBeenCalledWith("!1:example.org");
-                expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith(EventType.RTCMembership);
+                expect(widgetApi.requestCapabilityToSendEvent).toHaveBeenCalledWith(EventType.RTCMembershipStable);
                 expect(widgetApi.requestCapability).toHaveBeenCalledWith(MatrixCapabilities.MSC4407SendStickyEvent);
                 doesServerSupportUnstableFeatureMock.mockClear();
-                await client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                await client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembershipStable, {
                     slot_id: "m.call#ROOM",
+                    member: { id: "test", membership: "leave" },
                     msc4354_sticky_key: "test",
                 });
                 expect(widgetApi.sendRoomEvent).toHaveBeenCalledWith(
-                    EventType.RTCMembership,
-                    { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
+                    EventType.RTCMembershipStable,
+                    { slot_id: "m.call#ROOM", member: { id: "test", membership: "leave" }, msc4354_sticky_key: "test" },
                     "!1:example.org",
                     undefined,
                     2000,
@@ -1065,10 +1066,11 @@ describe("RoomWidgetClient", () => {
             });
 
             it.each([0, -1000, 1.5])("rejects a sticky duration of %s", async (duration) => {
-                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await makeClient({ sendEvent: [EventType.RTCMembershipStable], sendSticky: true });
                 await expect(
-                    client._unstable_sendStickyEvent("!1:example.org", duration, null, EventType.RTCMembership, {
+                    client._unstable_sendStickyEvent("!1:example.org", duration, null, EventType.RTCMembershipStable, {
                         slot_id: "m.call#ROOM",
+                        member: { id: "test", membership: "leave" },
                         msc4354_sticky_key: "test",
                     }),
                 ).rejects.toThrow("Sticky duration must be a positive integer");
@@ -1076,7 +1078,7 @@ describe("RoomWidgetClient", () => {
             });
 
             it("receives (adds, updates, then removes when redacted)", async () => {
-                await makeClient({ receiveEvent: [EventType.RTCMembership, EventType.RoomRedaction] });
+                await makeClient({ receiveEvent: [EventType.RTCMembershipStable, EventType.RoomRedaction] });
                 const room = client.getRoom("!1:example.org")!;
 
                 function expectStickyEvents(events: IEvent[]) {
@@ -1113,12 +1115,16 @@ describe("RoomWidgetClient", () => {
 
                 // First, add a new sticky event to the map. The client should emit.
                 const event1 = new MatrixEvent({
-                    type: EventType.RTCMembership,
+                    type: EventType.RTCMembershipStable,
                     event_id: "$pduhfiidph",
                     room_id: "!1:example.org",
                     sender: "@alice:example.org",
                     msc4354_sticky: { duration_ms: 1200000 },
-                    content: { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
+                    content: {
+                        slot_id: "m.call#ROOM",
+                        member: { id: "test", membership: "leave" },
+                        msc4354_sticky_key: "test",
+                    },
                 }).getEffectiveEvent();
                 await sendAndExpectStickyUpdate(event1, [event1], [], []);
                 // It should remain cached in the sticky map
@@ -1126,12 +1132,16 @@ describe("RoomWidgetClient", () => {
 
                 // Next, update the same key in the sticky map
                 const event2 = new MatrixEvent({
-                    type: EventType.RTCMembership,
+                    type: EventType.RTCMembershipStable,
                     event_id: "$zshgyutptfh",
                     room_id: "!1:example.org",
                     sender: "@alice:example.org",
                     msc4354_sticky: { duration_ms: 1200000 },
-                    content: { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
+                    content: {
+                        slot_id: "m.call#ROOM",
+                        member: { id: "test", membership: "leave" },
+                        msc4354_sticky_key: "test",
+                    },
                 }).getEffectiveEvent();
                 await sendAndExpectStickyUpdate(event2, [], [{ current: event2, previous: event1 }], []);
                 expectStickyEvents([event2]);
@@ -1167,11 +1177,12 @@ describe("RoomWidgetClient", () => {
             it("fails to send when the host withheld the capability", async () => {
                 // For a widget, support is decided by the host's capability grant rather than by the
                 // homeserver, and a missing grant is reported like a missing server feature.
-                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await makeClient({ sendEvent: [EventType.RTCMembershipStable], sendSticky: true });
                 widgetApi.hasCapability.mockReturnValue(false);
                 await expect(
-                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembershipStable, {
                         slot_id: "m.call#ROOM",
+                        member: { id: "test", membership: "leave" },
                         msc4354_sticky_key: "test",
                     }),
                 ).rejects.toThrow(UnsupportedStickyEventsEndpointError);
@@ -1185,7 +1196,7 @@ describe("RoomWidgetClient", () => {
                 const hostError = new WidgetApiResponseError("Error sending event", {});
                 vi.mocked(widgetApi.transport.send).mockRejectedValue(hostError);
 
-                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await makeClient({ sendEvent: [EventType.RTCMembershipStable], sendSticky: true });
                 widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
                 const cancelPendingEvent = vi.spyOn(client, "cancelPendingEvent");
 
@@ -1193,8 +1204,8 @@ describe("RoomWidgetClient", () => {
                     "!1:example.org",
                     2000,
                     null,
-                    EventType.RTCMembership,
-                    { slot_id: "m.call#ROOM", msc4354_sticky_key: "test" },
+                    EventType.RTCMembershipStable,
+                    { slot_id: "m.call#ROOM", member: { id: "test", membership: "leave" }, msc4354_sticky_key: "test" },
                 );
                 await expect(promise).rejects.toThrow(UnsupportedStickyEventsEndpointError);
                 await expect(promise).rejects.toMatchObject({ clientEndpoint: "sendStickyEvent", cause: hostError });
@@ -1235,12 +1246,13 @@ describe("RoomWidgetClient", () => {
                 );
                 vi.mocked(widgetApi.transport.send).mockRejectedValue(widgetError);
 
-                await makeClient({ sendEvent: [EventType.RTCMembership], sendSticky: true });
+                await makeClient({ sendEvent: [EventType.RTCMembershipStable], sendSticky: true });
                 widgetApi.sendRoomEvent.mockImplementation(widgetApi.transport.send as any);
 
                 await expect(
-                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembership, {
+                    client._unstable_sendStickyEvent("!1:example.org", 2000, null, EventType.RTCMembershipStable, {
                         slot_id: "m.call#ROOM",
+                        member: { id: "test", membership: "leave" },
                         msc4354_sticky_key: "test",
                     }),
                 ).rejects.toStrictEqual(matrixError);

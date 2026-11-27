@@ -22,11 +22,10 @@ import type { IContent } from "../../models/event.ts";
  * @experimental Part of [MSC4143](https://github.com/matrix-org/matrix-spec-proposals/pull/4143).
  */
 export function isLeftMembershipContent(content: IContent): boolean {
-    // Leaving a slot is expressed through setting membership to leave.
+    // `m.rtc.member` events set `membership` to `leave` when leaving.
     if (content.member?.membership === "leave") return true;
-    // Events predating the membership property instead emptied the content except for
-    // the slot ID and the sticky key.
-    return Object.keys(content).every((key) => key === "slot_id" || key === "msc4354_sticky_key");
+    // Legacy `org.matrix.msc3401.call.member` state events empty the content entirely when leaving.
+    return Object.keys(content).length === 0;
 }
 
 /**

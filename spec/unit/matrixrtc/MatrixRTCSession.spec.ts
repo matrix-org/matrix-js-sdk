@@ -458,9 +458,13 @@ describe("MatrixRTCSession", () => {
         it("ignores left sticky memberships", async () => {
             const mockRoom = makeMockRoom([]);
             mockRoom._unstable_getStickyEvents.mockImplementation(() => {
-                // Left memberships only contain the slot ID and the sticky key.
                 const ev = mockRTCEvent(
-                    { user_id: "@left:user.example", slot_id: "m.call#ROOM", msc4354_sticky_key: "MEMBER" },
+                    {
+                        user_id: "@left:user.example",
+                        slot_id: "m.call#ROOM",
+                        member: { id: "MEMBER", membership: "leave" },
+                        msc4354_sticky_key: "MEMBER",
+                    },
                     mockRoom.roomId,
                     5000,
                 );
@@ -518,22 +522,6 @@ describe("MatrixRTCSession", () => {
             });
             await sess.initialMembershipCalculated;
             expect(sess.memberships).toEqual([]);
-        });
-        it("accepts sticky memberships without member.membership for compatibility with older events", async () => {
-            const mockRoom = makeMockRoom([]);
-            const { membership: _membership, ...legacyMember } = rtcMembershipTemplate.member;
-            mockRoom._unstable_getStickyEvents.mockImplementation(() => {
-                const ev = mockRTCEvent({ ...rtcMembershipTemplate, member: legacyMember }, mockRoom.roomId, 5000);
-                return [ev as StickyMatrixEvent];
-            });
-
-            sess = MatrixRTCSession.sessionForSlot(client, mockRoom, callSession, {
-                listenForStickyEvents: true,
-                listenForMemberStateEvents: true,
-            });
-            await sess.initialMembershipCalculated;
-            expect(sess.memberships.length).toEqual(1);
-            expect(sess.memberships[0].deviceId).toEqual("AAAAAAA");
         });
         it("combines sticky and membership events when both exist", async () => {
             // Create a room with identical member state and sticky state for the same user.
