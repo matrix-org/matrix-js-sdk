@@ -20,6 +20,7 @@ import { MatrixEvent, MatrixEventEvent } from "../../src/models/event";
 import { Room } from "../../src/models/room";
 import { Relations, RelationsEvent } from "../../src/models/relations";
 import { TestClient } from "../TestClient";
+import { emitPromise, mkEdit, mkMessage } from "../test-utils/test-utils";
 import { MatrixClient, RelationType } from "../../src";
 import { logger } from "../../src/logger";
 
@@ -399,5 +400,76 @@ describe("Relations", function () {
 
         relations.addEvent(eventA);
         expect(relations.getSortedAnnotationsByKey()).toBeNull();
+    });
+
+    describe("m.replace sender validation", () => {
+        const alice = "@alice:example.com";
+        const bob = "@bob:example.com";
+        const roomId = "!room:example.com";
+        let room: Room;
+        let relations: Relations;
+
+        beforeEach(() => {
+            room = new Room(roomId, new TestClient(alice).client, alice);
+            relations = new Relations(RelationType.Replace, "m.room.message", room);
+        });
+
+        it("should ignore another sender's bundled edit timestamp and missing senders", async () => {
+            const target = mkMessage({
+                event: true,
+                room: roomId,
+                user: alice,
+                msg: "orig",
+                ts: 1000,
+                unsigned: {
+                    "m.relations": { [RelationType.Replace]: { event_id: "$b", sender: bob, origin_server_ts: 3000 } },
+                },
+            });
+            const aliceEdit = mkEdit(target, undefined!, alice, roomId, "alice", 2000);
+            await relations.setTargetEvent(target);
+            await relations.addEvent(aliceEdit);
+            expect(target.replacingEvent()).toBe(aliceEdit);
+
+            const senderlessRel = new Relations(RelationType.Replace, "m.room.message", room);
+            const senderless = new MatrixEvent({ event_id: "$s", type: "m.room.message", content: {} });
+            await senderlessRel.setTargetEvent(senderless);
+            await senderlessRel.addEvent(mkEdit(senderless, undefined!, undefined!, roomId, "edited", 2000));
+            expect(await senderlessRel.getLastReplacement()).toBeNull();
+        });
+
+        it("should keep a bundled edit across another sender's add, redaction, and remove", async () => {
+            const target = mkMessage({ event: true, room: roomId, user: alice, msg: "orig", ts: 1000 });
+            const bundled = mkEdit(target, undefined!, alice, roomId, "alice", 2000);
+            const bobEdit = mkEdit(target, undefined!, bob, roomId, "bob", 3000);
+            await relations.setTargetEvent(target);
+            target.makeReplaced(bundled);
+
+            const addSpy = vi.fn();
+            relations.on(RelationsEvent.Add, addSpy);
+            const addPromise = relations.addEvent(bobEdit);
+            expect(addSpy).not.toHaveBeenCalled();
+            await addPromise;
+            expect(target.replacingEvent()).toBe(bundled);
+
+            const seenRedacted: boolean[] = [];
+            relations.on(RelationsEvent.Redaction, (ev) => seenRedacted.push(ev.isRedacted()));
+            const redactionDone = emitPromise(relations, RelationsEvent.Redaction);
+            bobEdit.makeRedacted(
+                new MatrixEvent({ type: "m.room.redaction", sender: alice, redacts: bobEdit.getId() }),
+                room,
+            );
+            await redactionDone;
+            expect(seenRedacted).toEqual([true]);
+            expect(target.replacingEvent()).toBe(bundled);
+
+            const bobEdit2 = mkEdit(target, undefined!, bob, roomId, "bob2", 4000);
+            await relations.addEvent(bobEdit2);
+            const removeSpy = vi.fn();
+            relations.on(RelationsEvent.Remove, removeSpy);
+            const removePromise = relations.removeEvent(bobEdit2);
+            expect(removeSpy).not.toHaveBeenCalled();
+            await removePromise;
+            expect(target.replacingEvent()).toBe(bundled);
+        });
     });
 });

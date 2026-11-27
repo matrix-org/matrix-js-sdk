@@ -1544,6 +1544,13 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
         if (this.isState()) {
             return;
         }
+        // Only the original sender may replace an event
+        if (newEvent) {
+            const sender = this.getSender();
+            if (!sender || newEvent.getSender() !== sender) {
+                return;
+            }
+        }
         if (this._replacingEvent !== newEvent) {
             this._replacingEvent = newEvent ?? null;
             this.emit(MatrixEventEvent.Replaced, this);
@@ -1566,7 +1573,15 @@ export class MatrixEvent extends TypedEventEmitter<MatrixEventEmittedEvents, Mat
     }
 
     public getServerAggregatedRelation<T>(relType: RelationType | string): T | undefined {
-        return this.getUnsigned()["m.relations"]?.[relType];
+        const relation = this.getUnsigned()["m.relations"]?.[relType];
+        // Only the original sender may replace an event
+        if (relType === RelationType.Replace) {
+            const sender = this.getSender();
+            if (!sender || relation?.sender !== sender) {
+                return undefined;
+            }
+        }
+        return relation;
     }
 
     /**

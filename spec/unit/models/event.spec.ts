@@ -24,12 +24,13 @@ import {
     MatrixEventEvent,
     MAX_STICKY_DURATION_MS,
 } from "../../../src/models/event";
-import { emitPromise } from "../../test-utils/test-utils";
+import { emitPromise, mkEdit, mkMessage } from "../../test-utils/test-utils";
 import {
     type IAnnotatedPushRule,
     type IStickyEvent,
     type MatrixClient,
     PushRuleActionName,
+    RelationType,
     Room,
     THREAD_RELATION_TYPE,
     TweakName,
@@ -689,6 +690,36 @@ describe("MatrixEvent", () => {
             expect(event.unstableStickyExpiresAt).toBeUndefined();
         },
     );
+
+    it("should ignore m.replace from another or missing sender", () => {
+        const event = mkMessage({
+            event: true,
+            room: "!r:e",
+            user: "@alice:e",
+            msg: "orig",
+            unsigned: {
+                "m.relations": { [RelationType.Replace]: { event_id: "$b", origin_server_ts: 2, sender: "@bob:e" } },
+            },
+        });
+        const onReplaced = vi.fn();
+        event.on(MatrixEventEvent.Replaced, onReplaced);
+        event.makeReplaced(mkEdit(event, undefined!, "@bob:e", "!r:e", "bob"));
+        expect(event.replacingEvent()).toBeNull();
+        expect(onReplaced).not.toHaveBeenCalled();
+        expect(event.getServerAggregatedRelation(RelationType.Replace)).toBeUndefined();
+        expect(event.replacingEventId()).toBeUndefined();
+        expect(event.replacingEventDate()).toBeUndefined();
+
+        const senderless = new MatrixEvent({
+            event_id: "$s",
+            type: "m.room.message",
+            content: {},
+            unsigned: { "m.relations": { [RelationType.Replace]: { event_id: "$b", origin_server_ts: 2 } } },
+        });
+        senderless.makeReplaced(new MatrixEvent({ event_id: "$e", type: "m.room.message", content: {} }));
+        expect(senderless.replacingEvent()).toBeNull();
+        expect(senderless.getServerAggregatedRelation(RelationType.Replace)).toBeUndefined();
+    });
 });
 
 describe("isValidStickyDuration", () => {
